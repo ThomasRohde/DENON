@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Denon.App.Core/Denon.App.Core.csproj" />
+  <Project Path="Denon.App.Desktop/Denon.App.Desktop.csproj" />
+</Solution>
