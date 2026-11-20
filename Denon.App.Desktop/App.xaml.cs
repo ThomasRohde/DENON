@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Threading;
 using System.Windows;
 using Denon.App.Core.Heos;
 using Denon.App.Core.Infrastructure;
@@ -12,6 +13,12 @@ namespace Denon.App.Desktop;
 
 public partial class App : System.Windows.Application
 {
+    private const string SingleInstanceMutexName = "Local\\DenonDesktop_SingleInstance_Mutex_v2";
+    private const string SingleInstanceSignalName = "Local\\DenonDesktop_ActivateSignal_v2";
+
+    private Mutex? _singleInstanceMutex;
+    private EventWaitHandle? _activationSignal;
+    private CancellationTokenSource? _activationListenerCts;
     private IHost? _host;
     private TrayIconController? _trayIconController;
     private bool _isExiting;
@@ -19,21 +26,44 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // Enforce single instance: if already running, signal the running instance to surface its window
+        _singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var createdNew);
+        if (!createdNew)
+        {
+            try
+            {
+                using var existingSignal = EventWaitHandle.OpenExisting(SingleInstanceSignalName);
+                existingSignal.Set();
+            }
+            catch
+            {
+                // Ignore if existing instance hasn't created signal yet
+            }
+
+            Shutdown();
+            return;
+        }
+
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
         AppDataPaths.EnsureCreated();
 
         try
         {
-            var builder = Host.CreateApplicationBuilder(e.Args);
+            var builder = Host.CreateApplicationBuilder();
             builder.Services.AddSingleton<AppLogStore>();
             builder.Services.AddSingleton<AppSettingsStore>();
             builder.Services.AddSingleton<ReceiverStateStore>();
             builder.Services.AddSingleton<HeosClient>();
             builder.Services.AddSingleton<DenonAvrClient>();
+            builder.Services.AddSingleton<DenonDiscoveryService>();
+            builder.Services.AddSingleton<StreamProbeService>();
+            builder.Services.AddSingleton<WindowsStartupService>();
             builder.Services.AddSingleton<ReceiverController>();
             builder.Services.AddHostedService<ReceiverPollingService>();
             builder.Services.AddSingleton<MainViewModel>();
             builder.Services.AddSingleton<MainWindow>();
+            builder.Services.AddSingleton<TrayFlyoutWindow>();
             builder.Services.AddSingleton<TrayIconController>();
 
             _host = builder.Build();
@@ -42,7 +72,7 @@ public partial class App : System.Windows.Application
             await settingsStore.InitializeAsync();
             await _host.StartAsync();
 
-            _host.Services.GetRequiredService<AppLogStore>().Info("Application started.");
+            _host.Services.GetRequiredService<AppLogStore>().Info("Denon Desktop started.");
 
             var window = _host.Services.GetRequiredService<MainWindow>();
             MainWindow = window;
@@ -52,7 +82,12 @@ public partial class App : System.Windows.Application
             _trayIconController = _host.Services.GetRequiredService<TrayIconController>();
             _trayIconController.Initialize(window, ExitApplicationAsync);
 
-            if (settingsStore.Current.Ui.StartMinimizedToTray)
+            StartActivationSignalListener();
+
+            var startMinimized = settingsStore.Current.Ui.StartMinimizedToTray &&
+                                 !e.Args.Contains("--show", StringComparer.OrdinalIgnoreCase);
+
+            if (startMinimized)
             {
                 window.Hide();
             }
@@ -73,8 +108,35 @@ public partial class App : System.Windows.Application
         }
     }
 
+    private void StartActivationSignalListener()
+    {
+        _activationSignal = new EventWaitHandle(false, EventResetMode.AutoReset, SingleInstanceSignalName);
+        _activationListenerCts = new CancellationTokenSource();
+        var token = _activationListenerCts.Token;
+
+        _ = Task.Run(() =>
+        {
+            var handles = new[] { _activationSignal, token.WaitHandle };
+            while (!token.IsCancellationRequested)
+            {
+                var triggered = WaitHandle.WaitAny(handles);
+                if (triggered == 0 && _trayIconController is not null)
+                {
+                    _ = _trayIconController.ShowWindowAsync();
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }, token);
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
+        _activationListenerCts?.Cancel();
+        _activationListenerCts?.Dispose();
+        _activationSignal?.Dispose();
         _trayIconController?.Dispose();
 
         if (_host is not null)
@@ -88,6 +150,15 @@ public partial class App : System.Windows.Application
             }
         }
 
+        try
+        {
+            _singleInstanceMutex?.ReleaseMutex();
+        }
+        catch
+        {
+        }
+
+        _singleInstanceMutex?.Dispose();
         base.OnExit(e);
     }
 
@@ -102,7 +173,7 @@ public partial class App : System.Windows.Application
         if (settings.Ui.MinimizeToTray && window.WindowState == WindowState.Minimized)
         {
             window.Hide();
-            _trayIconController?.ShowBalloon("Denon Desktop", "Receiver control is still running in the tray.");
+            _trayIconController?.ShowBalloon("Denon Desktop", "Running in system tray. Click the tray icon for quick controls.");
         }
     }
 
@@ -119,7 +190,7 @@ public partial class App : System.Windows.Application
         if (settings.Ui.CloseToTray)
         {
             window.Hide();
-            _trayIconController?.ShowBalloon("Denon Desktop", "Window closed. Use the tray icon to reopen the app.");
+            _trayIconController?.ShowBalloon("Denon Desktop", "Minimized to tray. Click the tray icon to open quick controls.");
             return;
         }
 

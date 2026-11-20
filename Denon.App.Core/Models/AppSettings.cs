@@ -24,9 +24,11 @@ public sealed class ReceiverSettings
 
     public string PlayerName { get; set; } = "Denon AVR-X2400H";
 
-    public int DefaultLowVolume { get; set; } = 10;
+    public int DefaultLowVolume { get; set; } = 20;
 
     public int PollIntervalSeconds { get; set; } = 5;
+
+    public List<int> VolumePresets { get; set; } = [15, 28, 42, 55];
 
     public List<StationPreset> Stations { get; set; } = CreateDefaultStations();
 
@@ -38,6 +40,7 @@ public sealed class ReceiverSettings
             PlayerName = PlayerName,
             DefaultLowVolume = DefaultLowVolume,
             PollIntervalSeconds = PollIntervalSeconds,
+            VolumePresets = [.. VolumePresets],
             Stations = Stations.Select(static station => station.Clone()).ToList(),
         };
 
@@ -48,8 +51,8 @@ public sealed class ReceiverSettings
         new StationPreset("dr-p1", "DR P1", "http://live-icy.dr.dk/A/A03L.mp3"),
         new StationPreset("dr-p2", "DR P2", "http://live-icy.dr.dk/A/A04L.mp3"),
         new StationPreset("dr-p3", "DR P3", "http://live-icy.dr.dk/A/A05L.mp3"),
-        new StationPreset("dr-p4-kbh", "DR P4 Kobenhavn", "http://live-icy.dr.dk/A/A08L.mp3"),
-        new StationPreset("dr-p5-kbh", "DR P5 Kobenhavn", "http://live-icy.dr.dk/A/A28L.mp3"),
+        new StationPreset("dr-p4-kbh", "DR P4 København", "http://live-icy.dr.dk/A/A08L.mp3"),
+        new StationPreset("dr-p5-kbh", "DR P5 København", "http://live-icy.dr.dk/A/A28L.mp3"),
         new StationPreset("dr-p6", "DR P6 Beat", "http://live-icy.dr.dk/A/A29L.mp3"),
         new StationPreset("dr-p8", "DR P8 Jazz", "http://live-icy.dr.dk/A/A22L.mp3"),
     ];
@@ -57,13 +60,17 @@ public sealed class ReceiverSettings
 
 public sealed class UiSettings
 {
-    public bool StartMinimizedToTray { get; set; } = true;
+    public bool StartMinimizedToTray { get; set; } = false;
 
     public bool MinimizeToTray { get; set; } = true;
 
     public bool CloseToTray { get; set; } = true;
 
     public bool ShowNotifications { get; set; } = true;
+
+    public bool DisplayVolumeInDb { get; set; } = true;
+
+    public bool LaunchAtWindowsStartup { get; set; } = false;
 
     public UiSettings Clone() =>
         new()
@@ -72,6 +79,8 @@ public sealed class UiSettings
             MinimizeToTray = MinimizeToTray,
             CloseToTray = CloseToTray,
             ShowNotifications = ShowNotifications,
+            DisplayVolumeInDb = DisplayVolumeInDb,
+            LaunchAtWindowsStartup = LaunchAtWindowsStartup,
         };
 }
 

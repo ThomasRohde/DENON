@@ -5,271 +5,1586 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="Denon Desktop"
-        Width="1220"
-        Height="840"
-        MinWidth="1040"
-        MinHeight="720"
-        Background="#F4F6F8"
-        WindowStartupLocation="CenterScreen">
+        Width="1200"
+        Height="820"
+        MinWidth="920"
+        MinHeight="640"
+        Background="{StaticResource ChassisBgBrush}"
+        Icon="denon_icon.ico"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="SingleBorderWindow"
+        PreviewKeyDown="Window_PreviewKeyDown">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="46"
+                      CornerRadius="12"
+                      GlassFrameThickness="0"
+                      ResizeBorderThickness="6"
+                      UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+
     <Window.Resources>
-        <SolidColorBrush x:Key="AccentBrush" Color="#134E6F" />
-        <SolidColorBrush x:Key="CardBorderBrush" Color="#D7DEE5" />
-        <SolidColorBrush x:Key="CardBrush" Color="White" />
-        <SolidColorBrush x:Key="SubtleBrush" Color="#5C6B78" />
-        <SolidColorBrush x:Key="DangerBrush" Color="#8A2B2B" />
-
-        <Style x:Key="CardBorderStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource CardBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="16" />
-            <Setter Property="Padding" Value="20" />
-            <Setter Property="Margin" Value="0,0,0,18" />
+        <!-- Reusable Hardware Chip with Active State Trigger -->
+        <Style x:Key="ActiveAwareChipStyle" TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                    <Setter Property="Background" Value="#0C2E3D" />
+                    <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                    <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
-        <Style TargetType="Button">
-            <Setter Property="Margin" Value="0,0,10,10" />
-            <Setter Property="Padding" Value="14,9" />
-            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-            <Setter Property="BorderThickness" Value="0" />
-        </Style>
-
-        <Style TargetType="TextBox">
-            <Setter Property="Margin" Value="0,0,0,12" />
-            <Setter Property="Padding" Value="10,8" />
-            <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
+        <!-- Animated Equalizer Bar Style -->
+        <Style x:Key="EqBarStyle" TargetType="Border">
+            <Setter Property="Width" Value="3.5" />
+            <Setter Property="CornerRadius" Value="2" />
+            <Setter Property="VerticalAlignment" Value="Bottom" />
+            <Setter Property="Background" Value="{StaticResource AccentCyanBrush}" />
+            <Setter Property="Margin" Value="1.5,0" />
         </Style>
     </Window.Resources>
 
-    <Grid Margin="24">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+    <!-- Root Border handles maximized margin compensation cleanly -->
+    <Border x:Name="WindowRootBorder"
+            Background="{StaticResource ChassisBgBrush}"
+            BorderBrush="#1E2433"
+            BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="48" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-        <Border Style="{StaticResource CardBorderStyle}" Padding="24">
-            <Grid>
+            <!-- ======================== CUSTOM INTEGRATED TITLE BAR ======================== -->
+            <Border Grid.Row="0"
+                    Background="#0D1017"
+                    BorderBrush="{StaticResource BorderHairlineBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="14,0,8,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Brand Emblem -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Width="26"
+                                Height="26"
+                                CornerRadius="7"
+                                Background="{StaticResource CyanAccentGradient}"
+                                Margin="0,0,10,0">
+                            <TextBlock Text="D"
+                                       FontSize="15"
+                                       FontWeight="Black"
+                                       Foreground="#04151C"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="DENON"
+                                   FontSize="14"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   VerticalAlignment="Center" />
+                        <Border Background="#172130"
+                                BorderBrush="#24344D"
+                                BorderThickness="1"
+                                CornerRadius="5"
+                                Padding="6,2"
+                                Margin="8,0,0,0"
+                                VerticalAlignment="Center">
+                            <TextBlock Text="PRECISION"
+                                       FontSize="9.5"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource AccentCyanBrightBrush}" />
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Center Receiver Status Pill -->
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                        <Border Background="#121620"
+                                BorderBrush="#23293A"
+                                BorderThickness="1"
+                                CornerRadius="14"
+                                Padding="12,5">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Ellipse Width="8"
+                                         Height="8"
+                                         Fill="{Binding ConnectionBadgeBrush}"
+                                         Margin="0,0,8,0"
+                                         VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding ReceiverTitle}"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Text="  •  "
+                                           FontSize="11"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding ConnectionBadgeText}"
+                                           FontSize="11"
+                                           FontWeight="Bold"
+                                           Foreground="{Binding ConnectionBadgeBrush}"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding FirmwareVersion, StringFormat='  •  {0}'}"
+                                           FontSize="11"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           Visibility="{Binding FirmwareVersion, Converter={StaticResource StringToVis}}"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Right Quick Controls + Window Caption Buttons -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Command="{Binding RefreshCommand}"
+                                Style="{StaticResource TitleBarButton}"
+                                ToolTip="Refresh Receiver (F5)"
+                                Margin="0,0,4,0">
+                            <Path Data="M12,4V1L8,5L12,9V6A6,6 0 0,1 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6,12H4A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4Z"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  Width="13"
+                                  Height="13"
+                                  Stretch="Uniform" />
+                        </Button>
+
+                        <Button Command="{Binding TogglePowerCommand}"
+                                WindowChrome.IsHitTestVisibleInChrome="True"
+                                ToolTip="Toggle Receiver Power / Standby"
+                                Cursor="Hand"
+                                Margin="0,0,10,0">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Setter Property="Height" Value="30" />
+                                    <Setter Property="Padding" Value="11,0" />
+                                    <Setter Property="Background" Value="#1E2330" />
+                                    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+                                    <Setter Property="BorderBrush" Value="#2D3548" />
+                                    <Setter Property="BorderThickness" Value="1" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="Root"
+                                                        Background="{TemplateBinding Background}"
+                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                        CornerRadius="15"
+                                                        Padding="{TemplateBinding Padding}">
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <Path Data="M11,2H13V12H11V2M16.24,4.76L14.83,6.17C16.17,7.27 17,8.94 17,10.8C17,14.11 14.31,16.8 11,16.8C7.69,16.8 5,14.11 5,10.8C5,8.94 5.83,7.27 7.17,6.17L5.76,4.76C4.07,6.23 3,8.39 3,10.8C3,15.22 6.58,18.8 11,18.8C15.42,18.8 19,15.22 19,10.8C19,8.39 17.93,6.23 16.24,4.76Z"
+                                                              Fill="{TemplateBinding Foreground}"
+                                                              Width="12"
+                                                              Height="12"
+                                                              Stretch="Uniform"
+                                                              Margin="0,0,6,0" />
+                                                        <TextBlock Text="{Binding PowerStateLabel}"
+                                                                   FontSize="10.5"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="{TemplateBinding Foreground}"
+                                                                   VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Root" Property="Opacity" Value="0.88" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding PowerStateLabel}" Value="ACTIVE">
+                                            <Setter Property="Background" Value="#0C2D22" />
+                                            <Setter Property="BorderBrush" Value="{StaticResource AccentEmeraldBrush}" />
+                                            <Setter Property="Foreground" Value="{StaticResource AccentEmeraldBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Border Width="1" Height="18" Background="#232836" Margin="0,0,6,0" />
+
+                        <Button Click="MinimizeButton_Click" Style="{StaticResource TitleBarButton}" ToolTip="Minimize">
+                            <Rectangle Width="10" Height="1.5" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </Button>
+                        <Button Click="MaximizeRestoreButton_Click" Style="{StaticResource TitleBarButton}" ToolTip="Maximize / Restore">
+                            <Border Width="10" Height="10" BorderThickness="1.3" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" CornerRadius="1.5" />
+                        </Button>
+                        <Button Click="CloseButton_Click" Style="{StaticResource TitleBarCloseButton}" ToolTip="Close">
+                            <Path Data="M1,1 L9,9 M9,1 L1,9"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.5"
+                                  Width="10"
+                                  Height="10" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ======================== MAIN APP SHELL ======================== -->
+            <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="206" />
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel>
-                    <TextBlock Text="Denon Desktop" FontSize="32" FontWeight="Bold" Foreground="#16212B" />
-                    <TextBlock Text="{Binding ReceiverTitle}" Margin="0,8,0,0" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
-                    <TextBlock Text="{Binding ReceiverDetails}" Margin="0,6,0,0" Foreground="{StaticResource SubtleBrush}" />
-                    <TextBlock Text="{Binding StatusMessage}" Margin="0,10,0,0" TextWrapping="Wrap" Foreground="#243442" />
-                </StackPanel>
+                <!-- LEFT NAVIGATION SIDEBAR -->
+                <Border Grid.Column="0"
+                        Background="{StaticResource SidebarBgBrush}"
+                        BorderBrush="{StaticResource BorderHairlineBrush}"
+                        BorderThickness="0,0,1,0"
+                        Padding="12,16,12,14">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
 
-                <StackPanel Grid.Column="1" HorizontalAlignment="Right">
-                    <Border Background="{Binding ConnectionBadgeBrush}" CornerRadius="18" Padding="14,8">
-                        <TextBlock Text="{Binding ConnectionBadgeText}" Foreground="White" FontWeight="SemiBold" />
-                    </Border>
-                    <TextBlock Text="{Binding LastUpdatedText}" Margin="0,12,0,0" Foreground="{StaticResource SubtleBrush}" TextAlignment="Right" />
-                    <TextBlock Text="{Binding LastError}" Width="280" Margin="0,10,0,0" Foreground="{StaticResource DangerBrush}" TextAlignment="Right" TextWrapping="Wrap" />
-                </StackPanel>
-            </Grid>
-        </Border>
+                        <StackPanel Grid.Row="0">
+                            <TextBlock Text="NAVIGATION" Style="{StaticResource SectionLabelStyle}" Margin="10,0,0,10" />
 
-        <TabControl Grid.Row="1" Margin="0,18,0,0" BorderThickness="0">
-            <TabItem Header="Dashboard">
-                <Grid Margin="0,18,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1.15*" />
-                        <ColumnDefinition Width="0.85*" />
-                    </Grid.ColumnDefinitions>
+                            <RadioButton GroupName="NavRail"
+                                         Style="{StaticResource NavRailItem}"
+                                         IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Control}"
+                                         Command="{Binding NavigateCommand}"
+                                         CommandParameter="Control">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="M3,13H11V3H3V13M3,21H11V15H3V21M13,21H21V11H13V21M13,3V9H21V3H13Z"
+                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                          Width="15"
+                                          Height="15"
+                                          Stretch="Uniform"
+                                          Margin="0,0,11,0" />
+                                    <TextBlock Text="Control Deck" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                                </StackPanel>
+                            </RadioButton>
 
-                    <StackPanel Margin="0,0,18,0">
-                        <Border Style="{StaticResource CardBorderStyle}">
+                            <RadioButton GroupName="NavRail"
+                                         Style="{StaticResource NavRailItem}"
+                                         IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Stations}"
+                                         Command="{Binding NavigateCommand}"
+                                         CommandParameter="Stations">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="M20,6H8.3L16.56,2.59L15.81,0.74L3.24,5.96C2.5,6.27 2,7 2,7.8V20A2,2 0 0,0 4,22H20A2,2 0 0,0 22,20V8A2,2 0 0,0 20,6M7,20A3,3 0 0,1 4,17A3,3 0 0,1 7,14A3,3 0 0,1 10,17A3,3 0 0,1 7,20M20,12H18V10H16V12H4V8H20V12Z"
+                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                          Width="15"
+                                          Height="15"
+                                          Stretch="Uniform"
+                                          Margin="0,0,11,0" />
+                                    <TextBlock Text="Stations &amp; Streams" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                                </StackPanel>
+                            </RadioButton>
+
+                            <RadioButton GroupName="NavRail"
+                                         Style="{StaticResource NavRailItem}"
+                                         IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Settings}"
+                                         Command="{Binding NavigateCommand}"
+                                         CommandParameter="Settings">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"
+                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                          Width="15"
+                                          Height="15"
+                                          Stretch="Uniform"
+                                          Margin="0,0,11,0" />
+                                    <TextBlock Text="Settings" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                                </StackPanel>
+                            </RadioButton>
+
+                            <RadioButton GroupName="NavRail"
+                                         Style="{StaticResource NavRailItem}"
+                                         IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Diagnostics}"
+                                         Command="{Binding NavigateCommand}"
+                                         CommandParameter="Diagnostics">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="M20,4H4A2,2 0 0,0 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6A2,2 0 0,0 20,4M20,18H4V8H20V18M7,10.5L10.5,14L7,17.5L5.59,16.09L7.67,14L5.59,11.91L7,10.5M12,16H18V17.5H12V16Z"
+                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                          Width="15"
+                                          Height="15"
+                                          Stretch="Uniform"
+                                          Margin="0,0,11,0" />
+                                    <TextBlock Text="Diagnostics" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                                </StackPanel>
+                            </RadioButton>
+                        </StackPanel>
+
+                        <!-- Bottom Hardware Telemetry Card in Sidebar -->
+                        <Border Grid.Row="2"
+                                Background="#12151E"
+                                BorderBrush="{StaticResource BorderHairlineBrush}"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Padding="12">
                             <StackPanel>
-                                <TextBlock Text="Now Playing" FontSize="20" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding NowPlayingTitle}" Margin="0,10,0,0" FontSize="28" FontWeight="Bold" TextWrapping="Wrap" />
-                                <TextBlock Text="{Binding NowPlayingDetail}" Margin="0,8,0,0" Foreground="{StaticResource SubtleBrush}" TextWrapping="Wrap" />
-                                <Grid Margin="0,18,0,0">
+                                <TextBlock Text="TELEMETRY" Style="{StaticResource SectionLabelStyle}" />
+                                <TextBlock Text="{Binding ReceiverDetails}"
+                                           FontSize="11.5"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,6,0,0" />
+                                <TextBlock Text="{Binding StatusMessage}"
+                                           FontSize="11"
+                                           Foreground="{StaticResource AccentCyanBrightBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,8,0,0" />
+                                <TextBlock Text="{Binding LastUpdatedText}"
+                                           FontSize="10.5"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           Margin="0,6,0,0" />
+                                <TextBlock Text="{Binding LastError}"
+                                           FontSize="10.5"
+                                           Foreground="{StaticResource AccentCrimsonBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,6,0,0"
+                                           Visibility="{Binding LastError, Converter={StaticResource StringToVis}}" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- ======================== CONTENT STAGE ======================== -->
+                <Grid Grid.Column="1" Background="{StaticResource ChassisBgBrush}">
+
+                    <!-- ==================== VIEW 1: CONTROL DECK ==================== -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  Padding="20,16">
+                        <ScrollViewer.Style>
+                            <Style TargetType="ScrollViewer">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ActiveSection}" Value="Control">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ScrollViewer.Style>
+
+                        <StackPanel>
+                            <!-- HERO OLED NOW PLAYING DECK -->
+                            <Border Style="{StaticResource HeroOledCard}" Margin="0,0,0,14">
+                                <Grid>
                                     <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
 
-                                    <StackPanel Grid.Column="0" Margin="0,0,10,0">
-                                        <TextBlock Text="Play State" Foreground="{StaticResource SubtleBrush}" />
-                                        <TextBlock Text="{Binding PlayState}" Margin="0,6,0,0" FontSize="20" FontWeight="SemiBold" />
+                                    <!-- Artwork / Hi-Fi Vinyl Emblem -->
+                                    <Border Grid.Column="0"
+                                            Width="88"
+                                            Height="88"
+                                            CornerRadius="14"
+                                            Background="#0A0E16"
+                                            BorderBrush="#223144"
+                                            BorderThickness="1"
+                                            ClipToBounds="True"
+                                            Margin="0,0,20,0">
+                                        <Grid>
+                                            <!-- Default Hi-Fi Disc Emblem -->
+                                            <Grid Visibility="{Binding HasArtwork, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}">
+                                                <Ellipse Width="60" Height="60" Stroke="#1D3347" StrokeThickness="2" Fill="#0D1824" />
+                                                <Ellipse Width="38" Height="38" Stroke="#0E4F6B" StrokeThickness="1.2" />
+                                                <Ellipse Width="16" Height="16" Fill="{StaticResource AccentCyanBrush}" Opacity="0.85" />
+                                                <Ellipse Width="5" Height="5" Fill="#07090D" />
+                                            </Grid>
+
+                                            <!-- Live Album/Station Artwork -->
+                                            <Image Source="{Binding NowPlayingImageUrl, Converter={StaticResource SafeImageSource}}"
+                                                   Stretch="UniformToFill"
+                                                   Visibility="{Binding HasArtwork, Converter={StaticResource BoolToVis}}" />
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- OLED Track Metadata & Live Equalizer -->
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <!-- Animated 5-bar Audio Visualizer when actively playing -->
+                                            <StackPanel Orientation="Horizontal"
+                                                        Height="16"
+                                                        Margin="0,0,10,0"
+                                                        VerticalAlignment="Center"
+                                                        Visibility="{Binding IsActiveAndPlaying, Converter={StaticResource BoolToVis}}">
+                                                <StackPanel.Triggers>
+                                                    <EventTrigger RoutedEvent="Loaded">
+                                                        <BeginStoryboard>
+                                                            <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                                                <DoubleAnimation Storyboard.TargetName="Eq1" Storyboard.TargetProperty="Height" From="4" To="15" Duration="0:0:0.42" />
+                                                                <DoubleAnimation Storyboard.TargetName="Eq2" Storyboard.TargetProperty="Height" From="13" To="5" Duration="0:0:0.35" />
+                                                                <DoubleAnimation Storyboard.TargetName="Eq3" Storyboard.TargetProperty="Height" From="6" To="16" Duration="0:0:0.51" />
+                                                                <DoubleAnimation Storyboard.TargetName="Eq4" Storyboard.TargetProperty="Height" From="14" To="4" Duration="0:0:0.38" />
+                                                                <DoubleAnimation Storyboard.TargetName="Eq5" Storyboard.TargetProperty="Height" From="5" To="12" Duration="0:0:0.46" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </EventTrigger>
+                                                </StackPanel.Triggers>
+                                                <Border x:Name="Eq1" Style="{StaticResource EqBarStyle}" Height="6" />
+                                                <Border x:Name="Eq2" Style="{StaticResource EqBarStyle}" Height="12" />
+                                                <Border x:Name="Eq3" Style="{StaticResource EqBarStyle}" Height="8" />
+                                                <Border x:Name="Eq4" Style="{StaticResource EqBarStyle}" Height="14" />
+                                                <Border x:Name="Eq5" Style="{StaticResource EqBarStyle}" Height="6" />
+                                            </StackPanel>
+
+                                            <Border Background="#112736" CornerRadius="5" Padding="7,2.5" Margin="0,0,6,0">
+                                                <TextBlock Text="{Binding InputSourceDisplay}" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrush}" />
+                                            </Border>
+                                            <Border Background="#191E2A" CornerRadius="5" Padding="7,2.5" Margin="0,0,6,0">
+                                                <TextBlock Text="{Binding PlayState}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            </Border>
+                                            <Border Background="#191E2A" CornerRadius="5" Padding="7,2.5" Margin="0,0,6,0">
+                                                <TextBlock Text="{Binding SoundMode}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource AccentAmberBrush}" />
+                                            </Border>
+                                            <Border Background="#191E2A" CornerRadius="5" Padding="7,2.5"
+                                                    Visibility="{Binding HasSleepTimer, Converter={StaticResource BoolToVis}}">
+                                                <TextBlock Text="{Binding SleepTimerDisplay}" FontSize="10.5" FontWeight="SemiBold" Foreground="#A78BFA" />
+                                            </Border>
+                                        </StackPanel>
+
+                                        <TextBlock Text="{Binding NowPlayingTitle}"
+                                                   FontSize="24"
+                                                   FontWeight="Bold"
+                                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Margin="0,8,0,0" />
+                                        <TextBlock Text="{Binding NowPlayingDetail}"
+                                                   FontSize="13"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Margin="0,4,0,0" />
                                     </StackPanel>
-                                    <StackPanel Grid.Column="1" Margin="0,0,10,0">
-                                        <TextBlock Text="Live Volume" Foreground="{StaticResource SubtleBrush}" />
-                                        <TextBlock Text="{Binding LiveVolume}" Margin="0,6,0,0" FontSize="20" FontWeight="SemiBold" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2" Margin="0,0,10,0">
-                                        <TextBlock Text="Mute" Foreground="{StaticResource SubtleBrush}" />
-                                        <TextBlock Text="{Binding MuteButtonText}" Margin="0,6,0,0" FontSize="20" FontWeight="SemiBold" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="3">
-                                        <TextBlock Text="Connection" Foreground="{StaticResource SubtleBrush}" />
-                                        <TextBlock Text="{Binding ConnectionBadgeText}" Margin="0,6,0,0" FontSize="20" FontWeight="SemiBold" />
+
+                                    <!-- Circular Transport Deck -->
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Button Command="{Binding PreviousTrackCommand}"
+                                                Style="{StaticResource TransportCircleButton}"
+                                                ToolTip="Previous Track"
+                                                Margin="0,0,8,0">
+                                            <Path Data="M6,6H8V18H6M9.5,12L18,18V6"
+                                                  Fill="{StaticResource TextPrimaryBrush}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  Stretch="Uniform" />
+                                        </Button>
+
+                                        <Button Command="{Binding PlayPauseCommand}"
+                                                Style="{StaticResource HeroPlayCircleButton}"
+                                                ToolTip="Play / Pause (Space)"
+                                                Margin="0,0,8,0">
+                                            <Grid>
+                                                <!-- Play Icon -->
+                                                <Path Data="M8,5.14V19.14L19,12.14L8,5.14Z"
+                                                      Fill="#04151C"
+                                                      Width="20"
+                                                      Height="20"
+                                                      Margin="3,0,0,0"
+                                                      Stretch="Uniform"
+                                                      Visibility="{Binding IsPlaying, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
+                                                <!-- Pause Icon -->
+                                                <Path Data="M14,19H18V5H14M6,19H10V5H6V19Z"
+                                                      Fill="#04151C"
+                                                      Width="18"
+                                                      Height="18"
+                                                      Stretch="Uniform"
+                                                      Visibility="{Binding IsPlaying, Converter={StaticResource BoolToVis}}" />
+                                            </Grid>
+                                        </Button>
+
+                                        <Button Command="{Binding StopCommand}"
+                                                Style="{StaticResource TransportCircleButton}"
+                                                ToolTip="Stop Playback"
+                                                Margin="0,0,8,0">
+                                            <Rectangle Width="11" Height="11" RadiusX="2" RadiusY="2" Fill="{StaticResource TextPrimaryBrush}" />
+                                        </Button>
+
+                                        <Button Command="{Binding NextTrackCommand}"
+                                                Style="{StaticResource TransportCircleButton}"
+                                                ToolTip="Next Track">
+                                            <Path Data="M16,18H18V6H16M6,18L14.5,12L6,6V18Z"
+                                                  Fill="{StaticResource TextPrimaryBrush}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  Stretch="Uniform" />
+                                        </Button>
                                     </StackPanel>
                                 </Grid>
-                            </StackPanel>
-                        </Border>
+                            </Border>
 
-                        <Border Style="{StaticResource CardBorderStyle}">
-                            <StackPanel>
-                                <TextBlock Text="Transport" FontSize="20" FontWeight="SemiBold" />
-                                <WrapPanel Margin="0,16,0,0">
-                                    <Button Content="Refresh" Command="{Binding RefreshCommand}" />
-                                    <Button Content="Play" Command="{Binding PlayCommand}" />
-                                    <Button Content="Pause" Command="{Binding PauseCommand}" />
-                                    <Button Content="Stop" Command="{Binding StopCommand}" />
-                                    <Button Content="{Binding MuteButtonText}" Command="{Binding ToggleMuteCommand}" />
-                                    <Button Content="Low Volume" Command="{Binding SetLowVolumeCommand}" />
-                                </WrapPanel>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
+                            <!-- MIDDLE CONTROL GRID: INPUTS/MODES + MASTER VOLUME -->
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.18*" />
+                                    <ColumnDefinition Width="14" />
+                                    <ColumnDefinition Width="0.82*" />
+                                </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="1">
-                        <Border Style="{StaticResource CardBorderStyle}">
-                            <StackPanel>
-                                <TextBlock Text="Volume" FontSize="20" FontWeight="SemiBold" />
-                                <Slider Margin="0,18,0,8" Minimum="0" Maximum="100" Value="{Binding TargetVolume, Mode=TwoWay}" />
-                                <TextBlock Text="{Binding VolumeLabel}" Margin="0,0,0,14" FontSize="26" FontWeight="Bold" />
-                                <WrapPanel>
-                                    <Button Content="-5" Width="72" Command="{Binding VolumeDownCommand}" />
-                                    <Button Content="+5" Width="72" Command="{Binding VolumeUpCommand}" />
-                                    <Button Content="Apply Volume" Command="{Binding ApplyVolumeCommand}" />
-                                </WrapPanel>
-                            </StackPanel>
-                        </Border>
+                                <!-- LEFT COLUMN: INPUT SELECTOR + SOUND MODES & UTILITIES -->
+                                <StackPanel Grid.Column="0">
+                                    <!-- Input Source Matrix -->
+                                    <Border Style="{StaticResource SurfaceCard}" Margin="0,0,0,12">
+                                        <StackPanel>
+                                            <DockPanel Margin="0,0,0,12">
+                                                <TextBlock Text="INPUT SOURCE" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding InputSourceDisplay}"
+                                                           HorizontalAlignment="Right"
+                                                           FontSize="11.5"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource AccentCyanBrightBrush}" />
+                                            </DockPanel>
 
-                        <Border Style="{StaticResource CardBorderStyle}">
-                            <StackPanel>
-                                <TextBlock Text="Custom Stream" FontSize="20" FontWeight="SemiBold" />
-                                <TextBlock Text="URL" Margin="0,16,0,6" Foreground="{StaticResource SubtleBrush}" />
-                                <TextBox Text="{Binding CustomStreamUrl, UpdateSourceTrigger=PropertyChanged}" />
-                                <CheckBox Content="Use low volume before playback" IsChecked="{Binding UseLowVolumeForStreams}" Margin="0,0,0,10" />
-                                <CheckBox Content="Unmute before playback" IsChecked="{Binding UnmuteBeforePlay}" Margin="0,0,0,10" />
-                                <WrapPanel Margin="0,12,0,0">
-                                    <Button Content="Play URL" Command="{Binding PlayCustomStreamCommand}" />
-                                </WrapPanel>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </Grid>
-            </TabItem>
-
-            <TabItem Header="Stations">
-                <Grid Margin="0,18,0,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-                    <TextBlock Text="Quick radio presets. Play uses your current playback options; Play Low always uses the configured low-volume launch."
-                               Margin="0,0,0,14"
-                               TextWrapping="Wrap"
-                               Foreground="{StaticResource SubtleBrush}" />
-                    <DataGrid Grid.Row="1" ItemsSource="{Binding StationPresets}" SelectedItem="{Binding SelectedStationPreset}" AutoGenerateColumns="False" IsReadOnly="True">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Alias" Binding="{Binding Alias}" Width="160" />
-                            <DataGridTextColumn Header="Name" Binding="{Binding DisplayName}" Width="240" />
-                            <DataGridTextColumn Header="URL" Binding="{Binding Url}" Width="*" />
-                            <DataGridTemplateColumn Header="Actions" Width="230">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Orientation="Horizontal">
-                                            <Button Content="Play"
-                                                    Command="{Binding DataContext.PlayPresetCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                    CommandParameter="{Binding}" />
-                                            <Button Content="Play Low"
-                                                    Command="{Binding DataContext.PlayPresetLowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                    CommandParameter="{Binding}" />
+                                            <ItemsControl ItemsSource="{Binding InputSources}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Content="{Binding DisplayName}"
+                                                                Style="{StaticResource ActiveAwareChipStyle}"
+                                                                Command="{Binding DataContext.SelectInputCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                Margin="0,0,8,8"
+                                                                MinWidth="84" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
                                         </StackPanel>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </Grid>
-            </TabItem>
+                                    </Border>
 
-            <TabItem Header="Settings">
-                <Grid Margin="0,18,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="0.85*" />
-                        <ColumnDefinition Width="1.15*" />
-                    </Grid.ColumnDefinitions>
+                                    <!-- Sound Modes + Sleep / ECO / Zone 2 -->
+                                    <Border Style="{StaticResource SurfaceCard}">
+                                        <StackPanel>
+                                            <DockPanel Margin="0,0,0,12">
+                                                <TextBlock Text="SOUND MODE &amp; DSP" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding SoundMode}"
+                                                           HorizontalAlignment="Right"
+                                                           FontSize="11.5"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource AccentAmberBrush}" />
+                                            </DockPanel>
 
-                    <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,18,0">
-                        <StackPanel>
-                            <TextBlock Text="Receiver Connection" FontSize="20" FontWeight="SemiBold" />
-                            <TextBlock Text="Host" Margin="0,16,0,6" Foreground="{StaticResource SubtleBrush}" />
-                            <TextBox Text="{Binding SettingsHost, UpdateSourceTrigger=PropertyChanged}" />
-                            <TextBlock Text="Port" Margin="0,0,0,6" Foreground="{StaticResource SubtleBrush}" />
-                            <TextBox Text="{Binding SettingsPort, UpdateSourceTrigger=PropertyChanged}" />
-                            <TextBlock Text="Player Name" Margin="0,0,0,6" Foreground="{StaticResource SubtleBrush}" />
-                            <TextBox Text="{Binding SettingsPlayerName, UpdateSourceTrigger=PropertyChanged}" />
-                            <TextBlock Text="Poll Interval Seconds" Margin="0,0,0,6" Foreground="{StaticResource SubtleBrush}" />
-                            <TextBox Text="{Binding SettingsPollIntervalSeconds, UpdateSourceTrigger=PropertyChanged}" />
-                            <TextBlock Text="Low Volume" Margin="0,0,0,6" Foreground="{StaticResource SubtleBrush}" />
-                            <TextBox Text="{Binding SettingsLowVolume, UpdateSourceTrigger=PropertyChanged}" />
-                            <CheckBox Content="Start minimized to tray" IsChecked="{Binding SettingsStartMinimizedToTray}" Margin="0,6,0,6" />
-                            <CheckBox Content="Minimize to tray" IsChecked="{Binding SettingsMinimizeToTray}" Margin="0,0,0,6" />
-                            <CheckBox Content="Close window to tray" IsChecked="{Binding SettingsCloseToTray}" Margin="0,0,0,6" />
-                            <CheckBox Content="Show tray notifications" IsChecked="{Binding SettingsShowNotifications}" Margin="0,0,0,12" />
-                            <WrapPanel Margin="0,10,0,0">
-                                <Button Content="Save Settings" Command="{Binding SaveSettingsCommand}" />
-                                <Button Content="Reset Defaults" Command="{Binding ResetDefaultsCommand}" />
-                            </WrapPanel>
+                                            <ItemsControl ItemsSource="{Binding SoundModes}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Content="{Binding DisplayName}"
+                                                                Style="{StaticResource ActiveAwareChipStyle}"
+                                                                Command="{Binding DataContext.SelectSoundModeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                Padding="11,6"
+                                                                FontSize="11.5"
+                                                                Margin="0,0,7,7" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <Border Height="1" Background="{StaticResource BorderHairlineBrush}" Margin="0,10,0,12" />
+
+                                            <!-- Utility Strip: Sleep Timer, ECO Mode, Zone 2 -->
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock Text="SLEEP TIMER" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,7" />
+                                                    <ItemsControl ItemsSource="{Binding SleepTimerOptions}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Button Content="{Binding Label}"
+                                                                        Style="{StaticResource ActiveAwareChipStyle}"
+                                                                        Command="{Binding DataContext.SetSleepTimerCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Padding="9,5"
+                                                                        FontSize="11"
+                                                                        Margin="0,0,6,0" />
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="1" Margin="14,0,0,0">
+                                                    <TextBlock Text="ECO / ZONE 2" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,7" />
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Button Content="ECO Auto"
+                                                                Command="{Binding SetEcoModeCommand}"
+                                                                CommandParameter="AUTO"
+                                                                Padding="9,5"
+                                                                FontSize="11"
+                                                                Margin="0,0,6,0">
+                                                            <Button.Style>
+                                                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding EcoMode}" Value="AUTO">
+                                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                                            <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Button.Style>
+                                                        </Button>
+                                                        <Button Content="ECO On"
+                                                                Command="{Binding SetEcoModeCommand}"
+                                                                CommandParameter="ON"
+                                                                Padding="9,5"
+                                                                FontSize="11"
+                                                                Margin="0,0,6,0">
+                                                            <Button.Style>
+                                                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding EcoMode}" Value="ON">
+                                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                                            <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Button.Style>
+                                                        </Button>
+                                                        <Button Content="ECO Off"
+                                                                Command="{Binding SetEcoModeCommand}"
+                                                                CommandParameter="OFF"
+                                                                Padding="9,5"
+                                                                FontSize="11"
+                                                                Margin="0,0,6,0">
+                                                            <Button.Style>
+                                                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding EcoMode}" Value="OFF">
+                                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                                            <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Button.Style>
+                                                        </Button>
+                                                        <Button Command="{Binding ToggleZone2Command}"
+                                                                Padding="10,5"
+                                                                FontSize="11">
+                                                            <Button.Style>
+                                                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                                                    <Setter Property="Content" Value="Zone 2: Off" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsZone2On}" Value="True">
+                                                                            <Setter Property="Content" Value="Zone 2: ON" />
+                                                                            <Setter Property="Background" Value="#0C2D22" />
+                                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentEmeraldBrush}" />
+                                                                            <Setter Property="Foreground" Value="{StaticResource AccentEmeraldBrush}" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Button.Style>
+                                                        </Button>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- RIGHT COLUMN: PRECISION MASTER VOLUME DECK -->
+                                <Border Grid.Column="2"
+                                        Style="{StaticResource SurfaceCard}"
+                                        PreviewMouseWheel="VolumeCard_PreviewMouseWheel"
+                                        ToolTip="Scroll mouse wheel here to adjust volume">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+
+                                        <DockPanel Grid.Row="0" Margin="0,0,0,10">
+                                            <TextBlock Text="MASTER VOLUME" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                            <TextBlock Text="Scroll wheel enabled"
+                                                       HorizontalAlignment="Right"
+                                                       FontSize="10.5"
+                                                       Foreground="{StaticResource TextMutedBrush}" />
+                                        </DockPanel>
+
+                                        <!-- Clickable OLED Readout (click to swap dB vs Absolute) -->
+                                        <Button Grid.Row="1"
+                                                Command="{Binding ToggleVolumeDisplayModeCommand}"
+                                                Cursor="Hand"
+                                                ToolTip="Click to switch primary display between dB and 0-98 scale"
+                                                Margin="0,0,0,14">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="{StaticResource OledBgBrush}"
+                                                            BorderBrush="#1C2738"
+                                                            BorderThickness="1"
+                                                            CornerRadius="12"
+                                                            Padding="16,14">
+                                                        <StackPanel HorizontalAlignment="Center">
+                                                            <TextBlock Text="{Binding PrimaryVolumeText}"
+                                                                       FontSize="38"
+                                                                       FontWeight="Bold"
+                                                                       HorizontalAlignment="Center"
+                                                                       Style="{StaticResource OledMonoText}">
+                                                                <TextBlock.Effect>
+                                                                    <DropShadowEffect Color="#00D4FF" BlurRadius="14" ShadowDepth="0" Opacity="0.35" />
+                                                                </TextBlock.Effect>
+                                                            </TextBlock>
+                                                            <TextBlock Text="{Binding SecondaryVolumeText}"
+                                                                       FontSize="12"
+                                                                       Foreground="{StaticResource TextMutedBrush}"
+                                                                       FontFamily="Cascadia Mono, Consolas"
+                                                                       HorizontalAlignment="Center"
+                                                                       Margin="0,2,0,0" />
+                                                        </StackPanel>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                        </Button>
+
+                                        <!-- Precision Live Volume Slider -->
+                                        <Slider Grid.Row="2"
+                                                Style="{StaticResource VolumeSliderStyle}"
+                                                Minimum="0"
+                                                Maximum="{Binding MaxVolume}"
+                                                Value="{Binding TargetVolume, Mode=TwoWay}"
+                                                Thumb.DragStarted="VolumeSlider_DragStarted"
+                                                Thumb.DragCompleted="VolumeSlider_DragCompleted"
+                                                Margin="0,0,0,14" />
+
+                                        <!-- Fine / Coarse Steps + Mute -->
+                                        <Grid Grid.Row="3" Margin="0,0,0,16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="6" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="6" />
+                                                <ColumnDefinition Width="1.4*" />
+                                                <ColumnDefinition Width="6" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="6" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <Button Grid.Column="0" Content="-5" Command="{Binding VolumeDownCommand}" Style="{StaticResource SecondaryButton}" Padding="0,9" />
+                                            <Button Grid.Column="2" Content="-1" Command="{Binding VolumeFineDownCommand}" Style="{StaticResource SecondaryButton}" Padding="0,9" />
+                                            <Button Grid.Column="4" Command="{Binding ToggleMuteCommand}" Content="{Binding MuteButtonText}" Padding="0,9" ToolTip="Toggle Mute (M)">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsMuted}" Value="True">
+                                                                <Setter Property="Background" Value="#4C151B" />
+                                                                <Setter Property="BorderBrush" Value="{StaticResource AccentCrimsonBrush}" />
+                                                                <Setter Property="Foreground" Value="#FCA5A5" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                            <Button Grid.Column="6" Content="+1" Command="{Binding VolumeFineUpCommand}" Style="{StaticResource SecondaryButton}" Padding="0,9" />
+                                            <Button Grid.Column="8" Content="+5" Command="{Binding VolumeUpCommand}" Style="{StaticResource SecondaryButton}" Padding="0,9" />
+                                        </Grid>
+
+                                        <!-- One-Tap Volume Presets -->
+                                        <StackPanel Grid.Row="4" VerticalAlignment="Bottom">
+                                            <TextBlock Text="QUICK LEVELS" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,8" />
+                                            <ItemsControl ItemsSource="{Binding VolumePresets}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <UniformGrid Rows="1" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Style="{StaticResource ActiveAwareChipStyle}"
+                                                                Command="{Binding DataContext.SetVolumePresetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                Margin="0,0,6,0"
+                                                                Padding="6,8">
+                                                            <StackPanel HorizontalAlignment="Center">
+                                                                <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                                                <TextBlock Text="{Binding LevelLabel}" FontSize="12" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+
+                            <!-- QUICK-PLAY PRESET STATIONS SHELF -->
+                            <Border Style="{StaticResource SurfaceCard}">
+                                <StackPanel>
+                                    <DockPanel Margin="0,0,0,14">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="QUICK STATIONS" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                            <TextBlock Text="  •  One-click HEOS stream launch" FontSize="11.5" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <Button Content="Manage All →"
+                                                HorizontalAlignment="Right"
+                                                Command="{Binding NavigateCommand}"
+                                                CommandParameter="Stations"
+                                                Style="{StaticResource SecondaryButton}"
+                                                Padding="10,5"
+                                                FontSize="11.5" />
+                                    </DockPanel>
+
+                                    <ItemsControl ItemsSource="{Binding StationPresets}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Width="216"
+                                                        CornerRadius="12"
+                                                        Padding="12"
+                                                        Margin="0,0,10,10"
+                                                        BorderThickness="1">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="#171B24" />
+                                                            <Setter Property="BorderBrush" Value="#252C3D" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsCurrentlyPlaying}" Value="True">
+                                                                    <Setter Property="Background" Value="#0E2430" />
+                                                                    <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+
+                                                    <Grid>
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                        </Grid.RowDefinitions>
+
+                                                        <Grid Grid.Row="0" Margin="0,0,0,10">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <Border Grid.Column="0"
+                                                                    Width="36"
+                                                                    Height="36"
+                                                                    CornerRadius="9"
+                                                                    Background="{Binding BadgeBrush}"
+                                                                    Margin="0,0,10,0">
+                                                                <TextBlock Text="{Binding Monogram}"
+                                                                           FontSize="13"
+                                                                           FontWeight="Black"
+                                                                           Foreground="#06121A"
+                                                                           HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center" />
+                                                            </Border>
+
+                                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding DisplayName}"
+                                                                           FontSize="13"
+                                                                           FontWeight="SemiBold"
+                                                                           TextTrimming="CharacterEllipsis" />
+                                                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                                    <TextBlock Text="ON AIR"
+                                                                               FontSize="9.5"
+                                                                               FontWeight="Bold"
+                                                                               Foreground="{StaticResource AccentEmeraldBrush}"
+                                                                               Margin="0,0,6,0"
+                                                                               Visibility="{Binding IsCurrentlyPlaying, Converter={StaticResource BoolToVis}}" />
+                                                                    <TextBlock Text="{Binding Alias}"
+                                                                               FontSize="10.5"
+                                                                               Foreground="{StaticResource TextMutedBrush}"
+                                                                               TextTrimming="CharacterEllipsis" />
+                                                                </StackPanel>
+                                                            </StackPanel>
+                                                        </Grid>
+
+                                                        <Grid Grid.Row="1">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="6" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <Button Grid.Column="0"
+                                                                    Content="▶  Play"
+                                                                    Command="{Binding DataContext.PlayPresetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Style="{StaticResource PrimaryButton}"
+                                                                    Padding="8,6"
+                                                                    FontSize="11.5" />
+                                                            <Button Grid.Column="2"
+                                                                    Content="Low Vol"
+                                                                    Command="{Binding DataContext.PlayPresetLowCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Style="{StaticResource SecondaryButton}"
+                                                                    Padding="10,6"
+                                                                    FontSize="11.5"
+                                                                    ToolTip="Play at safety low volume" />
+                                                        </Grid>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
-                    </Border>
+                    </ScrollViewer>
 
-                    <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}">
+                    <!-- ==================== VIEW 2: STATIONS & STREAMS ==================== -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  Padding="22,20">
+                        <ScrollViewer.Style>
+                            <Style TargetType="ScrollViewer">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ActiveSection}" Value="Stations">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ScrollViewer.Style>
+
+                        <StackPanel>
+                            <!-- Direct Stream Launcher -->
+                            <Border Style="{StaticResource SurfaceCard}" Margin="0,0,0,18">
+                                <StackPanel>
+                                    <TextBlock Text="DIRECT STREAM LAUNCHER" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,12" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="10" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBox Grid.Column="0"
+                                                 Text="{Binding CustomStreamUrl, UpdateSourceTrigger=PropertyChanged}"
+                                                 Tag="Enter stream URL (e.g. http://live-icy.dr.dk/A/A08L.mp3)..."
+                                                 ToolTip="Enter any HTTP/HTTPS MP3, AAC, or Icecast stream URL" />
+                                        <Button Grid.Column="2"
+                                                Content="Test URL"
+                                                Command="{Binding TestCustomStreamCommand}"
+                                                Style="{StaticResource SecondaryButton}" />
+                                        <Button Grid.Column="4"
+                                                Content="▶  Stream Now"
+                                                Command="{Binding PlayCustomStreamCommand}"
+                                                Style="{StaticResource PrimaryButton}" />
+                                    </Grid>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                        <CheckBox Content="Apply safety low volume on stream launch"
+                                                  IsChecked="{Binding UseLowVolumeForStreams}"
+                                                  Style="{StaticResource ToggleSwitchStyle}"
+                                                  Margin="0,0,28,0" />
+                                        <CheckBox Content="Auto-unmute receiver before playback"
+                                                  IsChecked="{Binding UnmuteBeforePlay}"
+                                                  Style="{StaticResource ToggleSwitchStyle}" />
+                                    </StackPanel>
+
+                                    <TextBlock Text="{Binding CustomStreamProbeStatus}"
+                                               Foreground="{Binding CustomStreamProbeSuccess, Converter={StaticResource NullableBoolToBrush}}"
+                                               FontSize="12"
+                                               FontFamily="Cascadia Mono, Consolas"
+                                               Margin="0,8,0,0"
+                                               Visibility="{Binding CustomStreamProbeStatus, Converter={StaticResource StringToVis}}" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Preset Manager -->
+                            <Border Style="{StaticResource SurfaceCard}" Margin="0,0,0,18">
+                                <StackPanel>
+                                    <DockPanel Margin="0,0,0,14">
+                                        <TextBlock Text="PRESET STATIONS" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <TextBox Width="210"
+                                                     Text="{Binding StationSearchText, UpdateSourceTrigger=PropertyChanged}"
+                                                     Tag="Filter stations..."
+                                                     ToolTip="Filter stations by name, alias, or URL"
+                                                     Margin="0,0,10,0"
+                                                     Padding="10,6" />
+                                            <Button Content="+ Add Station"
+                                                    Command="{Binding AddStationCommand}"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Margin="0,0,8,0" />
+                                            <Button Content="Save Changes"
+                                                    Command="{Binding SaveSettingsCommand}"
+                                                    Style="{StaticResource PrimaryButton}" />
+                                        </StackPanel>
+                                    </DockPanel>
+
+                                    <ItemsControl ItemsSource="{Binding FilteredStationPresets}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="#161A23"
+                                                        BorderBrush="#242B3B"
+                                                        BorderThickness="1"
+                                                        CornerRadius="10"
+                                                        Padding="12"
+                                                        Margin="0,0,0,10">
+                                                    <StackPanel>
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="125" />
+                                                                <ColumnDefinition Width="8" />
+                                                                <ColumnDefinition Width="170" />
+                                                                <ColumnDefinition Width="8" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="10" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <Border Grid.Column="0"
+                                                                    Width="34"
+                                                                    Height="34"
+                                                                    CornerRadius="8"
+                                                                    Background="{Binding BadgeBrush}"
+                                                                    Margin="0,0,10,0">
+                                                                <TextBlock Text="{Binding Monogram}" FontSize="12" FontWeight="Black" Foreground="#06121A" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                            </Border>
+
+                                                            <TextBox Grid.Column="1" Text="{Binding Alias, UpdateSourceTrigger=PropertyChanged}" ToolTip="Alias" Padding="8,6" />
+                                                            <TextBox Grid.Column="3" Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}" ToolTip="Display Name" Padding="8,6" />
+                                                            <TextBox Grid.Column="5" Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}" ToolTip="Stream URL" Padding="8,6" FontFamily="Cascadia Mono, Consolas" FontSize="12" />
+
+                                                            <StackPanel Grid.Column="7" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <Button Content="▶"
+                                                                        Command="{Binding DataContext.PlayPresetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource PrimaryButton}"
+                                                                        Padding="10,6"
+                                                                        Margin="0,0,5,0"
+                                                                        ToolTip="Play Station" />
+                                                                <Button Content="Test"
+                                                                        Command="{Binding DataContext.TestPresetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource SecondaryButton}"
+                                                                        Padding="9,6"
+                                                                        Margin="0,0,5,0"
+                                                                        ToolTip="Verify Stream HTTP Health &amp; Bitrate" />
+                                                                <Button Content="↑"
+                                                                        Command="{Binding DataContext.MoveStationUpCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource SecondaryButton}"
+                                                                        Padding="8,6"
+                                                                        Margin="0,0,4,0"
+                                                                        ToolTip="Move Up" />
+                                                                <Button Content="↓"
+                                                                        Command="{Binding DataContext.MoveStationDownCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource SecondaryButton}"
+                                                                        Padding="8,6"
+                                                                        Margin="0,0,4,0"
+                                                                        ToolTip="Move Down" />
+                                                                <Button Content="✕"
+                                                                        Command="{Binding DataContext.RemoveStationCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource DangerButton}"
+                                                                        Padding="8,6"
+                                                                        ToolTip="Remove Station" />
+                                                            </StackPanel>
+                                                        </Grid>
+
+                                                        <TextBlock Text="{Binding ProbeStatusText}"
+                                                                   Foreground="{Binding ProbeSucceeded, Converter={StaticResource NullableBoolToBrush}}"
+                                                                   FontSize="11"
+                                                                   FontFamily="Cascadia Mono, Consolas"
+                                                                   Margin="44,6,0,0"
+                                                                   Visibility="{Binding ProbeStatusText, Converter={StaticResource StringToVis}}" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- HEOS Receiver Favorites -->
+                            <Border Style="{StaticResource SurfaceCard}">
+                                <StackPanel>
+                                    <DockPanel Margin="0,0,0,10">
+                                        <TextBlock Text="RECEIVER HEOS FAVORITES" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                        <Button Content="Load from Receiver"
+                                                HorizontalAlignment="Right"
+                                                Command="{Binding LoadFavoritesCommand}"
+                                                Style="{StaticResource SecondaryButton}" />
+                                    </DockPanel>
+                                    <TextBlock Text="{Binding FavoritesStatusText}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,12" />
+
+                                    <ItemsControl ItemsSource="{Binding HeosFavorites}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Command="{Binding DataContext.PlayFavoriteCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource HardwareChipButton}"
+                                                        Margin="0,0,8,8"
+                                                        Padding="14,9">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding PresetIndex, StringFormat='#{0}  '}" Foreground="{StaticResource AccentCyanBrush}" FontWeight="Bold" />
+                                                        <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimaryBrush}" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- ==================== VIEW 3: SETTINGS ==================== -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  Padding="22,20">
+                        <ScrollViewer.Style>
+                            <Style TargetType="ScrollViewer">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ActiveSection}" Value="Settings">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ScrollViewer.Style>
+
                         <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1.05*" />
+                                <ColumnDefinition Width="18" />
+                                <ColumnDefinition Width="0.95*" />
+                            </Grid.ColumnDefinitions>
 
-                            <StackPanel>
-                                <TextBlock Text="Preset Editor" FontSize="20" FontWeight="SemiBold" />
-                                <TextBlock Text="Edit station aliases, display names, and URLs here. Save settings to persist changes."
-                                           Margin="0,10,0,0"
-                                           TextWrapping="Wrap"
-                                           Foreground="{StaticResource SubtleBrush}" />
+                            <!-- Left: Hardware & Auto-Discovery -->
+                            <StackPanel Grid.Column="0">
+                                <Border Style="{StaticResource SurfaceCard}" Margin="0,0,0,18">
+                                    <StackPanel>
+                                        <DockPanel Margin="0,0,0,10">
+                                            <TextBlock Text="NETWORK AUTO-DISCOVERY" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                            <Button Content="Scan LAN"
+                                                    HorizontalAlignment="Right"
+                                                    Command="{Binding ScanNetworkCommand}"
+                                                    Style="{StaticResource PrimaryButton}"
+                                                    Padding="12,6" />
+                                        </DockPanel>
+                                        <TextBlock Text="{Binding DiscoveryStatusText}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+
+                                        <ItemsControl ItemsSource="{Binding DiscoveredReceivers}" Margin="0,10,0,0">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Command="{Binding DataContext.UseDiscoveredReceiverCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding}"
+                                                            Style="{StaticResource HardwareChipButton}"
+                                                            HorizontalContentAlignment="Left"
+                                                            Margin="0,0,0,6">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrush}" />
+                                                            <TextBlock FontSize="11" Foreground="{StaticResource TextSecondaryBrush}">
+                                                                <Run Text="{Binding Model, Mode=OneWay}" />
+                                                                <Run Text=" • " />
+                                                                <Run Text="{Binding IpAddress, Mode=OneWay}" />
+                                                                <Run Text=" • FW " />
+                                                                <Run Text="{Binding Version, Mode=OneWay}" />
+                                                            </TextBlock>
+                                                        </StackPanel>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource SurfaceCard}">
+                                    <StackPanel>
+                                        <TextBlock Text="RECEIVER CONNECTION PROFILE" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,14" />
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="2*" />
+                                                <ColumnDefinition Width="10" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Receiver IP / Host" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                                <TextBox Text="{Binding SettingsHost, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="HEOS Port" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                                <TextBox Text="{Binding SettingsPort, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <TextBlock Text="HEOS Player Name" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                        <TextBox Text="{Binding SettingsPlayerName, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="10" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Poll Interval (sec)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                                <TextBox Text="{Binding SettingsPollIntervalSeconds, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Safety Low Volume (0-98)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                                <TextBox Text="{Binding SettingsLowVolume, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <TextBlock Text="Quick Volume Presets (comma-separated, 0-98)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                        <TextBox Text="{Binding SettingsVolumePresetsText, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,18" />
+
+                                        <WrapPanel>
+                                            <Button Content="Save &amp; Sync" Command="{Binding SaveSettingsCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,8,8" />
+                                            <Button Content="Export JSON" Command="{Binding ExportSettingsCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,8,8" />
+                                            <Button Content="Import JSON" Command="{Binding ImportSettingsCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,8,8" />
+                                            <Button Content="Data Folder" Command="{Binding OpenDataFolderCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,8,8" />
+                                            <Button Content="Factory Reset" Command="{Binding ResetDefaultsCommand}" Style="{StaticResource DangerButton}" Margin="0,0,0,8" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
 
-                            <DataGrid Grid.Row="1" Margin="0,18,0,18" ItemsSource="{Binding StationPresets}" SelectedItem="{Binding SelectedStationPreset}" AutoGenerateColumns="False" IsReadOnly="False">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Alias" Binding="{Binding Alias, UpdateSourceTrigger=PropertyChanged}" Width="180" />
-                                    <DataGridTextColumn Header="Display Name" Binding="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}" Width="240" />
-                                    <DataGridTextColumn Header="URL" Binding="{Binding Url, UpdateSourceTrigger=PropertyChanged}" Width="*" />
-                                </DataGrid.Columns>
-                            </DataGrid>
+                            <!-- Right: Behavior & Shortcuts -->
+                            <StackPanel Grid.Column="2">
+                                <Border Style="{StaticResource SurfaceCard}" Margin="0,0,0,18">
+                                    <StackPanel>
+                                        <TextBlock Text="DESKTOP &amp; TRAY BEHAVIOR" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,14" />
 
-                            <WrapPanel Grid.Row="2">
-                                <Button Content="Add Station" Command="{Binding AddStationCommand}" />
-                                <Button Content="Remove Selected" Command="{Binding RemoveSelectedStationCommand}" />
-                            </WrapPanel>
+                                        <CheckBox Content="Start minimized in system tray" IsChecked="{Binding SettingsStartMinimizedToTray}" Style="{StaticResource ToggleSwitchStyle}" />
+                                        <CheckBox Content="Minimize window to tray" IsChecked="{Binding SettingsMinimizeToTray}" Style="{StaticResource ToggleSwitchStyle}" />
+                                        <CheckBox Content="Close window hides to tray" IsChecked="{Binding SettingsCloseToTray}" Style="{StaticResource ToggleSwitchStyle}" />
+                                        <CheckBox Content="Show tray notifications" IsChecked="{Binding SettingsShowNotifications}" Style="{StaticResource ToggleSwitchStyle}" />
+                                        <CheckBox Content="Display decibels (dB) as primary readout" IsChecked="{Binding SettingsDisplayVolumeInDb}" Style="{StaticResource ToggleSwitchStyle}" />
+                                        <CheckBox Content="Launch automatically at Windows startup" IsChecked="{Binding SettingsLaunchAtWindowsStartup}" Style="{StaticResource ToggleSwitchStyle}" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource SurfaceCard}">
+                                    <StackPanel>
+                                        <TextBlock Text="KEYBOARD SHORTCUTS &amp; TIPS" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,12" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="120" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="28" />
+                                                <RowDefinition Height="28" />
+                                                <RowDefinition Height="28" />
+                                                <RowDefinition Height="28" />
+                                                <RowDefinition Height="28" />
+                                                <RowDefinition Height="28" />
+                                            </Grid.RowDefinitions>
+
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Space" Style="{StaticResource OledMonoText}" FontSize="12" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Play / Pause HEOS playback" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
+
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="M" Style="{StaticResource OledMonoText}" FontSize="12" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Toggle Receiver Mute" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
+
+                                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Ctrl + ↑ / ↓" Style="{StaticResource OledMonoText}" FontSize="12" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Adjust Volume ±2 steps" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
+
+                                            <TextBlock Grid.Row="3" Grid.Column="0" Text="F5 / Ctrl+R" Style="{StaticResource OledMonoText}" FontSize="12" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Row="3" Grid.Column="1" Text="Force Refresh Receiver State" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
+
+                                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl + 1..4" Style="{StaticResource OledMonoText}" FontSize="12" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Row="4" Grid.Column="1" Text="Switch Navigation Views" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
+
+                                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Tray Click" Style="{StaticResource OledMonoText}" FontSize="12" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Row="5" Grid.Column="1" Text="Open Compact Floating Mini-Controller" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
                         </Grid>
-                    </Border>
-                </Grid>
-            </TabItem>
+                    </ScrollViewer>
 
-            <TabItem Header="Logs">
-                <Grid Margin="0,18,0,0">
-                    <DataGrid ItemsSource="{Binding LogEntries}" AutoGenerateColumns="False" IsReadOnly="True">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Timestamp" Binding="{Binding Timestamp}" Width="190" />
-                            <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="100" />
-                            <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*" />
-                        </DataGrid.Columns>
-                    </DataGrid>
+                    <!-- ==================== VIEW 4: DIAGNOSTICS & CONSOLE ==================== -->
+                    <Grid Margin="22,20">
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ActiveSection}" Value="Diagnostics">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Raw AVR / HEOS Protocol Console -->
+                        <Border Grid.Row="0" Style="{StaticResource SurfaceCard}" Margin="0,0,0,18">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,12">
+                                    <TextBlock Text="RAW PROTOCOL CONSOLE" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Button Content="AVR Telnet (:23)"
+                                                Command="{Binding SetConsoleProtocolCommand}"
+                                                CommandParameter="AVR"
+                                                Margin="0,0,6,0"
+                                                Padding="10,5"
+                                                FontSize="11.5">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ConsoleProtocol}" Value="AVR">
+                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                        <Button Content="HEOS CLI (:1255)"
+                                                Command="{Binding SetConsoleProtocolCommand}"
+                                                CommandParameter="HEOS"
+                                                Padding="10,5"
+                                                FontSize="11.5">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ConsoleProtocol}" Value="HEOS">
+                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="10" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0"
+                                             Text="{Binding ConsoleCommandInput, UpdateSourceTrigger=PropertyChanged}"
+                                             FontFamily="Cascadia Mono, Consolas"
+                                             KeyDown="ConsoleInput_KeyDown" />
+                                    <Button Grid.Column="2"
+                                            Content="Send Command"
+                                            Command="{Binding SendConsoleCommand}"
+                                            Style="{StaticResource PrimaryButton}" />
+                                </Grid>
+
+                                <WrapPanel Margin="0,0,0,10">
+                                    <Button Content="PW?" Command="{Binding RunQuickDiagnosticCommand}" CommandParameter="AVR:PW?" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="11" Margin="0,0,6,4" />
+                                    <Button Content="SI?" Command="{Binding RunQuickDiagnosticCommand}" CommandParameter="AVR:SI?" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="11" Margin="0,0,6,4" />
+                                    <Button Content="MV?" Command="{Binding RunQuickDiagnosticCommand}" CommandParameter="AVR:MV?" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="11" Margin="0,0,6,4" />
+                                    <Button Content="MS?" Command="{Binding RunQuickDiagnosticCommand}" CommandParameter="AVR:MS?" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="11" Margin="0,0,6,4" />
+                                    <Button Content="get_players" Command="{Binding RunQuickDiagnosticCommand}" CommandParameter="HEOS:heos://player/get_players" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="11" Margin="0,0,6,4" />
+                                    <Button Content="browse_sources" Command="{Binding RunQuickDiagnosticCommand}" CommandParameter="HEOS:heos://browse/get_music_sources" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="11" Margin="0,0,0,4" />
+                                </WrapPanel>
+
+                                <Border Background="{StaticResource OledBgBrush}"
+                                        BorderBrush="#1E2536"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Padding="12"
+                                        MaxHeight="130">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <TextBox Text="{Binding ConsoleOutput, Mode=OneWay}"
+                                                 IsReadOnly="True"
+                                                 BorderThickness="0"
+                                                 Background="Transparent"
+                                                 Foreground="{StaticResource AccentCyanBrightBrush}"
+                                                 FontFamily="Cascadia Mono, Consolas"
+                                                 FontSize="12"
+                                                 TextWrapping="Wrap"
+                                                 Padding="0" />
+                                    </ScrollViewer>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Live Telemetry Log Stream -->
+                        <Border Grid.Row="1" Style="{StaticResource SurfaceCard}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="TELEMETRY LOGS" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                                        <Button Content="All" Command="{Binding SetLogFilterCommand}" CommandParameter="All" Padding="9,4" FontSize="11" Margin="0,0,5,0">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding LogFilterLevel}" Value="All">
+                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                        <Button Content="Info" Command="{Binding SetLogFilterCommand}" CommandParameter="Info" Padding="9,4" FontSize="11" Margin="0,0,5,0">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding LogFilterLevel}" Value="Info">
+                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                        <Button Content="Warning" Command="{Binding SetLogFilterCommand}" CommandParameter="Warning" Padding="9,4" FontSize="11" Margin="0,0,5,0">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding LogFilterLevel}" Value="Warning">
+                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                        <Button Content="Error" Command="{Binding SetLogFilterCommand}" CommandParameter="Error" Padding="9,4" FontSize="11">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding LogFilterLevel}" Value="Error">
+                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </StackPanel>
+
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <TextBox Width="170"
+                                                 Text="{Binding LogSearchText, UpdateSourceTrigger=PropertyChanged}"
+                                                 Tag="Search logs..."
+                                                 Padding="8,5"
+                                                 FontSize="12"
+                                                 Margin="0,0,8,0"
+                                                 ToolTip="Search logs" />
+                                        <Button Content="Copy" Command="{Binding CopyLogsCommand}" Style="{StaticResource SecondaryButton}" Padding="10,5" FontSize="11.5" Margin="0,0,6,0" />
+                                        <Button Content="Folder" Command="{Binding OpenLogFolderCommand}" Style="{StaticResource SecondaryButton}" Padding="10,5" FontSize="11.5" Margin="0,0,6,0" />
+                                        <Button Content="Clear" Command="{Binding ClearLogsCommand}" Style="{StaticResource DangerButton}" Padding="10,5" FontSize="11.5" />
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <Border Grid.Row="1"
+                                        Background="{StaticResource OledBgBrush}"
+                                        BorderBrush="#1E2536"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Padding="8">
+                                    <ListBox ItemsSource="{Binding FilteredLogEntries}"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <Setter Property="Padding" Value="6,4" />
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                <Setter Property="Background" Value="Transparent" />
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                            <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" CornerRadius="4">
+                                                                <ContentPresenter />
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter Property="Background" Value="#141925" />
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="145" />
+                                                        <ColumnDefinition Width="72" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0"
+                                                               Text="{Binding Timestamp, StringFormat='yyyy-MM-dd HH:mm:ss'}"
+                                                               FontFamily="Cascadia Mono, Consolas"
+                                                               FontSize="11.5"
+                                                               Foreground="{StaticResource TextMutedBrush}" />
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding Level}"
+                                                               FontFamily="Cascadia Mono, Consolas"
+                                                               FontSize="11.5"
+                                                               FontWeight="Bold"
+                                                               Foreground="{Binding Level, Converter={StaticResource LogLevelToBrush}}" />
+                                                    <TextBlock Grid.Column="2"
+                                                               Text="{Binding Message}"
+                                                               FontFamily="Cascadia Mono, Consolas"
+                                                               FontSize="11.5"
+                                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                                               TextWrapping="Wrap" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </Grid>
                 </Grid>
-            </TabItem>
-        </TabControl>
-    </Grid>
+            </Grid>
+        </Grid>
+    </Border>
 </Window>

@@ -1,8 +1,16 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using System.Net.NetworkInformation;
+using System.Text;
+using System.Windows.Data;
 using System.Windows.Media;
+using Denon.App.Core.Infrastructure;
 using Denon.App.Core.Models;
 using Denon.App.Core.Services;
 using Denon.App.Desktop.Infrastructure;
+using Denon.App.Desktop.Services;
 using Brush = System.Windows.Media.Brush;
 using Color = System.Windows.Media.Color;
 
@@ -10,87 +18,233 @@ namespace Denon.App.Desktop.ViewModels;
 
 public sealed class MainViewModel : ObservableObject
 {
+    private static readonly Brush OnlineBrush = CreateFrozenBrush(16, 185, 129);
+    private static readonly Brush StandbyBrush = CreateFrozenBrush(245, 158, 11);
+    private static readonly Brush OfflineBrush = CreateFrozenBrush(239, 68, 68);
+
     private readonly ReceiverController _receiverController;
     private readonly AppSettingsStore _settingsStore;
     private readonly ReceiverStateStore _stateStore;
     private readonly AppLogStore _logStore;
+    private readonly DenonDiscoveryService _discoveryService;
+    private readonly StreamProbeService _streamProbeService;
+    private readonly WindowsStartupService _startupService;
     private readonly System.Windows.Threading.Dispatcher _dispatcher;
-    private readonly AsyncRelayCommand _refreshCommand;
-    private readonly AsyncRelayCommand _playCommand;
-    private readonly AsyncRelayCommand _pauseCommand;
-    private readonly AsyncRelayCommand _stopCommand;
-    private readonly AsyncRelayCommand _toggleMuteCommand;
-    private readonly AsyncRelayCommand _setLowVolumeCommand;
-    private readonly AsyncRelayCommand _applyVolumeCommand;
-    private readonly AsyncRelayCommand _volumeUpCommand;
-    private readonly AsyncRelayCommand _volumeDownCommand;
-    private readonly AsyncRelayCommand _playCustomStreamCommand;
-    private readonly AsyncRelayCommand _playPresetCommand;
-    private readonly AsyncRelayCommand _playPresetLowCommand;
-    private readonly AsyncRelayCommand _saveSettingsCommand;
-    private readonly RelayCommand _addStationCommand;
-    private readonly RelayCommand _removeSelectedStationCommand;
-    private readonly RelayCommand _resetDefaultsCommand;
 
-    private string _connectionBadgeText = "Offline";
-    private Brush _connectionBadgeBrush = new SolidColorBrush(Color.FromRgb(138, 43, 43));
-    private string _statusMessage = "Waiting for receiver status.";
-    private string _receiverTitle = "Denon AVR-X2400H";
-    private string _receiverDetails = "No receiver data yet.";
-    private string _nowPlayingTitle = "Nothing playing";
-    private string _nowPlayingDetail = "Use a preset station or custom stream to start playback.";
-    private string _playState = "Unknown";
-    private int _targetVolume = 10;
-    private int _liveVolume;
+    private CancellationTokenSource? _volumeDebounceCts;
+    private bool _isDraggingVolume;
+    private bool _suppressVolumeSend;
+
+    // Navigation
+    private string _activeSection = "Control";
+
+    // Receiver Telemetry
+    private bool _isConnected;
+    private bool _isPoweredOn;
+    private bool _isMainZoneOn;
+    private bool _isZone2On;
+    private bool _isPlaying;
+    private bool _isPaused;
     private bool _isMuted;
     private bool _isBusy;
-    private string _lastUpdatedText = "No successful refresh yet.";
+    private string _connectionBadgeText = "OFFLINE";
+    private Brush _connectionBadgeBrush = OfflineBrush;
+    private string _statusMessage = "Connecting to receiver...";
+    private string _receiverTitle = "Denon AVR-X2400H";
+    private string _receiverDetails = "Waiting for telemetry...";
+    private string _firmwareVersion = string.Empty;
+    private string _inputSourceCode = string.Empty;
+    private string _inputSourceDisplay = "—";
+    private string _soundMode = "—";
+    private string _ecoMode = "—";
+    private int? _sleepTimerMinutes;
+    private string _nowPlayingTitle = "Ready for Playback";
+    private string _nowPlayingDetail = "Select a preset station or input source to begin.";
+    private string _nowPlayingImageUrl = string.Empty;
+    private string _playState = "Stopped";
+    private int _targetVolume = 20;
+    private int _liveVolume;
+    private double _liveVolumeExact;
+    private int _maxVolume = 98;
+    private bool _displayVolumeInDb = true;
+    private string _lastUpdatedText = "Not synced yet";
     private string _lastError = string.Empty;
+
+    // Custom stream & stations
     private string _customStreamUrl = string.Empty;
     private bool _useLowVolumeForStreams = true;
     private bool _unmuteBeforePlay = true;
+    private string _customStreamProbeStatus = string.Empty;
+    private bool? _customStreamProbeSuccess;
+    private bool _isProbingCustomStream;
+    private string _stationSearchText = string.Empty;
+    private StationPresetEditor? _selectedStationPreset;
+    private bool _isLoadingFavorites;
+    private string _favoritesStatusText = "Click 'Load from Receiver' to fetch saved HEOS Favorites.";
+
+    // Discovery
+    private bool _isScanningNetwork;
+    private string _discoveryStatusText = "Scan your local network to detect Denon & Marantz HEOS receivers.";
+
+    // Settings editor fields
     private string _settingsHost = "192.168.1.3";
     private string _settingsPort = "1255";
     private string _settingsPlayerName = "Denon AVR-X2400H";
     private string _settingsPollIntervalSeconds = "5";
-    private string _settingsLowVolume = "10";
-    private bool _settingsStartMinimizedToTray = true;
+    private string _settingsLowVolume = "20";
+    private string _settingsVolumePresetsText = "15, 28, 42, 55";
+    private bool _settingsStartMinimizedToTray;
     private bool _settingsMinimizeToTray = true;
     private bool _settingsCloseToTray = true;
     private bool _settingsShowNotifications = true;
-    private StationPresetEditor? _selectedStationPreset;
+    private bool _settingsDisplayVolumeInDb = true;
+    private bool _settingsLaunchAtWindowsStartup;
+
+    // Diagnostics & Console
+    private string _logFilterLevel = "All";
+    private string _logSearchText = string.Empty;
+    private string _consoleProtocol = "AVR";
+    private string _consoleCommandInput = "SI?";
+    private string _consoleOutput = "Ready. Choose AVR (Telnet :23) or HEOS (:1255) and send any command.";
+    private bool _isRunningConsoleCommand;
+    private bool _isRunningHealthCheck;
+    private string _healthSummaryText = "Click 'Run Health Check' to test your receiver connection, audio readiness, and internet radio streams.";
+    private Brush _healthSummaryBrush = CreateFrozenBrush(148, 163, 184);
 
     public MainViewModel(
         ReceiverController receiverController,
         AppSettingsStore settingsStore,
         ReceiverStateStore stateStore,
-        AppLogStore logStore)
+        AppLogStore logStore,
+        DenonDiscoveryService discoveryService,
+        StreamProbeService streamProbeService,
+        WindowsStartupService startupService)
     {
         _receiverController = receiverController;
         _settingsStore = settingsStore;
         _stateStore = stateStore;
         _logStore = logStore;
+        _discoveryService = discoveryService;
+        _streamProbeService = streamProbeService;
+        _startupService = startupService;
         _dispatcher = System.Windows.Application.Current.Dispatcher;
 
-        StationPresets = new ObservableCollection<StationPresetEditor>();
-        LogEntries = new ObservableCollection<AppLogEntry>();
+        StationPresets = [];
+        HeosFavorites = [];
+        DiscoveredReceivers = [];
+        LogEntries = [];
+        VolumePresets = [];
+        DiagnosticChecks =
+        [
+            new DiagnosticCheckItem("Network Connection", "Checks if your Denon receiver IP responds on the local network."),
+            new DiagnosticCheckItem("AVR Control Interface", "Checks power, volume, mute, and input switching (Port 23)."),
+            new DiagnosticCheckItem("HEOS Streaming Engine", "Checks HEOS audio service and player name match (Port 1255)."),
+            new DiagnosticCheckItem("Audio Output Readiness", "Checks power state, mute status, and audible volume level."),
+            new DiagnosticCheckItem("Internet Radio Stream", "Tests whether your radio station URL is live and reachable."),
+        ];
 
-        _refreshCommand = new AsyncRelayCommand(_ => RefreshAsync(), CanControlReceiver);
-        _playCommand = new AsyncRelayCommand(_ => SetPlayStateAsync("play"), CanControlReceiver);
-        _pauseCommand = new AsyncRelayCommand(_ => SetPlayStateAsync("pause"), CanControlReceiver);
-        _stopCommand = new AsyncRelayCommand(_ => SetPlayStateAsync("stop"), CanControlReceiver);
-        _toggleMuteCommand = new AsyncRelayCommand(_ => ToggleMuteAsync(), CanControlReceiver);
-        _setLowVolumeCommand = new AsyncRelayCommand(_ => SetLowVolumeAsync(), CanControlReceiver);
-        _applyVolumeCommand = new AsyncRelayCommand(_ => ApplyVolumeAsync(), CanControlReceiver);
-        _volumeUpCommand = new AsyncRelayCommand(_ => StepVolumeAsync(5), CanControlReceiver);
-        _volumeDownCommand = new AsyncRelayCommand(_ => StepVolumeAsync(-5), CanControlReceiver);
-        _playCustomStreamCommand = new AsyncRelayCommand(_ => PlayCustomStreamAsync(), CanControlReceiver);
-        _playPresetCommand = new AsyncRelayCommand(PlayPresetAsync, CanPlayPreset);
-        _playPresetLowCommand = new AsyncRelayCommand(PlayPresetLowAsync, CanPlayPreset);
-        _saveSettingsCommand = new AsyncRelayCommand(_ => SaveSettingsAsync());
-        _addStationCommand = new RelayCommand(_ => AddStation());
-        _removeSelectedStationCommand = new RelayCommand(_ => RemoveSelectedStation(), _ => SelectedStationPreset is not null);
-        _resetDefaultsCommand = new RelayCommand(_ => LoadDefaultSettingsIntoEditor());
+        InputSources = new ObservableCollection<InputSourceItem>(
+            DenonCatalog.InputSources.Select(static opt => new InputSourceItem(opt.Code, opt.DisplayName, opt.ShortLabel)));
+
+        SoundModes = new ObservableCollection<SoundModeItem>(
+            DenonCatalog.SoundModes.Select(static opt => new SoundModeItem(opt.Code, opt.DisplayName)));
+
+        SleepTimerOptions =
+        [
+            new SleepTimerOption(null, "Off"),
+            new SleepTimerOption(30, "30m"),
+            new SleepTimerOption(60, "60m"),
+            new SleepTimerOption(90, "90m"),
+            new SleepTimerOption(120, "120m"),
+        ];
+
+        FilteredStationPresets = CollectionViewSource.GetDefaultView(StationPresets);
+        FilteredStationPresets.Filter = FilterStation;
+
+        FilteredLogEntries = CollectionViewSource.GetDefaultView(LogEntries);
+        FilteredLogEntries.Filter = FilterLogEntry;
+
+        // Navigation
+        NavigateCommand = new RelayCommand(param =>
+        {
+            if (param is string section && !string.IsNullOrWhiteSpace(section))
+            {
+                ActiveSection = section;
+            }
+        });
+
+        // Hardware & Transport Commands
+        RefreshCommand = new AsyncRelayCommand(_ => RefreshAsync(), CanControlReceiver);
+        TogglePowerCommand = new AsyncRelayCommand(_ => TogglePowerAsync(), CanControlReceiver);
+        ToggleZone2Command = new AsyncRelayCommand(_ => ToggleZone2Async(), CanControlReceiver);
+        PlayPauseCommand = new AsyncRelayCommand(_ => PlayPauseAsync(), CanControlReceiver);
+        PlayCommand = new AsyncRelayCommand(_ => SetPlayStateAsync("play"), CanControlReceiver);
+        PauseCommand = new AsyncRelayCommand(_ => SetPlayStateAsync("pause"), CanControlReceiver);
+        StopCommand = new AsyncRelayCommand(_ => SetPlayStateAsync("stop"), CanControlReceiver);
+        NextTrackCommand = new AsyncRelayCommand(_ => NextTrackAsync(), CanControlReceiver);
+        PreviousTrackCommand = new AsyncRelayCommand(_ => PreviousTrackAsync(), CanControlReceiver);
+        ToggleMuteCommand = new AsyncRelayCommand(_ => ToggleMuteAsync(), CanControlReceiver);
+        SetLowVolumeCommand = new AsyncRelayCommand(_ => SetLowVolumeAsync(), CanControlReceiver);
+        ApplyVolumeCommand = new AsyncRelayCommand(_ => ApplyVolumeAsync(), CanControlReceiver);
+        VolumeUpCommand = new AsyncRelayCommand(_ => StepVolumeAsync(5), CanControlReceiver);
+        VolumeDownCommand = new AsyncRelayCommand(_ => StepVolumeAsync(-5), CanControlReceiver);
+        VolumeFineUpCommand = new AsyncRelayCommand(_ => StepVolumeAsync(1), CanControlReceiver);
+        VolumeFineDownCommand = new AsyncRelayCommand(_ => StepVolumeAsync(-1), CanControlReceiver);
+        SetVolumePresetCommand = new AsyncRelayCommand(SetVolumePresetAsync, CanControlReceiver);
+        ToggleVolumeDisplayModeCommand = new RelayCommand(_ => DisplayVolumeInDb = !DisplayVolumeInDb);
+
+        SelectInputCommand = new AsyncRelayCommand(SelectInputAsync, CanControlReceiver);
+        SelectSoundModeCommand = new AsyncRelayCommand(SelectSoundModeAsync, CanControlReceiver);
+        SetEcoModeCommand = new AsyncRelayCommand(SetEcoModeAsync, CanControlReceiver);
+        SetSleepTimerCommand = new AsyncRelayCommand(SetSleepTimerAsync, CanControlReceiver);
+
+        // Stations & Streams
+        PlayCustomStreamCommand = new AsyncRelayCommand(_ => PlayCustomStreamAsync(), CanControlReceiver);
+        TestCustomStreamCommand = new AsyncRelayCommand(_ => TestCustomStreamAsync());
+        PlayPresetCommand = new AsyncRelayCommand(PlayPresetAsync, CanPlayPreset);
+        PlayPresetLowCommand = new AsyncRelayCommand(PlayPresetLowAsync, CanPlayPreset);
+        TestPresetCommand = new AsyncRelayCommand(TestPresetAsync);
+        AddStationCommand = new RelayCommand(_ => AddStation());
+        RemoveStationCommand = new RelayCommand(RemoveStation);
+        MoveStationUpCommand = new RelayCommand(MoveStationUp);
+        MoveStationDownCommand = new RelayCommand(MoveStationDown);
+        LoadFavoritesCommand = new AsyncRelayCommand(_ => LoadFavoritesAsync(), _ => !IsLoadingFavorites);
+        PlayFavoriteCommand = new AsyncRelayCommand(PlayFavoriteAsync, CanControlReceiver);
+
+        // Discovery & Settings
+        ScanNetworkCommand = new AsyncRelayCommand(_ => ScanNetworkAsync(), _ => !IsScanningNetwork);
+        UseDiscoveredReceiverCommand = new RelayCommand(UseDiscoveredReceiver);
+        SaveSettingsCommand = new AsyncRelayCommand(_ => SaveSettingsAsync());
+        ResetDefaultsCommand = new RelayCommand(_ => LoadDefaultSettingsIntoEditor());
+        ExportSettingsCommand = new RelayCommand(_ => ExportSettings());
+        ImportSettingsCommand = new AsyncRelayCommand(_ => ImportSettingsAsync());
+        OpenDataFolderCommand = new RelayCommand(_ => OpenFolder(AppDataPaths.RootDirectory));
+
+        // Diagnostics & Console
+        SetLogFilterCommand = new RelayCommand(param =>
+        {
+            if (param is string level)
+            {
+                LogFilterLevel = level;
+            }
+        });
+        ClearLogsCommand = new RelayCommand(_ => LogEntries.Clear());
+        CopyLogsCommand = new RelayCommand(_ => CopyLogsToClipboard());
+        OpenLogFolderCommand = new RelayCommand(_ => OpenFolder(AppDataPaths.LogsDirectory));
+        SetConsoleProtocolCommand = new RelayCommand(param =>
+        {
+            if (param is string proto)
+            {
+                ConsoleProtocol = proto;
+                ConsoleCommandInput = proto == "HEOS" ? "heos://player/get_players" : "SI?";
+            }
+        });
+        SendConsoleCommand = new AsyncRelayCommand(_ => RunConsoleCommandAsync(ConsoleCommandInput), _ => !IsRunningConsoleCommand);
+        RunQuickDiagnosticCommand = new AsyncRelayCommand(RunQuickDiagnosticAsync, _ => !IsRunningConsoleCommand);
+        RunHealthCheckCommand = new AsyncRelayCommand(_ => RunHealthCheckAsync(), _ => !IsRunningHealthCheck);
+        FixSilentAudioCommand = new AsyncRelayCommand(_ => FixSilentAudioAsync(), CanControlReceiver);
+        ResetConnectionsCommand = new AsyncRelayCommand(_ => ResetAndRefreshAsync(), CanControlReceiver);
+        CopyDiagnosticReportCommand = new RelayCommand(_ => CopyDiagnosticReportToClipboard());
 
         LoadSettings(_settingsStore.Current);
         ApplyStateSnapshot(_stateStore.Snapshot);
@@ -111,41 +265,139 @@ public sealed class MainViewModel : ObservableObject
         });
     }
 
+    // Collections
     public ObservableCollection<StationPresetEditor> StationPresets { get; }
-
+    public ICollectionView FilteredStationPresets { get; }
+    public ObservableCollection<HeosFavoriteItem> HeosFavorites { get; }
+    public ObservableCollection<DiscoveredReceiver> DiscoveredReceivers { get; }
+    public ObservableCollection<InputSourceItem> InputSources { get; }
+    public ObservableCollection<SoundModeItem> SoundModes { get; }
+    public ObservableCollection<VolumePresetItem> VolumePresets { get; }
+    public ObservableCollection<SleepTimerOption> SleepTimerOptions { get; }
     public ObservableCollection<AppLogEntry> LogEntries { get; }
+    public ICollectionView FilteredLogEntries { get; }
+    public ObservableCollection<DiagnosticCheckItem> DiagnosticChecks { get; }
 
-    public AsyncRelayCommand RefreshCommand => _refreshCommand;
+    // Commands
+    public RelayCommand NavigateCommand { get; }
+    public AsyncRelayCommand RefreshCommand { get; }
+    public AsyncRelayCommand TogglePowerCommand { get; }
+    public AsyncRelayCommand ToggleZone2Command { get; }
+    public AsyncRelayCommand PlayPauseCommand { get; }
+    public AsyncRelayCommand PlayCommand { get; }
+    public AsyncRelayCommand PauseCommand { get; }
+    public AsyncRelayCommand StopCommand { get; }
+    public AsyncRelayCommand NextTrackCommand { get; }
+    public AsyncRelayCommand PreviousTrackCommand { get; }
+    public AsyncRelayCommand ToggleMuteCommand { get; }
+    public AsyncRelayCommand SetLowVolumeCommand { get; }
+    public AsyncRelayCommand ApplyVolumeCommand { get; }
+    public AsyncRelayCommand VolumeUpCommand { get; }
+    public AsyncRelayCommand VolumeDownCommand { get; }
+    public AsyncRelayCommand VolumeFineUpCommand { get; }
+    public AsyncRelayCommand VolumeFineDownCommand { get; }
+    public AsyncRelayCommand SetVolumePresetCommand { get; }
+    public RelayCommand ToggleVolumeDisplayModeCommand { get; }
+    public AsyncRelayCommand SelectInputCommand { get; }
+    public AsyncRelayCommand SelectSoundModeCommand { get; }
+    public AsyncRelayCommand SetEcoModeCommand { get; }
+    public AsyncRelayCommand SetSleepTimerCommand { get; }
+    public AsyncRelayCommand PlayCustomStreamCommand { get; }
+    public AsyncRelayCommand TestCustomStreamCommand { get; }
+    public AsyncRelayCommand PlayPresetCommand { get; }
+    public AsyncRelayCommand PlayPresetLowCommand { get; }
+    public AsyncRelayCommand TestPresetCommand { get; }
+    public RelayCommand AddStationCommand { get; }
+    public RelayCommand RemoveStationCommand { get; }
+    public RelayCommand MoveStationUpCommand { get; }
+    public RelayCommand MoveStationDownCommand { get; }
+    public AsyncRelayCommand LoadFavoritesCommand { get; }
+    public AsyncRelayCommand PlayFavoriteCommand { get; }
+    public AsyncRelayCommand ScanNetworkCommand { get; }
+    public RelayCommand UseDiscoveredReceiverCommand { get; }
+    public AsyncRelayCommand SaveSettingsCommand { get; }
+    public RelayCommand ResetDefaultsCommand { get; }
+    public RelayCommand ExportSettingsCommand { get; }
+    public AsyncRelayCommand ImportSettingsCommand { get; }
+    public RelayCommand OpenDataFolderCommand { get; }
+    public RelayCommand SetLogFilterCommand { get; }
+    public RelayCommand ClearLogsCommand { get; }
+    public RelayCommand CopyLogsCommand { get; }
+    public RelayCommand OpenLogFolderCommand { get; }
+    public RelayCommand SetConsoleProtocolCommand { get; }
+    public AsyncRelayCommand SendConsoleCommand { get; }
+    public AsyncRelayCommand RunQuickDiagnosticCommand { get; }
+    public AsyncRelayCommand RunHealthCheckCommand { get; }
+    public AsyncRelayCommand FixSilentAudioCommand { get; }
+    public AsyncRelayCommand ResetConnectionsCommand { get; }
+    public RelayCommand CopyDiagnosticReportCommand { get; }
 
-    public AsyncRelayCommand PlayCommand => _playCommand;
+    // Properties
+    public string ActiveSection
+    {
+        get => _activeSection;
+        set => SetProperty(ref _activeSection, value);
+    }
 
-    public AsyncRelayCommand PauseCommand => _pauseCommand;
+    public bool IsConnected
+    {
+        get => _isConnected;
+        private set => SetProperty(ref _isConnected, value);
+    }
 
-    public AsyncRelayCommand StopCommand => _stopCommand;
+    public bool IsPoweredOn
+    {
+        get => _isPoweredOn;
+        private set
+        {
+            if (SetProperty(ref _isPoweredOn, value))
+            {
+                OnPropertyChanged(nameof(PowerStateLabel));
+                OnPropertyChanged(nameof(IsActiveAndPlaying));
+            }
+        }
+    }
 
-    public AsyncRelayCommand ToggleMuteCommand => _toggleMuteCommand;
+    public bool IsMainZoneOn
+    {
+        get => _isMainZoneOn;
+        private set
+        {
+            if (SetProperty(ref _isMainZoneOn, value))
+            {
+                OnPropertyChanged(nameof(PowerStateLabel));
+                OnPropertyChanged(nameof(IsActiveAndPlaying));
+            }
+        }
+    }
 
-    public AsyncRelayCommand SetLowVolumeCommand => _setLowVolumeCommand;
+    public bool IsZone2On
+    {
+        get => _isZone2On;
+        private set => SetProperty(ref _isZone2On, value);
+    }
 
-    public AsyncRelayCommand ApplyVolumeCommand => _applyVolumeCommand;
+    public bool IsPlaying
+    {
+        get => _isPlaying;
+        private set
+        {
+            if (SetProperty(ref _isPlaying, value))
+            {
+                OnPropertyChanged(nameof(IsActiveAndPlaying));
+            }
+        }
+    }
 
-    public AsyncRelayCommand VolumeUpCommand => _volumeUpCommand;
+    public bool IsPaused
+    {
+        get => _isPaused;
+        private set => SetProperty(ref _isPaused, value);
+    }
 
-    public AsyncRelayCommand VolumeDownCommand => _volumeDownCommand;
+    public bool IsActiveAndPlaying => IsConnected && IsPoweredOn && IsMainZoneOn && IsPlaying && !IsMuted;
 
-    public AsyncRelayCommand PlayCustomStreamCommand => _playCustomStreamCommand;
-
-    public AsyncRelayCommand PlayPresetCommand => _playPresetCommand;
-
-    public AsyncRelayCommand PlayPresetLowCommand => _playPresetLowCommand;
-
-    public AsyncRelayCommand SaveSettingsCommand => _saveSettingsCommand;
-
-    public RelayCommand AddStationCommand => _addStationCommand;
-
-    public RelayCommand RemoveSelectedStationCommand => _removeSelectedStationCommand;
-
-    public RelayCommand ResetDefaultsCommand => _resetDefaultsCommand;
+    public string PowerStateLabel => IsPoweredOn && IsMainZoneOn ? "ACTIVE" : "STANDBY";
 
     public string ConnectionBadgeText
     {
@@ -177,6 +429,53 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _receiverDetails, value);
     }
 
+    public string FirmwareVersion
+    {
+        get => _firmwareVersion;
+        private set => SetProperty(ref _firmwareVersion, value);
+    }
+
+    public string InputSourceCode
+    {
+        get => _inputSourceCode;
+        private set => SetProperty(ref _inputSourceCode, value);
+    }
+
+    public string InputSourceDisplay
+    {
+        get => _inputSourceDisplay;
+        private set => SetProperty(ref _inputSourceDisplay, value);
+    }
+
+    public string SoundMode
+    {
+        get => _soundMode;
+        private set => SetProperty(ref _soundMode, value);
+    }
+
+    public string EcoMode
+    {
+        get => _ecoMode;
+        private set => SetProperty(ref _ecoMode, value);
+    }
+
+    public int? SleepTimerMinutes
+    {
+        get => _sleepTimerMinutes;
+        private set
+        {
+            if (SetProperty(ref _sleepTimerMinutes, value))
+            {
+                OnPropertyChanged(nameof(SleepTimerDisplay));
+                OnPropertyChanged(nameof(HasSleepTimer));
+            }
+        }
+    }
+
+    public bool HasSleepTimer => SleepTimerMinutes is > 0;
+
+    public string SleepTimerDisplay => SleepTimerMinutes is > 0 ? $"Sleep {SleepTimerMinutes}m" : "Sleep Off";
+
     public string NowPlayingTitle
     {
         get => _nowPlayingTitle;
@@ -189,6 +488,20 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _nowPlayingDetail, value);
     }
 
+    public string NowPlayingImageUrl
+    {
+        get => _nowPlayingImageUrl;
+        private set
+        {
+            if (SetProperty(ref _nowPlayingImageUrl, value))
+            {
+                OnPropertyChanged(nameof(HasArtwork));
+            }
+        }
+    }
+
+    public bool HasArtwork => !string.IsNullOrWhiteSpace(NowPlayingImageUrl);
+
     public string PlayState
     {
         get => _playState;
@@ -200,9 +513,19 @@ public sealed class MainViewModel : ObservableObject
         get => _targetVolume;
         set
         {
-            if (SetProperty(ref _targetVolume, Math.Clamp(value, 0, 100)))
+            var clamped = Math.Clamp(value, 0, MaxVolume);
+            if (SetProperty(ref _targetVolume, clamped))
             {
-                OnPropertyChanged(nameof(VolumeLabel));
+                OnPropertyChanged(nameof(PrimaryVolumeText));
+                OnPropertyChanged(nameof(SecondaryVolumeText));
+                OnPropertyChanged(nameof(VolumeDbLabel));
+                OnPropertyChanged(nameof(VolumeAbsoluteLabel));
+                UpdateActiveVolumePreset(clamped);
+
+                if (!_suppressVolumeSend && !_isDraggingVolume)
+                {
+                    ScheduleDebouncedVolumeApply(clamped);
+                }
             }
         }
     }
@@ -213,6 +536,39 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _liveVolume, value);
     }
 
+    public double LiveVolumeExact
+    {
+        get => _liveVolumeExact;
+        private set => SetProperty(ref _liveVolumeExact, value);
+    }
+
+    public int MaxVolume
+    {
+        get => _maxVolume;
+        private set => SetProperty(ref _maxVolume, Math.Clamp(value, 20, 98));
+    }
+
+    public bool DisplayVolumeInDb
+    {
+        get => _displayVolumeInDb;
+        set
+        {
+            if (SetProperty(ref _displayVolumeInDb, value))
+            {
+                OnPropertyChanged(nameof(PrimaryVolumeText));
+                OnPropertyChanged(nameof(SecondaryVolumeText));
+            }
+        }
+    }
+
+    public string VolumeDbLabel => DenonVolumeMath.FormatDecibels(TargetVolume);
+
+    public string VolumeAbsoluteLabel => $"{TargetVolume} / {MaxVolume}";
+
+    public string PrimaryVolumeText => DisplayVolumeInDb ? VolumeDbLabel : $"{TargetVolume}";
+
+    public string SecondaryVolumeText => DisplayVolumeInDb ? $"VOL {TargetVolume} / {MaxVolume}" : VolumeDbLabel;
+
     public bool IsMuted
     {
         get => _isMuted;
@@ -221,9 +577,12 @@ public sealed class MainViewModel : ObservableObject
             if (SetProperty(ref _isMuted, value))
             {
                 OnPropertyChanged(nameof(MuteButtonText));
+                OnPropertyChanged(nameof(IsActiveAndPlaying));
             }
         }
     }
+
+    public string MuteButtonText => IsMuted ? "MUTED" : "MUTE";
 
     public bool IsBusy
     {
@@ -267,6 +626,78 @@ public sealed class MainViewModel : ObservableObject
         set => SetProperty(ref _unmuteBeforePlay, value);
     }
 
+    public string CustomStreamProbeStatus
+    {
+        get => _customStreamProbeStatus;
+        private set => SetProperty(ref _customStreamProbeStatus, value);
+    }
+
+    public bool? CustomStreamProbeSuccess
+    {
+        get => _customStreamProbeSuccess;
+        private set => SetProperty(ref _customStreamProbeSuccess, value);
+    }
+
+    public bool IsProbingCustomStream
+    {
+        get => _isProbingCustomStream;
+        private set => SetProperty(ref _isProbingCustomStream, value);
+    }
+
+    public string StationSearchText
+    {
+        get => _stationSearchText;
+        set
+        {
+            if (SetProperty(ref _stationSearchText, value))
+            {
+                FilteredStationPresets.Refresh();
+            }
+        }
+    }
+
+    public StationPresetEditor? SelectedStationPreset
+    {
+        get => _selectedStationPreset;
+        set => SetProperty(ref _selectedStationPreset, value);
+    }
+
+    public bool IsLoadingFavorites
+    {
+        get => _isLoadingFavorites;
+        private set
+        {
+            if (SetProperty(ref _isLoadingFavorites, value))
+            {
+                LoadFavoritesCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public string FavoritesStatusText
+    {
+        get => _favoritesStatusText;
+        private set => SetProperty(ref _favoritesStatusText, value);
+    }
+
+    public bool IsScanningNetwork
+    {
+        get => _isScanningNetwork;
+        private set
+        {
+            if (SetProperty(ref _isScanningNetwork, value))
+            {
+                ScanNetworkCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public string DiscoveryStatusText
+    {
+        get => _discoveryStatusText;
+        private set => SetProperty(ref _discoveryStatusText, value);
+    }
+
     public string SettingsHost
     {
         get => _settingsHost;
@@ -297,6 +728,12 @@ public sealed class MainViewModel : ObservableObject
         set => SetProperty(ref _settingsLowVolume, value);
     }
 
+    public string SettingsVolumePresetsText
+    {
+        get => _settingsVolumePresetsText;
+        set => SetProperty(ref _settingsVolumePresetsText, value);
+    }
+
     public bool SettingsStartMinimizedToTray
     {
         get => _settingsStartMinimizedToTray;
@@ -321,21 +758,118 @@ public sealed class MainViewModel : ObservableObject
         set => SetProperty(ref _settingsShowNotifications, value);
     }
 
-    public StationPresetEditor? SelectedStationPreset
+    public bool SettingsDisplayVolumeInDb
     {
-        get => _selectedStationPreset;
+        get => _settingsDisplayVolumeInDb;
+        set => SetProperty(ref _settingsDisplayVolumeInDb, value);
+    }
+
+    public bool SettingsLaunchAtWindowsStartup
+    {
+        get => _settingsLaunchAtWindowsStartup;
+        set => SetProperty(ref _settingsLaunchAtWindowsStartup, value);
+    }
+
+    public string LogFilterLevel
+    {
+        get => _logFilterLevel;
         set
         {
-            if (SetProperty(ref _selectedStationPreset, value))
+            if (SetProperty(ref _logFilterLevel, value))
             {
-                _removeSelectedStationCommand.NotifyCanExecuteChanged();
+                FilteredLogEntries.Refresh();
             }
         }
     }
 
-    public string VolumeLabel => $"{TargetVolume}%";
+    public string LogSearchText
+    {
+        get => _logSearchText;
+        set
+        {
+            if (SetProperty(ref _logSearchText, value))
+            {
+                FilteredLogEntries.Refresh();
+            }
+        }
+    }
 
-    public string MuteButtonText => IsMuted ? "Unmute" : "Mute";
+    public string ConsoleProtocol
+    {
+        get => _consoleProtocol;
+        set => SetProperty(ref _consoleProtocol, value);
+    }
+
+    public string ConsoleCommandInput
+    {
+        get => _consoleCommandInput;
+        set => SetProperty(ref _consoleCommandInput, value);
+    }
+
+    public string ConsoleOutput
+    {
+        get => _consoleOutput;
+        private set => SetProperty(ref _consoleOutput, value);
+    }
+
+    public bool IsRunningConsoleCommand
+    {
+        get => _isRunningConsoleCommand;
+        private set
+        {
+            if (SetProperty(ref _isRunningConsoleCommand, value))
+            {
+                SendConsoleCommand.NotifyCanExecuteChanged();
+                RunQuickDiagnosticCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool IsRunningHealthCheck
+    {
+        get => _isRunningHealthCheck;
+        private set
+        {
+            if (SetProperty(ref _isRunningHealthCheck, value))
+            {
+                RunHealthCheckCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public string HealthSummaryText
+    {
+        get => _healthSummaryText;
+        private set => SetProperty(ref _healthSummaryText, value);
+    }
+
+    public Brush HealthSummaryBrush
+    {
+        get => _healthSummaryBrush;
+        private set => SetProperty(ref _healthSummaryBrush, value);
+    }
+
+    public void BeginVolumeDrag()
+    {
+        _isDraggingVolume = true;
+        _volumeDebounceCts?.Cancel();
+    }
+
+    public void EndVolumeDrag()
+    {
+        _isDraggingVolume = false;
+        ScheduleDebouncedVolumeApply(TargetVolume, immediate: true);
+    }
+
+    public void AdjustVolumeByWheel(int deltaSteps)
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        TargetVolume = Math.Clamp(TargetVolume + deltaSteps, 0, MaxVolume);
+    }
 
     private bool CanControlReceiver(object? _) => !IsBusy;
 
@@ -343,56 +877,145 @@ public sealed class MainViewModel : ObservableObject
 
     private void NotifyCommandStateChanged()
     {
-        _refreshCommand.NotifyCanExecuteChanged();
-        _playCommand.NotifyCanExecuteChanged();
-        _pauseCommand.NotifyCanExecuteChanged();
-        _stopCommand.NotifyCanExecuteChanged();
-        _toggleMuteCommand.NotifyCanExecuteChanged();
-        _setLowVolumeCommand.NotifyCanExecuteChanged();
-        _applyVolumeCommand.NotifyCanExecuteChanged();
-        _volumeUpCommand.NotifyCanExecuteChanged();
-        _volumeDownCommand.NotifyCanExecuteChanged();
-        _playCustomStreamCommand.NotifyCanExecuteChanged();
-        _playPresetCommand.NotifyCanExecuteChanged();
-        _playPresetLowCommand.NotifyCanExecuteChanged();
-        _removeSelectedStationCommand.NotifyCanExecuteChanged();
+        RefreshCommand.NotifyCanExecuteChanged();
+        TogglePowerCommand.NotifyCanExecuteChanged();
+        ToggleZone2Command.NotifyCanExecuteChanged();
+        PlayPauseCommand.NotifyCanExecuteChanged();
+        PlayCommand.NotifyCanExecuteChanged();
+        PauseCommand.NotifyCanExecuteChanged();
+        StopCommand.NotifyCanExecuteChanged();
+        NextTrackCommand.NotifyCanExecuteChanged();
+        PreviousTrackCommand.NotifyCanExecuteChanged();
+        ToggleMuteCommand.NotifyCanExecuteChanged();
+        SetLowVolumeCommand.NotifyCanExecuteChanged();
+        ApplyVolumeCommand.NotifyCanExecuteChanged();
+        VolumeUpCommand.NotifyCanExecuteChanged();
+        VolumeDownCommand.NotifyCanExecuteChanged();
+        VolumeFineUpCommand.NotifyCanExecuteChanged();
+        VolumeFineDownCommand.NotifyCanExecuteChanged();
+        SetVolumePresetCommand.NotifyCanExecuteChanged();
+        SelectInputCommand.NotifyCanExecuteChanged();
+        SelectSoundModeCommand.NotifyCanExecuteChanged();
+        SetEcoModeCommand.NotifyCanExecuteChanged();
+        SetSleepTimerCommand.NotifyCanExecuteChanged();
+        PlayCustomStreamCommand.NotifyCanExecuteChanged();
+        PlayPresetCommand.NotifyCanExecuteChanged();
+        PlayPresetLowCommand.NotifyCanExecuteChanged();
+        PlayFavoriteCommand.NotifyCanExecuteChanged();
+        FixSilentAudioCommand.NotifyCanExecuteChanged();
+        ResetConnectionsCommand.NotifyCanExecuteChanged();
     }
 
     private void ApplyStateSnapshot(ReceiverStateSnapshot snapshot)
     {
         IsBusy = snapshot.IsBusy;
+        IsConnected = snapshot.IsConnected;
 
         if (snapshot.Status is { } status)
         {
-            ReceiverTitle = status.Player.Name;
-            var powerText = status.IsPoweredOn && status.IsMainZoneOn ? "Main Zone On" : "Standby";
-            var inputText = string.IsNullOrWhiteSpace(status.InputSource) ? "Unknown Input" : status.InputSource;
-            ReceiverDetails = $"{status.Player.Model} on {status.Player.IpAddress} via {status.Player.Network} • {powerText} • {inputText}";
-            NowPlayingTitle = FirstNonEmpty(status.NowPlaying.Song, "Url Stream");
-            NowPlayingDetail = BuildNowPlayingDetail(status.NowPlaying);
+            ReceiverTitle = string.IsNullOrWhiteSpace(status.Player.Name) ? _settingsStore.Current.Receiver.PlayerName : status.Player.Name;
+            FirmwareVersion = string.IsNullOrWhiteSpace(status.Player.Version) ? string.Empty : $"FW {status.Player.Version}";
+            IsPoweredOn = status.IsPoweredOn;
+            IsMainZoneOn = status.IsMainZoneOn;
+            IsZone2On = status.IsZone2On;
+
+            InputSourceCode = status.InputSource;
+            InputSourceDisplay = DenonCatalog.GetFriendlyInputName(status.InputSource);
+            SoundMode = string.IsNullOrWhiteSpace(status.SoundMode) ? "—" : status.SoundMode;
+            EcoMode = string.IsNullOrWhiteSpace(status.EcoMode) ? "—" : status.EcoMode;
+            SleepTimerMinutes = status.SleepTimerMinutes;
+
+            var powerText = status.IsPoweredOn && status.IsMainZoneOn ? "Active" : "Standby";
+            var netBadge = string.IsNullOrWhiteSpace(status.Player.Network) ? "LAN" : status.Player.Network.ToUpperInvariant();
+            ReceiverDetails = $"{status.Player.Model} • {status.Player.IpAddress} ({netBadge}) • {powerText}";
+
+            IsPlaying = string.Equals(status.PlayState, "play", StringComparison.OrdinalIgnoreCase);
+            IsPaused = string.Equals(status.PlayState, "pause", StringComparison.OrdinalIgnoreCase);
             PlayState = ToTitleCase(status.PlayState);
+
+            var activeStation = !string.IsNullOrWhiteSpace(status.ActiveStationAlias)
+                ? StationPresets.FirstOrDefault(s => string.Equals(s.Alias, status.ActiveStationAlias, StringComparison.OrdinalIgnoreCase))
+                : null;
+
+            foreach (var preset in StationPresets)
+            {
+                preset.IsCurrentlyPlaying = activeStation is not null && ReferenceEquals(preset, activeStation);
+            }
+
+            if (!status.IsPoweredOn || !status.IsMainZoneOn)
+            {
+                NowPlayingTitle = "Receiver in Standby";
+                NowPlayingDetail = "Press Power or select any station to wake the receiver.";
+                NowPlayingImageUrl = string.Empty;
+            }
+            else if (!DenonCatalog.InputMatches(status.InputSource, "NET"))
+            {
+                NowPlayingTitle = InputSourceDisplay;
+                NowPlayingDetail = $"External Input • Sound Mode: {SoundMode}";
+                NowPlayingImageUrl = string.Empty;
+            }
+            else
+            {
+                var fallbackTitle = activeStation?.DisplayName ?? "HEOS Stream";
+                NowPlayingTitle = FirstNonEmpty(status.NowPlaying.Song, fallbackTitle);
+                NowPlayingDetail = BuildNowPlayingDetail(status.NowPlaying, activeStation);
+                NowPlayingImageUrl = status.NowPlaying.ImageUrl;
+            }
+
+            MaxVolume = status.MaxVolume > 0 ? status.MaxVolume : 98;
             LiveVolume = status.Volume;
-            TargetVolume = status.Volume;
+            LiveVolumeExact = status.VolumeExact;
             IsMuted = status.IsMuted;
+
+            // Never fight the user while they are actively dragging the volume slider!
+            if (!_isDraggingVolume)
+            {
+                _suppressVolumeSend = true;
+                try
+                {
+                    TargetVolume = status.Volume;
+                }
+                finally
+                {
+                    _suppressVolumeSend = false;
+                }
+            }
+
+            foreach (var inputItem in InputSources)
+            {
+                inputItem.IsActive = status.IsPoweredOn && status.IsMainZoneOn && DenonCatalog.InputMatches(status.InputSource, inputItem.Code);
+            }
+
+            var normalizedSoundMode = (status.SoundMode ?? string.Empty).Trim().ToUpperInvariant();
+            foreach (var modeItem in SoundModes)
+            {
+                modeItem.IsActive = SoundModeMatches(normalizedSoundMode, modeItem.Code);
+            }
+
+            foreach (var sleepOption in SleepTimerOptions)
+            {
+                sleepOption.IsActive = sleepOption.Minutes == status.SleepTimerMinutes;
+            }
         }
 
         if (snapshot.IsConnected)
         {
-            ConnectionBadgeText = "Online";
-            ConnectionBadgeBrush = new SolidColorBrush(Color.FromRgb(26, 110, 79));
+            var isAwake = snapshot.Status is { IsPoweredOn: true, IsMainZoneOn: true };
+            ConnectionBadgeText = isAwake ? "ONLINE" : "STANDBY";
+            ConnectionBadgeBrush = isAwake ? OnlineBrush : StandbyBrush;
             StatusMessage = snapshot.Status is not null
-                ? $"{(snapshot.Status.IsPoweredOn && snapshot.Status.IsMainZoneOn ? PlayState : "Standby")} on {snapshot.Status.InputSource} at volume {LiveVolume}%."
+                ? $"{(isAwake ? InputSourceDisplay : "Standby")} • {DenonVolumeMath.FormatDecibels(LiveVolume)} ({LiveVolume})"
                 : "Receiver connected.";
         }
         else
         {
-            ConnectionBadgeText = "Offline";
-            ConnectionBadgeBrush = new SolidColorBrush(Color.FromRgb(138, 43, 43));
+            ConnectionBadgeText = "OFFLINE";
+            ConnectionBadgeBrush = OfflineBrush;
         }
 
         LastUpdatedText = snapshot.LastSuccessfulRefresh.HasValue
-            ? $"Last successful refresh: {snapshot.LastSuccessfulRefresh.Value.LocalDateTime:yyyy-MM-dd HH:mm:ss}"
-            : "No successful refresh yet.";
+            ? $"Synced {snapshot.LastSuccessfulRefresh.Value.LocalDateTime:HH:mm:ss}"
+            : "Not synced yet";
 
         LastError = snapshot.LastError ?? string.Empty;
         if (!string.IsNullOrWhiteSpace(snapshot.LastError))
@@ -408,10 +1031,16 @@ public sealed class MainViewModel : ObservableObject
         SettingsPlayerName = settings.Receiver.PlayerName;
         SettingsPollIntervalSeconds = settings.Receiver.PollIntervalSeconds.ToString();
         SettingsLowVolume = settings.Receiver.DefaultLowVolume.ToString();
+        SettingsVolumePresetsText = string.Join(", ", settings.Receiver.VolumePresets);
         SettingsStartMinimizedToTray = settings.Ui.StartMinimizedToTray;
         SettingsMinimizeToTray = settings.Ui.MinimizeToTray;
         SettingsCloseToTray = settings.Ui.CloseToTray;
         SettingsShowNotifications = settings.Ui.ShowNotifications;
+        SettingsDisplayVolumeInDb = settings.Ui.DisplayVolumeInDb;
+        SettingsLaunchAtWindowsStartup = settings.Ui.LaunchAtWindowsStartup || _startupService.IsEnabled();
+        DisplayVolumeInDb = settings.Ui.DisplayVolumeInDb;
+
+        RebuildVolumePresets(settings.Receiver.VolumePresets);
 
         StationPresets.Clear();
         foreach (var station in settings.Receiver.Stations)
@@ -423,57 +1052,225 @@ public sealed class MainViewModel : ObservableObject
         {
             SelectedStationPreset = StationPresets[0];
         }
+
+        FilteredStationPresets.Refresh();
     }
 
-    private async Task RefreshAsync() =>
-        await ExecuteReceiverActionAsync(
-            () => _receiverController.RefreshAsync(),
-            "Receiver refreshed.");
+    private void RebuildVolumePresets(IReadOnlyList<int> presets)
+    {
+        string[] defaultNames = ["Night", "Chill", "Normal", "Boost", "Party", "Max"];
+        VolumePresets.Clear();
+        for (var i = 0; i < presets.Count; i++)
+        {
+            var label = i < defaultNames.Length ? defaultNames[i] : $"Preset {i + 1}";
+            VolumePresets.Add(new VolumePresetItem(presets[i], label));
+        }
 
-    private async Task SetPlayStateAsync(string state) =>
-        await ExecuteReceiverActionAsync(
-            () => _receiverController.SetPlayStateAsync(state),
-            $"Play state set to {ToTitleCase(state)}.");
+        UpdateActiveVolumePreset(TargetVolume);
+    }
 
-    private async Task ToggleMuteAsync() =>
-        await ExecuteReceiverActionAsync(
-            () => _receiverController.ToggleMuteAsync(),
-            "Mute state updated.");
+    private void UpdateActiveVolumePreset(int currentLevel)
+    {
+        foreach (var item in VolumePresets)
+        {
+            item.IsActive = Math.Abs(item.Level - currentLevel) <= 1;
+        }
+    }
+
+    private void ScheduleDebouncedVolumeApply(int level, bool immediate = false)
+    {
+        _volumeDebounceCts?.Cancel();
+        _volumeDebounceCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        _volumeDebounceCts = cts;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (!immediate)
+                {
+                    await Task.Delay(170, cts.Token);
+                }
+
+                await _receiverController.SetVolumeAsync(level, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Superseded by newer drag/step
+            }
+            catch (Exception exception)
+            {
+                await _dispatcher.InvokeAsync(() =>
+                {
+                    LastError = exception.Message;
+                    StatusMessage = exception.Message;
+                });
+            }
+        });
+    }
+
+    private Task RefreshAsync() =>
+        ExecuteReceiverActionAsync(() => _receiverController.RefreshAsync(), "Receiver telemetry refreshed.");
+
+    private Task TogglePowerAsync() =>
+        ExecuteReceiverActionAsync(() => _receiverController.TogglePowerAsync(), IsPoweredOn && IsMainZoneOn ? "Receiver entering standby." : "Receiver powering on.");
+
+    private Task ToggleZone2Async() =>
+        ExecuteReceiverActionAsync(() => _receiverController.SetZone2PowerAsync(!IsZone2On), IsZone2On ? "Zone 2 turned off." : "Zone 2 turned on.");
+
+    private Task PlayPauseAsync() =>
+        SetPlayStateAsync(IsPlaying ? "pause" : "play");
+
+    private Task SetPlayStateAsync(string state) =>
+        ExecuteReceiverActionAsync(() => _receiverController.SetPlayStateAsync(state), $"Transport set to {ToTitleCase(state)}.");
+
+    private Task NextTrackAsync() =>
+        ExecuteReceiverActionAsync(() => _receiverController.PlayNextAsync(), "Skipped to next track.");
+
+    private Task PreviousTrackAsync() =>
+        ExecuteReceiverActionAsync(() => _receiverController.PlayPreviousAsync(), "Returned to previous track.");
+
+    private Task ToggleMuteAsync() =>
+        ExecuteReceiverActionAsync(() => _receiverController.ToggleMuteAsync(), IsMuted ? "Receiver unmuted." : "Receiver muted.");
 
     private async Task SetLowVolumeAsync()
     {
         if (int.TryParse(SettingsLowVolume, out var lowVolume))
         {
+            _suppressVolumeSend = true;
             TargetVolume = lowVolume;
+            _suppressVolumeSend = false;
         }
 
-        await ExecuteReceiverActionAsync(
-            () => _receiverController.SetLowVolumeAsync(),
-            "Receiver set to low volume.");
+        await ExecuteReceiverActionAsync(() => _receiverController.SetLowVolumeAsync(), "Safety low volume applied.");
     }
 
-    private async Task ApplyVolumeAsync() =>
-        await ExecuteReceiverActionAsync(
-            () => _receiverController.SetVolumeAsync(TargetVolume),
-            $"Volume set to {TargetVolume}%.");
+    private Task ApplyVolumeAsync() =>
+        ExecuteReceiverActionAsync(() => _receiverController.SetVolumeAsync(TargetVolume), $"Volume set to {DenonVolumeMath.FormatDecibels(TargetVolume)} ({TargetVolume}).");
 
     private async Task StepVolumeAsync(int delta)
     {
-        TargetVolume = Math.Clamp(TargetVolume + delta, 0, 100);
-        await ApplyVolumeAsync();
+        var next = Math.Clamp(TargetVolume + delta, 0, MaxVolume);
+        _suppressVolumeSend = true;
+        TargetVolume = next;
+        _suppressVolumeSend = false;
+        await ExecuteReceiverActionAsync(() => _receiverController.SetVolumeAsync(next), $"Volume set to {DenonVolumeMath.FormatDecibels(next)} ({next}).");
+    }
+
+    private async Task SetVolumePresetAsync(object? parameter)
+    {
+        if (parameter is not VolumePresetItem preset)
+        {
+            return;
+        }
+
+        _suppressVolumeSend = true;
+        TargetVolume = preset.Level;
+        _suppressVolumeSend = false;
+        await ExecuteReceiverActionAsync(() => _receiverController.SetVolumeAsync(preset.Level), $"{preset.Name} volume ({preset.DbLabel}) applied.");
+    }
+
+    private async Task SelectInputAsync(object? parameter)
+    {
+        var code = parameter switch
+        {
+            InputSourceItem item => item.Code,
+            string str => str,
+            _ => null,
+        };
+
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return;
+        }
+
+        await ExecuteReceiverActionAsync(
+            () => _receiverController.SetInputSourceAsync(code),
+            $"Switched input to {DenonCatalog.GetFriendlyInputName(code)}.");
+    }
+
+    private async Task SelectSoundModeAsync(object? parameter)
+    {
+        var code = parameter switch
+        {
+            SoundModeItem item => item.Code,
+            string str => str,
+            _ => null,
+        };
+
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return;
+        }
+
+        await ExecuteReceiverActionAsync(
+            () => _receiverController.SetSoundModeAsync(code),
+            $"Sound mode set to {code}.");
+    }
+
+    private async Task SetEcoModeAsync(object? parameter)
+    {
+        if (parameter is not string mode || string.IsNullOrWhiteSpace(mode))
+        {
+            return;
+        }
+
+        await ExecuteReceiverActionAsync(
+            () => _receiverController.SetEcoModeAsync(mode),
+            $"ECO mode set to {mode}.");
+    }
+
+    private async Task SetSleepTimerAsync(object? parameter)
+    {
+        int? minutes = parameter switch
+        {
+            SleepTimerOption opt => opt.Minutes,
+            int m => m,
+            _ => null,
+        };
+
+        await ExecuteReceiverActionAsync(
+            () => _receiverController.SetSleepTimerAsync(minutes),
+            minutes is > 0 ? $"Sleep timer set for {minutes} minutes." : "Sleep timer turned off.");
     }
 
     private async Task PlayCustomStreamAsync()
     {
         if (string.IsNullOrWhiteSpace(CustomStreamUrl))
         {
-            StatusMessage = "Enter a stream URL before starting custom playback.";
+            StatusMessage = "Enter a stream URL before starting playback.";
             return;
         }
 
         await ExecuteReceiverActionAsync(
             () => _receiverController.PlayCustomUrlAsync(CustomStreamUrl, UseLowVolumeForStreams, UnmuteBeforePlay),
             "Custom stream started.");
+    }
+
+    private async Task TestCustomStreamAsync()
+    {
+        if (string.IsNullOrWhiteSpace(CustomStreamUrl))
+        {
+            CustomStreamProbeStatus = "Enter a URL to test.";
+            CustomStreamProbeSuccess = false;
+            return;
+        }
+
+        IsProbingCustomStream = true;
+        CustomStreamProbeStatus = "Probing stream endpoint...";
+        CustomStreamProbeSuccess = null;
+
+        try
+        {
+            var result = await _streamProbeService.ProbeAsync(CustomStreamUrl);
+            CustomStreamProbeSuccess = result.IsReachable;
+            CustomStreamProbeStatus = result.IsReachable ? $"OK • {result.Message}" : $"Failed • {result.Message}";
+        }
+        finally
+        {
+            IsProbingCustomStream = false;
+        }
     }
 
     private async Task PlayPresetAsync(object? parameter)
@@ -484,8 +1281,8 @@ public sealed class MainViewModel : ObservableObject
         }
 
         await ExecuteReceiverActionAsync(
-            () => _receiverController.PlayPresetAsync(preset.ToModel(), UseLowVolumeForStreams, UnmuteBeforePlay),
-            $"Playing {preset.DisplayName}.");
+            () => _receiverController.PlayPresetAsync(preset.ToModel(), useLowVolume: false, unmute: UnmuteBeforePlay),
+            $"Tuning to {preset.DisplayName}...");
     }
 
     private async Task PlayPresetLowAsync(object? parameter)
@@ -497,13 +1294,178 @@ public sealed class MainViewModel : ObservableObject
 
         await ExecuteReceiverActionAsync(
             () => _receiverController.PlayPresetAsync(preset.ToModel(), useLowVolume: true, unmute: true),
-            $"Playing {preset.DisplayName} at low volume.");
+            $"Tuning to {preset.DisplayName} at safety low volume...");
+    }
+
+    private async Task TestPresetAsync(object? parameter)
+    {
+        if (parameter is not StationPresetEditor preset)
+        {
+            return;
+        }
+
+        preset.IsProbing = true;
+        preset.ProbeStatusText = "Probing...";
+        preset.ProbeSucceeded = null;
+
+        try
+        {
+            var result = await _streamProbeService.ProbeAsync(preset.Url);
+            preset.ProbeSucceeded = result.IsReachable;
+            preset.ProbeStatusText = result.IsReachable ? $"OK • {result.Message}" : $"Error • {result.Message}";
+        }
+        finally
+        {
+            preset.IsProbing = false;
+        }
+    }
+
+    private async Task LoadFavoritesAsync()
+    {
+        IsLoadingFavorites = true;
+        FavoritesStatusText = "Querying HEOS Favorites from receiver...";
+
+        try
+        {
+            var favorites = await _receiverController.GetFavoritesAsync();
+            HeosFavorites.Clear();
+            foreach (var fav in favorites)
+            {
+                HeosFavorites.Add(fav);
+            }
+
+            FavoritesStatusText = favorites.Count > 0
+                ? $"Loaded {favorites.Count} HEOS Favorites from your receiver."
+                : "No HEOS Favorites found on this receiver.";
+        }
+        catch (Exception exception)
+        {
+            FavoritesStatusText = $"Could not load favorites: {exception.Message}";
+        }
+        finally
+        {
+            IsLoadingFavorites = false;
+        }
+    }
+
+    private async Task PlayFavoriteAsync(object? parameter)
+    {
+        if (parameter is not HeosFavoriteItem favorite)
+        {
+            return;
+        }
+
+        await ExecuteReceiverActionAsync(
+            () => _receiverController.PlayFavoriteAsync(favorite, UseLowVolumeForStreams, UnmuteBeforePlay),
+            $"Playing HEOS Favorite: {favorite.Name}");
+    }
+
+    private async Task ScanNetworkAsync()
+    {
+        IsScanningNetwork = true;
+        DiscoveryStatusText = "Scanning LAN via SSDP & HEOS port 1255...";
+        DiscoveredReceivers.Clear();
+
+        try
+        {
+            var found = await _discoveryService.DiscoverAsync();
+            foreach (var receiver in found)
+            {
+                DiscoveredReceivers.Add(receiver);
+            }
+
+            DiscoveryStatusText = found.Count > 0
+                ? $"Found {found.Count} HEOS receiver(s). Click one to populate your connection settings."
+                : "No HEOS receivers responded to SSDP discovery. Verify your receiver is powered or in Network Standby.";
+        }
+        catch (Exception exception)
+        {
+            DiscoveryStatusText = $"Discovery failed: {exception.Message}";
+        }
+        finally
+        {
+            IsScanningNetwork = false;
+        }
+    }
+
+    private void UseDiscoveredReceiver(object? parameter)
+    {
+        if (parameter is not DiscoveredReceiver receiver)
+        {
+            return;
+        }
+
+        SettingsHost = receiver.IpAddress;
+        SettingsPort = receiver.Port.ToString();
+        SettingsPlayerName = receiver.Name;
+        StatusMessage = $"Selected {receiver.Name} ({receiver.IpAddress}). Click 'Save Settings' to apply.";
+    }
+
+    private void AddStation()
+    {
+        var editor = new StationPresetEditor
+        {
+            Alias = $"station-{StationPresets.Count + 1}",
+            DisplayName = "New Radio Station",
+            Url = "http://",
+        };
+
+        StationPresets.Add(editor);
+        SelectedStationPreset = editor;
+        FilteredStationPresets.Refresh();
+        StatusMessage = "Added new station preset. Edit details and click Save.";
+    }
+
+    private void RemoveStation(object? parameter)
+    {
+        var target = parameter as StationPresetEditor ?? SelectedStationPreset;
+        if (target is null)
+        {
+            return;
+        }
+
+        var removedName = target.DisplayName;
+        StationPresets.Remove(target);
+        SelectedStationPreset = StationPresets.FirstOrDefault();
+        FilteredStationPresets.Refresh();
+        StatusMessage = $"Removed '{removedName}'. Click Save to persist changes.";
+    }
+
+    private void MoveStationUp(object? parameter)
+    {
+        if (parameter is not StationPresetEditor station)
+        {
+            return;
+        }
+
+        var index = StationPresets.IndexOf(station);
+        if (index > 0)
+        {
+            StationPresets.Move(index, index - 1);
+            FilteredStationPresets.Refresh();
+        }
+    }
+
+    private void MoveStationDown(object? parameter)
+    {
+        if (parameter is not StationPresetEditor station)
+        {
+            return;
+        }
+
+        var index = StationPresets.IndexOf(station);
+        if (index >= 0 && index < StationPresets.Count - 1)
+        {
+            StationPresets.Move(index, index + 1);
+            FilteredStationPresets.Refresh();
+        }
     }
 
     private async Task SaveSettingsAsync()
     {
         try
         {
+            var volumePresets = ParseVolumePresets(SettingsVolumePresetsText);
             var settings = new AppSettings
             {
                 Receiver = new ReceiverSettings
@@ -512,7 +1474,8 @@ public sealed class MainViewModel : ObservableObject
                     Port = ParseInt(SettingsPort, 1255),
                     PlayerName = SettingsPlayerName,
                     PollIntervalSeconds = ParseInt(SettingsPollIntervalSeconds, 5),
-                    DefaultLowVolume = ParseInt(SettingsLowVolume, 10),
+                    DefaultLowVolume = ParseInt(SettingsLowVolume, 20),
+                    VolumePresets = volumePresets,
                     Stations = StationPresets.Select(static station => station.ToModel()).ToList(),
                 },
                 Ui = new UiSettings
@@ -521,11 +1484,15 @@ public sealed class MainViewModel : ObservableObject
                     MinimizeToTray = SettingsMinimizeToTray,
                     CloseToTray = SettingsCloseToTray,
                     ShowNotifications = SettingsShowNotifications,
+                    DisplayVolumeInDb = SettingsDisplayVolumeInDb,
+                    LaunchAtWindowsStartup = SettingsLaunchAtWindowsStartup,
                 },
             };
 
+            _startupService.SetEnabled(SettingsLaunchAtWindowsStartup);
+            _receiverController.ResetConnections();
             await _settingsStore.SaveAsync(settings);
-            StatusMessage = "Settings saved. Refreshing receiver with the new connection profile.";
+            StatusMessage = "Settings saved. Syncing with receiver...";
             await _receiverController.RefreshAsync();
         }
         catch (Exception exception)
@@ -535,37 +1502,410 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private void AddStation()
+    private void LoadDefaultSettingsIntoEditor()
     {
-        var editor = new StationPresetEditor
-        {
-            Alias = $"station-{StationPresets.Count + 1}",
-            DisplayName = "New Station",
-            Url = "http://",
-        };
-
-        StationPresets.Add(editor);
-        SelectedStationPreset = editor;
-        StatusMessage = "Added a new station row. Save settings to persist it.";
+        LoadSettings(AppSettings.CreateDefault());
+        StatusMessage = "Factory defaults loaded into editor. Click Save Settings to apply.";
     }
 
-    private void RemoveSelectedStation()
+    private void ExportSettings()
     {
-        if (SelectedStationPreset is null)
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Export Denon Desktop Settings",
+            Filter = "JSON Files (*.json)|*.json",
+            FileName = "denon-desktop-settings.json",
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            File.WriteAllText(dialog.FileName, _settingsStore.ExportJson());
+            StatusMessage = $"Settings exported to {Path.GetFileName(dialog.FileName)}.";
+            _logStore.Info($"Exported settings to {dialog.FileName}");
+        }
+    }
+
+    private async Task ImportSettingsAsync()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Import Denon Desktop Settings",
+            Filter = "JSON Files (*.json)|*.json",
+        };
+
+        if (dialog.ShowDialog() != true)
         {
             return;
         }
 
-        var removedName = SelectedStationPreset.DisplayName;
-        StationPresets.Remove(SelectedStationPreset);
-        SelectedStationPreset = StationPresets.FirstOrDefault();
-        StatusMessage = $"Removed station '{removedName}'. Save settings to persist the change.";
+        try
+        {
+            var json = await File.ReadAllTextAsync(dialog.FileName);
+            await _settingsStore.ImportJsonAsync(json);
+            _receiverController.ResetConnections();
+            StatusMessage = $"Settings imported from {Path.GetFileName(dialog.FileName)}.";
+        }
+        catch (Exception exception)
+        {
+            LastError = exception.Message;
+            StatusMessage = $"Import failed: {exception.Message}";
+        }
     }
 
-    private void LoadDefaultSettingsIntoEditor()
+    private async Task RunConsoleCommandAsync(string command)
     {
-        LoadSettings(AppSettings.CreateDefault());
-        StatusMessage = "Default settings loaded into the editor. Save to apply them.";
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            return;
+        }
+
+        IsRunningConsoleCommand = true;
+        try
+        {
+            var reply = string.Equals(ConsoleProtocol, "HEOS", StringComparison.OrdinalIgnoreCase)
+                ? await _receiverController.SendRawHeosCommandAsync(command)
+                : await _receiverController.SendRawAvrCommandAsync(command);
+
+            ConsoleOutput = $"[{DateTime.Now:HH:mm:ss}] ({ConsoleProtocol}) > {command.Trim()}\n{reply}";
+        }
+        catch (Exception exception)
+        {
+            ConsoleOutput = $"[{DateTime.Now:HH:mm:ss}] ({ConsoleProtocol}) ERROR: {exception.Message}";
+        }
+        finally
+        {
+            IsRunningConsoleCommand = false;
+        }
+    }
+
+    private async Task RunQuickDiagnosticAsync(object? parameter)
+    {
+        if (parameter is not string raw || string.IsNullOrWhiteSpace(raw))
+        {
+            return;
+        }
+
+        // Format: "AVR:MV?" or "HEOS:heos://player/get_players"
+        var separator = raw.IndexOf(':');
+        if (separator > 0)
+        {
+            var proto = raw[..separator];
+            var cmd = raw[(separator + 1)..];
+            ConsoleProtocol = proto;
+            ConsoleCommandInput = cmd;
+            await RunConsoleCommandAsync(cmd);
+        }
+    }
+
+    private void CopyLogsToClipboard()
+    {
+        var lines = LogEntries.Select(static e => $"{e.Timestamp:yyyy-MM-dd HH:mm:ss} [{e.Level}] {e.Message}");
+        System.Windows.Clipboard.SetText(string.Join(Environment.NewLine, lines));
+        StatusMessage = "Copied activity history to clipboard.";
+    }
+
+    private async Task FixSilentAudioAsync() =>
+        await ExecuteReceiverActionAsync(
+            () => _receiverController.FixSilentAudioAsync(35),
+            "Receiver woken, switched to HEOS, unmuted, and set to audible volume.");
+
+    private async Task ResetAndRefreshAsync()
+    {
+        _receiverController.ResetConnections();
+        await ExecuteReceiverActionAsync(
+            () => _receiverController.RefreshAsync(),
+            "Connections reset and receiver synced.");
+    }
+
+    private async Task RunHealthCheckAsync()
+    {
+        IsRunningHealthCheck = true;
+        HealthSummaryText = "Running 5-point receiver health check...";
+        HealthSummaryBrush = CreateFrozenBrush(56, 189, 248);
+
+        var settings = _settingsStore.Current.Receiver;
+        var netCheck = DiagnosticChecks[0];
+        var avrCheck = DiagnosticChecks[1];
+        var heosCheck = DiagnosticChecks[2];
+        var audioCheck = DiagnosticChecks[3];
+        var streamCheck = DiagnosticChecks[4];
+
+        foreach (var check in DiagnosticChecks)
+        {
+            check.SetResult(DiagnosticCheckState.Running, "Testing...");
+        }
+
+        try
+        {
+            // 1. Network Ping
+            try
+            {
+                using var ping = new Ping();
+                var reply = await ping.SendPingAsync(settings.Host, 2000);
+                if (reply.Status == IPStatus.Success)
+                {
+                    netCheck.SetResult(
+                        DiagnosticCheckState.Pass,
+                        $"Receiver at {settings.Host} responded in {reply.RoundtripTime} ms.");
+                }
+                else
+                {
+                    netCheck.SetResult(
+                        DiagnosticCheckState.Fail,
+                        $"Could not reach {settings.Host} ({reply.Status}).",
+                        "Make sure your Denon receiver is plugged in and connected to the same Wi-Fi/LAN, or click 'Scan LAN' in Settings.");
+                }
+            }
+            catch (Exception ex)
+            {
+                netCheck.SetResult(
+                    DiagnosticCheckState.Fail,
+                    $"Network test failed for '{settings.Host}': {ex.Message}",
+                    "Check the Receiver IP in Settings or run 'Scan LAN' to find the receiver automatically.");
+            }
+
+            // 2. AVR Control Interface (Port 23)
+            AvrDeviceStatus? avrStatus = null;
+            try
+            {
+                avrStatus = await _receiverController.GetAvrStatusOnlyAsync();
+                var powerText = avrStatus.IsPoweredOn && avrStatus.IsMainZoneOn ? "Awake" : "Standby";
+                avrCheck.SetResult(
+                    DiagnosticCheckState.Pass,
+                    $"AVR control responded ({powerText}, Input: {DenonCatalog.GetFriendlyInputName(avrStatus.InputSource)}, Volume: {DenonVolumeMath.FormatDecibels(avrStatus.Volume)}).");
+            }
+            catch (Exception ex)
+            {
+                avrCheck.SetResult(
+                    DiagnosticCheckState.Fail,
+                    $"AVR control port (:23) did not respond: {ex.Message}",
+                    "Denon receivers only allow 1 control connection at a time. Close other Denon remote apps or click 'Reset Connections'.");
+            }
+
+            // 3. HEOS Streaming Engine (Port 1255)
+            try
+            {
+                var players = await _receiverController.GetPlayersAsync();
+                if (players.Count == 0)
+                {
+                    heosCheck.SetResult(
+                        DiagnosticCheckState.Fail,
+                        "HEOS connected, but no players were reported.",
+                        "Restart the receiver's Network / HEOS module or unplug power for 15 seconds.");
+                }
+                else
+                {
+                    var targetSlug = SlugNormalizer.Normalize(settings.PlayerName);
+                    var matched = players.FirstOrDefault(p =>
+                        SlugNormalizer.Normalize(p.Name) == targetSlug ||
+                        SlugNormalizer.Normalize(p.Model) == targetSlug ||
+                        SlugNormalizer.Normalize(p.IpAddress) == targetSlug);
+
+                    if (matched is not null)
+                    {
+                        heosCheck.SetResult(
+                            DiagnosticCheckState.Pass,
+                            $"Matched '{matched.Name}' ({matched.Model}, Firmware {matched.Version}).");
+                    }
+                    else
+                    {
+                        var names = string.Join(", ", players.Select(static p => p.Name));
+                        heosCheck.SetResult(
+                            DiagnosticCheckState.Warning,
+                            $"HEOS is online, but player name '{settings.PlayerName}' did not match.",
+                            $"Available player(s): {names}. Update 'HEOS Player Name' in Settings.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                heosCheck.SetResult(
+                    DiagnosticCheckState.Fail,
+                    $"HEOS port ({settings.Port}) did not respond: {ex.Message}",
+                    "Verify Network Control is set to 'Always On' in your Denon receiver's Network menu.");
+            }
+
+            // 4. Audio Output Readiness
+            if (avrStatus is null)
+            {
+                audioCheck.SetResult(
+                    DiagnosticCheckState.Warning,
+                    "Skipped because AVR control did not respond.",
+                    "Resolve the AVR Control Interface issue above first.");
+            }
+            else if (!avrStatus.IsPoweredOn || !avrStatus.IsMainZoneOn)
+            {
+                audioCheck.SetResult(
+                    DiagnosticCheckState.Warning,
+                    "Receiver is currently in Standby (powered off).",
+                    "Click 'Fix Silent Audio' or the Power button in the title bar to wake the receiver.");
+            }
+            else if (avrStatus.IsMuted)
+            {
+                audioCheck.SetResult(
+                    DiagnosticCheckState.Warning,
+                    "Receiver audio is currently MUTED.",
+                    "Click 'Fix Silent Audio' or press M to unmute.");
+            }
+            else if (avrStatus.Volume < 18)
+            {
+                audioCheck.SetResult(
+                    DiagnosticCheckState.Warning,
+                    $"Volume is very quiet ({DenonVolumeMath.FormatDecibels(avrStatus.Volume)} / level {avrStatus.Volume}).",
+                    "Levels below 20 (-60 dB) are often inaudible. Click 'Fix Silent Audio' or raise the volume slider.");
+            }
+            else if (!DenonCatalog.InputMatches(avrStatus.InputSource, "NET"))
+            {
+                audioCheck.SetResult(
+                    DiagnosticCheckState.Pass,
+                    $"Audio is ready on {DenonCatalog.GetFriendlyInputName(avrStatus.InputSource)} at {DenonVolumeMath.FormatDecibels(avrStatus.Volume)}.",
+                    "Playing any radio station will automatically switch the input to HEOS Music.");
+            }
+            else
+            {
+                audioCheck.SetResult(
+                    DiagnosticCheckState.Pass,
+                    $"Receiver is awake on HEOS Music, unmuted, at audible level {DenonVolumeMath.FormatDecibels(avrStatus.Volume)} ({avrStatus.Volume}).");
+            }
+
+            // 5. Internet Radio Stream Reachability
+            var sampleStation = StationPresets.FirstOrDefault(static s => s.IsCurrentlyPlaying)
+                                ?? StationPresets.FirstOrDefault();
+            if (sampleStation is null)
+            {
+                streamCheck.SetResult(
+                    DiagnosticCheckState.Warning,
+                    "No station presets configured to test.",
+                    "Add a radio station in 'Stations & Streams'.");
+            }
+            else
+            {
+                var probe = await _streamProbeService.ProbeAsync(sampleStation.Url);
+                if (probe.IsReachable)
+                {
+                    streamCheck.SetResult(
+                        DiagnosticCheckState.Pass,
+                        $"'{sampleStation.DisplayName}' stream is live ({probe.Message}).");
+                }
+                else
+                {
+                    streamCheck.SetResult(
+                        DiagnosticCheckState.Fail,
+                        $"'{sampleStation.DisplayName}' stream failed: {probe.Message}",
+                        "The radio station URL may have moved or your internet/firewall blocked it. Test individual stations in 'Stations & Streams'.");
+                }
+            }
+
+            var fails = DiagnosticChecks.Count(static c => c.State == DiagnosticCheckState.Fail);
+            var warns = DiagnosticChecks.Count(static c => c.State == DiagnosticCheckState.Warning);
+
+            if (fails == 0 && warns == 0)
+            {
+                HealthSummaryText = "All systems healthy! Your Denon receiver and radio streams are ready.";
+                HealthSummaryBrush = OnlineBrush;
+            }
+            else if (fails == 0)
+            {
+                HealthSummaryText = $"Connected with {warns} item(s) to check — see tips below or click 'Fix Silent Audio'.";
+                HealthSummaryBrush = StandbyBrush;
+            }
+            else
+            {
+                HealthSummaryText = $"Found {fails} connection/stream issue(s) — follow the plain-English fixes below.";
+                HealthSummaryBrush = OfflineBrush;
+            }
+
+            _logStore.Info($"Health check completed ({5 - fails - warns} OK, {warns} warnings, {fails} issues).");
+        }
+        finally
+        {
+            IsRunningHealthCheck = false;
+        }
+    }
+
+    private void CopyDiagnosticReportToClipboard()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("=== Denon Desktop Health Report ===");
+        sb.AppendLine($"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine($"Receiver: {ReceiverTitle} ({SettingsHost}:{SettingsPort})");
+        sb.AppendLine($"Status: {ConnectionBadgeText} | Input: {InputSourceDisplay} | Volume: {DenonVolumeMath.FormatDecibels(LiveVolume)} ({LiveVolume}) | Muted: {IsMuted}");
+        sb.AppendLine();
+        sb.AppendLine("--- Health Checks ---");
+        foreach (var check in DiagnosticChecks)
+        {
+            sb.AppendLine($"[{check.StatusLabel}] {check.Title}: {check.Summary}");
+            if (!string.IsNullOrWhiteSpace(check.Advice))
+            {
+                sb.AppendLine($"    Tip: {check.Advice}");
+            }
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("--- Recent Activity (last 20) ---");
+        foreach (var entry in LogEntries.TakeLast(20))
+        {
+            sb.AppendLine($"{entry.Timestamp:HH:mm:ss} [{entry.Level}] {entry.Message}");
+        }
+
+        System.Windows.Clipboard.SetText(sb.ToString());
+        StatusMessage = "Copied full health & support report to clipboard.";
+    }
+
+    private static void OpenFolder(string path)
+    {
+        try
+        {
+            Directory.CreateDirectory(path);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = path,
+                UseShellExecute = true,
+            });
+        }
+        catch
+        {
+            // Ignore shell launch errors
+        }
+    }
+
+    private bool FilterStation(object obj)
+    {
+        if (obj is not StationPresetEditor station)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(StationSearchText))
+        {
+            return true;
+        }
+
+        return station.DisplayName.Contains(StationSearchText, StringComparison.OrdinalIgnoreCase) ||
+               station.Alias.Contains(StationSearchText, StringComparison.OrdinalIgnoreCase) ||
+               station.Url.Contains(StationSearchText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool FilterLogEntry(object obj)
+    {
+        if (obj is not AppLogEntry entry)
+        {
+            return false;
+        }
+
+        if (!string.Equals(LogFilterLevel, "All", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(entry.Level.ToString(), LogFilterLevel, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(LogSearchText) &&
+            !entry.Message.Contains(LogSearchText, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private async Task ExecuteReceiverActionAsync(Func<Task<ReceiverStatus>> action, string successMessage)
@@ -585,16 +1925,60 @@ public sealed class MainViewModel : ObservableObject
     private static string FirstNonEmpty(string value, string fallback) =>
         string.IsNullOrWhiteSpace(value) ? fallback : value;
 
-    private static string BuildNowPlayingDetail(NowPlayingMedia nowPlaying)
+    private static bool SoundModeMatches(string currentMode, string optionCode)
     {
-        var pieces = new[]
+        if (string.IsNullOrWhiteSpace(currentMode))
         {
-            nowPlaying.Artist,
-            nowPlaying.Album,
-            nowPlaying.Type,
-        }.Where(static value => !string.IsNullOrWhiteSpace(value)).ToArray();
+            return false;
+        }
 
-        return pieces.Length == 0 ? "No media metadata available." : string.Join(" • ", pieces);
+        if (string.Equals(currentMode, optionCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        // Prevent "MCH STEREO" from lighting up "STEREO", and "PURE DIRECT" from lighting up "DIRECT"
+        if (string.Equals(optionCode, "STEREO", StringComparison.OrdinalIgnoreCase))
+        {
+            return currentMode.Contains("STEREO", StringComparison.OrdinalIgnoreCase) &&
+                   !currentMode.Contains("MCH", StringComparison.OrdinalIgnoreCase) &&
+                   !currentMode.Contains("MULTI", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (string.Equals(optionCode, "DIRECT", StringComparison.OrdinalIgnoreCase))
+        {
+            return currentMode.Contains("DIRECT", StringComparison.OrdinalIgnoreCase) &&
+                   !currentMode.Contains("PURE", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return currentMode.Contains(optionCode, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildNowPlayingDetail(NowPlayingMedia nowPlaying, StationPresetEditor? activeStation)
+    {
+        var pieces = new List<string>();
+        if (!string.IsNullOrWhiteSpace(nowPlaying.Artist))
+        {
+            pieces.Add(nowPlaying.Artist);
+        }
+
+        if (!string.IsNullOrWhiteSpace(nowPlaying.Album))
+        {
+            pieces.Add(nowPlaying.Album);
+        }
+
+        if (activeStation is not null &&
+            !pieces.Any(p => p.Contains(activeStation.DisplayName, StringComparison.OrdinalIgnoreCase)))
+        {
+            pieces.Add(activeStation.DisplayName);
+        }
+
+        if (pieces.Count == 0 && !string.IsNullOrWhiteSpace(nowPlaying.Type))
+        {
+            pieces.Add(ToTitleCase(nowPlaying.Type));
+        }
+
+        return pieces.Count == 0 ? "HEOS Network Audio Stream" : string.Join(" • ", pieces);
     }
 
     private static string ToTitleCase(string value) =>
@@ -604,4 +1988,31 @@ public sealed class MainViewModel : ObservableObject
 
     private static int ParseInt(string? value, int fallback) =>
         int.TryParse(value, out var parsed) ? parsed : fallback;
+
+    private static List<int> ParseVolumePresets(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return [15, 28, 42, 55];
+        }
+
+        var list = raw
+            .Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(static s => int.TryParse(s, out var v) ? (int?)Math.Clamp(v, 0, 98) : null)
+            .Where(static v => v.HasValue)
+            .Select(static v => v!.Value)
+            .Distinct()
+            .OrderBy(static v => v)
+            .Take(6)
+            .ToList();
+
+        return list.Count == 0 ? [15, 28, 42, 55] : list;
+    }
+
+    private static Brush CreateFrozenBrush(byte r, byte g, byte b)
+    {
+        var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
+        brush.Freeze();
+        return brush;
+    }
 }

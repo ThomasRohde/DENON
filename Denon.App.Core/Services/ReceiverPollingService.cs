@@ -8,6 +8,7 @@ public sealed class ReceiverPollingService : BackgroundService
     private readonly AppSettingsStore _settingsStore;
     private readonly AppLogStore _logStore;
     private string? _lastPollFailure;
+    private int _consecutiveFailures;
 
     public ReceiverPollingService(
         ReceiverController receiverController,
@@ -28,7 +29,13 @@ public sealed class ReceiverPollingService : BackgroundService
             try
             {
                 await _receiverController.RefreshAsync(stoppingToken);
+                if (_consecutiveFailures > 0)
+                {
+                    _logStore.Info("Receiver connection restored.");
+                }
+
                 _lastPollFailure = null;
+                _consecutiveFailures = 0;
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -36,6 +43,7 @@ public sealed class ReceiverPollingService : BackgroundService
             }
             catch (Exception exception)
             {
+                _consecutiveFailures++;
                 if (!string.Equals(_lastPollFailure, exception.Message, StringComparison.Ordinal))
                 {
                     _logStore.Warning($"Receiver poll failed. {exception.Message}");
@@ -43,10 +51,18 @@ public sealed class ReceiverPollingService : BackgroundService
                 }
             }
 
-            var delay = TimeSpan.FromSeconds(_settingsStore.Current.Receiver.PollIntervalSeconds);
+            var baseSeconds = _settingsStore.Current.Receiver.PollIntervalSeconds;
+            var backoffMultiplier = _consecutiveFailures switch
+            {
+                0 => 1,
+                <= 3 => 2,
+                _ => 3,
+            };
+            var delaySeconds = Math.Clamp(baseSeconds * backoffMultiplier, 2, 30);
+
             try
             {
-                await Task.Delay(delay, stoppingToken);
+                await Task.Delay(TimeSpan.FromSeconds(delaySeconds), stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

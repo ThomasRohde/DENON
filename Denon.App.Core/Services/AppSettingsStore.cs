@@ -68,6 +68,17 @@ public sealed class AppSettingsStore
         SettingsChanged?.Invoke(_current.Clone());
     }
 
+    public string ExportJson() => JsonSerializer.Serialize(_current, JsonOptions);
+
+    public async Task<AppSettings> ImportJsonAsync(string json, CancellationToken cancellationToken = default)
+    {
+        var parsed = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions)
+            ?? throw new InvalidOperationException("Imported JSON did not contain valid settings.");
+
+        await SaveAsync(parsed, cancellationToken);
+        return _current.Clone();
+    }
+
     private async Task<AppSettings> LoadFromDiskAsync(CancellationToken cancellationToken)
     {
         try
@@ -85,11 +96,25 @@ public sealed class AppSettingsStore
 
     private static async Task SaveInternalAsync(AppSettings settings, CancellationToken cancellationToken)
     {
-        await using var stream = File.Create(AppDataPaths.SettingsFilePath);
-        await JsonSerializer.SerializeAsync(stream, settings, JsonOptions, cancellationToken);
+        var tempPath = AppDataPaths.SettingsFilePath + ".tmp";
+        try
+        {
+            await using (var stream = File.Create(tempPath))
+            {
+                await JsonSerializer.SerializeAsync(stream, settings, JsonOptions, cancellationToken);
+            }
+
+            File.Move(tempPath, AppDataPaths.SettingsFilePath, overwrite: true);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+            await using var stream = File.Create(AppDataPaths.SettingsFilePath);
+            await JsonSerializer.SerializeAsync(stream, settings, JsonOptions, cancellationToken);
+        }
     }
 
-    private static AppSettings Normalize(AppSettings settings)
+    public static AppSettings Normalize(AppSettings settings)
     {
         var normalized = settings.Clone();
         normalized.Receiver.Host = NormalizeHost(normalized.Receiver.Host);
@@ -97,8 +122,9 @@ public sealed class AppSettingsStore
         normalized.Receiver.PlayerName = string.IsNullOrWhiteSpace(normalized.Receiver.PlayerName)
             ? "Denon AVR-X2400H"
             : normalized.Receiver.PlayerName.Trim();
-        normalized.Receiver.DefaultLowVolume = Math.Clamp(normalized.Receiver.DefaultLowVolume, 0, 100);
+        normalized.Receiver.DefaultLowVolume = Math.Clamp(normalized.Receiver.DefaultLowVolume, 0, 98);
         normalized.Receiver.PollIntervalSeconds = Math.Clamp(normalized.Receiver.PollIntervalSeconds, 2, 60);
+        normalized.Receiver.VolumePresets = NormalizeVolumePresets(normalized.Receiver.VolumePresets);
         normalized.Receiver.Stations = NormalizeStations(normalized.Receiver.Stations);
         return normalized;
     }
@@ -107,6 +133,18 @@ public sealed class AppSettingsStore
         string.IsNullOrWhiteSpace(value) ? "192.168.1.3" : value.Trim();
 
     private static int NormalizePort(int value) => value is > 0 and <= 65535 ? value : 1255;
+
+    private static List<int> NormalizeVolumePresets(IEnumerable<int>? presets)
+    {
+        var cleaned = (presets ?? [])
+            .Select(static v => Math.Clamp(v, 0, 98))
+            .Distinct()
+            .OrderBy(static v => v)
+            .Take(6)
+            .ToList();
+
+        return cleaned.Count == 0 ? [15, 28, 42, 55] : cleaned;
+    }
 
     private static List<StationPreset> NormalizeStations(IEnumerable<StationPreset>? stations)
     {
