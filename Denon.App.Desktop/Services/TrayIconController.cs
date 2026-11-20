@@ -154,6 +154,7 @@ public sealed class TrayIconController : IDisposable
         _powerItem = CreateItem("Power On / Standby", onClick: () => ExecuteTrayActionAsync("Toggle power", token => _receiverController.TogglePowerAsync(token)));
 
         var inputsMenu = CreateItem("Switch Input");
+        ConfigureSubMenu(inputsMenu);
         foreach (var input in DenonCatalog.InputSources)
         {
             var code = input.Code;
@@ -169,6 +170,7 @@ public sealed class TrayIconController : IDisposable
         var lowVolumeItem = CreateItem("Safety Low Volume", onClick: () => ExecuteTrayActionAsync("Low volume", token => _receiverController.SetLowVolumeAsync(token)));
 
         var stationMenu = CreateItem("Play Station");
+        ConfigureSubMenu(stationMenu);
         foreach (var station in _settingsStore.Current.Receiver.Stations)
         {
             var capturedStation = station.Clone();
@@ -204,6 +206,17 @@ public sealed class TrayIconController : IDisposable
         _notifyIcon.ContextMenuStrip = menu;
     }
 
+    private static void ConfigureSubMenu(Forms.ToolStripMenuItem parent)
+    {
+        if (parent.DropDown is Forms.ToolStripDropDownMenu dropDown)
+        {
+            dropDown.ShowImageMargin = false;
+            dropDown.BackColor = Color.FromArgb(18, 22, 31);
+            dropDown.ForeColor = Color.FromArgb(241, 245, 249);
+            dropDown.Renderer = new DarkTrayMenuRenderer();
+        }
+    }
+
     private static Forms.ToolStripMenuItem CreateItem(string text, bool enabled = true, Func<Task>? onClick = null)
     {
         var item = new Forms.ToolStripMenuItem(text)
@@ -211,6 +224,7 @@ public sealed class TrayIconController : IDisposable
             Enabled = enabled,
             ForeColor = enabled ? Color.FromArgb(241, 245, 249) : Color.FromArgb(148, 163, 184),
             BackColor = Color.FromArgb(18, 22, 31),
+            Padding = new Forms.Padding(6, 3, 6, 3),
         };
 
         if (onClick is not null)
@@ -279,41 +293,83 @@ public sealed class TrayIconController : IDisposable
 
     private sealed class DarkTrayMenuRenderer : Forms.ToolStripProfessionalRenderer
     {
+        private static readonly Color BgColor = Color.FromArgb(16, 20, 29);
+        private static readonly Color HoverFillColor = Color.FromArgb(18, 54, 74);
+        private static readonly Color HoverBorderColor = Color.FromArgb(0, 212, 255);
+        private static readonly Color SeparatorColor = Color.FromArgb(38, 46, 64);
+        private static readonly Color NormalTextColor = Color.FromArgb(232, 238, 246);
+        private static readonly Color HoverTextColor = Color.White;
+        private static readonly Color HeaderTextColor = Color.FromArgb(148, 163, 184);
+
         public DarkTrayMenuRenderer() : base(new DarkColorTable())
         {
+            RoundedEdges = false;
+        }
+
+        protected override void OnRenderToolStripBackground(Forms.ToolStripRenderEventArgs e)
+        {
+            using var brush = new SolidBrush(BgColor);
+            e.Graphics.FillRectangle(brush, e.AffectedBounds);
+        }
+
+        protected override void OnRenderMenuItemBackground(Forms.ToolStripItemRenderEventArgs e)
+        {
+            var rect = new Rectangle(4, 1, e.Item.Width - 8, e.Item.Height - 2);
+            if (e.Item.Selected && e.Item.Enabled)
+            {
+                using var fill = new SolidBrush(HoverFillColor);
+                using var border = new Pen(HoverBorderColor, 1f);
+                e.Graphics.FillRectangle(fill, rect);
+                e.Graphics.DrawRectangle(border, rect.X, rect.Y, rect.Width - 1, rect.Height - 1);
+            }
+            else
+            {
+                using var fill = new SolidBrush(BgColor);
+                e.Graphics.FillRectangle(fill, new Rectangle(System.Drawing.Point.Empty, e.Item.Size));
+            }
         }
 
         protected override void OnRenderItemText(Forms.ToolStripItemTextRenderEventArgs e)
         {
-            e.TextColor = e.Item.Enabled
-                ? (e.Item.Selected ? Color.FromArgb(0, 212, 255) : Color.FromArgb(241, 245, 249))
-                : Color.FromArgb(148, 163, 184);
-            base.OnRenderItemText(e);
+            var color = !e.Item.Enabled
+                ? HeaderTextColor
+                : (e.Item.Selected ? HoverTextColor : NormalTextColor);
+
+            Forms.TextRenderer.DrawText(
+                e.Graphics,
+                e.Text,
+                e.TextFont,
+                e.TextRectangle,
+                color,
+                e.TextFormat);
+        }
+
+        protected override void OnRenderSeparator(Forms.ToolStripSeparatorRenderEventArgs e)
+        {
+            var y = e.Item.Height / 2;
+            using var pen = new Pen(SeparatorColor, 1f);
+            e.Graphics.DrawLine(pen, 8, y, e.Item.Width - 8, y);
         }
 
         protected override void OnRenderArrow(Forms.ToolStripArrowRenderEventArgs e)
         {
-            e.ArrowColor = Color.FromArgb(148, 163, 184);
+            e.ArrowColor = e.Item?.Selected == true ? HoverBorderColor : HeaderTextColor;
             base.OnRenderArrow(e);
         }
 
         private sealed class DarkColorTable : Forms.ProfessionalColorTable
         {
-            private static readonly Color Bg = Color.FromArgb(18, 22, 31);
-            private static readonly Color Border = Color.FromArgb(38, 46, 64);
-            private static readonly Color Hover = Color.FromArgb(20, 42, 58);
-
-            public override Color ToolStripDropDownBackground => Bg;
-            public override Color MenuBorder => Border;
-            public override Color MenuItemBorder => Color.FromArgb(0, 140, 180);
-            public override Color MenuItemSelected => Hover;
-            public override Color MenuItemSelectedGradientBegin => Hover;
-            public override Color MenuItemSelectedGradientEnd => Hover;
-            public override Color ImageMarginGradientBegin => Bg;
-            public override Color ImageMarginGradientMiddle => Bg;
-            public override Color ImageMarginGradientEnd => Bg;
-            public override Color SeparatorDark => Border;
-            public override Color SeparatorLight => Border;
+            public override Color ToolStripDropDownBackground => BgColor;
+            public override Color MenuBorder => SeparatorColor;
+            public override Color MenuItemBorder => HoverBorderColor;
+            public override Color MenuItemSelected => HoverFillColor;
+            public override Color MenuItemSelectedGradientBegin => HoverFillColor;
+            public override Color MenuItemSelectedGradientEnd => HoverFillColor;
+            public override Color ImageMarginGradientBegin => BgColor;
+            public override Color ImageMarginGradientMiddle => BgColor;
+            public override Color ImageMarginGradientEnd => BgColor;
+            public override Color SeparatorDark => SeparatorColor;
+            public override Color SeparatorLight => SeparatorColor;
         }
     }
 }
