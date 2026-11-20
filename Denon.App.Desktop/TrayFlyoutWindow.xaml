@@ -166,37 +166,41 @@
                 <Button Content="BT" Command="{Binding SelectInputCommand}" CommandParameter="BT" Style="{StaticResource HardwareChipButton}" Padding="10,5" FontSize="11" Margin="0,0,0,6" />
             </WrapPanel>
 
-            <!-- Quick Stations -->
+            <!-- Quick Stations (Internally Scrollable) -->
             <TextBlock Text="PRESET STATIONS" Style="{StaticResource SectionLabelStyle}" Margin="2,0,0,6" />
-            <ItemsControl ItemsSource="{Binding StationPresets}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Button Command="{Binding DataContext.PlayPresetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                CommandParameter="{Binding}"
-                                Padding="10,6"
-                                FontSize="11"
-                                Margin="0,0,6,6">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsCurrentlyPlaying}" Value="True">
-                                            <Setter Property="Background" Value="#0C2E3D" />
-                                            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
-                                            <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                            <TextBlock Text="{Binding DisplayName}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                        </Button>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <ScrollViewer MaxHeight="140"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding StationPresets}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Command="{Binding DataContext.PlayPresetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="{Binding}"
+                                    Padding="10,6"
+                                    FontSize="11"
+                                    Margin="0,0,6,6">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsCurrentlyPlaying}" Value="True">
+                                                <Setter Property="Background" Value="#0C2E3D" />
+                                                <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                                <TextBlock Text="{Binding DisplayName}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
         </StackPanel>
     </Border>
 </Window>

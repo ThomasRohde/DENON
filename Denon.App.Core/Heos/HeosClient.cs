@@ -117,27 +117,25 @@ public sealed class HeosClient : IDisposable
             EnsureSuccess(await SendCommandAsync(settings, $"heos://player/set_mute?pid={player.PlayerId}&state=off", DefaultCommandTimeout, cancellationToken));
         }
 
-        var encodedUrl = Uri.EscapeDataString(url.Trim());
+        // HEOS CLI requires literal scheme/path characters (http://host/path) rather than full Uri.EscapeDataString.
+        // Percent-encoding ':' and '/' causes HEOS firmware to load "Url Stream" and immediately transition to state=stop.
+        var heosUrl = FormatStreamUrlForHeos(url);
         var streamResponse = await SendCommandAsync(
             settings,
-            $"heos://browse/play_stream?pid={player.PlayerId}&url={encodedUrl}",
+            $"heos://browse/play_stream?pid={player.PlayerId}&url={heosUrl}",
             AsyncCommandTimeout,
             cancellationToken);
         EnsureSuccess(streamResponse);
 
-        // Give HEOS a brief moment to engage the stream pipeline before inspecting play state.
-        // Only issue set_play_state=play if the player did not automatically transition to play.
-        await Task.Delay(500, cancellationToken);
-        var stateResponse = await SendCommandAsync(settings, $"heos://player/get_play_state?pid={player.PlayerId}", DefaultCommandTimeout, cancellationToken);
-        if (stateResponse.IsSuccess &&
-            stateResponse.MessageFields.TryGetValue("state", out var currentPlayState) &&
-            !string.Equals(currentPlayState, "play", StringComparison.OrdinalIgnoreCase))
-        {
-            await SendCommandAsync(settings, $"heos://player/set_play_state?pid={player.PlayerId}&state=play", DefaultCommandTimeout, cancellationToken);
-        }
-
+        // Allow HEOS to begin buffering the stream; play_stream transitions to state=play automatically.
+        await Task.Delay(700, cancellationToken);
         return await GetStatusAsync(settings, player, cancellationToken);
     }
+
+    public static string FormatStreamUrlForHeos(string url) =>
+        url.Trim()
+            .Replace(" ", "%20", StringComparison.Ordinal)
+            .Replace("&", "%26", StringComparison.Ordinal);
 
     public async Task<IReadOnlyList<HeosFavoriteItem>> GetFavoritesAsync(ReceiverSettings settings, CancellationToken cancellationToken)
     {
