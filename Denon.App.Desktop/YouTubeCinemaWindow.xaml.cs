@@ -85,8 +85,14 @@ public partial class YouTubeCinemaWindow : Window
                     position: fixed !important;
                     top: 0 !important;
                     left: 0 !important;
+                    right: 0 !important;
+                    bottom: 0 !important;
+                    margin: 0 !important;
+                    transform: none !important;
                     width: 100vw !important;
                     height: 100vh !important;
+                    max-width: 100vw !important;
+                    max-height: 100vh !important;
                     object-fit: contain !important;
                     background: #000 !important;
                     z-index: 2147483645 !important;
@@ -107,6 +113,16 @@ public partial class YouTubeCinemaWindow : Window
                 if (skipBtn) skipBtn.click();
             };
 
+            window.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Escape' || ev.key === 'F11' || ev.key === 'h' || ev.key === 'H') {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    if (window.chrome && window.chrome.webview) {
+                        window.chrome.webview.postMessage(ev.key.toUpperCase());
+                    }
+                }
+            }, true);
+
             injectStyle();
             document.addEventListener('DOMContentLoaded', injectStyle);
             const observer = new MutationObserver(() => {
@@ -122,6 +138,8 @@ public partial class YouTubeCinemaWindow : Window
 
     private bool _isInitialized;
     private bool _keepVideoMuted = true;
+    private bool _isFullscreen;
+    private bool _barsHidden;
     private string? _currentVideoId;
     private string? _currentWatchUrl;
     private int _syncOffsetMs = 1800;
@@ -161,11 +179,8 @@ public partial class YouTubeCinemaWindow : Window
             Show();
         }
 
-        if (WindowState == WindowState.Minimized)
-        {
-            WindowState = WindowState.Normal;
-        }
-
+        // Automatically open YouTube Cinema in borderless fullscreen
+        SetFullscreen(true);
         Activate();
         await EnsureWebViewReadyAsync();
 
@@ -224,6 +239,7 @@ public partial class YouTubeCinemaWindow : Window
             VideoWebView.CoreWebView2.Settings.AreDevToolsEnabled = false;
             VideoWebView.CoreWebView2.IsMuted = _keepVideoMuted;
             await VideoWebView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(PureVideoModeScript);
+            VideoWebView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
             VideoWebView.NavigationCompleted += OnNavigationCompleted;
             _isInitialized = true;
         }
@@ -378,6 +394,107 @@ public partial class YouTubeCinemaWindow : Window
         await ApplyLiveSyncPositionAsync();
     }
 
+    private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        try
+        {
+            var msg = e.TryGetWebMessageAsString();
+            Dispatcher.Invoke(() => HandleCinemaShortcutKey(msg));
+        }
+        catch
+        {
+        }
+    }
+
+    private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case System.Windows.Input.Key.Escape:
+                HandleCinemaShortcutKey("ESCAPE");
+                e.Handled = true;
+                break;
+            case System.Windows.Input.Key.F11:
+                HandleCinemaShortcutKey("F11");
+                e.Handled = true;
+                break;
+            case System.Windows.Input.Key.H:
+                HandleCinemaShortcutKey("H");
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void HandleCinemaShortcutKey(string keyName)
+    {
+        switch (keyName.ToUpperInvariant())
+        {
+            case "F11":
+                SetFullscreen(!_isFullscreen);
+                break;
+            case "H":
+                SetBarsHidden(!_barsHidden);
+                break;
+            case "ESCAPE":
+                if (_barsHidden)
+                {
+                    SetBarsHidden(false);
+                }
+                else if (_isFullscreen)
+                {
+                    SetFullscreen(false);
+                }
+                else
+                {
+                    HideAndStopVideo();
+                }
+                break;
+        }
+    }
+
+    private void SetFullscreen(bool fullscreen)
+    {
+        _isFullscreen = fullscreen;
+        if (fullscreen)
+        {
+            // Temporarily switch to Normal before WindowStyle.None + Maximized so Windows covers the taskbar cleanly
+            WindowState = WindowState.Normal;
+            WindowStyle = WindowStyle.None;
+            ResizeMode = ResizeMode.NoResize;
+            CinemaWindowChrome.CaptionHeight = 0;
+            CinemaWindowChrome.ResizeBorderThickness = new Thickness(0);
+            RootBorder.BorderThickness = new Thickness(0);
+            WindowState = WindowState.Maximized;
+            FullscreenButton.Content = "Exit Fullscreen (F11)";
+        }
+        else
+        {
+            SetBarsHidden(false);
+            WindowState = WindowState.Normal;
+            WindowStyle = WindowStyle.SingleBorderWindow;
+            ResizeMode = ResizeMode.CanResize;
+            CinemaWindowChrome.CaptionHeight = 42;
+            CinemaWindowChrome.ResizeBorderThickness = new Thickness(6);
+            RootBorder.BorderThickness = new Thickness(1);
+            Width = 960;
+            Height = 600;
+            FullscreenButton.Content = "Fullscreen (F11)";
+        }
+    }
+
+    private void SetBarsHidden(bool hidden)
+    {
+        _barsHidden = hidden;
+        TitleBarBorder.Visibility = hidden ? Visibility.Collapsed : Visibility.Visible;
+        TitleBarRow.Height = hidden ? new GridLength(0) : new GridLength(42);
+        BottomSyncBar.Visibility = hidden ? Visibility.Collapsed : Visibility.Visible;
+        HideBarsButton.Content = hidden ? "Show Bars (H)" : "Hide Bars (H)";
+    }
+
+    private void ToggleFullscreen_Click(object sender, RoutedEventArgs e) => SetFullscreen(!_isFullscreen);
+
+    private void ToggleBars_Click(object sender, RoutedEventArgs e) => SetBarsHidden(!_barsHidden);
+
     private void PinButton_Click(object sender, RoutedEventArgs e)
     {
         Topmost = !Topmost;
@@ -412,6 +529,7 @@ public partial class YouTubeCinemaWindow : Window
     public void HideAndStopVideo()
     {
         _syncWaitCts?.Cancel();
+        SetBarsHidden(false);
         try
         {
             if (_isInitialized && VideoWebView.CoreWebView2 is not null)
