@@ -423,6 +423,8 @@ public sealed class LocalAudioRelayServer : IDisposable
 
                     if (completedNaturally && !streamCts.IsCancellationRequested)
                     {
+                        // Remove finished token immediately so HEOS firmware cannot auto-reconnect and loop the finished stream
+                        _tracks.TryRemove(registered.Token, out _);
                         UpdateStatus(_status with { StreamState = "Track Completed" });
                         TrackStreamCompleted?.Invoke(registered.Token, registered.Track);
                     }
@@ -881,6 +883,8 @@ public sealed class LocalAudioRelayServer : IDisposable
 
             if (completedNaturally && !streamCts.IsCancellationRequested)
             {
+                // Remove finished token immediately so HEOS firmware cannot auto-reconnect and replay it
+                _localTracks.TryRemove(registered.Token, out _);
                 UpdateStatus(_status with { StreamState = "Local Track Completed" });
                 LocalTrackStreamCompleted?.Invoke(registered.Token, registered.Track);
             }

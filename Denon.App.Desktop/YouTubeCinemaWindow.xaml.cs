@@ -56,6 +56,8 @@ public partial class YouTubeCinemaWindow : Window
                 .ytp-paid-content-overlay,
                 .ytp-suggested-action,
                 .ytp-endscreen-content,
+                .ytp-upnext,
+                .ytp-autonav-endscreen-upnext-container,
                 .ytp-bezel-text-wrapper,
                 .iv-branding {
                     display: none !important;
@@ -111,6 +113,24 @@ public partial class YouTubeCinemaWindow : Window
             const dismissOverlays = () => {
                 const skipBtn = document.querySelector('.ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern');
                 if (skipBtn) skipBtn.click();
+
+                // Disable YouTube's built-in web Autoplay so our Denon Queue stays in control
+                const autoNav = document.querySelector('.ytp-autonav-toggle-button[aria-checked="true"]');
+                if (autoNav) autoNav.click();
+
+                const cancelAutoplay = document.querySelector('.ytp-autonav-endscreen-upnext-cancel-button, .ytp-upnext-cancel-button');
+                if (cancelAutoplay) cancelAutoplay.click();
+
+                const v = document.querySelector('video');
+                if (v && !v.__denonEndedHooked) {
+                    v.__denonEndedHooked = true;
+                    v.addEventListener('ended', () => {
+                        v.pause();
+                        if (window.chrome && window.chrome.webview) {
+                            window.chrome.webview.postMessage('VIDEO_ENDED');
+                        }
+                    });
+                }
             };
 
             window.addEventListener('keydown', (ev) => {
@@ -240,6 +260,7 @@ public partial class YouTubeCinemaWindow : Window
             VideoWebView.CoreWebView2.IsMuted = _keepVideoMuted;
             await VideoWebView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(PureVideoModeScript);
             VideoWebView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+            VideoWebView.CoreWebView2.SourceChanged += OnWebSourceChanged;
             VideoWebView.NavigationCompleted += OnNavigationCompleted;
             _isInitialized = true;
         }
@@ -394,11 +415,40 @@ public partial class YouTubeCinemaWindow : Window
         await ApplyLiveSyncPositionAsync();
     }
 
+    private async void OnWebSourceChanged(object? sender, CoreWebView2SourceChangedEventArgs e)
+    {
+        if (!_isInitialized || VideoWebView.CoreWebView2 is null || string.IsNullOrWhiteSpace(_currentVideoId))
+        {
+            return;
+        }
+
+        // Prevent YouTube's web Autoplay SPA from jumping to an unrelated video on its own
+        var source = VideoWebView.CoreWebView2.Source ?? string.Empty;
+        if (source.Contains("youtube.com/watch", StringComparison.OrdinalIgnoreCase) &&
+            !source.Contains(_currentVideoId, StringComparison.Ordinal))
+        {
+            try
+            {
+                await VideoWebView.ExecuteScriptAsync("(() => { const v = document.querySelector('video'); if (v) v.pause(); })();");
+                SyncStatusText.Text = "Blocked YouTube web autoplay — Denon Queue is in control";
+            }
+            catch
+            {
+            }
+        }
+    }
+
     private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
         try
         {
             var msg = e.TryGetWebMessageAsString();
+            if (string.Equals(msg, "VIDEO_ENDED", StringComparison.OrdinalIgnoreCase))
+            {
+                Dispatcher.Invoke(() => SyncStatusText.Text = "Video ended — waiting for Denon Queue...");
+                return;
+            }
+
             Dispatcher.Invoke(() => HandleCinemaShortcutKey(msg));
         }
         catch

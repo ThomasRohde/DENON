@@ -553,6 +553,29 @@ public sealed class YouTubeQueueService : IDisposable
                 {
                     _logStore.Info($"YouTube queue auto-advanced after '{track.Title}'.");
                 }
+                else
+                {
+                    lock (_sync)
+                    {
+                        if (string.Equals(_activeRelayToken, token, StringComparison.Ordinal))
+                        {
+                            _isActive = false;
+                            _activeRelayToken = null;
+                            _clockRunningSinceUtc = null;
+                        }
+                    }
+
+                    NotifyChanged();
+                    try
+                    {
+                        await _receiverController.SetPlayStateAsync("stop", cts.Token);
+                    }
+                    catch
+                    {
+                    }
+
+                    _logStore.Info($"YouTube queue finished after '{track.Title}'.");
+                }
             }
             catch (OperationCanceledException)
             {
