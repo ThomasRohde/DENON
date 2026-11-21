@@ -114,18 +114,26 @@ dotnet publish .\Denon.App.Desktop\Denon.App.Desktop.csproj -c Release -r win-x6
 - **Logs:** `%LocalAppData%\DenonDesktop\logs\app.log`
 - **WebView2 Cache:** `%LocalAppData%\DenonDesktop\webview2\`
 
-### Keyboard Shortcuts
-| Shortcut | Action |
-| :--- | :--- |
-| `Space` | Play / Pause HEOS playback |
-| `M` | Toggle Receiver Mute |
-| `Ctrl + ↑` / `Ctrl + ↓` | Adjust Master Volume ±2 steps |
-| `F5` / `Ctrl + R` | Force Refresh Receiver Telemetry |
-| `Ctrl + 1..7` | Switch Navigation Views |
-| **Mouse Wheel** (over Volume card) | Adjust Master Volume ±2 steps |
+### Keyboard Shortcuts (Customizable in Settings)
+All global Windows hotkeys and in-app shortcuts can be recorded, cleared, and checked for internal & OS collisions in **Settings → Shortcut Editor**:
+
+| Default Shortcut | Scope | Action |
+| :--- | :---: | :--- |
+| `Ctrl + Alt + D` | Global | Open / Toggle Main Window (even from tray) |
+| `Ctrl + Alt + P` | Global | Play / Pause Playback |
+| `Ctrl + Alt + M` | Global | Toggle Receiver Mute |
+| `Ctrl + Alt + ↑` / `↓` | Global | Adjust Master Volume ±2 steps |
+| `Ctrl + Alt + →` / `←` | Global | Next / Previous Track |
+| `Space` | In-App | Play / Pause Playback |
+| `M` | In-App | Toggle Receiver Mute |
+| `Ctrl + ↑` / `Ctrl + ↓` | In-App | Adjust Master Volume ±2 steps |
+| `F5` / `Ctrl + R` | In-App | Force Refresh Receiver Telemetry |
+| `Ctrl + 1..7` | In-App | Switch Navigation Views |
+| **Mouse Wheel** (over Volume card) | In-App | Adjust Master Volume ±2 steps |
 
 ---
 
-## License
+## Changelog & License
 
-MIT License — see [LICENSE](LICENSE) for details.
+- See [CHANGELOG.md](CHANGELOG.md) for release history.
+- MIT License — see [LICENSE](LICENSE) for details.
