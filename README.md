@@ -82,9 +82,9 @@ Denon Desktop combines the **HEOS CLI Protocol (TCP `:1255`)** for streaming, me
 - **Optional (Recommended for YouTube MP3 320k & PC Audio Cast):** [`ffmpeg`](https://ffmpeg.org/) installed on `PATH` (e.g. `winget install Gyan.FFmpeg`). Denon Desktop auto-detects WinGet and `PATH` installs, and falls back to Direct M4A / Lossless WAV if FFmpeg is not present.
 - **Optional (Cinema Companion Video Window):** Microsoft Edge WebView2 Runtime (pre-installed on Windows 11 and most Windows 10 systems).
 
-### Run Prebuilt Single-File Executable
-Download or launch [`Denon.App.Desktop/AppRelease/Denon.App.Desktop.exe`](Denon.App.Desktop/AppRelease/Denon.App.Desktop.exe):
-1. On first launch, Denon Desktop automatically scans your LAN and connects to your Denon/Marantz receiver.
+### Download Prebuilt Executable (GitHub Releases)
+Download the latest self-contained single-file **`Denon.App.Desktop-win-x64.exe`** from the [**Releases**](../../releases/latest) page (no .NET runtime installation required):
+1. Double-click `Denon.App.Desktop-win-x64.exe` — on first launch, Denon Desktop automatically scans your LAN and connects to your Denon/Marantz receiver.
 2. To use **YouTube Cast**, **PC Audio Cast**, **Local FLAC Jukebox**, or the **Couch Phone Remote**, click **Allow Firewall** in the **YouTube & Music** or **Cast & Remote** tab once to open Private-LAN TCP port `18925`.
 
 ### Build From Source (.NET 10 SDK)
