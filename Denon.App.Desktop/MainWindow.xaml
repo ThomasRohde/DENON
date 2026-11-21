@@ -6,10 +6,10 @@
         xmlns:controls="clr-namespace:Denon.App.Desktop.Controls"
         mc:Ignorable="d"
         Title="{Binding WindowTitle}"
-        Width="1200"
-        Height="820"
-        MinWidth="920"
-        MinHeight="640"
+        Width="1360"
+        Height="920"
+        MinWidth="980"
+        MinHeight="700"
         Background="{StaticResource ChassisBgBrush}"
         Icon="denon_icon.ico"
         WindowStartupLocation="CenterScreen"
@@ -608,10 +608,10 @@
                                     </StackPanel>
                                 </Grid>
 
-                                <!-- Toggleable Retro Hi-Fi Analog VU Meters -->
+                                <!-- Toggleable Large Retro Hi-Fi Analog VU Meters -->
                                 <controls:AnalogVuMeterControl x:Name="HeroVuMeter"
-                                                               Margin="0,12,0,0"
-                                                               Height="76"
+                                                               Margin="0,14,0,0"
+                                                               Height="138"
                                                                LeftLevel="{Binding VuLeftLevel}"
                                                                RightLevel="{Binding VuRightLevel}"
                                                                IsLiveSignal="{Binding IsVuLiveSignal}"
@@ -2882,94 +2882,128 @@
                             </StackPanel>
                         </ScrollViewer>
 
-                        <!-- Right: Behavior & Shortcuts -->
-                        <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,0">
-                            <StackPanel>
-                                <Border Style="{StaticResource SurfaceCard}" Margin="0,0,0,18">
-                                    <StackPanel>
-                                        <TextBlock Text="DESKTOP &amp; TRAY BEHAVIOR" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,14" />
+                        <!-- Right: Behavior, Relay & Dedicated Scrollable Shortcut Editor -->
+                        <Grid Grid.Column="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
 
-                                        <CheckBox Content="Start minimized in system tray" IsChecked="{Binding SettingsStartMinimizedToTray}" Style="{StaticResource ToggleSwitchStyle}" />
-                                        <CheckBox Content="Minimize window to tray" IsChecked="{Binding SettingsMinimizeToTray}" Style="{StaticResource ToggleSwitchStyle}" />
-                                        <CheckBox Content="Close window hides to tray" IsChecked="{Binding SettingsCloseToTray}" Style="{StaticResource ToggleSwitchStyle}" />
-                                        <CheckBox Content="Show tray notifications" IsChecked="{Binding SettingsShowNotifications}" Style="{StaticResource ToggleSwitchStyle}" />
-                                        <CheckBox Content="Display decibels (dB) as primary readout" IsChecked="{Binding SettingsDisplayVolumeInDb}" Style="{StaticResource ToggleSwitchStyle}" />
-                                        <CheckBox Content="Launch automatically at Windows startup" IsChecked="{Binding SettingsLaunchAtWindowsStartup}" Style="{StaticResource ToggleSwitchStyle}" />
-                                    </StackPanel>
-                                </Border>
+                            <Border Grid.Row="0" Style="{StaticResource SurfaceCard}" Padding="14,12" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="DESKTOP &amp; TRAY BEHAVIOR" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,8" />
 
-                                <Border Style="{StaticResource SurfaceCard}" Margin="0,0,0,18">
-                                    <StackPanel>
-                                        <TextBlock Text="YOUTUBE &amp; LOCAL AUDIO RELAY" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,12" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="12" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <CheckBox Content="Start minimized in tray" IsChecked="{Binding SettingsStartMinimizedToTray}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="12" />
+                                            <CheckBox Content="Minimize window to tray" IsChecked="{Binding SettingsMinimizeToTray}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="12" />
+                                            <CheckBox Content="Close hides to tray" IsChecked="{Binding SettingsCloseToTray}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="12" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <CheckBox Content="Tray notifications" IsChecked="{Binding SettingsShowNotifications}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="12" />
+                                            <CheckBox Content="Primary dB readout" IsChecked="{Binding SettingsDisplayVolumeInDb}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="12" />
+                                            <CheckBox Content="Launch at startup" IsChecked="{Binding SettingsLaunchAtWindowsStartup}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="12" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
 
-                                        <Grid Margin="0,0,0,10">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="10" />
-                                                <ColumnDefinition Width="*" />
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel Grid.Column="0">
-                                                <TextBlock Text="LAN Relay Port" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
-                                                <TextBox Text="{Binding SettingsRelayPort, UpdateSourceTrigger=PropertyChanged}" />
-                                            </StackPanel>
-                                            <StackPanel Grid.Column="2">
-                                                <TextBlock Text="Cinema A/V Offset (ms)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
-                                                <TextBox Text="{Binding SettingsCinemaSyncOffsetMs, UpdateSourceTrigger=PropertyChanged}" />
-                                            </StackPanel>
-                                        </Grid>
+                            <Border Grid.Row="1" Style="{StaticResource SurfaceCard}" Padding="14,12" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="YOUTUBE &amp; LOCAL AUDIO RELAY" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,8" />
 
-                                        <TextBlock Text="Custom FFmpeg Path (leave empty for auto-detect)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
-                                        <TextBox Text="{Binding SettingsFfmpegPath, UpdateSourceTrigger=PropertyChanged}" Tag="Auto-detect ffmpeg.exe (WinGet / PATH)" Margin="0,0,0,10" />
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="0.75*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="0.85*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="1.4*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Relay Port" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                                            <TextBox Text="{Binding SettingsRelayPort, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Cinema Offset (ms)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                                            <TextBox Text="{Binding SettingsCinemaSyncOffsetMs, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="4">
+                                            <TextBlock Text="FFmpeg Path (optional)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                                            <TextBox Text="{Binding SettingsFfmpegPath, UpdateSourceTrigger=PropertyChanged}" Tag="Auto-detect..." Padding="8,6" FontSize="12" />
+                                        </StackPanel>
+                                    </Grid>
 
-                                        <CheckBox Content="Transcode YouTube audio to 320 kbps MP3 via FFmpeg (best HEOS compatibility)"
-                                                  IsChecked="{Binding SettingsPreferFfmpegMp3}"
-                                                  Style="{StaticResource ToggleSwitchStyle}" />
-                                    </StackPanel>
-                                </Border>
+                                    <CheckBox Content="Transcode YouTube audio to 320 kbps MP3 via FFmpeg"
+                                              IsChecked="{Binding SettingsPreferFfmpegMp3}"
+                                              Style="{StaticResource ToggleSwitchStyle}"
+                                              Margin="0,2"
+                                              FontSize="12" />
+                                </StackPanel>
+                            </Border>
 
-                                <Border Style="{StaticResource SurfaceCard}">
-                                    <StackPanel>
-                                        <DockPanel Margin="0,0,0,8">
-                                            <TextBlock Text="SHORTCUT EDITOR &amp; COLLISION CHECKER" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                                <Button Content="Check Collisions"
-                                                        Command="{Binding CheckShortcutCollisionsCommand}"
-                                                        Style="{StaticResource SecondaryButton}"
-                                                        Padding="8,4"
-                                                        FontSize="10.5"
-                                                        Margin="0,0,5,0"
-                                                        ToolTip="Re-check internal duplicates, reserved Windows combos, and live Win32 global hotkey availability" />
-                                                <Button Content="Reset"
-                                                        Command="{Binding ResetShortcutsToDefaultCommand}"
-                                                        Style="{StaticResource SecondaryButton}"
-                                                        Padding="8,4"
-                                                        FontSize="10.5"
-                                                        Margin="0,0,5,0" />
-                                                <Button Content="Save"
-                                                        Command="{Binding SaveSettingsCommand}"
-                                                        Style="{StaticResource PrimaryButton}"
-                                                        Padding="10,4"
-                                                        FontSize="10.5" />
-                                            </StackPanel>
-                                        </DockPanel>
+                            <Border Grid.Row="2" Style="{StaticResource SurfaceCard}" Padding="14,12">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
 
-                                        <TextBlock Text="{Binding ShortcutSummaryText}"
-                                                   FontSize="11.5"
-                                                   TextWrapping="Wrap"
-                                                   Margin="0,0,0,10">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Foreground" Value="{StaticResource AccentCyanBrightBrush}" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding HasShortcutCollisions}" Value="True">
-                                                            <Setter Property="Foreground" Value="{StaticResource AccentCrimsonBrush}" />
-                                                            <Setter Property="FontWeight" Value="SemiBold" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
+                                    <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                                        <TextBlock Text="SHORTCUT EDITOR &amp; COLLISION CHECKER" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Button Content="Check Collisions"
+                                                    Command="{Binding CheckShortcutCollisionsCommand}"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Padding="8,4"
+                                                    FontSize="10.5"
+                                                    Margin="0,0,5,0"
+                                                    ToolTip="Re-check internal duplicates, reserved Windows combos, and live Win32 global hotkey availability" />
+                                            <Button Content="Reset"
+                                                    Command="{Binding ResetShortcutsToDefaultCommand}"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Padding="8,4"
+                                                    FontSize="10.5"
+                                                    Margin="0,0,5,0" />
+                                            <Button Content="Save"
+                                                    Command="{Binding SaveSettingsCommand}"
+                                                    Style="{StaticResource PrimaryButton}"
+                                                    Padding="10,4"
+                                                    FontSize="10.5" />
+                                        </StackPanel>
+                                    </DockPanel>
 
+                                    <TextBlock Grid.Row="1"
+                                               Text="{Binding ShortcutSummaryText}"
+                                               FontSize="11.5"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,8">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{StaticResource AccentCyanBrightBrush}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasShortcutCollisions}" Value="True">
+                                                        <Setter Property="Foreground" Value="{StaticResource AccentCrimsonBrush}" />
+                                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+
+                                    <!-- Dedicated Internal ScrollView for Shortcuts Only -->
+                                    <ScrollViewer Grid.Row="2"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  Padding="0,0,6,0">
                                         <ItemsControl ItemsSource="{Binding ShortcutEditors}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
@@ -3090,15 +3124,16 @@
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
+                                    </ScrollViewer>
 
-                                        <TextBlock Text="Built-in: Ctrl+1..7 switches views • Ctrl+R refreshes • Mouse wheel over Volume adjusts ±2 steps"
-                                                   FontSize="10.5"
-                                                   Foreground="{StaticResource TextMutedBrush}"
-                                                   Margin="0,6,0,0" />
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </ScrollViewer>
+                                    <TextBlock Grid.Row="3"
+                                               Text="Built-in: Ctrl+1..7 switches views • Ctrl+R refreshes • Mouse wheel over Volume adjusts ±2 steps"
+                                               FontSize="10.5"
+                                               Foreground="{StaticResource TextMutedBrush}"
+                                               Margin="0,8,0,0" />
+                                </Grid>
+                            </Border>
+                        </Grid>
                     </Grid>
 
                     <!-- ==================== VIEW 4: HEALTH & SUPPORT ==================== -->

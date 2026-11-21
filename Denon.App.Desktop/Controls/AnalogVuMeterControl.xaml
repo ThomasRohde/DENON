@@ -1,31 +1,31 @@
 <UserControl x:Class="Denon.App.Desktop.Controls.AnalogVuMeterControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Height="92">
+             Height="136">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="10" />
+            <ColumnDefinition Width="12" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <!-- LEFT CHANNEL VU DIAL -->
+        <!-- LEFT CHANNEL LARGE HI-FI VU DIAL -->
         <Border Grid.Column="0"
-                CornerRadius="10"
-                BorderBrush="#273245"
+                CornerRadius="12"
+                BorderBrush="#29354B"
                 BorderThickness="1"
                 ClipToBounds="True">
             <Border.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                    <GradientStop Color="#141822" Offset="0" />
-                    <GradientStop Color="#0B0E15" Offset="0.6" />
-                    <GradientStop Color="#17130C" Offset="1" />
+                    <GradientStop Color="#141924" Offset="0" />
+                    <GradientStop Color="#0A0D14" Offset="0.58" />
+                    <GradientStop Color="#1C150B" Offset="1" />
                 </LinearGradientBrush>
             </Border.Background>
 
             <Grid>
-                <!-- Subtle warm backlight glow -->
-                <Ellipse Width="170" Height="90" VerticalAlignment="Bottom" Margin="0,0,0,-44" Opacity="0.22">
+                <!-- Warm vintage amber backlight glow -->
+                <Ellipse Width="280" Height="140" VerticalAlignment="Bottom" Margin="0,0,0,-66" Opacity="0.28">
                     <Ellipse.Fill>
                         <RadialGradientBrush>
                             <GradientStop Color="#F59E0B" Offset="0" />
@@ -34,74 +34,86 @@
                     </Ellipse.Fill>
                 </Ellipse>
 
-                <!-- Scale Arc & Labels -->
-                <Viewbox Stretch="Uniform" Margin="8,4,8,2">
-                    <Canvas Width="200" Height="86">
+                <!-- Precision Wide Scale Arc & Hardware Needle -->
+                <Viewbox Stretch="Uniform" Margin="10,5,10,2">
+                    <Canvas Width="280" Height="114">
+                        <!-- Subtle recessed bezel inner rim -->
+                        <Path Data="M 32,96 A 116,116 0 0,1 248,96"
+                              Stroke="#1E2636"
+                              StrokeThickness="1" />
+
                         <!-- Main scale arc (-20 to 0 dB) -->
-                        <Path Data="M 24,68 A 86,86 0 0,1 142,24"
+                        <Path Data="M 36,92 A 112,112 0 0,1 196,34"
                               Stroke="#D99B38"
-                              StrokeThickness="2"
+                              StrokeThickness="2.6"
                               StrokeStartLineCap="Round" />
+
                         <!-- Red overload zone (0 to +3 dB) -->
-                        <Path Data="M 142,24 A 86,86 0 0,1 176,68"
+                        <Path Data="M 196,34 A 112,112 0 0,1 244,92"
                               Stroke="#EF4444"
-                              StrokeThickness="2.8"
+                              StrokeThickness="3.6"
                               StrokeEndLineCap="Round" />
 
-                        <!-- Tick Labels -->
-                        <TextBlock Canvas.Left="16" Canvas.Top="44" Text="-20" FontSize="9" FontFamily="Cascadia Mono, Consolas" Foreground="#94A3B8" />
-                        <TextBlock Canvas.Left="46" Canvas.Top="20" Text="-10" FontSize="9" FontFamily="Cascadia Mono, Consolas" Foreground="#CBD5E1" />
-                        <TextBlock Canvas.Left="84" Canvas.Top="8" Text="-5" FontSize="9" FontFamily="Cascadia Mono, Consolas" Foreground="#F59E0B" />
-                        <TextBlock Canvas.Left="118" Canvas.Top="10" Text="-3" FontSize="9" FontFamily="Cascadia Mono, Consolas" Foreground="#F59E0B" />
-                        <TextBlock Canvas.Left="146" Canvas.Top="19" Text="0" FontSize="9.5" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="#F87171" />
-                        <TextBlock Canvas.Left="169" Canvas.Top="44" Text="+3" FontSize="9" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="#EF4444" />
+                        <!-- Scale Labels -->
+                        <TextBlock Canvas.Left="22" Canvas.Top="64" Text="-20" FontSize="10.5" FontWeight="SemiBold" FontFamily="Cascadia Mono, Consolas" Foreground="#94A3B8" />
+                        <TextBlock Canvas.Left="62" Canvas.Top="30" Text="-10" FontSize="10.5" FontWeight="SemiBold" FontFamily="Cascadia Mono, Consolas" Foreground="#CBD5E1" />
+                        <TextBlock Canvas.Left="102" Canvas.Top="15" Text="-7" FontSize="10" FontWeight="SemiBold" FontFamily="Cascadia Mono, Consolas" Foreground="#E2E8F0" />
+                        <TextBlock Canvas.Left="134" Canvas.Top="11" Text="-5" FontSize="10.5" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="#F59E0B" />
+                        <TextBlock Canvas.Left="168" Canvas.Top="15" Text="-3" FontSize="10.5" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="#F59E0B" />
+                        <TextBlock Canvas.Left="204" Canvas.Top="29" Text="0" FontSize="11.5" FontWeight="Black" FontFamily="Cascadia Mono, Consolas" Foreground="#F87171" />
+                        <TextBlock Canvas.Left="236" Canvas.Top="64" Text="+3" FontSize="10.5" FontWeight="Black" FontFamily="Cascadia Mono, Consolas" Foreground="#EF4444" />
 
-                        <TextBlock Canvas.Left="87" Canvas.Top="36" Text="VU" FontSize="12" FontWeight="Bold" Foreground="#F59E0B" Opacity="0.85" />
-                        <TextBlock Canvas.Left="10" Canvas.Top="6" Text="CH L" FontSize="8.5" FontWeight="Bold" Foreground="#64748B" />
+                        <TextBlock Canvas.Left="124" Canvas.Top="50" Text="VU" FontSize="16" FontWeight="Bold" Foreground="#F59E0B" Opacity="0.88" />
+                        <TextBlock Canvas.Left="121" Canvas.Top="70" Text="dB" FontSize="9" FontWeight="SemiBold" FontFamily="Cascadia Mono, Consolas" Foreground="#64748B" />
+                        <TextBlock Canvas.Left="12" Canvas.Top="8" Text="LEFT CH" FontSize="9.5" FontWeight="Bold" Foreground="#64748B" />
 
                         <!-- Peak LED -->
-                        <Ellipse x:Name="PeakLedLeft" Canvas.Left="180" Canvas.Top="8" Width="7" Height="7" Fill="#3B1518" />
+                        <StackPanel Canvas.Left="224" Canvas.Top="8" Orientation="Horizontal">
+                            <TextBlock Text="PEAK" FontSize="8.5" FontWeight="Bold" Foreground="#64748B" Margin="0,0,5,0" VerticalAlignment="Center" />
+                            <Ellipse x:Name="PeakLedLeft" Width="8" Height="8" Fill="#3B1518" VerticalAlignment="Center" />
+                        </StackPanel>
 
                         <!-- Hardware-accelerated Dual-Stroke Needle (zero DropShadowEffect lag) -->
                         <Canvas RenderTransformOrigin="0,0">
                             <Canvas.RenderTransform>
-                                <RotateTransform x:Name="LeftNeedleTransform" CenterX="100" CenterY="94" Angle="-44" />
+                                <RotateTransform x:Name="LeftNeedleTransform" CenterX="140" CenterY="126" Angle="-44" />
                             </Canvas.RenderTransform>
-                            <Line X1="100" Y1="94" X2="100" Y2="14"
+                            <Line X1="140" Y1="126" X2="140" Y2="16"
                                   Stroke="#66F59E0B"
-                                  StrokeThickness="5"
+                                  StrokeThickness="5.5"
                                   StrokeStartLineCap="Round"
                                   StrokeEndLineCap="Round" />
-                            <Line X1="100" Y1="94" X2="100" Y2="14"
+                            <Line X1="140" Y1="126" X2="140" Y2="16"
                                   Stroke="#F8FAFC"
-                                  StrokeThickness="1.8"
+                                  StrokeThickness="2"
                                   StrokeStartLineCap="Round"
                                   StrokeEndLineCap="Round" />
                         </Canvas>
 
-                        <!-- Pivot Cap -->
-                        <Ellipse Canvas.Left="88" Canvas.Top="78" Width="24" Height="24" Fill="#1E2433" Stroke="#3B455E" StrokeThickness="1" />
+                        <!-- Brushed Pivot Cap -->
+                        <Ellipse Canvas.Left="124" Canvas.Top="104" Width="32" Height="32" Fill="#1B2130" Stroke="#3B4660" StrokeThickness="1.2" />
+                        <Ellipse Canvas.Left="135" Canvas.Top="115" Width="10" Height="10" Fill="#0B0E15" Stroke="#475569" StrokeThickness="0.8" />
                     </Canvas>
                 </Viewbox>
             </Grid>
         </Border>
 
-        <!-- RIGHT CHANNEL VU DIAL -->
+        <!-- RIGHT CHANNEL LARGE HI-FI VU DIAL -->
         <Border Grid.Column="2"
-                CornerRadius="10"
-                BorderBrush="#273245"
+                CornerRadius="12"
+                BorderBrush="#29354B"
                 BorderThickness="1"
                 ClipToBounds="True">
             <Border.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                    <GradientStop Color="#141822" Offset="0" />
-                    <GradientStop Color="#0B0E15" Offset="0.6" />
-                    <GradientStop Color="#17130C" Offset="1" />
+                    <GradientStop Color="#141924" Offset="0" />
+                    <GradientStop Color="#0A0D14" Offset="0.58" />
+                    <GradientStop Color="#0B1822" Offset="1" />
                 </LinearGradientBrush>
             </Border.Background>
 
             <Grid>
-                <Ellipse Width="170" Height="90" VerticalAlignment="Bottom" Margin="0,0,0,-44" Opacity="0.22">
+                <Ellipse Width="280" Height="140" VerticalAlignment="Bottom" Margin="0,0,0,-66" Opacity="0.28">
                     <Ellipse.Fill>
                         <RadialGradientBrush>
                             <GradientStop Color="#00D4FF" Offset="0" />
@@ -110,47 +122,58 @@
                     </Ellipse.Fill>
                 </Ellipse>
 
-                <Viewbox Stretch="Uniform" Margin="8,4,8,2">
-                    <Canvas Width="200" Height="86">
-                        <Path Data="M 24,68 A 86,86 0 0,1 142,24"
+                <Viewbox Stretch="Uniform" Margin="10,5,10,2">
+                    <Canvas Width="280" Height="114">
+                        <Path Data="M 32,96 A 116,116 0 0,1 248,96"
+                              Stroke="#1E2636"
+                              StrokeThickness="1" />
+
+                        <Path Data="M 36,92 A 112,112 0 0,1 196,34"
                               Stroke="#38BDF8"
-                              StrokeThickness="2"
+                              StrokeThickness="2.6"
                               StrokeStartLineCap="Round" />
-                        <Path Data="M 142,24 A 86,86 0 0,1 176,68"
+
+                        <Path Data="M 196,34 A 112,112 0 0,1 244,92"
                               Stroke="#EF4444"
-                              StrokeThickness="2.8"
+                              StrokeThickness="3.6"
                               StrokeEndLineCap="Round" />
 
-                        <TextBlock Canvas.Left="16" Canvas.Top="44" Text="-20" FontSize="9" FontFamily="Cascadia Mono, Consolas" Foreground="#94A3B8" />
-                        <TextBlock Canvas.Left="46" Canvas.Top="20" Text="-10" FontSize="9" FontFamily="Cascadia Mono, Consolas" Foreground="#CBD5E1" />
-                        <TextBlock Canvas.Left="84" Canvas.Top="8" Text="-5" FontSize="9" FontFamily="Cascadia Mono, Consolas" Foreground="#38BDF8" />
-                        <TextBlock Canvas.Left="118" Canvas.Top="10" Text="-3" FontSize="9" FontFamily="Cascadia Mono, Consolas" Foreground="#38BDF8" />
-                        <TextBlock Canvas.Left="146" Canvas.Top="19" Text="0" FontSize="9.5" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="#F87171" />
-                        <TextBlock Canvas.Left="169" Canvas.Top="44" Text="+3" FontSize="9" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="#EF4444" />
+                        <TextBlock Canvas.Left="22" Canvas.Top="64" Text="-20" FontSize="10.5" FontWeight="SemiBold" FontFamily="Cascadia Mono, Consolas" Foreground="#94A3B8" />
+                        <TextBlock Canvas.Left="62" Canvas.Top="30" Text="-10" FontSize="10.5" FontWeight="SemiBold" FontFamily="Cascadia Mono, Consolas" Foreground="#CBD5E1" />
+                        <TextBlock Canvas.Left="102" Canvas.Top="15" Text="-7" FontSize="10" FontWeight="SemiBold" FontFamily="Cascadia Mono, Consolas" Foreground="#E2E8F0" />
+                        <TextBlock Canvas.Left="134" Canvas.Top="11" Text="-5" FontSize="10.5" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="#38BDF8" />
+                        <TextBlock Canvas.Left="168" Canvas.Top="15" Text="-3" FontSize="10.5" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="#38BDF8" />
+                        <TextBlock Canvas.Left="204" Canvas.Top="29" Text="0" FontSize="11.5" FontWeight="Black" FontFamily="Cascadia Mono, Consolas" Foreground="#F87171" />
+                        <TextBlock Canvas.Left="236" Canvas.Top="64" Text="+3" FontSize="10.5" FontWeight="Black" FontFamily="Cascadia Mono, Consolas" Foreground="#EF4444" />
 
-                        <TextBlock Canvas.Left="87" Canvas.Top="36" Text="VU" FontSize="12" FontWeight="Bold" Foreground="#00D4FF" Opacity="0.85" />
-                        <TextBlock Canvas.Left="10" Canvas.Top="6" Text="CH R" FontSize="8.5" FontWeight="Bold" Foreground="#64748B" />
-                        <TextBlock x:Name="ModeBadgeText" Canvas.Left="134" Canvas.Top="6" Text="SYNC" FontSize="8" FontWeight="Bold" Foreground="#10B981" />
+                        <TextBlock Canvas.Left="124" Canvas.Top="50" Text="VU" FontSize="16" FontWeight="Bold" Foreground="#00D4FF" Opacity="0.88" />
+                        <TextBlock Canvas.Left="121" Canvas.Top="70" Text="dB" FontSize="9" FontWeight="SemiBold" FontFamily="Cascadia Mono, Consolas" Foreground="#64748B" />
+                        <TextBlock Canvas.Left="12" Canvas.Top="8" Text="RIGHT CH" FontSize="9.5" FontWeight="Bold" Foreground="#64748B" />
+                        <TextBlock x:Name="ModeBadgeText" Canvas.Left="184" Canvas.Top="8" Text="SYNC" FontSize="9" FontWeight="Bold" Foreground="#10B981" />
 
-                        <Ellipse x:Name="PeakLedRight" Canvas.Left="180" Canvas.Top="8" Width="7" Height="7" Fill="#3B1518" />
+                        <StackPanel Canvas.Left="224" Canvas.Top="8" Orientation="Horizontal">
+                            <TextBlock Text="PEAK" FontSize="8.5" FontWeight="Bold" Foreground="#64748B" Margin="0,0,5,0" VerticalAlignment="Center" />
+                            <Ellipse x:Name="PeakLedRight" Width="8" Height="8" Fill="#3B1518" VerticalAlignment="Center" />
+                        </StackPanel>
 
                         <Canvas RenderTransformOrigin="0,0">
                             <Canvas.RenderTransform>
-                                <RotateTransform x:Name="RightNeedleTransform" CenterX="100" CenterY="94" Angle="-44" />
+                                <RotateTransform x:Name="RightNeedleTransform" CenterX="140" CenterY="126" Angle="-44" />
                             </Canvas.RenderTransform>
-                            <Line X1="100" Y1="94" X2="100" Y2="14"
+                            <Line X1="140" Y1="126" X2="140" Y2="16"
                                   Stroke="#6600D4FF"
-                                  StrokeThickness="5"
+                                  StrokeThickness="5.5"
                                   StrokeStartLineCap="Round"
                                   StrokeEndLineCap="Round" />
-                            <Line X1="100" Y1="94" X2="100" Y2="14"
+                            <Line X1="140" Y1="126" X2="140" Y2="16"
                                   Stroke="#F8FAFC"
-                                  StrokeThickness="1.8"
+                                  StrokeThickness="2"
                                   StrokeStartLineCap="Round"
                                   StrokeEndLineCap="Round" />
                         </Canvas>
 
-                        <Ellipse Canvas.Left="88" Canvas.Top="78" Width="24" Height="24" Fill="#1E2433" Stroke="#3B455E" StrokeThickness="1" />
+                        <Ellipse Canvas.Left="124" Canvas.Top="104" Width="32" Height="32" Fill="#1B2130" Stroke="#3B4660" StrokeThickness="1.2" />
+                        <Ellipse Canvas.Left="135" Canvas.Top="115" Width="10" Height="10" Fill="#0B0E15" Stroke="#475569" StrokeThickness="0.8" />
                     </Canvas>
                 </Viewbox>
             </Grid>

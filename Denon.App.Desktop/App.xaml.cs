@@ -121,8 +121,8 @@ public partial class App : System.Windows.Application
             {
                 var vm = _host.Services.GetRequiredService<MainViewModel>();
                 vm.LoadShowcaseStateForScreenshots();
-                window.Width = 1240;
-                window.Height = 840;
+                window.Width = 1360;
+                window.Height = 920;
                 window.ShowActivated = false;
                 window.Show();
                 await CaptureScreenshotsAsync(window, vm, captureDir!);
@@ -201,6 +201,7 @@ public partial class App : System.Windows.Application
             ("Acoustics", null, "03-scenes-acoustics.png"),
             ("CastRemote", null, "04-cast-phone-remote.png"),
             ("Stations", "Explorer", "05-global-radio-explorer.png"),
+            ("Settings", null, "06-settings-shortcuts.png"),
         ];
 
         foreach (var (section, stationsTab, fileName) in shots)

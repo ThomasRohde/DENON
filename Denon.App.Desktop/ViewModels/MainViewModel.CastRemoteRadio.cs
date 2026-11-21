@@ -874,5 +874,12 @@ public sealed partial class MainViewModel
         RadioBrowserResults.Add(new RadioBrowserStation("4", "DR P8 Jazz", "http://live-icy.dr.dk/A/A22L.mp3", string.Empty, "Denmark", "jazz, danish public radio", "MP3", 192, 5320));
         RadioBrowserResults.Add(new RadioBrowserStation("5", "Nightride FM", "https://stream.nightride.fm/nightride.mp3", string.Empty, "Germany", "synthwave, retrowave, electronic", "MP3", 320, 7890));
         RadioBrowserStatusText = "Showing 5 of 40,000+ live global stations — click ▶ Play or + Save to add to presets.";
+
+        foreach (var shortcut in ShortcutEditors)
+        {
+            shortcut.SetValidationResult(false, false, null, string.IsNullOrWhiteSpace(shortcut.Gesture) ? "OFF" : "OK");
+        }
+        HasShortcutCollisions = false;
+        ShortcutSummaryText = "All shortcuts checked — zero internal or Windows OS collisions detected!";
     }
 }

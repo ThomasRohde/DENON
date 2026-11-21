@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 - **Auto-Fullscreen YouTube Cinema Mode**: Opening a YouTube video now automatically launches the Cinema Companion in borderless fullscreen covering the taskbar, with `F11` / **Exit Fullscreen** toggle, `H` / **Hide Bars** for 100% pure edge-to-edge video, and `Esc` progressive exit (show bars → exit fullscreen → close).
 
+### Changed
+- **Larger Default Window & Commanding Analog VU Meters**: Increased default window dimensions to `1360×920`, expanded the dual-channel Analog VU Meters to `138 px` height with a wider high-contrast dB arc (`-20` to `+3 dB`), and gave the Settings Shortcut Editor its own dedicated internal scroll view so Desktop Behavior and Relay controls stay anchored in place.
+
 ### Fixed
 - **Prevented Finished YouTube/Local Streams From Replaying or Autoplaying**: Immediately expires completed LAN relay stream tokens on EOF so HEOS firmware cannot reconnect and loop a finished track, cleanly stops HEOS when the Up-Next queue ends, and disables/blocks YouTube's built-in web Autoplay inside the Cinema Companion window.
 
