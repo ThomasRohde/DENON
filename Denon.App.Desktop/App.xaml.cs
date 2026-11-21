@@ -66,6 +66,7 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<DenonDiscoveryService>();
             builder.Services.AddSingleton<StreamProbeService>();
             builder.Services.AddSingleton<WindowsStartupService>();
+            builder.Services.AddSingleton<GlobalHotkeyService>();
             builder.Services.AddSingleton<ReceiverController>();
             builder.Services.AddSingleton<YouTubeMediaService>();
             builder.Services.AddSingleton<LocalAudioRelayServer>();
@@ -131,6 +132,37 @@ public partial class App : System.Windows.Application
 
             _trayIconController = _host.Services.GetRequiredService<TrayIconController>();
             _trayIconController.Initialize(window, ExitApplicationAsync);
+
+            var hotkeyService = _host.Services.GetRequiredService<GlobalHotkeyService>();
+            var mainVm = _host.Services.GetRequiredService<MainViewModel>();
+            hotkeyService.HotkeyPressed += actionId =>
+            {
+                _ = Dispatcher.InvokeAsync(async () =>
+                {
+                    if (string.Equals(actionId, Denon.App.Core.Models.ShortcutActionIds.GlobalShowApp, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (window.IsVisible && window.IsActive && window.WindowState != WindowState.Minimized)
+                        {
+                            if (settingsStore.Current.Ui.MinimizeToTray)
+                            {
+                                window.Hide();
+                            }
+                            else
+                            {
+                                window.WindowState = WindowState.Minimized;
+                            }
+                        }
+                        else
+                        {
+                            await _trayIconController.ShowWindowAsync();
+                        }
+                    }
+                    else
+                    {
+                        mainVm.ExecuteShortcutAction(actionId);
+                    }
+                });
+            };
 
             StartActivationSignalListener();
 

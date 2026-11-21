@@ -8,12 +8,15 @@ public sealed class AppSettings
 
     public MediaRelaySettings Media { get; set; } = new();
 
+    public ShortcutSettings Shortcuts { get; set; } = new();
+
     public AppSettings Clone() =>
         new()
         {
             Receiver = Receiver.Clone(),
             Ui = Ui.Clone(),
             Media = Media.Clone(),
+            Shortcuts = Shortcuts.Clone(),
         };
 
     public static AppSettings CreateDefault() => new();

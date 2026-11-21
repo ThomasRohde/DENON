@@ -2929,39 +2929,172 @@
 
                                 <Border Style="{StaticResource SurfaceCard}">
                                     <StackPanel>
-                                        <TextBlock Text="KEYBOARD SHORTCUTS &amp; TIPS" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,12" />
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="120" />
-                                                <ColumnDefinition Width="*" />
-                                            </Grid.ColumnDefinitions>
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="28" />
-                                                <RowDefinition Height="28" />
-                                                <RowDefinition Height="28" />
-                                                <RowDefinition Height="28" />
-                                                <RowDefinition Height="28" />
-                                                <RowDefinition Height="28" />
-                                            </Grid.RowDefinitions>
+                                        <DockPanel Margin="0,0,0,8">
+                                            <TextBlock Text="SHORTCUT EDITOR &amp; COLLISION CHECKER" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                <Button Content="Check Collisions"
+                                                        Command="{Binding CheckShortcutCollisionsCommand}"
+                                                        Style="{StaticResource SecondaryButton}"
+                                                        Padding="8,4"
+                                                        FontSize="10.5"
+                                                        Margin="0,0,5,0"
+                                                        ToolTip="Re-check internal duplicates, reserved Windows combos, and live Win32 global hotkey availability" />
+                                                <Button Content="Reset"
+                                                        Command="{Binding ResetShortcutsToDefaultCommand}"
+                                                        Style="{StaticResource SecondaryButton}"
+                                                        Padding="8,4"
+                                                        FontSize="10.5"
+                                                        Margin="0,0,5,0" />
+                                                <Button Content="Save"
+                                                        Command="{Binding SaveSettingsCommand}"
+                                                        Style="{StaticResource PrimaryButton}"
+                                                        Padding="10,4"
+                                                        FontSize="10.5" />
+                                            </StackPanel>
+                                        </DockPanel>
 
-                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Space" Style="{StaticResource OledMonoText}" FontSize="12" VerticalAlignment="Center" />
-                                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Play / Pause HEOS playback" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding ShortcutSummaryText}"
+                                                   FontSize="11.5"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,10">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentCyanBrightBrush}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasShortcutCollisions}" Value="True">
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentCrimsonBrush}" />
+                                                            <Setter Property="FontWeight" Value="SemiBold" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
 
-                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="M" Style="{StaticResource OledMonoText}" FontSize="12" VerticalAlignment="Center" />
-                                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Toggle Receiver Mute" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
+                                        <ItemsControl ItemsSource="{Binding ShortcutEditors}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border CornerRadius="9" Padding="9,7" Margin="0,0,0,6" BorderThickness="1">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Background" Value="#141822" />
+                                                                <Setter Property="BorderBrush" Value="#232A3A" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsRecording}" Value="True">
+                                                                        <Setter Property="Background" Value="#0C2636" />
+                                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding HasCollision}" Value="True">
+                                                                        <Setter Property="Background" Value="#2A1216" />
+                                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentCrimsonBrush}" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsWarningOnly}" Value="True">
+                                                                        <Setter Property="Background" Value="#251E10" />
+                                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentAmberBrush}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
 
-                                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Ctrl + ↑ / ↓" Style="{StaticResource OledMonoText}" FontSize="12" VerticalAlignment="Center" />
-                                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Adjust Volume ±2 steps" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
+                                                        <StackPanel>
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
 
-                                            <TextBlock Grid.Row="3" Grid.Column="0" Text="F5 / Ctrl+R" Style="{StaticResource OledMonoText}" FontSize="12" VerticalAlignment="Center" />
-                                            <TextBlock Grid.Row="3" Grid.Column="1" Text="Force Refresh Receiver State" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
+                                                                <Border Grid.Column="0" CornerRadius="4" Padding="5,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                                    <Border.Style>
+                                                                        <Style TargetType="Border">
+                                                                            <Setter Property="Background" Value="#1E2534" />
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsGlobal}" Value="True">
+                                                                                    <Setter Property="Background" Value="#0E2D3D" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </Border.Style>
+                                                                    <TextBlock Text="{Binding ScopeBadge}" FontSize="9" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas">
+                                                                        <TextBlock.Style>
+                                                                            <Style TargetType="TextBlock">
+                                                                                <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsGlobal}" Value="True">
+                                                                                        <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </TextBlock.Style>
+                                                                    </TextBlock>
+                                                                </Border>
 
-                                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl + 1..7" Style="{StaticResource OledMonoText}" FontSize="12" VerticalAlignment="Center" />
-                                            <TextBlock Grid.Row="4" Grid.Column="1" Text="Switch Navigation Views" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
+                                                                <TextBlock Grid.Column="1"
+                                                                           Text="{Binding Label}"
+                                                                           FontSize="12"
+                                                                           FontWeight="SemiBold"
+                                                                           VerticalAlignment="Center"
+                                                                           TextTrimming="CharacterEllipsis"
+                                                                           Margin="0,0,8,0" />
 
-                                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Tray Click" Style="{StaticResource OledMonoText}" FontSize="12" VerticalAlignment="Center" />
-                                            <TextBlock Grid.Row="5" Grid.Column="1" Text="Open Compact Floating Mini-Controller" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
-                                        </Grid>
+                                                                <Border Grid.Column="2"
+                                                                        Background="#0A0E16"
+                                                                        BorderBrush="#293246"
+                                                                        BorderThickness="1"
+                                                                        CornerRadius="6"
+                                                                        Padding="8,4"
+                                                                        Margin="0,0,6,0"
+                                                                        VerticalAlignment="Center">
+                                                                    <StackPanel Orientation="Horizontal">
+                                                                        <TextBlock Text="{Binding GestureDisplay}"
+                                                                                   FontSize="11"
+                                                                                   FontWeight="Bold"
+                                                                                   FontFamily="Cascadia Mono, Consolas"
+                                                                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                                                                   VerticalAlignment="Center" />
+                                                                        <TextBlock Text="{Binding StatusLabel, StringFormat='  [{0}]'}"
+                                                                                   FontSize="9.5"
+                                                                                   FontWeight="Bold"
+                                                                                   FontFamily="Cascadia Mono, Consolas"
+                                                                                   Foreground="{Binding StatusBrush}"
+                                                                                   VerticalAlignment="Center" />
+                                                                    </StackPanel>
+                                                                </Border>
+
+                                                                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                    <Button Content="{Binding RecordButtonText}"
+                                                                            Command="{Binding DataContext.ToggleRecordShortcutCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Style="{StaticResource SecondaryButton}"
+                                                                            Padding="8,4"
+                                                                            FontSize="10.5"
+                                                                            Margin="0,0,4,0" />
+                                                                    <Button Content="✕"
+                                                                            Command="{Binding DataContext.ClearShortcutCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Style="{StaticResource DangerButton}"
+                                                                            Padding="6,4"
+                                                                            FontSize="10.5"
+                                                                            ToolTip="Clear shortcut" />
+                                                                </StackPanel>
+                                                            </Grid>
+
+                                                            <TextBlock Text="{Binding CollisionMessage}"
+                                                                       FontSize="10.5"
+                                                                       Foreground="{Binding StatusBrush}"
+                                                                       TextWrapping="Wrap"
+                                                                       Margin="0,5,0,0"
+                                                                       Visibility="{Binding CollisionMessage, Converter={StaticResource StringToVis}}" />
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <TextBlock Text="Built-in: Ctrl+1..7 switches views • Ctrl+R refreshes • Mouse wheel over Volume adjusts ±2 steps"
+                                                   FontSize="10.5"
+                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                   Margin="0,6,0,0" />
                                     </StackPanel>
                                 </Border>
                             </StackPanel>

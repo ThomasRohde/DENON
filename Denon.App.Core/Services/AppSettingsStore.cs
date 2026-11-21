@@ -131,7 +131,34 @@ public sealed class AppSettingsStore
             : 18925;
         normalized.Media.FfmpegPath = normalized.Media.FfmpegPath?.Trim() ?? string.Empty;
         normalized.Media.CinemaSyncOffsetMs = Math.Clamp(normalized.Media.CinemaSyncOffsetMs, 0, 8000);
+        normalized.Shortcuts ??= new ShortcutSettings();
+        normalized.Shortcuts.Bindings = NormalizeShortcuts(normalized.Shortcuts.Bindings);
         return normalized;
+    }
+
+    private static List<ShortcutBinding> NormalizeShortcuts(IEnumerable<ShortcutBinding>? existing)
+    {
+        var byId = (existing ?? [])
+            .Where(static b => !string.IsNullOrWhiteSpace(b.ActionId))
+            .GroupBy(static b => b.ActionId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(static g => g.Key, static g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        var defaults = ShortcutSettings.CreateDefaults();
+        var result = new List<ShortcutBinding>(defaults.Count);
+
+        foreach (var def in defaults)
+        {
+            if (byId.TryGetValue(def.ActionId, out var saved))
+            {
+                result.Add(new ShortcutBinding(def.ActionId, def.Label, def.IsGlobal, saved.Gesture?.Trim() ?? string.Empty));
+            }
+            else
+            {
+                result.Add(def.Clone());
+            }
+        }
+
+        return result;
     }
 
     private static List<ScenePreset> NormalizeScenes(IEnumerable<ScenePreset>? scenes)

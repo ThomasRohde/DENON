@@ -156,10 +156,24 @@ public partial class MainWindow : Window
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        var isTyping = Keyboard.FocusedElement is TextBox or PasswordBox;
-        var ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+        var actualKey = e.Key == Key.System ? e.SystemKey : e.Key;
+        var modifiers = Keyboard.Modifiers;
 
-        if (e.Key == Key.F5 || (ctrl && e.Key == Key.R))
+        // Interactive shortcut recorder in Settings takes priority over all other key handling
+        if (_viewModel.IsRecordingAnyShortcut)
+        {
+            if (_viewModel.TryCaptureRecordedShortcut(actualKey, modifiers))
+            {
+                e.Handled = true;
+            }
+
+            return;
+        }
+
+        var isTyping = Keyboard.FocusedElement is TextBox or PasswordBox;
+        var ctrl = modifiers.HasFlag(ModifierKeys.Control);
+
+        if (ctrl && actualKey == Key.R)
         {
             if (_viewModel.RefreshCommand.CanExecute(null))
             {
@@ -170,9 +184,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (ctrl)
+        if (ctrl && modifiers == ModifierKeys.Control)
         {
-            switch (e.Key)
+            switch (actualKey)
             {
                 case Key.D1:
                     _viewModel.ActiveSection = "Control";
@@ -202,30 +216,16 @@ public partial class MainWindow : Window
                     _viewModel.ActiveSection = "Diagnostics";
                     e.Handled = true;
                     return;
-                case Key.Up:
-                    _viewModel.AdjustVolumeByWheel(2);
-                    e.Handled = true;
-                    return;
-                case Key.Down:
-                    _viewModel.AdjustVolumeByWheel(-2);
-                    e.Handled = true;
-                    return;
             }
         }
 
-        if (isTyping)
+        if (isTyping && modifiers == ModifierKeys.None && actualKey is not (>= Key.F1 and <= Key.F24))
         {
             return;
         }
 
-        if (e.Key == Key.Space && _viewModel.PlayPauseCommand.CanExecute(null))
+        if (_viewModel.TryExecuteInAppShortcut(actualKey, modifiers))
         {
-            _viewModel.PlayPauseCommand.Execute(null);
-            e.Handled = true;
-        }
-        else if (e.Key == Key.M && _viewModel.ToggleMuteCommand.CanExecute(null))
-        {
-            _viewModel.ToggleMuteCommand.Execute(null);
             e.Handled = true;
         }
     }

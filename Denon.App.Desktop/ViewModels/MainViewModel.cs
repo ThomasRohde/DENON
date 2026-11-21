@@ -127,7 +127,8 @@ public sealed partial class MainViewModel : ObservableObject
         RadioBrowserService radioBrowserService,
         LocalMediaJukeboxService localJukeboxService,
         PcAudioCastService pcAudioCastService,
-        HeosEventListenerService heosEventListener)
+        HeosEventListenerService heosEventListener,
+        GlobalHotkeyService globalHotkeyService)
     {
         _receiverController = receiverController;
         _settingsStore = settingsStore;
@@ -258,6 +259,7 @@ public sealed partial class MainViewModel : ObservableObject
         InitializeYouTube(youtubeService, relayServer, youtubeQueueService, cinemaWindow);
         InitializeScenesAcoustics();
         InitializeCastRemoteRadio(radioBrowserService, localJukeboxService, pcAudioCastService, heosEventListener);
+        InitializeShortcuts(globalHotkeyService);
 
         LoadSettings(_settingsStore.Current);
         ApplyStateSnapshot(_stateStore.Snapshot);
@@ -1179,6 +1181,7 @@ public sealed partial class MainViewModel : ObservableObject
         RefreshFfmpegBadge();
 
         LoadScenesFromSettings(settings);
+        LoadShortcutsFromSettings(settings);
 
         RebuildVolumePresets(settings.Receiver.VolumePresets);
 
@@ -1693,6 +1696,12 @@ public sealed partial class MainViewModel : ObservableObject
     {
         try
         {
+            if (!ValidateShortcutCollisions(reportClean: false))
+            {
+                StatusMessage = "Cannot save: resolve highlighted shortcut collisions in Settings first.";
+                return;
+            }
+
             var volumePresets = ParseVolumePresets(SettingsVolumePresetsText);
             var settings = new AppSettings
             {
@@ -1722,6 +1731,10 @@ public sealed partial class MainViewModel : ObservableObject
                     FfmpegPath = SettingsFfmpegPath?.Trim() ?? string.Empty,
                     PreferFfmpegMp3Transcode = SettingsPreferFfmpegMp3,
                     CinemaSyncOffsetMs = ParseInt(SettingsCinemaSyncOffsetMs, 1800),
+                },
+                Shortcuts = new ShortcutSettings
+                {
+                    Bindings = ShortcutEditors.Select(static s => s.ToModel()).ToList(),
                 },
             };
 
