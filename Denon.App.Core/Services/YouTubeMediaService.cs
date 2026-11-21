@@ -35,9 +35,11 @@ public sealed class YouTubeMediaService
             return new YouTubeSearchResponse([], [], "Enter a song, artist, YouTube URL, or playlist link.");
         }
 
-        // 1. Direct Playlist URL (unless it's a watch URL with a single video AND a list? Let's detect!)
-        var parsedVideoId = VideoId.TryParse(input);
-        var parsedPlaylistId = PlaylistId.TryParse(input);
+        // Only parse direct Video/Playlist IDs when the user actually entered a YouTube URL.
+        // Plain single-word queries like "Slopcore" can otherwise be accepted by PlaylistId.TryParse!
+        var isUrl = LooksLikeYouTubeUrl(input);
+        var parsedVideoId = isUrl ? VideoId.TryParse(input) : null;
+        var parsedPlaylistId = isUrl ? PlaylistId.TryParse(input) : null;
 
         if (parsedPlaylistId is { } playlistId && (parsedVideoId is null || input.Contains("/playlist", StringComparison.OrdinalIgnoreCase)))
         {
@@ -256,13 +258,42 @@ public sealed class YouTubeMediaService
 
     public static bool IsYouTubeUrl(string? input)
     {
+        if (!LooksLikeYouTubeUrl(input))
+        {
+            return false;
+        }
+
+        var trimmed = input!.Trim();
+        return VideoId.TryParse(trimmed) is not null || PlaylistId.TryParse(trimmed) is not null;
+    }
+
+    private static bool LooksLikeYouTubeUrl(string? input)
+    {
         if (string.IsNullOrWhiteSpace(input))
         {
             return false;
         }
 
         var trimmed = input.Trim();
-        return VideoId.TryParse(trimmed) is not null || PlaylistId.TryParse(trimmed) is not null;
+        if (trimmed.Contains(' '))
+        {
+            return false;
+        }
+
+        var normalized = trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                         trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+            ? trimmed
+            : $"https://{trimmed}";
+
+        if (!Uri.TryCreate(normalized, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        var host = uri.Host;
+        return host.Equals("youtu.be", StringComparison.OrdinalIgnoreCase) ||
+               host.Equals("youtube.com", StringComparison.OrdinalIgnoreCase) ||
+               host.EndsWith(".youtube.com", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task<StreamManifest> GetCachedManifestAsync(string videoId, CancellationToken cancellationToken)

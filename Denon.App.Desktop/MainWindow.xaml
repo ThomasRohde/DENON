@@ -1121,8 +1121,14 @@
                                             Style="{StaticResource PrimaryButton}" />
                                 </Grid>
 
-                                <DockPanel Margin="0,10,0,0">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                                         <Button Content="Music"
                                                 Command="{Binding SetYouTubeSearchModeCommand}"
                                                 CommandParameter="Music"
@@ -1163,8 +1169,7 @@
                                                 Command="{Binding SetYouTubeSearchModeCommand}"
                                                 CommandParameter="Playlists"
                                                 Padding="11,5"
-                                                FontSize="11.5"
-                                                Margin="0,0,14,0">
+                                                FontSize="11.5">
                                             <Button.Style>
                                                 <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                     <Style.Triggers>
@@ -1177,21 +1182,32 @@
                                                 </Style>
                                             </Button.Style>
                                         </Button>
-
-                                        <TextBlock Text="{Binding YouTubeStatusText}"
-                                                   FontSize="11.5"
-                                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   VerticalAlignment="Center" />
                                     </StackPanel>
 
-                                    <TextBlock Text="{Binding RelayEndpointText}"
-                                               HorizontalAlignment="Right"
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding YouTubeStatusText}"
+                                               ToolTip="{Binding YouTubeStatusText}"
+                                               FontSize="11.5"
+                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               TextTrimming="CharacterEllipsis"
                                                VerticalAlignment="Center"
-                                               FontSize="10.5"
-                                               FontFamily="Cascadia Mono, Consolas"
-                                               Foreground="{StaticResource TextMutedBrush}" />
-                                </DockPanel>
+                                               Margin="0,0,12,0" />
+
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding RelayEndpointText}"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="10.5"
+                                                   FontFamily="Cascadia Mono, Consolas"
+                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                   Margin="0,0,8,0" />
+                                        <Button Content="Allow Firewall"
+                                                Command="{Binding AllowRelayFirewallCommand}"
+                                                Style="{StaticResource SecondaryButton}"
+                                                Padding="8,4"
+                                                FontSize="10.5"
+                                                ToolTip="Add a Private LAN Windows Firewall inbound rule for the Denon Audio Relay port" />
+                                    </StackPanel>
+                                </Grid>
                             </StackPanel>
                         </Border>
 

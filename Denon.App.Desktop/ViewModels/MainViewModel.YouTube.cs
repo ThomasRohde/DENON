@@ -53,6 +53,7 @@ public sealed partial class MainViewModel
     public RelayCommand CycleYouTubeRepeatCommand { get; private set; } = null!;
     public AsyncRelayCommand OpenCinemaForCurrentTrackCommand { get; private set; } = null!;
     public RelayCommand PasteAndSearchYouTubeCommand { get; private set; } = null!;
+    public AsyncRelayCommand AllowRelayFirewallCommand { get; private set; } = null!;
 
     private void InitializeYouTube(
         YouTubeMediaService youtubeService,
@@ -88,6 +89,7 @@ public sealed partial class MainViewModel
         CycleYouTubeRepeatCommand = new RelayCommand(_ => _youtubeQueueService.CycleRepeatMode());
         OpenCinemaForCurrentTrackCommand = new AsyncRelayCommand(_ => OpenCinemaForCurrentTrackAsync(), _ => IsYouTubeActive);
         PasteAndSearchYouTubeCommand = new RelayCommand(_ => PasteFromClipboardAndSearch());
+        AllowRelayFirewallCommand = new AsyncRelayCommand(_ => AllowRelayFirewallAsync());
 
         _relayServer.StatusChanged += snapshot => _ = _dispatcher.InvokeAsync(() => ApplyRelayStatus(snapshot));
         _youtubeQueueService.QueueChanged += snapshot => _ = _dispatcher.InvokeAsync(() => ApplyYouTubeQueueSnapshot(snapshot));
@@ -274,6 +276,48 @@ public sealed partial class MainViewModel
         }
         catch
         {
+        }
+    }
+
+    private async Task AllowRelayFirewallAsync()
+    {
+        try
+        {
+            await _relayServer.EnsureStartedAsync();
+            var port = _settingsStore.Current.Media.RelayPort;
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "netsh",
+                Arguments = $"advfirewall firewall add rule name=\"Denon Desktop Audio Relay\" dir=in action=allow protocol=TCP localport={port} profile=private",
+                UseShellExecute = true,
+                Verb = "runas",
+                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
+            };
+
+            using var proc = System.Diagnostics.Process.Start(psi);
+            if (proc is not null)
+            {
+                await proc.WaitForExitAsync();
+                if (proc.ExitCode == 0)
+                {
+                    YouTubeStatusText = $"Windows Firewall rule added for Private LAN TCP port {port}.";
+                    StatusMessage = $"Firewall opened for LAN Audio Relay (port {port}).";
+                    _logStore.Info($"Added Windows Firewall inbound rule for TCP port {port}.");
+                }
+                else
+                {
+                    YouTubeStatusText = $"Firewall command exited with code {proc.ExitCode}.";
+                }
+            }
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            YouTubeStatusText = "Firewall prompt canceled.";
+        }
+        catch (Exception ex)
+        {
+            YouTubeStatusText = $"Could not configure firewall: {ex.Message}";
+            _logStore.Warning($"Firewall rule setup failed: {ex.Message}");
         }
     }
 

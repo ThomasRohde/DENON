@@ -76,6 +76,18 @@ public partial class App : System.Windows.Application
             await settingsStore.InitializeAsync();
             await _host.StartAsync();
 
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _host.Services.GetRequiredService<LocalAudioRelayServer>().EnsureStartedAsync();
+                }
+                catch (Exception ex)
+                {
+                    _host.Services.GetRequiredService<AppLogStore>().Warning($"Local audio relay startup deferred: {ex.Message}");
+                }
+            });
+
             _host.Services.GetRequiredService<AppLogStore>().Info("Denon Desktop started.");
 
             var window = _host.Services.GetRequiredService<MainWindow>();
