@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-21
+
+### Added
+- **Unsigned Windows x64 Installer (`DenonDesktop-Setup-win-x64.exe`)**: Added an Inno Setup 6 installer (`installer/DenonDesktop.iss`) built automatically alongside the portable single-file `.exe` in GitHub Releases, featuring per-user zero-admin installation (with optional All Users), Start Menu & optional Desktop/Startup shortcuts, the R2C5 app icon, clean Add/Remove Programs uninstaller, and SHA-256 verification.
+
+### Fixed
+- **Philips Hue "All Lights" View & Internal Group Cleanup**: Added an **All Lights** chip (default view) and a **Show All Lights** button on the Individual Lights header so every light on the Hue Bridge is visible at once instead of being filtered to only the first alphabetical room; filtered out internal `hgrp-*` Hue system groups and fixed singular/plural light count labels (`1 light` vs `3 lights`).
+- **Responsive Plugin Dashboard Headers**: Converted the Philips Hue, Smart TV, and Home Assistant dashboard headers from `DockPanel` to 2-column `Grid` layouts with subtitle wrapping so action buttons (`Try Demo Mode`, `Push Status`, `Save & Sync`, `Pair with LG TV`) never overlap text at narrower window widths.
+
 ## [1.3.0] - 2026-11-21
 
 ### Added
@@ -94,7 +103,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Zero-Lag Real-Time HEOS Push Events (`LIVE PUSH`) & Analog VU Meters**: Dedicated `register_for_change_events` push listener for `<50 ms` knob/remote sync and toggleable dual-channel illuminated VU dials.
 - **Automated GitHub Releases Workflow**: `.github/workflows/release.yml` builds self-contained single-file `win-x64` executables and SHA-256 checksums on version tags.
 
-[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/ThomasRohde/DENON/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/ThomasRohde/DENON/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/ThomasRohde/DENON/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/ThomasRohde/DENON/compare/v1.1.0...v1.1.1

@@ -496,6 +496,12 @@ public sealed class HueBridgeClient : IDisposable
             }
 
             var name = obj.TryGetProperty("name", out var nEl) ? nEl.GetString() ?? $"Room {prop.Name}" : $"Room {prop.Name}";
+            // Skip internal Hue Bridge auto-generated system groups (e.g. hgrp-0000000014)
+            if (name.StartsWith("hgrp-", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             var roomClass = obj.TryGetProperty("class", out var cEl) ? cEl.GetString() ?? groupType : groupType;
 
             var anyOn = false;

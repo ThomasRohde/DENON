@@ -110,20 +110,25 @@
             <!-- ================= BRIDGE CONNECTION & PAIRING CARD ================= -->
             <Border Style="{StaticResource HueSurfaceCard}" Margin="0,0,0,14">
                 <StackPanel>
-                    <DockPanel Margin="0,0,0,12">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Border Width="34" Height="34" CornerRadius="9" Background="#2B1D08" BorderBrush="#F59E0B" BorderThickness="1" Margin="0,0,12,0">
-                                <TextBlock Text="💡" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                            <StackPanel>
-                                <TextBlock Text="Philips Hue Smart Lighting" FontSize="16" FontWeight="Bold" Foreground="{StaticResource HueTextPrimary}" />
-                                <TextBlock Text="Direct LAN Bridge API • Rooms, Individual Lights, Mood Swatches &amp; Denon Smart Scene Sync"
-                                           FontSize="11.5"
-                                           Foreground="{StaticResource HueTextSecondary}" />
-                            </StackPanel>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Width="34" Height="34" CornerRadius="9" Background="#2B1D08" BorderBrush="#F59E0B" BorderThickness="1" Margin="0,0,12,0" VerticalAlignment="Center">
+                            <TextBlock Text="💡" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="Philips Hue Smart Lighting" FontSize="16" FontWeight="Bold" Foreground="{StaticResource HueTextPrimary}" />
+                            <TextBlock Text="Direct LAN Bridge API • Rooms, Individual Lights, Mood Swatches &amp; Denon Smart Scene Sync"
+                                       FontSize="11.5"
+                                       Foreground="{StaticResource HueTextSecondary}"
+                                       TextWrapping="Wrap" />
                         </StackPanel>
 
-                        <Border HorizontalAlignment="Right"
+                        <Border Grid.Column="3"
                                 VerticalAlignment="Center"
                                 Background="#0D111A"
                                 BorderBrush="{Binding ConnectionBadgeBrush}"
@@ -138,7 +143,7 @@
                                            Foreground="{Binding ConnectionBadgeBrush}" />
                             </StackPanel>
                         </Border>
-                    </DockPanel>
+                    </Grid>
 
                     <WrapPanel Margin="0,0,0,6" VerticalAlignment="Center">
                         <TextBlock Text="BRIDGE IP" Style="{StaticResource HueSectionLabel}" VerticalAlignment="Center" Margin="0,0,10,6" />
@@ -598,14 +603,26 @@
             <!-- ================= INDIVIDUAL LIGHTS GRID ================= -->
             <Border Style="{StaticResource HueSurfaceCard}" Visibility="{Binding IsConnectedOrDemo, Converter={StaticResource HueBoolToVis}}">
                 <StackPanel>
-                    <DockPanel Margin="0,0,0,12">
-                        <TextBlock Text="INDIVIDUAL LIGHTS" Style="{StaticResource HueSectionLabel}" VerticalAlignment="Center" />
-                        <TextBlock Text="Drag sliders to smoothly dim or shift color temperature in real time"
-                                   FontSize="11"
-                                   Foreground="{StaticResource HueTextMuted}"
-                                   HorizontalAlignment="Right"
-                                   VerticalAlignment="Center" />
-                    </DockPanel>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="{Binding IndividualLightsHeader}" Style="{StaticResource HueSectionLabel}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Content="Show All Lights"
+                                    Command="{Binding ShowAllLightsCommand}"
+                                    Style="{StaticResource HueButton}"
+                                    Padding="9,3"
+                                    FontSize="10.5"
+                                    Margin="0,0,8,0"
+                                    Visibility="{Binding IsFilteredToSingleRoom, Converter={StaticResource HueBoolToVis}}" />
+                            <TextBlock Text="Drag sliders to dim or adjust warmth"
+                                       FontSize="11"
+                                       Foreground="{StaticResource HueTextMuted}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
 
                     <ItemsControl ItemsSource="{Binding VisibleLights}">
                         <ItemsControl.ItemsPanel>

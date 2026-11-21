@@ -54,17 +54,22 @@
         <StackPanel Margin="0,0,4,12">
             <Border Style="{StaticResource TvCard}" Margin="0,0,0,14">
                 <StackPanel>
-                    <DockPanel Margin="0,0,0,12">
-                        <StackPanel>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
                             <TextBlock Text="Smart TV Control (LG webOS + Wake-on-LAN)" FontSize="16" FontWeight="Bold" />
-                            <TextBlock Text="Direct SSAP WebSocket (wss://:3001 &amp; ws://:3000) for Power, HDMI Inputs, Apps &amp; On-Screen Toast Alerts" FontSize="11.5" Foreground="#94A3B8" />
+                            <TextBlock Text="Direct SSAP WebSocket (wss://:3001 &amp; ws://:3000) for Power, HDMI Inputs, Apps &amp; On-Screen Toast Alerts" FontSize="11.5" Foreground="#94A3B8" TextWrapping="Wrap" />
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                             <Button Content="{Binding DemoButtonLabel}" Command="{Binding ToggleDemoCommand}" Style="{StaticResource TvBtn}" Margin="0,0,6,0" />
                             <Button Content="Save" Command="{Binding SaveCommand}" Style="{StaticResource TvBtn}" Margin="0,0,6,0" />
                             <Button Content="Pair with LG TV" Command="{Binding PairCommand}" Style="{StaticResource TvPrimaryBtn}" />
                         </StackPanel>
-                    </DockPanel>
+                    </Grid>
 
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>

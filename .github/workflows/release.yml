@@ -1,4 +1,4 @@
-name: Release Windows Single-File EXE
+name: Release Windows Single-File EXE & Installer
 
 on:
   push:
@@ -38,14 +38,44 @@ jobs:
           Move-Item .\release-out\Denon.App.Desktop.exe .\release-out\Denon.App.Desktop-win-x64.exe -Force
           Remove-Item .\release-out\*.xml -Force -ErrorAction SilentlyContinue
 
-          $hash = (Get-FileHash .\release-out\Denon.App.Desktop-win-x64.exe -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  Denon.App.Desktop-win-x64.exe" | Set-Content -Path .\release-out\SHA256SUMS.txt -Encoding ascii
+      - name: Build Unsigned Windows Installer (Inno Setup)
+        shell: pwsh
+        run: |
+          $iscc = Get-Command iscc -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+          if (-not $iscc -and (Test-Path 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe')) {
+            $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          }
+          if (-not $iscc -and (Test-Path 'C:\Program Files\Inno Setup 6\ISCC.exe')) {
+            $iscc = 'C:\Program Files\Inno Setup 6\ISCC.exe'
+          }
+          if (-not $iscc) {
+            choco install innosetup -y --no-progress
+            $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          }
 
-      - name: Upload build artifact
+          $tag = "${{ github.ref_name }}"
+          $version = if ($tag -match '^v(\d+\.\d+\.\d+)') { $Matches[1] } else { '1.4.0' }
+          $outDir = (Resolve-Path .\release-out).Path
+          $srcExe = Join-Path $outDir 'Denon.App.Desktop-win-x64.exe'
+
+          & $iscc "/DMyAppVersion=$version" "/DMySourceExe=$srcExe" "/DMyOutputDir=$outDir" .\installer\DenonDesktop.iss
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup compiler failed with exit code $LASTEXITCODE"
+          }
+
+          $exeHash = (Get-FileHash (Join-Path $outDir 'Denon.App.Desktop-win-x64.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
+          $setupHash = (Get-FileHash (Join-Path $outDir 'DenonDesktop-Setup-win-x64.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
+          @(
+            "$setupHash  DenonDesktop-Setup-win-x64.exe",
+            "$exeHash  Denon.App.Desktop-win-x64.exe"
+          ) | Set-Content -Path (Join-Path $outDir 'SHA256SUMS.txt') -Encoding ascii
+
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Denon.App.Desktop-win-x64
           path: |
+            release-out/DenonDesktop-Setup-win-x64.exe
             release-out/Denon.App.Desktop-win-x64.exe
             release-out/SHA256SUMS.txt
 
@@ -71,9 +101,11 @@ jobs:
             '',
             '---',
             '',
-            '### Download & Verification',
-            '- **Windows x64 Single-File Executable (no .NET runtime required):** `Denon.App.Desktop-win-x64.exe`',
-            '- **SHA-256:**',
+            '### Downloads (No .NET Runtime Required)',
+            '- **Windows Installer (Unsigned):** `DenonDesktop-Setup-win-x64.exe` — Start Menu & optional Desktop / Startup shortcuts, clean Add/Remove Programs uninstaller. *(Because this open-source build is unsigned, Windows SmartScreen may show a warning — click **More info → Run anyway**.)*',
+            '- **Portable Single-File Executable:** `Denon.App.Desktop-win-x64.exe` — run directly from any folder with zero installation.',
+            '',
+            '### SHA-256 Checksums',
             "${fence}text",
             $sha,
             $fence
@@ -88,5 +120,6 @@ jobs:
           body_path: release-out/RELEASE_NOTES.md
           generate_release_notes: true
           files: |
+            release-out/DenonDesktop-Setup-win-x64.exe
             release-out/Denon.App.Desktop-win-x64.exe
             release-out/SHA256SUMS.txt

@@ -54,17 +54,22 @@
         <StackPanel Margin="0,0,4,12">
             <Border Style="{StaticResource HaCard}" Margin="0,0,0,14">
                 <StackPanel>
-                    <DockPanel Margin="0,0,0,12">
-                        <StackPanel>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
                             <TextBlock Text="Home Assistant REST &amp; Webhook Bridge" FontSize="16" FontWeight="Bold" />
-                            <TextBlock Text="Trigger HA scenes, scripts, blinds &amp; smart plugs — and publish sensor.denon_desktop_receiver live" FontSize="11.5" Foreground="#94A3B8" />
+                            <TextBlock Text="Trigger HA scenes, scripts, blinds &amp; smart plugs — and publish sensor.denon_desktop_receiver live" FontSize="11.5" Foreground="#94A3B8" TextWrapping="Wrap" />
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                             <Button Content="{Binding DemoButtonLabel}" Command="{Binding ToggleDemoCommand}" Style="{StaticResource HaBtn}" Margin="0,0,6,0" />
                             <Button Content="Push Status" Command="{Binding PushNowCommand}" Style="{StaticResource HaBtn}" Margin="0,0,6,0" />
                             <Button Content="Save &amp; Sync" Command="{Binding SaveAndConnectCommand}" Style="{StaticResource HaPrimaryBtn}" />
                         </StackPanel>
-                    </DockPanel>
+                    </Grid>
 
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>

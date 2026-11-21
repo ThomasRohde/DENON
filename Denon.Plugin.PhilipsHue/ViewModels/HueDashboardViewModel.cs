@@ -369,9 +369,16 @@ public sealed class HueRoomChipViewModel : HueObservableObject
         }
     }
 
-    public string Subtitle => AnyOn
-        ? $"{LightIds.Count} lights • {BrightnessPercent}%"
-        : $"{LightIds.Count} lights • Off";
+    public string Subtitle
+    {
+        get
+        {
+            var unit = LightIds.Count == 1 ? "light" : "lights";
+            return AnyOn
+                ? $"{LightIds.Count} {unit} • {BrightnessPercent}%"
+                : $"{LightIds.Count} {unit} • Off";
+        }
+    }
 }
 
 public sealed class HueDashboardViewModel : HueObservableObject
@@ -467,6 +474,14 @@ public sealed class HueDashboardViewModel : HueObservableObject
             }
         });
         UseSelectedRoomForAutomationCommand = new HueAsyncCommand(_ => SetAutomationTargetToSelectedRoomAsync());
+        ShowAllLightsCommand = new HueCommand(_ =>
+        {
+            var allChip = Rooms.FirstOrDefault(r => r.Id == "0");
+            if (allChip is not null)
+            {
+                SelectRoom(allChip);
+            }
+        });
         ToggleMusicSyncCommand = new HueAsyncCommand(_ => ToggleMusicSyncAsync(), _ => IsConnectedOrDemo);
         SetMusicSyncModeCommand = new HueAsyncCommand(param =>
         {
@@ -502,6 +517,7 @@ public sealed class HueDashboardViewModel : HueObservableObject
     public HueAsyncCommand ActivateHueSceneCommand { get; }
     public HueCommand SelectDiscoveredBridgeCommand { get; }
     public HueAsyncCommand UseSelectedRoomForAutomationCommand { get; }
+    public HueCommand ShowAllLightsCommand { get; }
     public HueAsyncCommand ToggleMusicSyncCommand { get; }
     public HueAsyncCommand SetMusicSyncModeCommand { get; }
     public HueCommand ToggleDemoBeatCommand { get; }
@@ -612,9 +628,25 @@ public sealed class HueDashboardViewModel : HueObservableObject
         }
     }
 
-    public string SelectedRoomHeader => SelectedRoom is not null
-        ? $"{SelectedRoom.Name} ({SelectedRoom.LightIds.Count} lights)"
-        : "All Lights";
+    public string SelectedRoomHeader
+    {
+        get
+        {
+            if (SelectedRoom is null)
+            {
+                return $"All Lights ({_allLightsCache.Count})";
+            }
+
+            var unit = SelectedRoom.LightIds.Count == 1 ? "light" : "lights";
+            return $"{SelectedRoom.Name} ({SelectedRoom.LightIds.Count} {unit})";
+        }
+    }
+
+    public string IndividualLightsHeader => SelectedRoom is null || SelectedRoom.Id == "0"
+        ? $"INDIVIDUAL LIGHTS ({VisibleLights.Count} TOTAL)"
+        : $"INDIVIDUAL LIGHTS • {SelectedRoom.Name.ToUpperInvariant()} ({VisibleLights.Count} OF {_allLightsCache.Count})";
+
+    public bool IsFilteredToSingleRoom => SelectedRoom is not null && SelectedRoom.Id != "0";
 
     public string SelectedRoomToggleLabel => SelectedRoom?.AnyOn == true ? "Turn Room Off" : "Turn Room On";
 
@@ -971,8 +1003,30 @@ public sealed class HueDashboardViewModel : HueObservableObject
             _allLightsCache = lights;
             _allScenesCache = scenes;
 
-            var activeRoomId = preferredRoomId ?? SelectedRoom?.Id ?? _plugin.Config.SelectedRoomId;
+            var activeRoomId = !string.IsNullOrWhiteSpace(preferredRoomId)
+                ? preferredRoomId
+                : !string.IsNullOrWhiteSpace(SelectedRoom?.Id)
+                    ? SelectedRoom.Id
+                    : !string.IsNullOrWhiteSpace(_plugin.Config.SelectedRoomId)
+                        ? _plugin.Config.SelectedRoomId
+                        : "0";
+
             Rooms.Clear();
+
+            // Always include an "All Lights" chip first so every light on the Bridge is accessible in 1 click
+            var allAnyOn = lights.Any(l => l.IsOn);
+            var allAllOn = lights.Count > 0 && lights.All(l => l.IsOn);
+            var allAvgBri = lights.Count > 0 ? (int)Math.Round(lights.Average(l => l.BrightnessPercent)) : 0;
+            Rooms.Add(new HueRoomChipViewModel(new HueRoomGroup(
+                "0",
+                "All Lights",
+                "All",
+                "All",
+                allAnyOn,
+                allAllOn,
+                allAvgBri,
+                lights.Select(static l => l.Id).ToList())));
+
             foreach (var r in rooms)
             {
                 Rooms.Add(new HueRoomChipViewModel(r));
@@ -1017,7 +1071,7 @@ public sealed class HueDashboardViewModel : HueObservableObject
         }
 
         VisibleLights.Clear();
-        var filteredLights = room is null
+        var filteredLights = room is null || room.Id == "0"
             ? _allLightsCache
             : _allLightsCache.Where(l => room.LightIds.Contains(l.Id)).ToList();
 
@@ -1032,7 +1086,7 @@ public sealed class HueDashboardViewModel : HueObservableObject
         }
 
         VisibleScenes.Clear();
-        var filteredScenes = room is null
+        var filteredScenes = room is null || room.Id == "0"
             ? _allScenesCache.Take(12)
             : _allScenesCache.Where(s => string.Equals(s.GroupId, room.Id, StringComparison.OrdinalIgnoreCase)).Take(12);
 
@@ -1044,6 +1098,8 @@ public sealed class HueDashboardViewModel : HueObservableObject
         RaisePropertyChanged(nameof(HasVisibleScenes));
         RaisePropertyChanged(nameof(SelectedRoomHeader));
         RaisePropertyChanged(nameof(SelectedRoomToggleLabel));
+        RaisePropertyChanged(nameof(IndividualLightsHeader));
+        RaisePropertyChanged(nameof(IsFilteredToSingleRoom));
 
         if (saveSelection && room is not null)
         {
