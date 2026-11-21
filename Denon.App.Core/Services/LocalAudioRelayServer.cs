@@ -39,6 +39,8 @@ public sealed class LocalAudioRelayServer : IDisposable
 
     public event Action<RelayStatusSnapshot>? StatusChanged;
 
+    public event Action<string, DateTimeOffset>? TrackPlaybackStarted;
+
     public event Action<string, YouTubeTrackItem>? TrackStreamCompleted;
 
     public event Action<string, LocalAudioTrackItem>? LocalTrackStreamCompleted;
@@ -499,6 +501,7 @@ public sealed class LocalAudioRelayServer : IDisposable
         var totalBytes = 0L;
         var sourceReachedEof = false;
         var outputReachedEof = false;
+        var playbackClockSignaled = false;
 
         try
         {
@@ -539,6 +542,12 @@ public sealed class LocalAudioRelayServer : IDisposable
 
                 await networkStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
                 totalBytes += read;
+
+                if (!playbackClockSignaled && totalBytes >= 16384)
+                {
+                    playbackClockSignaled = true;
+                    TrackPlaybackStarted?.Invoke(registered.Token, DateTimeOffset.UtcNow);
+                }
 
                 var nowTick = Environment.TickCount64;
                 if (nowTick - lastStatusTick >= 1000)
@@ -633,6 +642,7 @@ public sealed class LocalAudioRelayServer : IDisposable
         var remaining = contentLength ?? long.MaxValue;
         long written = 0;
         var lastStatusTick = Environment.TickCount64;
+        var playbackClockSignaled = false;
 
         while (remaining > 0 && !cancellationToken.IsCancellationRequested)
         {
@@ -648,6 +658,12 @@ public sealed class LocalAudioRelayServer : IDisposable
             if (contentLength.HasValue)
             {
                 remaining -= read;
+            }
+
+            if (!playbackClockSignaled && !isPartial && written >= 16384)
+            {
+                playbackClockSignaled = true;
+                TrackPlaybackStarted?.Invoke(registered.Token, DateTimeOffset.UtcNow);
             }
 
             var nowTick = Environment.TickCount64;

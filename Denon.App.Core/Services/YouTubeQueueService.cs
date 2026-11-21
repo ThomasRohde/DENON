@@ -42,6 +42,7 @@ public sealed class YouTubeQueueService : IDisposable
 {
     private readonly LocalAudioRelayServer _relayServer;
     private readonly ReceiverController _receiverController;
+    private readonly ReceiverStateStore _stateStore;
     private readonly AppLogStore _logStore;
     private readonly object _sync = new();
     private readonly List<YouTubeTrackItem> _queue = [];
@@ -57,17 +58,26 @@ public sealed class YouTubeQueueService : IDisposable
     private bool _lastUnmute = true;
     private CancellationTokenSource? _autoAdvanceCts;
 
+    // Precision playback clock for Cinema A/V sync
+    private DateTimeOffset? _clockRunningSinceUtc;
+    private TimeSpan _clockAccumulated = TimeSpan.Zero;
+    private bool _clockPaused;
+
     public YouTubeQueueService(
         LocalAudioRelayServer relayServer,
         ReceiverController receiverController,
+        ReceiverStateStore stateStore,
         AppLogStore logStore)
     {
         _relayServer = relayServer;
         _receiverController = receiverController;
+        _stateStore = stateStore;
         _logStore = logStore;
 
+        _relayServer.TrackPlaybackStarted += OnRelayTrackPlaybackStarted;
         _relayServer.TrackStreamCompleted += OnRelayTrackStreamCompleted;
         _receiverController.NonRelaySourceActivated += OnNonRelaySourceActivated;
+        _stateStore.StateChanged += OnReceiverStateChanged;
     }
 
     public event Action<YouTubeQueueSnapshot>? QueueChanged;
@@ -93,6 +103,31 @@ public sealed class YouTubeQueueService : IDisposable
             {
                 return _isActive && _currentIndex >= 0 && _currentIndex < _queue.Count;
             }
+        }
+    }
+
+    public double GetEstimatedPlaybackPositionSeconds(int heosBufferOffsetMs = 1800)
+    {
+        lock (_sync)
+        {
+            if (!_isActive || _currentIndex < 0 || _currentIndex >= _queue.Count)
+            {
+                return 0;
+            }
+
+            var elapsed = _clockAccumulated;
+            if (!_clockPaused && _clockRunningSinceUtc is { } startedAt)
+            {
+                elapsed += DateTimeOffset.UtcNow - startedAt;
+            }
+
+            var compensatedSeconds = Math.Max(0.0, elapsed.TotalSeconds - (Math.Clamp(heosBufferOffsetMs, 0, 8000) / 1000.0));
+            if (_queue[_currentIndex].Duration is { } duration && duration.TotalSeconds > 1)
+            {
+                compensatedSeconds = Math.Min(compensatedSeconds, Math.Max(0, duration.TotalSeconds - 1));
+            }
+
+            return compensatedSeconds;
         }
     }
 
@@ -420,11 +455,76 @@ public sealed class YouTubeQueueService : IDisposable
         lock (_sync)
         {
             _activeRelayToken = token;
+            _clockAccumulated = TimeSpan.Zero;
+            _clockRunningSinceUtc = null;
+            _clockPaused = false;
         }
 
         await _receiverController.PlayRelayStreamAsync(relayUrl, track.Title, useLowVolume, unmute, cancellationToken);
+
+        lock (_sync)
+        {
+            // Fallback start time if HEOS hasn't crossed the initial 16KB threshold yet
+            if (string.Equals(_activeRelayToken, token, StringComparison.Ordinal) && _clockRunningSinceUtc is null)
+            {
+                _clockRunningSinceUtc = DateTimeOffset.UtcNow;
+            }
+        }
+
         TrackStarted?.Invoke(track);
         NotifyChanged();
+    }
+
+    private void OnRelayTrackPlaybackStarted(string token, DateTimeOffset startedAtUtc)
+    {
+        lock (_sync)
+        {
+            if (!_isActive || !string.Equals(_activeRelayToken, token, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            // Reset clock cleanly to the exact moment HEOS starts pulling real audio frames
+            _clockAccumulated = TimeSpan.Zero;
+            _clockRunningSinceUtc = startedAtUtc;
+            _clockPaused = false;
+        }
+    }
+
+    private void OnReceiverStateChanged(ReceiverStateSnapshot snapshot)
+    {
+        var playState = snapshot.Status?.PlayState;
+        if (string.IsNullOrWhiteSpace(playState))
+        {
+            return;
+        }
+
+        lock (_sync)
+        {
+            if (!_isActive)
+            {
+                return;
+            }
+
+            var isPausedNow = string.Equals(playState, "pause", StringComparison.OrdinalIgnoreCase);
+            var isPlayingNow = string.Equals(playState, "play", StringComparison.OrdinalIgnoreCase);
+
+            if (isPausedNow && !_clockPaused)
+            {
+                if (_clockRunningSinceUtc is { } started)
+                {
+                    _clockAccumulated += DateTimeOffset.UtcNow - started;
+                }
+
+                _clockRunningSinceUtc = null;
+                _clockPaused = true;
+            }
+            else if (isPlayingNow && _clockPaused)
+            {
+                _clockRunningSinceUtc = DateTimeOffset.UtcNow;
+                _clockPaused = false;
+            }
+        }
     }
 
     private void OnRelayTrackStreamCompleted(string token, YouTubeTrackItem track)
@@ -513,7 +613,9 @@ public sealed class YouTubeQueueService : IDisposable
     public void Dispose()
     {
         CancelPendingAutoAdvance();
+        _relayServer.TrackPlaybackStarted -= OnRelayTrackPlaybackStarted;
         _relayServer.TrackStreamCompleted -= OnRelayTrackStreamCompleted;
         _receiverController.NonRelaySourceActivated -= OnNonRelaySourceActivated;
+        _stateStore.StateChanged -= OnReceiverStateChanged;
     }
 }

@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -16,6 +17,106 @@ public partial class YouTubeCinemaWindow : Window
     private const int DwmwaWindowCornerPreference = 33;
     private const int DwmwcpRound = 2;
 
+    private const string PureVideoModeScript = """
+        (() => {
+            if (window.__denonCinemaInstalled) return;
+            window.__denonCinemaInstalled = true;
+
+            const css = `
+                html, body {
+                    background: #000 !important;
+                    overflow: hidden !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    width: 100vw !important;
+                    height: 100vh !important;
+                }
+                #masthead-container,
+                ytd-masthead,
+                #secondary,
+                #below,
+                #related,
+                #comments,
+                #chat,
+                #guide,
+                tp-yt-app-drawer,
+                ytd-mini-guide-renderer,
+                ytd-consent-bump-v2-lightbox,
+                ytd-popup-container,
+                tp-yt-paper-dialog,
+                .ytp-chrome-top,
+                .ytp-chrome-bottom,
+                .ytp-gradient-top,
+                .ytp-gradient-bottom,
+                .ytp-watermark,
+                .ytp-ce-element,
+                .ytp-cards-teaser,
+                .ytp-cards-button,
+                .ytp-pause-overlay,
+                .ytp-paid-content-overlay,
+                .ytp-suggested-action,
+                .ytp-endscreen-content,
+                .ytp-bezel-text-wrapper,
+                .iv-branding {
+                    display: none !important;
+                    visibility: hidden !important;
+                    opacity: 0 !important;
+                    pointer-events: none !important;
+                }
+                #movie_player,
+                .html5-video-player {
+                    position: fixed !important;
+                    inset: 0 !important;
+                    width: 100vw !important;
+                    height: 100vh !important;
+                    max-width: 100vw !important;
+                    max-height: 100vh !important;
+                    background: #000 !important;
+                    z-index: 2147483640 !important;
+                }
+                .html5-video-container {
+                    position: fixed !important;
+                    inset: 0 !important;
+                    width: 100vw !important;
+                    height: 100vh !important;
+                    background: #000 !important;
+                }
+                video.html5-main-video {
+                    position: fixed !important;
+                    top: 0 !important;
+                    left: 0 !important;
+                    width: 100vw !important;
+                    height: 100vh !important;
+                    object-fit: contain !important;
+                    background: #000 !important;
+                    z-index: 2147483645 !important;
+                }
+            `;
+
+            const injectStyle = () => {
+                if (!document.getElementById('denon-pure-cinema-css')) {
+                    const style = document.createElement('style');
+                    style.id = 'denon-pure-cinema-css';
+                    style.textContent = css;
+                    (document.head || document.documentElement).appendChild(style);
+                }
+            };
+
+            const dismissOverlays = () => {
+                const skipBtn = document.querySelector('.ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern');
+                if (skipBtn) skipBtn.click();
+            };
+
+            injectStyle();
+            document.addEventListener('DOMContentLoaded', injectStyle);
+            const observer = new MutationObserver(() => {
+                injectStyle();
+                dismissOverlays();
+            });
+            observer.observe(document.documentElement, { childList: true, subtree: true });
+        })();
+        """;
+
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
@@ -24,6 +125,8 @@ public partial class YouTubeCinemaWindow : Window
     private string? _currentVideoId;
     private string? _currentWatchUrl;
     private int _syncOffsetMs = 1800;
+    private Func<int, double>? _positionProvider;
+    private CancellationTokenSource? _syncWaitCts;
 
     public YouTubeCinemaWindow()
     {
@@ -31,13 +134,24 @@ public partial class YouTubeCinemaWindow : Window
         ApplyDwmStyling();
     }
 
-    public async Task LoadTrackAsync(YouTubeTrackItem track, int syncOffsetMs = 1800)
+    public async Task LoadTrackAsync(
+        YouTubeTrackItem track,
+        int syncOffsetMs = 1800,
+        Func<int, double>? positionProvider = null)
     {
         _currentVideoId = track.VideoId;
-        _currentWatchUrl = string.IsNullOrWhiteSpace(track.WatchUrl)
+        _positionProvider = positionProvider;
+        _syncOffsetMs = Math.Clamp(syncOffsetMs, 0, 8000);
+
+        var initialSeconds = positionProvider is not null ? Math.Max(0, (int)Math.Floor(positionProvider(_syncOffsetMs))) : 0;
+        var baseUrl = string.IsNullOrWhiteSpace(track.WatchUrl)
             ? $"https://www.youtube.com/watch?v={track.VideoId}"
             : track.WatchUrl;
-        _syncOffsetMs = Math.Clamp(syncOffsetMs, 0, 8000);
+
+        _currentWatchUrl = baseUrl;
+        var navUrl = initialSeconds > 1
+            ? (baseUrl.Contains('?') ? $"{baseUrl}&t={initialSeconds}s" : $"{baseUrl}?t={initialSeconds}s")
+            : baseUrl;
 
         TitleText.Text = $"{track.Title}  •  {track.Author}";
         Title = $"Denon Cinema — {track.Title}";
@@ -60,10 +174,36 @@ public partial class YouTubeCinemaWindow : Window
             return;
         }
 
+        LoadingOverlay.Text = initialSeconds > 1
+            ? $"Syncing video to {FormatTime(initialSeconds)}..."
+            : "Loading pure Cinema video...";
         LoadingOverlay.Visibility = Visibility.Visible;
         VideoWebView.CoreWebView2.IsMuted = _keepVideoMuted;
-        VideoWebView.CoreWebView2.Navigate(_currentWatchUrl);
-        UpdateSyncStatus();
+        VideoWebView.CoreWebView2.Navigate(navUrl);
+        UpdateSyncStatus(initialSeconds);
+    }
+
+    public async Task SyncPlaybackStateAsync(bool isPaused)
+    {
+        if (!_isInitialized || !IsVisible || VideoWebView.CoreWebView2 is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (isPaused)
+            {
+                await VideoWebView.ExecuteScriptAsync("(() => { const v = document.querySelector('video'); if (v && !v.paused) v.pause(); })();");
+            }
+            else
+            {
+                await ApplyLiveSyncPositionAsync();
+            }
+        }
+        catch
+        {
+        }
     }
 
     private async Task EnsureWebViewReadyAsync()
@@ -83,6 +223,7 @@ public partial class YouTubeCinemaWindow : Window
             VideoWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
             VideoWebView.CoreWebView2.Settings.AreDevToolsEnabled = false;
             VideoWebView.CoreWebView2.IsMuted = _keepVideoMuted;
+            await VideoWebView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(PureVideoModeScript);
             VideoWebView.NavigationCompleted += OnNavigationCompleted;
             _isInitialized = true;
         }
@@ -95,7 +236,6 @@ public partial class YouTubeCinemaWindow : Window
 
     private async void OnNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
     {
-        LoadingOverlay.Visibility = Visibility.Collapsed;
         if (!_isInitialized || VideoWebView.CoreWebView2 is null)
         {
             return;
@@ -103,25 +243,83 @@ public partial class YouTubeCinemaWindow : Window
 
         VideoWebView.CoreWebView2.IsMuted = _keepVideoMuted;
 
-        // Cleanly apply mute state and nudge video slightly if Denon HEOS buffer delay is active
+        try
+        {
+            await VideoWebView.ExecuteScriptAsync(PureVideoModeScript);
+        }
+        catch
+        {
+        }
+
+        await WaitForVideoReadyAndSyncAsync();
+        LoadingOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private async Task WaitForVideoReadyAndSyncAsync()
+    {
+        _syncWaitCts?.Cancel();
+        _syncWaitCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        _syncWaitCts = cts;
+
+        try
+        {
+            for (var attempt = 0; attempt < 24 && !cts.IsCancellationRequested; attempt++)
+            {
+                var readyRaw = await VideoWebView.ExecuteScriptAsync("(() => { const v = document.querySelector('video'); return v && v.readyState >= 1 ? 1 : 0; })();");
+                if (readyRaw.Trim() == "1")
+                {
+                    await ApplyLiveSyncPositionAsync();
+                    return;
+                }
+
+                await Task.Delay(180, cts.Token);
+            }
+
+            await ApplyLiveSyncPositionAsync();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task ApplyLiveSyncPositionAsync()
+    {
+        if (!_isInitialized || VideoWebView.CoreWebView2 is null)
+        {
+            return;
+        }
+
+        var targetSeconds = _positionProvider is not null ? Math.Max(0.0, _positionProvider(_syncOffsetMs)) : 0.0;
+        var targetLiteral = targetSeconds.ToString("0.###", CultureInfo.InvariantCulture);
         var mutedLiteral = _keepVideoMuted ? "true" : "false";
+
         var script = $$"""
             (() => {
                 const v = document.querySelector('video');
-                if (v) {
-                    v.muted = {{mutedLiteral}};
-                    if (v.paused) { v.play().catch(() => {}); }
+                if (!v) return;
+                v.muted = {{mutedLiteral}};
+                const target = {{targetLiteral}};
+                if (Math.abs((v.currentTime || 0) - target) > 0.35) {
+                    v.currentTime = target;
+                }
+                if (v.paused) {
+                    v.play().catch(() => {});
                 }
             })();
             """;
 
         try
         {
+            VideoWebView.CoreWebView2.IsMuted = _keepVideoMuted;
             await VideoWebView.ExecuteScriptAsync(script);
+            UpdateSyncStatus(targetSeconds);
         }
         catch
         {
-            // Ignore transient script injection errors
         }
     }
 
@@ -146,16 +344,25 @@ public partial class YouTubeCinemaWindow : Window
         UpdateSyncStatus();
     }
 
-    private Task NudgeVideoSecondsAsync(double deltaSeconds)
+    private async Task NudgeVideoSecondsAsync(double deltaSeconds)
     {
         if (!_isInitialized || VideoWebView.CoreWebView2 is null)
         {
-            return Task.CompletedTask;
+            return;
         }
 
-        var deltaStr = deltaSeconds.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
-        SyncStatusText.Text = $"Nudged video {(deltaSeconds >= 0 ? "+" : "")}{(int)(deltaSeconds * 1000)} ms";
-        return VideoWebView.ExecuteScriptAsync($"(() => {{ const v = document.querySelector('video'); if (v) v.currentTime = Math.max(0, v.currentTime + ({deltaStr})); }})();");
+        // Remember offset adjustment so future Re-Syncs & next tracks inherit the dialed-in sync
+        _syncOffsetMs = Math.Clamp(_syncOffsetMs - (int)Math.Round(deltaSeconds * 1000), 0, 8000);
+
+        var deltaStr = deltaSeconds.ToString("0.###", CultureInfo.InvariantCulture);
+        try
+        {
+            await VideoWebView.ExecuteScriptAsync($"(() => {{ const v = document.querySelector('video'); if (v) v.currentTime = Math.max(0, v.currentTime + ({deltaStr})); }})();");
+            SyncStatusText.Text = $"Nudged {(deltaSeconds >= 0 ? "+" : "")}{(int)(deltaSeconds * 1000)} ms (HEOS offset {_syncOffsetMs}ms)";
+        }
+        catch
+        {
+        }
     }
 
     private async void NudgeMinus500_Click(object sender, RoutedEventArgs e) => await NudgeVideoSecondsAsync(-0.5);
@@ -166,21 +373,9 @@ public partial class YouTubeCinemaWindow : Window
 
     private async void NudgePlus500_Click(object sender, RoutedEventArgs e) => await NudgeVideoSecondsAsync(0.5);
 
-    private async void RestartVideo_Click(object sender, RoutedEventArgs e)
+    private async void ResyncToDenon_Click(object sender, RoutedEventArgs e)
     {
-        if (!_isInitialized || VideoWebView.CoreWebView2 is null)
-        {
-            return;
-        }
-
-        try
-        {
-            await VideoWebView.ExecuteScriptAsync("(() => { const v = document.querySelector('video'); if (v) { v.currentTime = 0; v.play().catch(() => {}); } })();");
-            SyncStatusText.Text = "Video restarted to 0:00";
-        }
-        catch
-        {
-        }
+        await ApplyLiveSyncPositionAsync();
     }
 
     private void PinButton_Click(object sender, RoutedEventArgs e)
@@ -216,6 +411,7 @@ public partial class YouTubeCinemaWindow : Window
 
     public void HideAndStopVideo()
     {
+        _syncWaitCts?.Cancel();
         try
         {
             if (_isInitialized && VideoWebView.CoreWebView2 is not null)
@@ -230,11 +426,18 @@ public partial class YouTubeCinemaWindow : Window
         Hide();
     }
 
-    private void UpdateSyncStatus()
+    private void UpdateSyncStatus(double? syncedSeconds = null)
     {
+        var timeTag = syncedSeconds is > 0.5 ? $"Synced {FormatTime(syncedSeconds.Value)} • " : string.Empty;
         SyncStatusText.Text = _keepVideoMuted
-            ? $"Audio routed to Denon AVR • Video muted (HEOS offset ~{_syncOffsetMs}ms)"
-            : "Video audio unmuted on PC / HDMI";
+            ? $"{timeTag}Audio on Denon AVR • Video muted (offset {_syncOffsetMs}ms)"
+            : $"{timeTag}Video audio unmuted on PC / HDMI";
+    }
+
+    private static string FormatTime(double seconds)
+    {
+        var ts = TimeSpan.FromSeconds(Math.Max(0, seconds));
+        return ts.TotalHours >= 1 ? ts.ToString(@"h\:mm\:ss") : ts.ToString(@"m\:ss");
     }
 
     private void ApplyDwmStyling()

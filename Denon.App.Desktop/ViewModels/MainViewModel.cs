@@ -1033,9 +1033,15 @@ public sealed partial class MainViewModel : ObservableObject
             var netBadge = string.IsNullOrWhiteSpace(status.Player.Network) ? "LAN" : status.Player.Network.ToUpperInvariant();
             ReceiverDetails = $"{status.Player.Model} • {status.Player.IpAddress} ({netBadge}) • {powerText}";
 
+            var wasPaused = IsPaused;
             IsPlaying = string.Equals(status.PlayState, "play", StringComparison.OrdinalIgnoreCase);
             IsPaused = string.Equals(status.PlayState, "pause", StringComparison.OrdinalIgnoreCase);
             PlayState = ToTitleCase(status.PlayState);
+
+            if (wasPaused != IsPaused && _youtubeQueueService is { IsYouTubePlaybackActive: true } && _cinemaWindow is { IsVisible: true })
+            {
+                _ = _cinemaWindow.SyncPlaybackStateAsync(IsPaused);
+            }
 
             var activeStation = !string.IsNullOrWhiteSpace(status.ActiveStationAlias)
                 ? StationPresets.FirstOrDefault(s => string.Equals(s.Alias, status.ActiveStationAlias, StringComparison.OrdinalIgnoreCase))

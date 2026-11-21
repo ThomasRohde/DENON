@@ -97,7 +97,10 @@ public sealed partial class MainViewModel
         {
             if (_cinemaWindow.IsVisible)
             {
-                await _cinemaWindow.LoadTrackAsync(track, _settingsStore.Current.Media.CinemaSyncOffsetMs);
+                await _cinemaWindow.LoadTrackAsync(
+                    track,
+                    _settingsStore.Current.Media.CinemaSyncOffsetMs,
+                    offsetMs => _youtubeQueueService.GetEstimatedPlaybackPositionSeconds(offsetMs));
             }
         });
 
@@ -439,7 +442,10 @@ public sealed partial class MainViewModel
         }
 
         await PlayYouTubeTrackAsync(track);
-        await _cinemaWindow.LoadTrackAsync(track, _settingsStore.Current.Media.CinemaSyncOffsetMs);
+        await _cinemaWindow.LoadTrackAsync(
+            track,
+            _settingsStore.Current.Media.CinemaSyncOffsetMs,
+            offsetMs => _youtubeQueueService.GetEstimatedPlaybackPositionSeconds(offsetMs));
     }
 
     private async Task OpenCinemaForCurrentTrackAsync()
@@ -450,7 +456,10 @@ public sealed partial class MainViewModel
             return;
         }
 
-        await _cinemaWindow.LoadTrackAsync(track, _settingsStore.Current.Media.CinemaSyncOffsetMs);
+        await _cinemaWindow.LoadTrackAsync(
+            track,
+            _settingsStore.Current.Media.CinemaSyncOffsetMs,
+            offsetMs => _youtubeQueueService.GetEstimatedPlaybackPositionSeconds(offsetMs));
     }
 
     private void EnqueueYouTubeTrack(object? parameter)
