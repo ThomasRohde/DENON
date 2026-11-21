@@ -51,6 +51,34 @@ public sealed class ReceiverStateStore
         });
     }
 
+    public void PatchLiveTelemetry(int? volume = null, bool? isMuted = null, string? playState = null)
+    {
+        Update(snapshot =>
+        {
+            if (snapshot.Status is null)
+            {
+                return snapshot;
+            }
+
+            var now = DateTimeOffset.Now;
+            var updatedStatus = snapshot.Status with
+            {
+                Volume = volume ?? snapshot.Status.Volume,
+                VolumeExact = volume.HasValue ? volume.Value : snapshot.Status.VolumeExact,
+                IsMuted = isMuted ?? snapshot.Status.IsMuted,
+                PlayState = !string.IsNullOrWhiteSpace(playState) ? playState : snapshot.Status.PlayState,
+                RetrievedAt = now,
+            };
+
+            return snapshot with
+            {
+                Status = updatedStatus,
+                IsConnected = true,
+                LastSuccessfulRefresh = now,
+            };
+        });
+    }
+
     private void Update(Func<ReceiverStateSnapshot, ReceiverStateSnapshot> updater)
     {
         ReceiverStateSnapshot snapshot;

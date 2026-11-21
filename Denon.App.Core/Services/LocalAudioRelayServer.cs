@@ -15,8 +15,12 @@ public sealed class LocalAudioRelayServer : IDisposable
     private readonly AppLogStore _logStore;
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private readonly ConcurrentDictionary<string, RegisteredTrack> _tracks = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, RegisteredLocalTrack> _localTracks = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, PcCastFormat> _livePcSessions = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeStreamTokens = new(StringComparer.Ordinal);
 
+    private IRemoteWebApiHandler? _webApiHandler;
+    private Func<Stream, PcCastFormat, CancellationToken, Task>? _livePcAudioHandler;
     private TcpListener? _listener;
     private CancellationTokenSource? _serverCts;
     private Task? _acceptLoopTask;
@@ -37,7 +41,83 @@ public sealed class LocalAudioRelayServer : IDisposable
 
     public event Action<string, YouTubeTrackItem>? TrackStreamCompleted;
 
+    public event Action<string, LocalAudioTrackItem>? LocalTrackStreamCompleted;
+
     public RelayStatusSnapshot CurrentStatus => _status;
+
+    public void AttachWebApiHandler(IRemoteWebApiHandler handler) => _webApiHandler = handler;
+
+    public void AttachLivePcAudioHandler(Func<Stream, PcCastFormat, CancellationToken, Task> handler) =>
+        _livePcAudioHandler = handler;
+
+    public async Task<(string Url, string Token)> RegisterLocalTrackAsync(LocalAudioTrackItem track, CancellationToken cancellationToken = default)
+    {
+        await EnsureStartedAsync(cancellationToken);
+        CancelAllActiveStreams();
+
+        var ffmpegPath = _youtubeService.FindFfmpegPath();
+        var useDirectNative = track.IsNativeHeosFormat;
+        var token = Guid.NewGuid().ToString("N")[..12];
+        var ext = useDirectNative ? track.Extension.TrimStart('.').ToLowerInvariant() : "mp3";
+
+        if (_localTracks.Count > 8)
+        {
+            foreach (var oldKey in _localTracks.Keys.Take(_localTracks.Count - 4).ToList())
+            {
+                _localTracks.TryRemove(oldKey, out _);
+            }
+        }
+
+        _localTracks[token] = new RegisteredLocalTrack(token, track, useDirectNative, ffmpegPath);
+
+        var lanIp = ResolveLocalLanIpForReceiver(_settingsStore.Current.Receiver.Host);
+        var baseUrl = $"http://{lanIp}:{_boundPort}";
+        var streamUrl = $"{baseUrl}/local/{token}.{ext}";
+
+        UpdateStatus(new RelayStatusSnapshot(
+            IsRunning: true,
+            EndpointBaseUrl: baseUrl,
+            TranscodeMode: useDirectNative ? $"Direct Local {track.CodecBadge}" : "FFmpeg MP3 320k",
+            HasFfmpeg: !string.IsNullOrWhiteSpace(ffmpegPath),
+            FfmpegPath: ffmpegPath,
+            StreamState: $"Ready ({track.CodecBadge})",
+            ActiveTrackTitle: track.Title,
+            BytesStreamed: 0,
+            LastError: null));
+
+        _logStore.Info($"Registered local file relay URL: {streamUrl} ({track.FileName})");
+        return (streamUrl, token);
+    }
+
+    public async Task<(string Url, string Token)> RegisterLivePcCastAsync(PcCastFormat format, CancellationToken cancellationToken = default)
+    {
+        await EnsureStartedAsync(cancellationToken);
+        CancelAllActiveStreams();
+
+        var token = Guid.NewGuid().ToString("N")[..10];
+        _livePcSessions.Clear();
+        _livePcSessions[token] = format;
+
+        var ext = format == PcCastFormat.Wav_Lossless ? "wav" : "mp3";
+        var lanIp = ResolveLocalLanIpForReceiver(_settingsStore.Current.Receiver.Host);
+        var baseUrl = $"http://{lanIp}:{_boundPort}";
+        var streamUrl = $"{baseUrl}/live/pc/{token}.{ext}";
+        var ffmpegPath = _youtubeService.FindFfmpegPath();
+
+        UpdateStatus(new RelayStatusSnapshot(
+            IsRunning: true,
+            EndpointBaseUrl: baseUrl,
+            TranscodeMode: format == PcCastFormat.Wav_Lossless ? "PC Live WAV Lossless" : "PC Live MP3 320k",
+            HasFfmpeg: !string.IsNullOrWhiteSpace(ffmpegPath),
+            FfmpegPath: ffmpegPath,
+            StreamState: "Awaiting Denon connection...",
+            ActiveTrackTitle: "Windows PC Audio (Live)",
+            BytesStreamed: 0,
+            LastError: null));
+
+        _logStore.Info($"Registered PC Audio live cast URL: {streamUrl}");
+        return (streamUrl, token);
+    }
 
     public async Task<string> RegisterTrackAsync(YouTubeTrackItem track, CancellationToken cancellationToken = default)
     {
@@ -260,6 +340,43 @@ public sealed class LocalAudioRelayServer : IDisposable
                 if (string.Equals(request.Path, "/health", StringComparison.OrdinalIgnoreCase))
                 {
                     await WriteSimpleResponseAsync(networkStream, "200 OK", "text/plain", "Denon Desktop Audio Relay OK\r\n", serverToken);
+                    return;
+                }
+
+                // Couch Phone Remote Web UI & Party Jukebox JSON API
+                if (request.Path == "/" ||
+                    request.Path.Equals("/index.html", StringComparison.OrdinalIgnoreCase) ||
+                    request.Path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (_webApiHandler is null)
+                    {
+                        await WriteSimpleResponseAsync(networkStream, "503 Service Unavailable", "text/plain", "Remote API not initialized\r\n", serverToken);
+                        return;
+                    }
+
+                    var resp = await _webApiHandler.HandleAsync(request.Method, request.Path, request.Query, request.Body, serverToken);
+                    var statusText = resp.StatusCode switch
+                    {
+                        200 => "200 OK",
+                        400 => "400 Bad Request",
+                        404 => "404 Not Found",
+                        _ => "500 Internal Server Error",
+                    };
+                    await WriteSimpleResponseAsync(networkStream, statusText, resp.ContentType, resp.Body, serverToken);
+                    return;
+                }
+
+                // Local Hi-Res File Jukebox (/local/{token}.{ext})
+                if (request.Path.StartsWith("/local/", StringComparison.OrdinalIgnoreCase))
+                {
+                    await HandleLocalFileRequestAsync(networkStream, request, serverToken);
+                    return;
+                }
+
+                // Live PC Audio Cast (/live/pc/{token}.{ext})
+                if (request.Path.StartsWith("/live/pc/", StringComparison.OrdinalIgnoreCase))
+                {
+                    await HandleLivePcCastRequestAsync(networkStream, request, serverToken);
                     return;
                 }
 
@@ -621,7 +738,11 @@ public sealed class LocalAudioRelayServer : IDisposable
         }
 
         var raw = builder.ToString();
-        var lines = raw.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+        var headerEnd = raw.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+        var headerPart = headerEnd >= 0 ? raw[..headerEnd] : raw;
+        var initialBody = headerEnd >= 0 ? raw[(headerEnd + 4)..] : string.Empty;
+
+        var lines = headerPart.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
         if (lines.Length == 0)
         {
             return null;
@@ -634,24 +755,328 @@ public sealed class LocalAudioRelayServer : IDisposable
         }
 
         string? rangeHeader = null;
+        var contentLength = 0;
         for (var i = 1; i < lines.Length; i++)
         {
             if (lines[i].StartsWith("Range:", StringComparison.OrdinalIgnoreCase))
             {
                 rangeHeader = lines[i]["Range:".Length..].Trim();
-                break;
+            }
+            else if (lines[i].StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
+            {
+                _ = int.TryParse(lines[i]["Content-Length:".Length..].Trim(), out contentLength);
             }
         }
 
-        var path = parts[1];
-        var queryIndex = path.IndexOf('?');
-        if (queryIndex >= 0)
+        var body = initialBody;
+        if (contentLength > 0 && contentLength <= 65536)
         {
-            path = path[..queryIndex];
+            var bodyBytes = new List<byte>(Encoding.UTF8.GetBytes(initialBody));
+            while (bodyBytes.Count < contentLength)
+            {
+                var remaining = Math.Min(buffer.Length, contentLength - bodyBytes.Count);
+                var read = await stream.ReadAsync(buffer.AsMemory(0, remaining), timeoutCts.Token);
+                if (read <= 0)
+                {
+                    break;
+                }
+
+                for (var idx = 0; idx < read; idx++)
+                {
+                    bodyBytes.Add(buffer[idx]);
+                }
+            }
+
+            body = Encoding.UTF8.GetString(bodyBytes.ToArray());
         }
 
-        return new ParsedHttpRequest(parts[0], path, rangeHeader);
+        var rawPath = parts[1];
+        string? query = null;
+        var queryIndex = rawPath.IndexOf('?');
+        if (queryIndex >= 0)
+        {
+            query = rawPath[(queryIndex + 1)..];
+            rawPath = rawPath[..queryIndex];
+        }
+
+        return new ParsedHttpRequest(parts[0], rawPath, query, rangeHeader, body);
     }
+
+    private async Task HandleLocalFileRequestAsync(
+        NetworkStream networkStream,
+        ParsedHttpRequest request,
+        CancellationToken serverToken)
+    {
+        var segment = request.Path[7..].Trim('/');
+        var dot = segment.IndexOf('.');
+        var token = dot > 0 ? segment[..dot] : segment;
+
+        if (string.IsNullOrWhiteSpace(token) || !_localTracks.TryGetValue(token, out var registered) || !File.Exists(registered.Track.FilePath))
+        {
+            await WriteSimpleResponseAsync(networkStream, "404 Not Found", "text/plain", "Local track not found\r\n", serverToken);
+            return;
+        }
+
+        var contentType = registered.UseDirectNative
+            ? GetMimeTypeForExtension(registered.Track.Extension)
+            : "audio/mpeg";
+
+        var fakeYtForHeaders = new YouTubeTrackItem(registered.Token, registered.Track.Title, registered.Track.Artist, null, string.Empty, string.Empty);
+
+        if (request.Method.Equals("HEAD", StringComparison.OrdinalIgnoreCase))
+        {
+            var fileLen = registered.UseDirectNative ? new FileInfo(registered.Track.FilePath).Length : (long?)null;
+            var headHeaders = BuildStreamHeaders(contentType, fakeYtForHeaders, fileLen, isRange: false);
+            await networkStream.WriteAsync(Encoding.ASCII.GetBytes(headHeaders), serverToken);
+            await networkStream.FlushAsync(serverToken);
+            return;
+        }
+
+        if (!request.Method.Equals("GET", StringComparison.OrdinalIgnoreCase))
+        {
+            await WriteSimpleResponseAsync(networkStream, "405 Method Not Allowed", "text/plain", "Method Not Allowed\r\n", serverToken);
+            return;
+        }
+
+        if (_activeStreamTokens.TryRemove(token, out var prevCts))
+        {
+            try { prevCts.Cancel(); } catch { }
+            prevCts.Dispose();
+        }
+
+        using var streamCts = CancellationTokenSource.CreateLinkedTokenSource(serverToken);
+        _activeStreamTokens[token] = streamCts;
+
+        try
+        {
+            bool completedNaturally;
+            if (registered.UseDirectNative)
+            {
+                completedNaturally = await StreamDirectLocalFileAsync(networkStream, registered.Track, contentType, fakeYtForHeaders, request.RangeHeader, streamCts.Token);
+            }
+            else if (!string.IsNullOrWhiteSpace(registered.FfmpegPath))
+            {
+                completedNaturally = await StreamTranscodedLocalFileAsync(networkStream, registered, fakeYtForHeaders, streamCts.Token);
+            }
+            else
+            {
+                completedNaturally = await StreamDirectLocalFileAsync(networkStream, registered.Track, "application/octet-stream", fakeYtForHeaders, request.RangeHeader, streamCts.Token);
+            }
+
+            if (completedNaturally && !streamCts.IsCancellationRequested)
+            {
+                UpdateStatus(_status with { StreamState = "Local Track Completed" });
+                LocalTrackStreamCompleted?.Invoke(registered.Token, registered.Track);
+            }
+        }
+        finally
+        {
+            if (_activeStreamTokens.TryGetValue(token, out var current) && ReferenceEquals(current, streamCts))
+            {
+                _activeStreamTokens.TryRemove(token, out _);
+            }
+        }
+    }
+
+    private async Task<bool> StreamDirectLocalFileAsync(
+        NetworkStream networkStream,
+        LocalAudioTrackItem track,
+        string contentType,
+        YouTubeTrackItem headerMeta,
+        string? rangeHeader,
+        CancellationToken cancellationToken)
+    {
+        await using var fileStream = new FileStream(track.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, useAsync: true);
+        var totalSize = fileStream.Length;
+        long rangeStart = 0;
+        long rangeEnd = totalSize > 0 ? totalSize - 1 : -1;
+        var isPartial = false;
+
+        if (!string.IsNullOrWhiteSpace(rangeHeader) && totalSize > 0 && TryParseRangeHeader(rangeHeader, totalSize, out var s, out var e))
+        {
+            rangeStart = s;
+            rangeEnd = e;
+            isPartial = rangeStart > 0 || rangeEnd < totalSize - 1;
+        }
+
+        var contentLength = totalSize > 0 ? (rangeEnd - rangeStart + 1) : 0;
+        var headers = BuildStreamHeaders(contentType, headerMeta, contentLength, isPartial, rangeStart, rangeEnd, totalSize);
+        await networkStream.WriteAsync(Encoding.ASCII.GetBytes(headers), cancellationToken);
+        await networkStream.FlushAsync(cancellationToken);
+
+        UpdateStatus(_status with
+        {
+            StreamState = $"Streaming Local {track.CodecBadge}",
+            ActiveTrackTitle = track.Title,
+            BytesStreamed = 0,
+            LastError = null,
+        });
+
+        if (rangeStart > 0)
+        {
+            fileStream.Seek(rangeStart, SeekOrigin.Begin);
+        }
+
+        var buffer = new byte[65536];
+        var remaining = contentLength;
+        long written = 0;
+        var lastTick = Environment.TickCount64;
+
+        while (remaining > 0 && !cancellationToken.IsCancellationRequested)
+        {
+            var toRead = (int)Math.Min(buffer.Length, remaining);
+            var read = await fileStream.ReadAsync(buffer.AsMemory(0, toRead), cancellationToken);
+            if (read <= 0)
+            {
+                break;
+            }
+
+            await networkStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+            written += read;
+            remaining -= read;
+
+            var nowTick = Environment.TickCount64;
+            if (nowTick - lastTick >= 900)
+            {
+                lastTick = nowTick;
+                UpdateStatus(_status with { StreamState = $"Streaming Local {track.CodecBadge}", BytesStreamed = written });
+            }
+        }
+
+        await networkStream.FlushAsync(cancellationToken);
+        UpdateStatus(_status with { BytesStreamed = written });
+
+        var reachedEnd = !isPartial || (totalSize > 0 && rangeEnd >= totalSize - 1);
+        return reachedEnd && remaining == 0 && written > 16_000;
+    }
+
+    private async Task<bool> StreamTranscodedLocalFileAsync(
+        NetworkStream networkStream,
+        RegisteredLocalTrack registered,
+        YouTubeTrackItem headerMeta,
+        CancellationToken cancellationToken)
+    {
+        var headers = BuildStreamHeaders("audio/mpeg", headerMeta, contentLength: null, isRange: false);
+        await networkStream.WriteAsync(Encoding.ASCII.GetBytes(headers), cancellationToken);
+        await networkStream.FlushAsync(cancellationToken);
+
+        using var ffmpeg = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = registered.FfmpegPath!,
+                Arguments = $"-hide_banner -loglevel error -i \"{registered.Track.FilePath}\" -vn -c:a libmp3lame -b:a 320k -ar 44100 -ac 2 -f mp3 pipe:1",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            },
+        };
+
+        if (!ffmpeg.Start())
+        {
+            throw new InvalidOperationException("Failed to start FFmpeg for local audio transcode.");
+        }
+
+        UpdateStatus(_status with { StreamState = "Streaming Local (MP3 320k)", ActiveTrackTitle = registered.Track.Title, BytesStreamed = 0 });
+
+        long totalBytes = 0;
+        var reachedEof = false;
+        try
+        {
+            var buffer = new byte[32768];
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                var read = await ffmpeg.StandardOutput.BaseStream.ReadAsync(buffer, cancellationToken);
+                if (read <= 0)
+                {
+                    reachedEof = true;
+                    break;
+                }
+
+                await networkStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                totalBytes += read;
+            }
+
+            await networkStream.FlushAsync(cancellationToken);
+            UpdateStatus(_status with { BytesStreamed = totalBytes });
+            return reachedEof && totalBytes > 16_000;
+        }
+        finally
+        {
+            try { if (!ffmpeg.HasExited) ffmpeg.Kill(entireProcessTree: true); } catch { }
+        }
+    }
+
+    private async Task HandleLivePcCastRequestAsync(
+        NetworkStream networkStream,
+        ParsedHttpRequest request,
+        CancellationToken serverToken)
+    {
+        var segment = request.Path[9..].Trim('/');
+        var dot = segment.IndexOf('.');
+        var token = dot > 0 ? segment[..dot] : segment;
+
+        if (string.IsNullOrWhiteSpace(token) || !_livePcSessions.TryGetValue(token, out var format) || _livePcAudioHandler is null)
+        {
+            await WriteSimpleResponseAsync(networkStream, "404 Not Found", "text/plain", "PC Audio Cast session not active\r\n", serverToken);
+            return;
+        }
+
+        var contentType = format == PcCastFormat.Wav_Lossless ? "audio/wav" : "audio/mpeg";
+        var fakeMeta = new YouTubeTrackItem(token, "Windows PC Audio", "Live WASAPI Stream", null, string.Empty, string.Empty);
+
+        if (request.Method.Equals("HEAD", StringComparison.OrdinalIgnoreCase))
+        {
+            var headHeaders = BuildStreamHeaders(contentType, fakeMeta, contentLength: null, isRange: false);
+            await networkStream.WriteAsync(Encoding.ASCII.GetBytes(headHeaders), serverToken);
+            await networkStream.FlushAsync(serverToken);
+            return;
+        }
+
+        if (_activeStreamTokens.TryRemove(token, out var prevCts))
+        {
+            try { prevCts.Cancel(); } catch { }
+            prevCts.Dispose();
+        }
+
+        using var streamCts = CancellationTokenSource.CreateLinkedTokenSource(serverToken);
+        _activeStreamTokens[token] = streamCts;
+
+        try
+        {
+            var headers = BuildStreamHeaders(contentType, fakeMeta, contentLength: null, isRange: false);
+            await networkStream.WriteAsync(Encoding.ASCII.GetBytes(headers), streamCts.Token);
+            await networkStream.FlushAsync(streamCts.Token);
+
+            UpdateStatus(_status with
+            {
+                StreamState = format == PcCastFormat.Wav_Lossless ? "Live PC Cast (WAV Lossless)" : "Live PC Cast (MP3 320k)",
+                ActiveTrackTitle = "Windows PC Audio (Live)",
+                LastError = null,
+            });
+
+            await _livePcAudioHandler(networkStream, format, streamCts.Token);
+        }
+        finally
+        {
+            if (_activeStreamTokens.TryGetValue(token, out var current) && ReferenceEquals(current, streamCts))
+            {
+                _activeStreamTokens.TryRemove(token, out _);
+            }
+        }
+    }
+
+    private static string GetMimeTypeForExtension(string ext) =>
+        ext.ToLowerInvariant() switch
+        {
+            ".flac" => "audio/flac",
+            ".wav" => "audio/wav",
+            ".mp3" => "audio/mpeg",
+            ".m4a" => "audio/mp4",
+            ".aac" => "audio/aac",
+            _ => "application/octet-stream",
+        };
 
     private static string? ExtractTrackToken(string path)
     {
@@ -740,5 +1165,7 @@ public sealed class LocalAudioRelayServer : IDisposable
 
     private sealed record RegisteredTrack(string Token, YouTubeTrackItem Track, bool UseFfmpeg, string? FfmpegPath);
 
-    private sealed record ParsedHttpRequest(string Method, string Path, string? RangeHeader);
+    private sealed record RegisteredLocalTrack(string Token, LocalAudioTrackItem Track, bool UseDirectNative, string? FfmpegPath);
+
+    private sealed record ParsedHttpRequest(string Method, string Path, string? Query, string? RangeHeader, string Body);
 }

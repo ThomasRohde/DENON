@@ -411,6 +411,12 @@ public sealed partial class MainViewModel
 
         try
         {
+            _localJukeboxService?.StopSession();
+            if (_pcAudioCastService is { IsCasting: true })
+            {
+                await _pcAudioCastService.StopCastingAsync();
+            }
+
             YouTubeStatusText = $"Casting \"{track.Title}\" to Denon AVR...";
             StatusMessage = $"Casting YouTube: {track.Title}";
             await _youtubeQueueService.PlayNowAsync(track, UseLowVolumeForStreams, UnmuteBeforePlay);

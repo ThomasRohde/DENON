@@ -122,7 +122,11 @@ public sealed partial class MainViewModel : ObservableObject
         YouTubeMediaService youtubeService,
         LocalAudioRelayServer relayServer,
         YouTubeQueueService youtubeQueueService,
-        YouTubeCinemaWindow cinemaWindow)
+        YouTubeCinemaWindow cinemaWindow,
+        RadioBrowserService radioBrowserService,
+        LocalMediaJukeboxService localJukeboxService,
+        PcAudioCastService pcAudioCastService,
+        HeosEventListenerService heosEventListener)
     {
         _receiverController = receiverController;
         _settingsStore = settingsStore;
@@ -252,6 +256,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         InitializeYouTube(youtubeService, relayServer, youtubeQueueService, cinemaWindow);
         InitializeScenesAcoustics();
+        InitializeCastRemoteRadio(radioBrowserService, localJukeboxService, pcAudioCastService, heosEventListener);
 
         LoadSettings(_settingsStore.Current);
         ApplyStateSnapshot(_stateStore.Snapshot);
@@ -940,6 +945,10 @@ public sealed partial class MainViewModel : ObservableObject
         StepBassCommand?.NotifyCanExecuteChanged();
         StepTrebleCommand?.NotifyCanExecuteChanged();
         ResetAcousticTrimsCommand?.NotifyCanExecuteChanged();
+        TogglePcCastCommand?.NotifyCanExecuteChanged();
+        PlayLocalTrackCommand?.NotifyCanExecuteChanged();
+        PlayAllLocalTracksCommand?.NotifyCanExecuteChanged();
+        PlayRadioBrowserStationCommand?.NotifyCanExecuteChanged();
     }
 
     private void ApplyStateSnapshot(ReceiverStateSnapshot snapshot)
@@ -988,6 +997,20 @@ public sealed partial class MainViewModel : ObservableObject
             {
                 NowPlayingTitle = InputSourceDisplay;
                 NowPlayingDetail = $"External Input • Sound Mode: {SoundMode}";
+                NowPlayingImageUrl = string.Empty;
+            }
+            else if (_pcAudioCastService is not null && _pcAudioCastService.IsCasting)
+            {
+                NowPlayingTitle = "Windows PC Audio (Live Cast)";
+                NowPlayingDetail = $"{SelectedAudioDevice?.FriendlyName ?? "System Output"} • {(SelectedPcCastFormat == PcCastFormat.Wav_Lossless ? "Lossless WAV" : "MP3 320 kbps")}";
+                NowPlayingImageUrl = string.Empty;
+            }
+            else if (_localJukeboxService is not null &&
+                     _localJukeboxService.IsLocalPlaybackActive &&
+                     _localJukeboxService.Snapshot.CurrentTrack is { } activeLocalTrack)
+            {
+                NowPlayingTitle = activeLocalTrack.Title;
+                NowPlayingDetail = $"{activeLocalTrack.Artist} • Local {activeLocalTrack.CodecBadge} ({activeLocalTrack.SizeDisplay})";
                 NowPlayingImageUrl = string.Empty;
             }
             else if (_youtubeQueueService is not null &&
@@ -1176,9 +1199,22 @@ public sealed partial class MainViewModel : ObservableObject
 
     private async Task SetPlayStateAsync(string state)
     {
-        if (string.Equals(state, "stop", StringComparison.OrdinalIgnoreCase) && _youtubeQueueService.IsYouTubePlaybackActive)
+        if (string.Equals(state, "stop", StringComparison.OrdinalIgnoreCase))
         {
-            _youtubeQueueService.StopSession();
+            if (_youtubeQueueService.IsYouTubePlaybackActive)
+            {
+                _youtubeQueueService.StopSession();
+            }
+
+            if (_localJukeboxService.IsLocalPlaybackActive)
+            {
+                _localJukeboxService.StopSession();
+            }
+
+            if (_pcAudioCastService.IsCasting)
+            {
+                await _pcAudioCastService.StopCastingAsync();
+            }
         }
 
         await ExecuteReceiverActionAsync(() => _receiverController.SetPlayStateAsync(state), $"Transport set to {ToTitleCase(state)}.");
@@ -1202,6 +1238,22 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
+        if (_localJukeboxService.IsLocalPlaybackActive)
+        {
+            try
+            {
+                var skipped = await _localJukeboxService.PlayNextAsync();
+                StatusMessage = skipped ? "Skipped to next local audio file." : "Reached end of local playlist.";
+            }
+            catch (Exception ex)
+            {
+                LastError = ex.Message;
+                StatusMessage = ex.Message;
+            }
+
+            return;
+        }
+
         await ExecuteReceiverActionAsync(() => _receiverController.PlayNextAsync(), "Skipped to next track.");
     }
 
@@ -1213,6 +1265,22 @@ public sealed partial class MainViewModel : ObservableObject
             {
                 var skipped = await _youtubeQueueService.PlayPreviousAsync();
                 StatusMessage = skipped ? "Returned to previous YouTube track." : "No previous YouTube track in queue.";
+            }
+            catch (Exception ex)
+            {
+                LastError = ex.Message;
+                StatusMessage = ex.Message;
+            }
+
+            return;
+        }
+
+        if (_localJukeboxService.IsLocalPlaybackActive)
+        {
+            try
+            {
+                var skipped = await _localJukeboxService.PlayPreviousAsync();
+                StatusMessage = skipped ? "Returned to previous local audio file." : "No previous local track.";
             }
             catch (Exception ex)
             {

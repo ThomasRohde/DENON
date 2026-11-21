@@ -97,6 +97,41 @@ public partial class MainWindow : Window
         }
     }
 
+    private void RadioBrowserSearch_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && _viewModel.SearchRadioBrowserCommand.CanExecute(null))
+        {
+            _viewModel.SearchRadioBrowserCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
+    private void LocalDropZone_DragOver(object sender, System.Windows.DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
+        {
+            e.Effects = System.Windows.DragDropEffects.Copy;
+        }
+        else
+        {
+            e.Effects = System.Windows.DragDropEffects.None;
+        }
+
+        e.Handled = true;
+    }
+
+    private void LocalDropZone_Drop(object sender, System.Windows.DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop) &&
+            e.Data.GetData(System.Windows.DataFormats.FileDrop) is string[] paths &&
+            paths.Length > 0)
+        {
+            _viewModel.HandleDroppedLocalPaths(paths);
+        }
+
+        e.Handled = true;
+    }
+
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         var isTyping = Keyboard.FocusedElement is TextBox or PasswordBox;
@@ -130,14 +165,18 @@ public partial class MainWindow : Window
                     e.Handled = true;
                     return;
                 case Key.D4:
-                    _viewModel.ActiveSection = "Stations";
+                    _viewModel.ActiveSection = "CastRemote";
                     e.Handled = true;
                     return;
                 case Key.D5:
-                    _viewModel.ActiveSection = "Settings";
+                    _viewModel.ActiveSection = "Stations";
                     e.Handled = true;
                     return;
                 case Key.D6:
+                    _viewModel.ActiveSection = "Settings";
+                    e.Handled = true;
+                    return;
+                case Key.D7:
                     _viewModel.ActiveSection = "Diagnostics";
                     e.Handled = true;
                     return;

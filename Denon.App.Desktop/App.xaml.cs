@@ -63,6 +63,12 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<YouTubeMediaService>();
             builder.Services.AddSingleton<LocalAudioRelayServer>();
             builder.Services.AddSingleton<YouTubeQueueService>();
+            builder.Services.AddSingleton<LocalMediaJukeboxService>();
+            builder.Services.AddSingleton<RadioBrowserService>();
+            builder.Services.AddSingleton<RemoteWebApiHandler>();
+            builder.Services.AddSingleton<PcAudioCastService>();
+            builder.Services.AddSingleton<HeosEventListenerService>();
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<HeosEventListenerService>());
             builder.Services.AddSingleton<YouTubeCinemaWindow>();
             builder.Services.AddHostedService<ReceiverPollingService>();
             builder.Services.AddSingleton<MainViewModel>();
@@ -74,13 +80,18 @@ public partial class App : System.Windows.Application
 
             var settingsStore = _host.Services.GetRequiredService<AppSettingsStore>();
             await settingsStore.InitializeAsync();
+
+            var relayServer = _host.Services.GetRequiredService<LocalAudioRelayServer>();
+            relayServer.AttachWebApiHandler(_host.Services.GetRequiredService<RemoteWebApiHandler>());
+            _ = _host.Services.GetRequiredService<PcAudioCastService>(); // ensures live PC audio handler is attached
+
             await _host.StartAsync();
 
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    await _host.Services.GetRequiredService<LocalAudioRelayServer>().EnsureStartedAsync();
+                    await relayServer.EnsureStartedAsync();
                 }
                 catch (Exception ex)
                 {
