@@ -2,12 +2,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Denon.App.Core\Denon.App.Core.csproj" />
+    <ProjectReference Include="..\Denon.App.PluginSdk\Denon.App.PluginSdk.csproj" />
+    <ProjectReference Include="..\Denon.Plugin.PhilipsHue\Denon.Plugin.PhilipsHue.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
-    <Version>1.1.1</Version>
+    <Version>1.2.0</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>

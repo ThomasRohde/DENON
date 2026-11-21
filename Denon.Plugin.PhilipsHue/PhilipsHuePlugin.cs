@@ -1,0 +1,753 @@
+using Denon.App.PluginSdk;
+using Denon.Plugin.PhilipsHue.Models;
+using Denon.Plugin.PhilipsHue.Services;
+using Denon.Plugin.PhilipsHue.ViewModels;
+using Denon.Plugin.PhilipsHue.Views;
+
+namespace Denon.Plugin.PhilipsHue;
+
+public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudioReactivePlugin
+{
+    private static readonly (double X, double Y, string Hex)[] BeatPalette =
+    [
+        (0.168, 0.340, "#00D4FF"), // Hi-Fi Cyan
+        (0.561, 0.328, "#FB7185"), // Sunset Coral
+        (0.195, 0.115, "#818CF8"), // Deep Indigo
+        (0.510, 0.410, "#F59E0B"), // Warm Amber
+        (0.385, 0.165, "#EC4899"), // Neon Magenta
+        (0.214, 0.655, "#10B981"), // Emerald Pulse
+    ];
+
+    private IPluginContext? _context;
+    private HueBridgeClient? _client;
+    private HueDashboardViewModel? _viewModel;
+    private HuePluginConfig _config = new();
+    private bool _isStarted;
+
+    // Real-time Music Sync state
+    private volatile bool _musicSyncActive;
+    private volatile bool _demoBeatRunning;
+    private CancellationTokenSource? _demoBeatCts;
+    private IReadOnlyList<HueRoomGroup> _cachedRooms = [];
+    private IReadOnlyList<HueLightState> _cachedLights = [];
+    private IReadOnlyList<HueEntertainmentArea> _entertainmentAreas = [];
+    private string _albumDominantHex = "#00D4FF";
+    private string _albumSecondaryHex = "#F59E0B";
+    private string _albumTrackTitle = string.Empty;
+    private long _lastSyncPushTickMs;
+    private int _paletteIndex;
+    private int _roundRobinLightIdx;
+    private int _inFlightSyncPushes;
+
+    public PluginManifest Manifest { get; } = new(
+        Id: "philips-hue",
+        Name: "Philips Hue Lighting",
+        Version: "1.2.0",
+        Author: "Denon Desktop",
+        Description: "Control Philips Hue rooms, lights, colors, and scenes over your LAN — with real-time FFT Music Sync, Album-Art Ambient colors, and automatic Denon AVR Smart Scene lighting.",
+        Category: "Smart Lighting",
+        AccentHex: "#F59E0B",
+        IconGlyph: "HUE",
+        Capabilities: PluginCapabilities.DashboardUi
+                      | PluginCapabilities.ReceiverEvents
+                      | PluginCapabilities.SceneAutomation
+                      | PluginCapabilities.Actions
+                      | PluginCapabilities.LocalNetwork
+                      | PluginCapabilities.AudioReactive
+                      | PluginCapabilities.AlbumArtSync);
+
+    internal HuePluginConfig Config => _config;
+
+    public bool IsAudioSyncActive => _isStarted && _musicSyncActive && (_config.DemoMode || IsConfigured);
+
+    public async Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default)
+    {
+        _context = context;
+        _client = new HueBridgeClient(context.CreateHttpClient(allowLocalSelfSignedTls: true, timeout: TimeSpan.FromSeconds(6)));
+        _config = await context.Storage.LoadConfigAsync(static () => new HuePluginConfig(), cancellationToken);
+        _config.MusicSync ??= new HueMusicSyncConfig();
+        _musicSyncActive = _config.MusicSync.Enabled;
+        _viewModel = new HueDashboardViewModel(this);
+        _viewModel.SyncFromPluginConfig(_config);
+    }
+
+    public async Task StartAsync(CancellationToken cancellationToken = default)
+    {
+        _isStarted = true;
+        if (_config.DemoMode || IsConfigured)
+        {
+            try
+            {
+                await RefreshBridgeStateAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _context?.Logger.Warning($"Initial Hue sync deferred: {ex.Message}");
+                _context?.ReportStatus($"Bridge unreachable ({_config.BridgeIp})", PluginHealthState.Warning);
+            }
+        }
+        else
+        {
+            _context?.ReportStatus("Ready to discover & pair Hue Bridge (or try Demo Mode)", PluginHealthState.Idle);
+        }
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken = default)
+    {
+        _isStarted = false;
+        StopDemoBeatSimulator();
+        _context?.ReportStatus("Stopped", PluginHealthState.Disabled);
+        return Task.CompletedTask;
+    }
+
+    public object? CreateDashboardView()
+    {
+        _viewModel ??= new HueDashboardViewModel(this);
+        _viewModel.SyncFromPluginConfig(_config);
+        _viewModel.ApplyAlbumArtPalette(_albumDominantHex, _albumSecondaryHex, _albumTrackTitle);
+        _viewModel.ApplyEntertainmentAreas(_entertainmentAreas);
+        return new HueDashboardView
+        {
+            DataContext = _viewModel,
+        };
+    }
+
+    public IReadOnlyList<PluginActionDescriptor> GetActions() =>
+    [
+        new("hue.all_on", "All Hue Lights On", "Turn on every light on the paired Philips Hue Bridge.", "Master"),
+        new("hue.all_off", "All Hue Lights Off", "Turn off every light on the paired Philips Hue Bridge.", "Master"),
+        new("hue.movie_dim", "Cinema Dim (15%)", "Dim the target room to warm 15% cinema ambience.", "Ambience"),
+        new("hue.candlelight", "Late Night Candlelight", "Set the target room to soft 24% candlelight glow.", "Ambience"),
+        new("hue.hifi_cyan", "Hi-Fi Cyan Glow", "Set the target room to signature Denon cyan ambience.", "Ambience"),
+        new("hue.daylight", "Full Daylight (100%)", "Set the target room to crisp 100% daylight.", "Ambience"),
+        new("hue.music_sync_on", "Start Hue Music Sync", "Enable real-time FFT beat-reactive Hue lighting.", "Music Sync"),
+        new("hue.music_sync_off", "Stop Hue Music Sync", "Disable real-time FFT beat-reactive Hue lighting.", "Music Sync"),
+        new("hue.music_sync_toggle", "Toggle Hue Music Sync", "Toggle real-time beat-reactive Hue lighting on or off.", "Music Sync"),
+        new("hue.refresh", "Sync Bridge State", "Refresh rooms, lights, and scenes from the Hue Bridge.", "System"),
+    ];
+
+    public async Task<PluginActionResult> ExecuteActionAsync(
+        string actionId,
+        IReadOnlyDictionary<string, string>? parameters = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_isStarted)
+        {
+            return PluginActionResult.Fail("Philips Hue plugin is currently stopped.");
+        }
+
+        if (!_config.DemoMode && !IsConfigured)
+        {
+            return PluginActionResult.Fail("No Philips Hue Bridge paired (pair a Bridge or enable Demo Mode in the Hue dashboard).");
+        }
+
+        var targetRoom = parameters is not null && parameters.TryGetValue("roomId", out var explicitRoom) && !string.IsNullOrWhiteSpace(explicitRoom)
+            ? explicitRoom
+            : ResolveAutomationGroupId();
+
+        switch (actionId.ToLowerInvariant())
+        {
+            case "hue.all_on":
+                await SetGroupStateAsync("0", isOn: true, cancellationToken: cancellationToken);
+                return PluginActionResult.Ok("Turned all Hue lights ON.");
+
+            case "hue.all_off":
+                await SetMusicSyncEnabledAsync(false, cancellationToken);
+                await SetGroupStateAsync("0", isOn: false, cancellationToken: cancellationToken);
+                return PluginActionResult.Ok("Turned all Hue lights OFF.");
+
+            case "hue.movie_dim":
+                await ApplyNamedPresetAsync(targetRoom, "cinema", cancellationToken);
+                return PluginActionResult.Ok("Applied Cinema Dim (15%).");
+
+            case "hue.candlelight":
+                await ApplyNamedPresetAsync(targetRoom, "candle", cancellationToken);
+                return PluginActionResult.Ok("Applied Late Night Candlelight.");
+
+            case "hue.hifi_cyan":
+                await ApplyNamedPresetAsync(targetRoom, "cyan", cancellationToken);
+                return PluginActionResult.Ok("Applied Hi-Fi Cyan Glow.");
+
+            case "hue.daylight":
+                await ApplyNamedPresetAsync(targetRoom, "daylight", cancellationToken);
+                return PluginActionResult.Ok("Applied Full Daylight (100%).");
+
+            case "hue.music_sync_on":
+                await SetMusicSyncEnabledAsync(true, cancellationToken);
+                return PluginActionResult.Ok($"Hue Music Sync started ({_config.MusicSync.Mode}).");
+
+            case "hue.music_sync_off":
+                await SetMusicSyncEnabledAsync(false, cancellationToken);
+                return PluginActionResult.Ok("Hue Music Sync stopped.");
+
+            case "hue.music_sync_toggle":
+                await SetMusicSyncEnabledAsync(!_musicSyncActive, cancellationToken);
+                return PluginActionResult.Ok(_musicSyncActive ? "Hue Music Sync started." : "Hue Music Sync stopped.");
+
+            case "hue.refresh":
+                await RefreshBridgeStateAsync(cancellationToken);
+                return PluginActionResult.Ok("Synced rooms, lights, and scenes from Hue Bridge.");
+
+            default:
+                return PluginActionResult.Fail($"Unknown Hue action '{actionId}'.");
+        }
+    }
+
+    public async Task OnReceiverEventAsync(PluginReceiverEvent receiverEvent, CancellationToken cancellationToken = default)
+    {
+        if (!_isStarted || (!_config.DemoMode && !IsConfigured))
+        {
+            return;
+        }
+
+        var rules = _config.Automation;
+        var targetRoom = ResolveAutomationGroupId();
+
+        switch (receiverEvent.EventType)
+        {
+            case PluginReceiverEventType.SceneActivated when rules.SyncWithSmartScenes:
+                await HandleSceneAutomationAsync(targetRoom, receiverEvent.SceneId, receiverEvent.SceneName, cancellationToken);
+                break;
+
+            case PluginReceiverEventType.PowerChanged:
+                if (receiverEvent.Snapshot.IsPoweredOn && rules.TurnOnWithReceiverPower)
+                {
+                    await SetGroupStateAsync(targetRoom, isOn: true, cancellationToken: cancellationToken);
+                    LogAndNotifyAutomation("Denon Power ON → turned Hue room ON.");
+                }
+                else if (!receiverEvent.Snapshot.IsPoweredOn && rules.TurnOffWithReceiverStandby)
+                {
+                    await SetMusicSyncEnabledAsync(false, cancellationToken);
+                    await SetGroupStateAsync(targetRoom, isOn: false, cancellationToken: cancellationToken);
+                    LogAndNotifyAutomation("Denon Standby → turned Hue room OFF.");
+                }
+
+                break;
+
+            case PluginReceiverEventType.PlaybackChanged when rules.CinemaPauseLights:
+                if (string.Equals(receiverEvent.Snapshot.PlayState, "Paused", StringComparison.OrdinalIgnoreCase))
+                {
+                    await SetGroupStateAsync(targetRoom, isOn: true, brightnessPercent: rules.PauseBrightenPercent, cancellationToken: cancellationToken);
+                    LogAndNotifyAutomation($"Playback Paused → brightened Hue to {rules.PauseBrightenPercent}%.");
+                }
+                else if (string.Equals(receiverEvent.Snapshot.PlayState, "Playing", StringComparison.OrdinalIgnoreCase))
+                {
+                    await SetGroupStateAsync(targetRoom, isOn: true, brightnessPercent: rules.ResumeDimPercent, cancellationToken: cancellationToken);
+                    LogAndNotifyAutomation($"Playback Resumed → dimmed Hue to {rules.ResumeDimPercent}%.");
+                }
+
+                break;
+        }
+    }
+
+    public void OnAudioFrame(in PluginAudioFrame frame)
+    {
+        if (!IsAudioSyncActive)
+        {
+            return;
+        }
+
+        // Update live 3-band FFT & Beat meters in the Hue Dashboard UI
+        _viewModel?.UpdateLiveAudioMeters(frame.BassEnergy, frame.MidEnergy, frame.TrebleEnergy, frame.IsBeat, frame.IsLiveSignal);
+
+        if (!frame.IsLiveSignal)
+        {
+            return;
+        }
+
+        DispatchMusicSyncFrame(frame);
+    }
+
+    public async Task OnAlbumArtPaletteChangedAsync(PluginAlbumArtPalette palette, CancellationToken cancellationToken = default)
+    {
+        _albumDominantHex = palette.DominantHex;
+        _albumSecondaryHex = palette.SecondaryHex;
+        _albumTrackTitle = palette.TrackTitle;
+        _viewModel?.ApplyAlbumArtPalette(palette.DominantHex, palette.SecondaryHex, palette.TrackTitle);
+
+        // If Album-Art Ambient mode is enabled, immediately bathe the room in the new track's cover color
+        if (IsAudioSyncActive && _config.MusicSync.Mode == HueMusicSyncMode.AlbumArtAmbient)
+        {
+            var (x, y) = HueColorConverter.HexToXy(palette.DominantHex);
+            var targetRoom = ResolveAutomationGroupId();
+            try
+            {
+                await SetGroupStateAsync(
+                    targetRoom,
+                    isOn: true,
+                    brightnessPercent: Math.Clamp((_config.MusicSync.MinBrightness + _config.MusicSync.MaxBrightness) / 2, 15, 90),
+                    x: x,
+                    y: y,
+                    cancellationToken: cancellationToken);
+                LogAndNotifyAutomation($"Album-Art Ambient → {palette.DominantHex} ({palette.TrackTitle})");
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        StopDemoBeatSimulator();
+        _client?.Dispose();
+        _client = null;
+        return ValueTask.CompletedTask;
+    }
+
+    internal async Task<IReadOnlyList<HueDiscoveredBridge>> DiscoverBridgesAsync(CancellationToken cancellationToken = default)
+    {
+        EnsureClient();
+        var bridges = await _client!.DiscoverBridgesAsync(cancellationToken);
+        _context?.Logger.Info($"Hue discovery completed: found {bridges.Count} bridge(s).");
+        return bridges;
+    }
+
+    internal async Task<HuePairingResult> TryPairBridgeAsync(string bridgeIp, bool useHttps, CancellationToken cancellationToken = default)
+    {
+        EnsureClient();
+        var result = await _client!.TryPairAsync(bridgeIp, useHttps, cancellationToken);
+        if (result.Success && !string.IsNullOrWhiteSpace(result.ApplicationKey))
+        {
+            _config.BridgeIp = bridgeIp.Trim();
+            _config.ApplicationKey = result.ApplicationKey;
+            if (!string.IsNullOrWhiteSpace(result.ClientKey))
+            {
+                _config.ClientKey = result.ClientKey;
+            }
+
+            _config.UseHttps = useHttps;
+            _config.DemoMode = false;
+            await SaveConfigAsync(cancellationToken);
+            _viewModel?.SyncFromPluginConfig(_config);
+            _context?.Logger.Info($"Paired with Philips Hue Bridge at {_config.BridgeIp}.");
+        }
+
+        return result;
+    }
+
+    internal async Task SetDemoModeAsync(bool enabled, CancellationToken cancellationToken = default)
+    {
+        _config.DemoMode = enabled;
+        if (!enabled)
+        {
+            StopDemoBeatSimulator();
+        }
+
+        await SaveConfigAsync(cancellationToken);
+        _viewModel?.SyncFromPluginConfig(_config);
+
+        if (enabled || IsConfigured)
+        {
+            await RefreshBridgeStateAsync(cancellationToken);
+        }
+        else
+        {
+            _context?.ReportStatus("Ready to discover & pair Hue Bridge (or try Demo Mode)", PluginHealthState.Idle);
+        }
+    }
+
+    internal async Task DisconnectBridgeAsync(CancellationToken cancellationToken = default)
+    {
+        StopDemoBeatSimulator();
+        _musicSyncActive = false;
+        _config.MusicSync.Enabled = false;
+        _config.ApplicationKey = string.Empty;
+        _config.ClientKey = string.Empty;
+        _config.DemoMode = false;
+        await SaveConfigAsync(cancellationToken);
+        _viewModel?.SyncFromPluginConfig(_config);
+        _context?.ReportStatus("Bridge unlinked — ready to pair", PluginHealthState.Idle);
+    }
+
+    internal async Task RefreshBridgeStateAsync(CancellationToken cancellationToken = default)
+    {
+        EnsureClient();
+        var (rooms, lights, scenes) = await _client!.FetchFullStateAsync(_config, cancellationToken);
+        _cachedRooms = rooms;
+        _cachedLights = lights;
+        _entertainmentAreas = await _client.FetchEntertainmentAreasAsync(_config, cancellationToken);
+
+        _viewModel?.ApplyBridgeState(rooms, lights, scenes, _config.SelectedRoomId);
+        _viewModel?.ApplyEntertainmentAreas(_entertainmentAreas);
+
+        var activeCount = lights.Count(l => l.IsOn);
+        var modeTag = _config.DemoMode ? "Demo Bridge" : _config.BridgeIp;
+        var syncTag = _musicSyncActive ? $" • Sync: {_config.MusicSync.Mode}" : string.Empty;
+        _context?.ReportStatus(
+            $"{modeTag} • {activeCount}/{lights.Count} lights on{syncTag}",
+            PluginHealthState.Connected);
+    }
+
+    internal async Task SetMusicSyncEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
+    {
+        _musicSyncActive = enabled;
+        _config.MusicSync.Enabled = enabled;
+        if (!enabled)
+        {
+            StopDemoBeatSimulator();
+        }
+
+        await SaveConfigAsync(cancellationToken);
+        _viewModel?.SyncFromPluginConfig(_config);
+
+        var modeTag = _config.DemoMode ? "Demo Bridge" : _config.BridgeIp;
+        _context?.ReportStatus(
+            enabled
+                ? $"{modeTag} • Music Sync LIVE ({_config.MusicSync.Mode})"
+                : $"{modeTag} • {_cachedLights.Count(l => l.IsOn)}/{_cachedLights.Count} lights on",
+            _config.DemoMode || IsConfigured ? PluginHealthState.Connected : PluginHealthState.Idle);
+    }
+
+    internal async Task UpdateMusicSyncConfigAsync(HueMusicSyncConfig updated, CancellationToken cancellationToken = default)
+    {
+        _config.MusicSync = updated;
+        _musicSyncActive = updated.Enabled;
+        await SaveConfigAsync(cancellationToken);
+        _viewModel?.SyncFromPluginConfig(_config);
+    }
+
+    internal void ToggleDemoBeatSimulator()
+    {
+        if (_demoBeatRunning)
+        {
+            StopDemoBeatSimulator();
+            return;
+        }
+
+        _demoBeatRunning = true;
+        _musicSyncActive = true;
+        _config.MusicSync.Enabled = true;
+        _viewModel?.SyncFromPluginConfig(_config);
+        _viewModel?.SetDemoBeatState(true);
+
+        _demoBeatCts = new CancellationTokenSource();
+        var token = _demoBeatCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            var tick = 0;
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    var isBeat = tick % 12 == 0; // ~125 BPM at 40ms/tick
+                    var phase = (tick % 12) / 12.0;
+                    var bass = isBeat ? 0.94 : Math.Max(0.12, Math.Exp(-phase * 4.2) * 0.85);
+                    var mid = 0.35 + (0.42 * Math.Abs(Math.Sin(tick * 0.19)));
+                    var treble = 0.25 + (0.50 * Math.Abs(Math.Cos(tick * 0.37)));
+
+                    var frame = new PluginAudioFrame(
+                        LeftLevel: bass,
+                        RightLevel: (bass + mid) * 0.5,
+                        BassEnergy: bass,
+                        MidEnergy: mid,
+                        TrebleEnergy: treble,
+                        BeatIntensity: isBeat ? 0.95 : bass * 0.3,
+                        IsBeat: isBeat,
+                        IsLiveSignal: true,
+                        TimestampMs: Environment.TickCount64);
+
+                    OnAudioFrame(in frame);
+                    tick++;
+                    await Task.Delay(40, token);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            finally
+            {
+                _demoBeatRunning = false;
+                _viewModel?.SetDemoBeatState(false);
+            }
+        }, token);
+    }
+
+    internal async Task SetLightStateAsync(
+        string lightId,
+        bool? isOn = null,
+        int? brightnessPercent = null,
+        int? colorTempMirek = null,
+        double? x = null,
+        double? y = null,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureClient();
+        await _client!.SetLightStateAsync(_config, lightId, isOn, brightnessPercent, colorTempMirek, x, y, cancellationToken: cancellationToken);
+        await RefreshBridgeStateAsync(cancellationToken);
+    }
+
+    internal async Task SetGroupStateAsync(
+        string groupId,
+        bool? isOn = null,
+        int? brightnessPercent = null,
+        int? colorTempMirek = null,
+        double? x = null,
+        double? y = null,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureClient();
+        await _client!.SetGroupActionAsync(_config, groupId, isOn, brightnessPercent, colorTempMirek, x, y, cancellationToken: cancellationToken);
+        await RefreshBridgeStateAsync(cancellationToken);
+    }
+
+    internal async Task ApplyColorPresetAsync(string groupId, HueColorPreset preset, CancellationToken cancellationToken = default)
+    {
+        EnsureClient();
+        await _client!.SetGroupActionAsync(
+            _config,
+            groupId,
+            isOn: true,
+            brightnessPercent: preset.BrightnessPercent,
+            colorTempMirek: preset.ColorTempMirek,
+            x: preset.X,
+            y: preset.Y,
+            transitionDeciseconds: 8,
+            cancellationToken: cancellationToken);
+        await RefreshBridgeStateAsync(cancellationToken);
+    }
+
+    internal async Task ActivateNativeSceneAsync(string groupId, string sceneId, CancellationToken cancellationToken = default)
+    {
+        EnsureClient();
+        await _client!.SetGroupActionAsync(_config, groupId, sceneId: sceneId, cancellationToken: cancellationToken);
+        await RefreshBridgeStateAsync(cancellationToken);
+    }
+
+    internal async Task SaveSelectedRoomAsync(string roomId)
+    {
+        _config.SelectedRoomId = roomId;
+        await SaveConfigAsync();
+    }
+
+    internal async Task UpdateAutomationRulesAsync(HueAutomationRules rules)
+    {
+        _config.Automation = rules;
+        await SaveConfigAsync();
+    }
+
+    private void DispatchMusicSyncFrame(in PluginAudioFrame frame)
+    {
+        if (_client is null)
+        {
+            return;
+        }
+
+        // Respect Hue Bridge LAN rate limit (~10-12 updates/sec on physical bridge, 15 Hz in Demo Mode)
+        var minIntervalMs = _config.DemoMode ? 65 : 95;
+        if (frame.IsBeat)
+        {
+            minIntervalMs = _config.DemoMode ? 45 : 70;
+        }
+
+        var now = Environment.TickCount64;
+        if (now - _lastSyncPushTickMs < minIntervalMs)
+        {
+            return;
+        }
+
+        if (Interlocked.CompareExchange(ref _inFlightSyncPushes, 1, 0) != 0)
+        {
+            return;
+        }
+
+        _lastSyncPushTickMs = now;
+
+        var syncCfg = _config.MusicSync;
+        var sens = Math.Clamp(syncCfg.Sensitivity, 0.4, 2.5);
+        var minBri = Math.Clamp(syncCfg.MinBrightness, 5, 90);
+        var maxBri = Math.Clamp(syncCfg.MaxBrightness, minBri + 5, 100);
+
+        if (frame.IsBeat)
+        {
+            _paletteIndex = (_paletteIndex + 1) % BeatPalette.Length;
+        }
+
+        var targetLights = GetTargetSyncLightIds();
+        if (targetLights.Count == 0)
+        {
+            Interlocked.Exchange(ref _inFlightSyncPushes, 0);
+            return;
+        }
+
+        var lightIdx = _roundRobinLightIdx++ % targetLights.Count;
+        var targetLightId = targetLights[lightIdx];
+        var bass = Math.Clamp(frame.BassEnergy * sens, 0.0, 1.0);
+        var mid = Math.Clamp(frame.MidEnergy * sens, 0.0, 1.0);
+        var treble = Math.Clamp(frame.TrebleEnergy * sens, 0.0, 1.0);
+
+        int bri;
+        double x, y;
+        int transitionDs;
+
+        switch (syncCfg.Mode)
+        {
+            case HueMusicSyncMode.SpectrumSplit:
+            {
+                // Split lights across Bass (deep magenta/amber), Mids (cyan/indigo), Treble (electric blue/emerald)
+                var band = lightIdx % 3;
+                var energy = band switch { 0 => bass, 1 => mid, _ => treble };
+                bri = (int)Math.Round(minBri + ((maxBri - minBri) * energy));
+                (x, y, _) = band switch
+                {
+                    0 => frame.IsBeat ? (0.561, 0.328, "#FB7185") : (0.510, 0.410, "#F59E0B"),
+                    1 => (0.168, 0.340, "#00D4FF"),
+                    _ => (0.195, 0.115, "#818CF8"),
+                };
+                transitionDs = 1;
+                break;
+            }
+
+            case HueMusicSyncMode.AlbumArtAmbient:
+            {
+                var loudness = Math.Clamp((bass * 0.55) + (mid * 0.35) + (treble * 0.10), 0.0, 1.0);
+                bri = (int)Math.Round(minBri + ((maxBri - minBri) * loudness));
+                var hex = (lightIdx % 2 == 0) ? _albumDominantHex : _albumSecondaryHex;
+                (x, y) = HueColorConverter.HexToXy(hex);
+                transitionDs = 2;
+                break;
+            }
+
+            case HueMusicSyncMode.CinemaSubtle:
+            {
+                var calmEnergy = Math.Clamp((bass * 0.5) + (mid * 0.5), 0.0, 1.0);
+                var subtleCeil = Math.Min(maxBri, 60);
+                bri = (int)Math.Round(minBri + ((subtleCeil - minBri) * calmEnergy));
+                (x, y) = frame.IsBeat ? (0.485, 0.415) : (0.455, 0.405);
+                transitionDs = 3;
+                break;
+            }
+
+            default: // BassPulse
+            {
+                var punch = frame.IsBeat ? Math.Min(1.0, bass * 1.25 + 0.15) : bass;
+                bri = (int)Math.Round(minBri + ((maxBri - minBri) * punch));
+                (x, y, _) = BeatPalette[_paletteIndex];
+                transitionDs = frame.IsBeat ? 0 : 1;
+                break;
+            }
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _client.PushFastSyncLightAsync(_config, targetLightId, bri, x, y, transitionDs);
+                if (_config.DemoMode)
+                {
+                    var (rooms, lights, scenes) = await _client.FetchFullStateAsync(_config);
+                    _cachedRooms = rooms;
+                    _cachedLights = lights;
+                    _viewModel?.ApplyLiveLightPreviews(lights);
+                }
+            }
+            catch
+            {
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _inFlightSyncPushes, 0);
+            }
+        });
+    }
+
+    private IReadOnlyList<string> GetTargetSyncLightIds()
+    {
+        var groupId = ResolveAutomationGroupId();
+        if (!string.IsNullOrWhiteSpace(groupId) && groupId != "0")
+        {
+            var room = _cachedRooms.FirstOrDefault(r => string.Equals(r.Id, groupId, StringComparison.OrdinalIgnoreCase));
+            if (room is { LightIds.Count: > 0 })
+            {
+                return room.LightIds;
+            }
+        }
+
+        return _cachedLights.Select(static l => l.Id).ToList();
+    }
+
+    private void StopDemoBeatSimulator()
+    {
+        _demoBeatCts?.Cancel();
+        _demoBeatCts?.Dispose();
+        _demoBeatCts = null;
+        _demoBeatRunning = false;
+        _viewModel?.SetDemoBeatState(false);
+    }
+
+    private async Task HandleSceneAutomationAsync(string targetRoom, string? sceneId, string? sceneName, CancellationToken cancellationToken)
+    {
+        var key = $"{sceneId} {sceneName}".ToLowerInvariant();
+        string presetId;
+        if (key.Contains("movie") || key.Contains("cine"))
+        {
+            presetId = "cinema";
+        }
+        else if (key.Contains("late") || key.Contains("night") || key.Contains("nite"))
+        {
+            presetId = "candle";
+        }
+        else if (key.Contains("hifi") || key.Contains("hi-fi") || key.Contains("audiophile") || key.Contains("pure"))
+        {
+            presetId = "cyan";
+        }
+        else if (key.Contains("morning") || key.Contains("jazz") || key.Contains("coffee"))
+        {
+            presetId = "warm-white";
+        }
+        else if (key.Contains("party"))
+        {
+            presetId = "sunset";
+        }
+        else
+        {
+            presetId = "warm-white";
+        }
+
+        await ApplyNamedPresetAsync(targetRoom, presetId, cancellationToken);
+        LogAndNotifyAutomation($"Smart Scene '{sceneName ?? sceneId}' → applied '{presetId}' Hue ambience.");
+    }
+
+    private async Task ApplyNamedPresetAsync(string groupId, string presetId, CancellationToken cancellationToken)
+    {
+        var preset = HueColorPreset.Defaults.FirstOrDefault(p => string.Equals(p.Id, presetId, StringComparison.OrdinalIgnoreCase))
+                     ?? HueColorPreset.Defaults[0];
+        await ApplyColorPresetAsync(groupId, preset, cancellationToken);
+    }
+
+    private string ResolveAutomationGroupId()
+    {
+        if (!string.IsNullOrWhiteSpace(_config.Automation.TargetRoomId))
+        {
+            return _config.Automation.TargetRoomId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_config.SelectedRoomId))
+        {
+            return _config.SelectedRoomId;
+        }
+
+        return "0";
+    }
+
+    private void LogAndNotifyAutomation(string message)
+    {
+        _context?.Logger.Info(message);
+        _viewModel?.NotifyAutomationEvent(message);
+    }
+
+    private bool IsConfigured =>
+        !string.IsNullOrWhiteSpace(_config.BridgeIp) && !string.IsNullOrWhiteSpace(_config.ApplicationKey);
+
+    private void EnsureClient()
+    {
+        if (_client is null)
+        {
+            throw new InvalidOperationException("Philips Hue plugin has not been initialized yet.");
+        }
+    }
+
+    private Task SaveConfigAsync(CancellationToken cancellationToken = default) =>
+        _context?.Storage.SaveConfigAsync(_config, cancellationToken) ?? Task.CompletedTask;
+}

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Interop;
 using Denon.App.Core.Infrastructure;
@@ -19,9 +20,6 @@ public partial class YouTubeCinemaWindow : Window
 
     private const string PureVideoModeScript = """
         (() => {
-            if (window.__denonCinemaInstalled) return;
-            window.__denonCinemaInstalled = true;
-
             const css = `
                 html, body {
                     background: #000 !important;
@@ -30,6 +28,23 @@ public partial class YouTubeCinemaWindow : Window
                     padding: 0 !important;
                     width: 100vw !important;
                     height: 100vh !important;
+                }
+                ytd-app,
+                ytd-watch-flexy,
+                #page-manager,
+                #columns,
+                #primary,
+                #primary-inner,
+                #player,
+                #player-container-outer,
+                #player-container-inner,
+                #player-container,
+                #ytd-player {
+                    transform: none !important;
+                    contain: none !important;
+                    filter: none !important;
+                    perspective: none !important;
+                    background: #000 !important;
                 }
                 #masthead-container,
                 ytd-masthead,
@@ -48,6 +63,8 @@ public partial class YouTubeCinemaWindow : Window
                 .ytp-chrome-bottom,
                 .ytp-gradient-top,
                 .ytp-gradient-bottom,
+                .ytp-title,
+                .ytp-show-cards-title,
                 .ytp-watermark,
                 .ytp-ce-element,
                 .ytp-cards-teaser,
@@ -58,6 +75,11 @@ public partial class YouTubeCinemaWindow : Window
                 .ytp-endscreen-content,
                 .ytp-upnext,
                 .ytp-autonav-endscreen-upnext-container,
+                .ytp-fullscreen-grid,
+                .ytp-fullscreen-metadata-top-container,
+                .ytp-fullscreen-quick-actions,
+                .ytp-overlay-bottom-right,
+                .ytp-scroll-min,
                 .ytp-bezel-text-wrapper,
                 .iv-branding {
                     display: none !important;
@@ -66,7 +88,9 @@ public partial class YouTubeCinemaWindow : Window
                     pointer-events: none !important;
                 }
                 #movie_player,
-                .html5-video-player {
+                .html5-video-player,
+                #movie_player:fullscreen,
+                .html5-video-player:fullscreen {
                     position: fixed !important;
                     inset: 0 !important;
                     width: 100vw !important;
@@ -102,12 +126,15 @@ public partial class YouTubeCinemaWindow : Window
             `;
 
             const injectStyle = () => {
+                const host = document.head || document.documentElement;
+                if (!host) return false;
                 if (!document.getElementById('denon-pure-cinema-css')) {
                     const style = document.createElement('style');
                     style.id = 'denon-pure-cinema-css';
                     style.textContent = css;
-                    (document.head || document.documentElement).appendChild(style);
+                    host.appendChild(style);
                 }
+                return true;
             };
 
             const dismissOverlays = () => {
@@ -133,24 +160,76 @@ public partial class YouTubeCinemaWindow : Window
                 }
             };
 
-            window.addEventListener('keydown', (ev) => {
-                if (ev.key === 'Escape' || ev.key === 'F11' || ev.key === 'h' || ev.key === 'H') {
-                    ev.preventDefault();
-                    ev.stopPropagation();
-                    if (window.chrome && window.chrome.webview) {
-                        window.chrome.webview.postMessage(ev.key.toUpperCase());
-                    }
-                }
-            }, true);
-
             injectStyle();
-            document.addEventListener('DOMContentLoaded', injectStyle);
-            const observer = new MutationObserver(() => {
-                injectStyle();
-                dismissOverlays();
-            });
-            observer.observe(document.documentElement, { childList: true, subtree: true });
+            dismissOverlays();
+
+            if (!window.__denonCinemaKeyHooked) {
+                window.__denonCinemaKeyHooked = true;
+                window.addEventListener('keydown', (ev) => {
+                    if (ev.key === 'Escape' || ev.key === 'F11' || ev.key === 'h' || ev.key === 'H') {
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        if (window.chrome && window.chrome.webview) {
+                            window.chrome.webview.postMessage(ev.key.toUpperCase());
+                        }
+                    }
+                }, true);
+            }
+
+            if (!window.__denonCinemaObserverInstalled) {
+                const attachObserver = () => {
+                    if (window.__denonCinemaObserverInstalled) return;
+                    if (!document.documentElement) return;
+                    window.__denonCinemaObserverInstalled = true;
+                    injectStyle();
+                    dismissOverlays();
+                    const observer = new MutationObserver(() => {
+                        injectStyle();
+                        dismissOverlays();
+                    });
+                    observer.observe(document.documentElement, { childList: true, subtree: true });
+                };
+
+                if (document.documentElement) {
+                    attachObserver();
+                } else {
+                    document.addEventListener('DOMContentLoaded', attachObserver, { once: true });
+                }
+            }
         })();
+        """;
+
+    private const string EnterEmbeddedPlayerFullscreenScript = """
+        (async () => {
+            if (document.fullscreenElement) return 'already';
+
+            const fsBtn = document.querySelector('.ytp-fullscreen-button');
+            if (fsBtn && fsBtn.getAttribute('aria-pressed') !== 'true') {
+                try {
+                    fsBtn.click();
+                } catch {}
+                await new Promise(resolve => setTimeout(resolve, 120));
+                if (document.fullscreenElement) return 'button';
+            }
+
+            const player = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+            if (player && typeof player.requestFullscreen === 'function') {
+                try {
+                    await player.requestFullscreen();
+                    if (document.fullscreenElement) return 'player';
+                } catch {}
+            }
+
+            const video = document.querySelector('video');
+            if (video && typeof video.requestFullscreen === 'function') {
+                try {
+                    await video.requestFullscreen();
+                    if (document.fullscreenElement) return 'video';
+                } catch {}
+            }
+
+            return 'fallback';
+        })()
         """;
 
     [DllImport("dwmapi.dll")]
@@ -160,6 +239,10 @@ public partial class YouTubeCinemaWindow : Window
     private bool _keepVideoMuted = true;
     private bool _isFullscreen;
     private bool _barsHidden;
+    private double _restoreWidth = 960;
+    private double _restoreHeight = 600;
+    private double _restoreLeft = double.NaN;
+    private double _restoreTop = double.NaN;
     private string? _currentVideoId;
     private string? _currentWatchUrl;
     private int _syncOffsetMs = 1800;
@@ -199,8 +282,11 @@ public partial class YouTubeCinemaWindow : Window
             Show();
         }
 
-        // Automatically open YouTube Cinema in borderless fullscreen
-        SetFullscreen(true);
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
         Activate();
         await EnsureWebViewReadyAsync();
 
@@ -261,6 +347,7 @@ public partial class YouTubeCinemaWindow : Window
             await VideoWebView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(PureVideoModeScript);
             VideoWebView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
             VideoWebView.CoreWebView2.SourceChanged += OnWebSourceChanged;
+            VideoWebView.CoreWebView2.ContainsFullScreenElementChanged += OnContainsFullScreenElementChanged;
             VideoWebView.NavigationCompleted += OnNavigationCompleted;
             _isInitialized = true;
         }
@@ -271,9 +358,22 @@ public partial class YouTubeCinemaWindow : Window
         }
     }
 
+    private void OnContainsFullScreenElementChanged(object? sender, object e)
+    {
+        // Intentionally do NOT maximize the WPF desktop window when YouTube's embedded player enters
+        // HTML5 fullscreen — WebView2 automatically expands the video player to fill the Cinema viewport
+        // while keeping the desktop window at its normal resizable size.
+    }
+
     private async void OnNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
     {
         if (!_isInitialized || VideoWebView.CoreWebView2 is null)
+        {
+            return;
+        }
+
+        var source = VideoWebView.CoreWebView2.Source ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(source) || source.Equals("about:blank", StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
@@ -306,14 +406,56 @@ public partial class YouTubeCinemaWindow : Window
                 var readyRaw = await VideoWebView.ExecuteScriptAsync("(() => { const v = document.querySelector('video'); return v && v.readyState >= 1 ? 1 : 0; })();");
                 if (readyRaw.Trim() == "1")
                 {
+                    await VideoWebView.ExecuteScriptAsync(PureVideoModeScript);
                     await ApplyLiveSyncPositionAsync();
+                    await EnterEmbeddedPlayerFullscreenAsync(cts.Token);
                     return;
                 }
 
                 await Task.Delay(180, cts.Token);
             }
 
+            await VideoWebView.ExecuteScriptAsync(PureVideoModeScript);
             await ApplyLiveSyncPositionAsync();
+            await EnterEmbeddedPlayerFullscreenAsync(cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task EnterEmbeddedPlayerFullscreenAsync(CancellationToken cancellationToken)
+    {
+        if (!_isInitialized || VideoWebView.CoreWebView2 is null || cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        var cdpParams = JsonSerializer.Serialize(new
+        {
+            expression = EnterEmbeddedPlayerFullscreenScript,
+            userGesture = true,
+            awaitPromise = true,
+            returnByValue = true,
+        });
+
+        try
+        {
+            await VideoWebView.CoreWebView2.CallDevToolsProtocolMethodAsync("Runtime.evaluate", cdpParams);
+
+            // Retry once briefly in case YouTube's Polymer player mounted the fullscreen button slightly after readyState >= 1
+            if (!VideoWebView.CoreWebView2.ContainsFullScreenElement && !cancellationToken.IsCancellationRequested)
+            {
+                await Task.Delay(500, cancellationToken);
+                if (_isInitialized && VideoWebView.CoreWebView2 is not null && !VideoWebView.CoreWebView2.ContainsFullScreenElement)
+                {
+                    await VideoWebView.ExecuteScriptAsync(PureVideoModeScript);
+                    await VideoWebView.CoreWebView2.CallDevToolsProtocolMethodAsync("Runtime.evaluate", cdpParams);
+                }
+            }
         }
         catch (OperationCanceledException)
         {
@@ -504,9 +646,22 @@ public partial class YouTubeCinemaWindow : Window
 
     private void SetFullscreen(bool fullscreen)
     {
+        if (fullscreen == _isFullscreen)
+        {
+            return;
+        }
+
         _isFullscreen = fullscreen;
         if (fullscreen)
         {
+            if (WindowState == WindowState.Normal)
+            {
+                _restoreWidth = ActualWidth > 200 ? ActualWidth : Width;
+                _restoreHeight = ActualHeight > 200 ? ActualHeight : Height;
+                _restoreLeft = Left;
+                _restoreTop = Top;
+            }
+
             // Temporarily switch to Normal before WindowStyle.None + Maximized so Windows covers the taskbar cleanly
             WindowState = WindowState.Normal;
             WindowStyle = WindowStyle.None;
@@ -526,8 +681,13 @@ public partial class YouTubeCinemaWindow : Window
             CinemaWindowChrome.CaptionHeight = 42;
             CinemaWindowChrome.ResizeBorderThickness = new Thickness(6);
             RootBorder.BorderThickness = new Thickness(1);
-            Width = 960;
-            Height = 600;
+            Width = _restoreWidth > 200 ? _restoreWidth : 960;
+            Height = _restoreHeight > 200 ? _restoreHeight : 600;
+            if (!double.IsNaN(_restoreLeft) && !double.IsNaN(_restoreTop))
+            {
+                Left = _restoreLeft;
+                Top = _restoreTop;
+            }
             FullscreenButton.Content = "Fullscreen (F11)";
         }
     }
@@ -580,6 +740,10 @@ public partial class YouTubeCinemaWindow : Window
     {
         _syncWaitCts?.Cancel();
         SetBarsHidden(false);
+        if (_isFullscreen)
+        {
+            SetFullscreen(false);
+        }
         try
         {
             if (_isInitialized && VideoWebView.CoreWebView2 is not null)

@@ -8,6 +8,7 @@ using System.Windows.Data;
 using System.Windows.Media;
 using Denon.App.Core.Infrastructure;
 using Denon.App.Core.Models;
+using Denon.App.Core.Plugins;
 using Denon.App.Core.Services;
 using Denon.App.Desktop.Infrastructure;
 using Denon.App.Desktop.Services;
@@ -29,6 +30,8 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly DenonDiscoveryService _discoveryService;
     private readonly StreamProbeService _streamProbeService;
     private readonly WindowsStartupService _startupService;
+    private readonly LiveAudioAnalyzerService _liveAudioAnalyzer;
+    private readonly AlbumArtPaletteService _albumArtPaletteService;
     private readonly System.Windows.Threading.Dispatcher _dispatcher;
 
     private CancellationTokenSource? _volumeDebounceCts;
@@ -128,7 +131,11 @@ public sealed partial class MainViewModel : ObservableObject
         LocalMediaJukeboxService localJukeboxService,
         PcAudioCastService pcAudioCastService,
         HeosEventListenerService heosEventListener,
-        GlobalHotkeyService globalHotkeyService)
+        GlobalHotkeyService globalHotkeyService,
+        PluginHostService pluginHostService,
+        AutomationEngineService automationEngineService,
+        LiveAudioAnalyzerService liveAudioAnalyzerService,
+        AlbumArtPaletteService albumArtPaletteService)
     {
         _receiverController = receiverController;
         _settingsStore = settingsStore;
@@ -137,6 +144,8 @@ public sealed partial class MainViewModel : ObservableObject
         _discoveryService = discoveryService;
         _streamProbeService = streamProbeService;
         _startupService = startupService;
+        _liveAudioAnalyzer = liveAudioAnalyzerService;
+        _albumArtPaletteService = albumArtPaletteService;
         _dispatcher = System.Windows.Application.Current.Dispatcher;
 
         StationPresets = [];
@@ -260,6 +269,9 @@ public sealed partial class MainViewModel : ObservableObject
         InitializeScenesAcoustics();
         InitializeCastRemoteRadio(radioBrowserService, localJukeboxService, pcAudioCastService, heosEventListener);
         InitializeShortcuts(globalHotkeyService);
+        InitializePlugins(pluginHostService);
+        InitializeAutomations(automationEngineService);
+        _liveAudioAnalyzer.SetVuCaptureRequested(ShowVuMeters);
 
         LoadSettings(_settingsStore.Current);
         ApplyStateSnapshot(_stateStore.Snapshot);
@@ -570,6 +582,10 @@ public sealed partial class MainViewModel : ObservableObject
             if (SetProperty(ref _nowPlayingImageUrl, value))
             {
                 OnPropertyChanged(nameof(HasArtwork));
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    _ = _albumArtPaletteService.ProcessArtworkAsync(value, NowPlayingTitle);
+                }
             }
         }
     }
@@ -1181,6 +1197,7 @@ public sealed partial class MainViewModel : ObservableObject
         RefreshFfmpegBadge();
 
         LoadScenesFromSettings(settings);
+        LoadAutomationsFromSettings(settings);
         LoadShortcutsFromSettings(settings);
 
         RebuildVolumePresets(settings.Receiver.VolumePresets);

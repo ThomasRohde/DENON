@@ -355,6 +355,36 @@
 
                             <RadioButton GroupName="NavRail"
                                          Style="{StaticResource NavRailItem}"
+                                         IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Plugins}"
+                                         Command="{Binding NavigateCommand}"
+                                         CommandParameter="Plugins">
+                                <DockPanel LastChildFill="True">
+                                    <Border DockPanel.Dock="Right"
+                                            Background="#1A2233"
+                                            BorderBrush="#2C3852"
+                                            BorderThickness="1"
+                                            CornerRadius="8"
+                                            Padding="6,1"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding ActivePluginsBadgeText}"
+                                                   FontSize="9.5"
+                                                   FontWeight="Bold"
+                                                   Foreground="{StaticResource AccentAmberBrush}" />
+                                    </Border>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Path Data="M20.5,11H19V7C19,5.89 18.1,5 17,5H13V3.5A2.5,2.5 0 0,0 10.5,1A2.5,2.5 0 0,0 8,3.5V5H4A2,2 0 0,0 2,7V10.8H3.5C5,10.8 6.2,12 6.2,13.5C6.2,15 5,16.2 3.5,16.2H2V20A2,2 0 0,0 4,22H7.8V20.5C7.8,19 9,17.8 10.5,17.8C12,17.8 13.2,19 13.2,20.5V22H17A2,2 0 0,0 19,20V16H20.5A2.5,2.5 0 0,0 23,13.5A2.5,2.5 0 0,0 20.5,11Z"
+                                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                              Width="15"
+                                              Height="15"
+                                              Stretch="Uniform"
+                                              Margin="0,0,11,0" />
+                                        <TextBlock Text="Plugins" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </RadioButton>
+
+                            <RadioButton GroupName="NavRail"
+                                         Style="{StaticResource NavRailItem}"
                                          IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Settings}"
                                          Command="{Binding NavigateCommand}"
                                          CommandParameter="Settings">
@@ -1591,10 +1621,82 @@
                         </Grid.Style>
 
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="14" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
+
+                        <!-- Sub-Tab Bar: Smart Scenes & Acoustics vs Automation Rules -->
+                        <Border Grid.Row="0" Style="{StaticResource SurfaceCard}" Padding="12,8" Margin="0,0,0,12">
+                            <DockPanel>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Content="Smart Scenes &amp; Acoustics"
+                                            Command="{Binding SetAcousticsSubTabCommand}"
+                                            CommandParameter="Scenes"
+                                            Padding="12,6"
+                                            FontSize="12"
+                                            Margin="0,0,8,0">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding AcousticsSubTab}" Value="Scenes">
+                                                        <Setter Property="Background" Value="#0C2E3D" />
+                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                        <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+
+                                    <Button Command="{Binding SetAcousticsSubTabCommand}"
+                                            CommandParameter="Automations"
+                                            Padding="12,6"
+                                            FontSize="12">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding AcousticsSubTab}" Value="Automations">
+                                                        <Setter Property="Background" Value="#0C2E3D" />
+                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                        <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Automation Rules" VerticalAlignment="Center" />
+                                            <Border Background="#1B2334" BorderBrush="#2D3B56" BorderThickness="1" CornerRadius="7" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding EnabledAutomationsBadge}" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentEmeraldBrush}" />
+                                            </Border>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+
+                                <TextBlock Text="Chain Philips Hue &amp; plugin actions onto Smart Scenes, or auto-trigger on App Launch &amp; Night Guard schedules"
+                                           FontSize="11"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center" />
+                            </DockPanel>
+                        </Border>
+
+                        <!-- Sub-View 1: Smart Scenes & Live Acoustic Tuning -->
+                        <Grid Grid.Row="1">
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding AcousticsSubTab}" Value="Scenes">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="14" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
 
                         <!-- Top Split: Smart Scenes Deck (Left) + Scene Macro Editor (Right) -->
                         <Grid Grid.Row="0">
@@ -1812,6 +1914,61 @@
 
                                             <CheckBox Content="Smooth gentle volume ramp" IsChecked="{Binding SmoothVolumeRamp}" Style="{StaticResource ToggleSwitchStyle}" />
                                             <CheckBox Content="Power on &amp; auto-unmute AVR" IsChecked="{Binding Unmute}" Style="{StaticResource ToggleSwitchStyle}" />
+
+                                            <!-- Smart Scenes 2.0: Plugin Action Chain -->
+                                            <Border Background="#0E121B" BorderBrush="#232B3D" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,10,0,0">
+                                                <StackPanel>
+                                                    <TextBlock Text="PLUGIN ACTION CHAIN" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,6" />
+                                                    <Grid Margin="0,0,0,8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="6" />
+                                                            <ColumnDefinition Width="62" />
+                                                            <ColumnDefinition Width="6" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <ComboBox Grid.Column="0"
+                                                                  ItemsSource="{Binding DataContext.AvailablePluginActions, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                  SelectedItem="{Binding DataContext.SelectedScenePluginAction, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                  DisplayMemberPath="FullLabel"
+                                                                  FontSize="11.5" />
+                                                        <TextBox Grid.Column="2"
+                                                                 Text="{Binding DataContext.SceneActionDelayMsText, RelativeSource={RelativeSource AncestorType=Window}, UpdateSourceTrigger=PropertyChanged}"
+                                                                 Padding="6,5"
+                                                                 FontSize="11"
+                                                                 ToolTip="Optional delay in ms before running this plugin step" />
+                                                        <Button Grid.Column="4"
+                                                                Content="+ Step"
+                                                                Command="{Binding DataContext.AddPluginActionToSceneCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                Style="{StaticResource SecondaryButton}"
+                                                                Padding="9,5"
+                                                                FontSize="11" />
+                                                    </Grid>
+
+                                                    <ItemsControl ItemsSource="{Binding PluginActions}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Border Background="#161C29" BorderBrush="#2B364E" BorderThickness="1" CornerRadius="7" Padding="8,5" Margin="0,0,0,5">
+                                                                    <DockPanel>
+                                                                        <Button DockPanel.Dock="Right"
+                                                                                Content="✕"
+                                                                                Command="{Binding DataContext.RemovePluginActionFromSceneCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                                CommandParameter="{Binding}"
+                                                                                Style="{StaticResource DangerButton}"
+                                                                                Padding="6,2"
+                                                                                FontSize="10" />
+                                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                            <TextBlock Text="⚡ " Foreground="{StaticResource AccentAmberBrush}" FontSize="11" />
+                                                                            <TextBlock Text="{Binding DisplayName}" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                                                            <TextBlock Text="{Binding DelayMs, StringFormat=' (+{0}ms)'}" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" />
+                                                                        </StackPanel>
+                                                                    </DockPanel>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </Border>
                                         </StackPanel>
                                     </ScrollViewer>
                                 </Grid>
@@ -2063,6 +2220,220 @@
                                 </Grid>
                             </StackPanel>
                         </Border>
+                        </Grid>
+
+                        <!-- Sub-View 2: Smart Automation Rules (App Launch Watchers & Schedules) -->
+                        <Grid Grid.Row="1">
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding AcousticsSubTab}" Value="Automations">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
+
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="12" />
+                                <RowDefinition Height="130" />
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.1*" />
+                                    <ColumnDefinition Width="14" />
+                                    <ColumnDefinition Width="0.9*" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Left: Automation Rules List -->
+                                <Border Grid.Column="0" Style="{StaticResource SurfaceCard}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+
+                                        <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                                            <TextBlock Text="AUTOMATION TRIGGERS" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                <Button Content="+ App Trigger" Command="{Binding AddAppLaunchRuleCommand}" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="11" Margin="0,0,5,0" />
+                                                <Button Content="+ Schedule" Command="{Binding AddScheduleRuleCommand}" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="11" Margin="0,0,5,0" />
+                                                <Button Content="Save Automations" Command="{Binding SaveAutomationsCommand}" Style="{StaticResource PrimaryButton}" Padding="11,5" FontSize="11" />
+                                            </StackPanel>
+                                        </DockPanel>
+
+                                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                                            <ItemsControl ItemsSource="{Binding AutomationRules}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Background="#151923" BorderBrush="#262D40" BorderThickness="1" CornerRadius="12" Padding="12" Margin="0,0,0,8">
+                                                            <DockPanel>
+                                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                    <CheckBox IsChecked="{Binding IsEnabled}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,8,0" ToolTip="Enable or pause this automation rule (click Save Automations to persist)" />
+                                                                    <Button Content="Test"
+                                                                            Command="{Binding DataContext.TestAutomationRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Style="{StaticResource SecondaryButton}"
+                                                                            Padding="9,4"
+                                                                            FontSize="10.5"
+                                                                            Margin="0,0,5,0" />
+                                                                    <Button Content="Edit"
+                                                                            Command="{Binding DataContext.SelectAutomationRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Style="{StaticResource SecondaryButton}"
+                                                                            Padding="9,4"
+                                                                            FontSize="10.5" />
+                                                                </StackPanel>
+                                                                <StackPanel VerticalAlignment="Center">
+                                                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
+                                                                        <Border Background="#1E273A" BorderBrush="#334155" BorderThickness="1" CornerRadius="5" Padding="6,1.5" Margin="0,0,8,0">
+                                                                            <TextBlock Text="{Binding TriggerBadge}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
+                                                                        </Border>
+                                                                        <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                                                    </StackPanel>
+                                                                    <TextBlock Text="{Binding SummaryLine}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                                </StackPanel>
+                                                            </DockPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Right: Selected Rule Editor -->
+                                <Border Grid.Column="2" Style="{StaticResource SurfaceCard}">
+                                    <Grid DataContext="{Binding SelectedAutomationRule}">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+
+                                        <DockPanel Grid.Row="0" Margin="0,0,0,10">
+                                            <TextBlock Text="RULE EDITOR" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                            <Button Content="Delete Rule"
+                                                    Command="{Binding DataContext.RemoveAutomationRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource DangerButton}"
+                                                    Padding="8,4"
+                                                    FontSize="10.5"
+                                                    HorizontalAlignment="Right" />
+                                        </DockPanel>
+
+                                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,6,0">
+                                            <StackPanel>
+                                                <TextBlock Text="Rule Name" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" Margin="0,0,0,8" />
+
+                                                <CheckBox Content="Rule enabled" IsChecked="{Binding IsEnabled}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,8" />
+
+                                                <!-- AppLaunch Fields -->
+                                                <StackPanel Visibility="{Binding IsAppLaunchTrigger, Converter={StaticResource BoolToVis}}" Margin="0,0,0,8">
+                                                    <TextBlock Text="Watched Process Names (comma-separated, without .exe)" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                    <TextBox Text="{Binding ProcessNames, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas" Padding="8,6" FontSize="11.5" Margin="0,0,0,6" />
+                                                    <TextBlock Text="Cooldown (seconds)" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                    <TextBox Text="{Binding CooldownSecondsText, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="11.5" Width="100" HorizontalAlignment="Left" />
+                                                </StackPanel>
+
+                                                <!-- TimeOfDay Schedule Fields -->
+                                                <Grid Visibility="{Binding IsTimeScheduleTrigger, Converter={StaticResource BoolToVis}}" Margin="0,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="10" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0">
+                                                        <TextBlock Text="Local Time (24h HH:mm)" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                        <TextBox Text="{Binding ScheduleTime, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas" Padding="8,6" FontSize="12" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2">
+                                                        <TextBlock Text="Days" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                        <ComboBox ItemsSource="{Binding DataContext.ScheduleDayOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                  SelectedItem="{Binding DaysFilter}" />
+                                                    </StackPanel>
+                                                </Grid>
+
+                                                <TextBlock Text="Activate Smart Scene (optional Scene ID, e.g. movie-night, late-night)" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                <ComboBox ItemsSource="{Binding DataContext.ScenePresets, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                          SelectedValuePath="Id"
+                                                          DisplayMemberPath="Name"
+                                                          SelectedValue="{Binding TargetSceneId}"
+                                                          Margin="0,0,0,10" />
+
+                                                <Border Background="#0E121B" BorderBrush="#232B3D" BorderThickness="1" CornerRadius="10" Padding="10">
+                                                    <StackPanel>
+                                                        <TextBlock Text="EXTRA PLUGIN ACTIONS" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,6" />
+                                                        <Grid Margin="0,0,0,8">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="6" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <ComboBox Grid.Column="0"
+                                                                      ItemsSource="{Binding DataContext.AvailablePluginActions, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                      SelectedItem="{Binding DataContext.SelectedRulePluginAction, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                      DisplayMemberPath="FullLabel"
+                                                                      FontSize="11.5" />
+                                                            <Button Grid.Column="2"
+                                                                    Content="+ Add"
+                                                                    Command="{Binding DataContext.AddPluginActionToRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                    Style="{StaticResource SecondaryButton}"
+                                                                    Padding="10,5"
+                                                                    FontSize="11" />
+                                                        </Grid>
+                                                        <ItemsControl ItemsSource="{Binding PluginActions}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Border Background="#161C29" BorderBrush="#2B364E" BorderThickness="1" CornerRadius="7" Padding="8,5" Margin="0,0,0,5">
+                                                                        <DockPanel>
+                                                                            <Button DockPanel.Dock="Right"
+                                                                                    Content="✕"
+                                                                                    Command="{Binding DataContext.RemovePluginActionFromRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                                    CommandParameter="{Binding}"
+                                                                                    Style="{StaticResource DangerButton}"
+                                                                                    Padding="6,2"
+                                                                                    FontSize="10" />
+                                                                            <TextBlock Text="{Binding DisplayName}" FontSize="11.5" VerticalAlignment="Center" />
+                                                                        </DockPanel>
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+                                        </ScrollViewer>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+
+                            <!-- Bottom: Live Automation Activity Feed -->
+                            <Border Grid.Row="2" Style="{StaticResource SurfaceCard}" Padding="14,10">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <DockPanel Grid.Row="0" Margin="0,0,0,6">
+                                        <TextBlock Text="AUTOMATION ACTIVITY LOG" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding AutomationsStatusText}" FontSize="11" Foreground="{StaticResource AccentCyanBrightBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding AutomationActivityLog}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding}" FontFamily="Cascadia Mono, Consolas" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,3" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Border>
+                        </Grid>
                     </Grid>
 
                     <!-- ==================== VIEW 1D: CAST & REMOTE ==================== -->
@@ -3126,11 +3497,47 @@
                                         </ItemsControl>
                                     </ScrollViewer>
 
-                                    <TextBlock Grid.Row="3"
-                                               Text="Built-in: Ctrl+1..7 switches views • Ctrl+R refreshes • Mouse wheel over Volume adjusts ±2 steps"
-                                               FontSize="10.5"
-                                               Foreground="{StaticResource TextMutedBrush}"
-                                               Margin="0,8,0,0" />
+                                    <StackPanel Grid.Row="3" Margin="0,8,0,0">
+                                        <!-- Quick-Add Global Hotkey for any Smart Scene or Plugin Action -->
+                                        <Border Background="#0E121B" BorderBrush="#232B3D" BorderThickness="1" CornerRadius="9" Padding="9,7" Margin="0,0,0,6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="6" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="10" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="6" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <ComboBox Grid.Column="0"
+                                                          ItemsSource="{Binding ScenePresets}"
+                                                          SelectedItem="{Binding ShortcutSceneToAdd}"
+                                                          DisplayMemberPath="Name"
+                                                          FontSize="11" />
+                                                <Button Grid.Column="2"
+                                                        Content="+ Scene Key"
+                                                        Command="{Binding AddSceneShortcutCommand}"
+                                                        Style="{StaticResource SecondaryButton}"
+                                                        Padding="8,4"
+                                                        FontSize="10.5" />
+                                                <ComboBox Grid.Column="4"
+                                                          ItemsSource="{Binding AvailablePluginActions}"
+                                                          SelectedItem="{Binding ShortcutPluginActionToAdd}"
+                                                          DisplayMemberPath="FullLabel"
+                                                          FontSize="11" />
+                                                <Button Grid.Column="6"
+                                                        Content="+ Plugin Key"
+                                                        Command="{Binding AddPluginActionShortcutCommand}"
+                                                        Style="{StaticResource SecondaryButton}"
+                                                        Padding="8,4"
+                                                        FontSize="10.5" />
+                                            </Grid>
+                                        </Border>
+                                        <TextBlock Text="Built-in: Ctrl+1..7 switches views • Ctrl+R refreshes • Mouse wheel over Volume adjusts ±2 steps"
+                                                   FontSize="10.5"
+                                                   Foreground="{StaticResource TextMutedBrush}" />
+                                    </StackPanel>
                                 </Grid>
                             </Border>
                         </Grid>
@@ -3512,6 +3919,260 @@
                                 </Border>
                             </StackPanel>
                         </Expander>
+                    </Grid>
+
+                    <!-- ==================== VIEW 8: PLUGINS & EXTENSIONS ==================== -->
+                    <Grid Margin="20,16">
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ActiveSection}" Value="Plugins">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Plugins Header Bar -->
+                        <Border Grid.Row="0" Style="{StaticResource SurfaceCard}" Padding="16,12" Margin="0,0,0,14">
+                            <DockPanel>
+                                <StackPanel VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="Plugins &amp; Extensions" FontSize="17" FontWeight="Bold" />
+                                        <Border Background="#1B2334" BorderBrush="#2D3B56" BorderThickness="1" CornerRadius="6" Padding="7,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock Text="SDK v1.0" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding PluginsStatusText}"
+                                               FontSize="11.5"
+                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               Margin="0,3,0,0" />
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <Button Content="Rescan External DLLs"
+                                            Command="{Binding RescanPluginsCommand}"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Padding="12,6"
+                                            FontSize="11.5"
+                                            Margin="0,0,8,0" />
+                                    <Button Content="Open Plugins Folder"
+                                            Command="{Binding OpenExternalPluginsFolderCommand}"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Padding="12,6"
+                                            FontSize="11.5"
+                                            ToolTip="Drop external .NET 10 plugins referencing Denon.App.PluginSdk.dll here" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <!-- Two-Column Plugins Workspace -->
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="290" />
+                                <ColumnDefinition Width="14" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Left Rail: Installed Plugins -->
+                            <Border Grid.Column="0" Style="{StaticResource SurfaceCard}" Padding="12">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Text="INSTALLED PLUGINS" Style="{StaticResource SectionLabelStyle}" Margin="4,0,0,10" />
+
+                                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding InstalledPlugins}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Command="{Binding DataContext.SelectPluginCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding}"
+                                                            Margin="0,0,0,8"
+                                                            HorizontalContentAlignment="Stretch"
+                                                            Cursor="Hand">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button">
+                                                                <Setter Property="Background" Value="#161A24" />
+                                                                <Setter Property="BorderBrush" Value="#252B3C" />
+                                                                <Setter Property="BorderThickness" Value="1" />
+                                                                <Setter Property="Padding" Value="12" />
+                                                                <Setter Property="Template">
+                                                                    <Setter.Value>
+                                                                        <ControlTemplate TargetType="Button">
+                                                                            <Border Background="{TemplateBinding Background}"
+                                                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                                                                    CornerRadius="12"
+                                                                                    Padding="{TemplateBinding Padding}">
+                                                                                <ContentPresenter />
+                                                                            </Border>
+                                                                        </ControlTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                        <Setter Property="Background" Value="#1C2332" />
+                                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Button.Style>
+
+                                                        <StackPanel>
+                                                            <DockPanel Margin="0,0,0,6">
+                                                                <Border Width="36" Height="26" CornerRadius="6" Background="#0D1119" BorderBrush="{Binding AccentBrush}" BorderThickness="1" Margin="0,0,9,0">
+                                                                    <TextBlock Text="{Binding IconGlyph}" FontSize="10" FontWeight="Black" Foreground="{Binding AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                </Border>
+                                                                <Border DockPanel.Dock="Right" Background="#0D111A" BorderBrush="{Binding HealthBadgeBrush}" BorderThickness="1" CornerRadius="6" Padding="6,1.5" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding HealthBadgeText}" FontSize="9" FontWeight="Bold" Foreground="{Binding HealthBadgeBrush}" />
+                                                                </Border>
+                                                                <StackPanel VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                                    <TextBlock FontSize="10.5" Foreground="{StaticResource TextMutedBrush}">
+                                                                        <Run Text="{Binding Category, Mode=OneWay}" />
+                                                                        <Run Text=" • " />
+                                                                        <Run Text="{Binding VersionTag, Mode=OneWay}" />
+                                                                    </TextBlock>
+                                                                </StackPanel>
+                                                            </DockPanel>
+
+                                                            <TextBlock Text="{Binding StatusText}"
+                                                                       FontSize="11"
+                                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       Margin="0,0,0,8" />
+
+                                                            <DockPanel>
+                                                                <Border Background="#111622" BorderBrush="#232C40" BorderThickness="1" CornerRadius="5" Padding="6,2" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding OriginLabel}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" />
+                                                                </Border>
+                                                                <Button Content="{Binding EnableButtonLabel}"
+                                                                        Command="{Binding DataContext.TogglePluginEnabledCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource SecondaryButton}"
+                                                                        Padding="9,3"
+                                                                        FontSize="10.5"
+                                                                        HorizontalAlignment="Right" />
+                                                            </DockPanel>
+                                                        </StackPanel>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+
+                                    <Border Grid.Row="2" Background="#0E121B" BorderBrush="#22293B" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,10,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="DROP-IN PLUGIN SDK" Style="{StaticResource SectionLabelStyle}" />
+                                            <TextBlock Text="Implement IDenonPlugin from Denon.App.PluginSdk, build a .NET 10 DLL, and place it in the external plugins folder."
+                                                       FontSize="10.5"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,4,0,0" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Border>
+
+                            <!-- Right Main Stage: Selected Plugin Dashboard & Actions -->
+                            <Grid Grid.Column="2">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <!-- Active Plugin Dashboard Host -->
+                                <Grid Grid.Row="0">
+                                    <ContentControl Content="{Binding SelectedPluginView}"
+                                                    Visibility="{Binding HasSelectedPluginView, Converter={StaticResource BoolToVis}}" />
+
+                                    <!-- Fallback when plugin is disabled or has no custom dashboard UI -->
+                                    <Border VerticalAlignment="Top">
+                                        <Border.Style>
+                                            <Style TargetType="Border" BasedOn="{StaticResource SurfaceCard}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasSelectedPluginView}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding SelectedPlugin.Name}" FontSize="16" FontWeight="Bold" />
+                                            <TextBlock Text="{Binding SelectedPlugin.Description}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,12" />
+                                            <TextBlock Text="Enable this plugin to activate its dashboard, AVR event hooks, and actions."
+                                                       FontSize="12"
+                                                       Foreground="{StaticResource AccentAmberBrush}"
+                                                       Margin="0,0,0,12" />
+                                            <Button Content="{Binding SelectedPlugin.EnableButtonLabel}"
+                                                    Command="{Binding TogglePluginEnabledCommand}"
+                                                    CommandParameter="{Binding SelectedPlugin}"
+                                                    Style="{StaticResource PrimaryButton}"
+                                                    HorizontalAlignment="Left"
+                                                    Padding="14,7" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- Expandable Plugin Actions & Capabilities Drawer -->
+                                <Expander Grid.Row="1"
+                                          Style="{StaticResource DarkExpanderStyle}"
+                                          IsExpanded="False"
+                                          Margin="0,10,0,0"
+                                          Visibility="{Binding HasSelectedPlugin, Converter={StaticResource BoolToVis}}">
+                                    <Expander.Header>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="PLUGIN ACTIONS &amp; CAPABILITIES" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding SelectedPlugin.CapabilitiesText, StringFormat='  •  {0}'}"
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Expander.Header>
+
+                                    <StackPanel Margin="0,6,0,0">
+                                        <ItemsControl ItemsSource="{Binding SelectedPluginActions}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Command="{Binding DataContext.ExecutePluginActionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding}"
+                                                            Style="{StaticResource HardwareChipButton}"
+                                                            Padding="10,5"
+                                                            Margin="0,0,6,6"
+                                                            ToolTip="{Binding Description}">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="▶ " Foreground="{StaticResource AccentCyanBrush}" FontSize="10" VerticalAlignment="Center" />
+                                                            <TextBlock Text="{Binding DisplayName}" FontSize="11.5" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Text="{Binding SelectedPlugin.AssemblyPath, StringFormat='Source: {0}'}"
+                                                   FontFamily="Cascadia Mono, Consolas"
+                                                   FontSize="10.5"
+                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                   Margin="0,4,0,0" />
+                                    </StackPanel>
+                                </Expander>
+                            </Grid>
+                        </Grid>
                     </Grid>
                 </Grid>
             </Grid>

@@ -10,6 +10,10 @@ public sealed class AppSettings
 
     public ShortcutSettings Shortcuts { get; set; } = new();
 
+    public PluginSettings Plugins { get; set; } = new();
+
+    public List<AutomationRule> Automations { get; set; } = AutomationRule.CreateDefaults();
+
     public AppSettings Clone() =>
         new()
         {
@@ -17,9 +21,25 @@ public sealed class AppSettings
             Ui = Ui.Clone(),
             Media = Media.Clone(),
             Shortcuts = Shortcuts.Clone(),
+            Plugins = Plugins.Clone(),
+            Automations = Automations.Select(static a => a.Clone()).ToList(),
         };
 
     public static AppSettings CreateDefault() => new();
+}
+
+public sealed class PluginSettings
+{
+    public List<string> DisabledPluginIds { get; set; } = [];
+
+    public string SelectedPluginId { get; set; } = "philips-hue";
+
+    public PluginSettings Clone() =>
+        new()
+        {
+            DisabledPluginIds = [.. DisabledPluginIds],
+            SelectedPluginId = SelectedPluginId,
+        };
 }
 
 public sealed class MediaRelaySettings

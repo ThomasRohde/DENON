@@ -106,6 +106,34 @@ public sealed partial class MainViewModel
 
     public void ExecuteShortcutAction(string actionId)
     {
+        if (actionId.StartsWith("scene:", StringComparison.OrdinalIgnoreCase))
+        {
+            var sceneId = actionId["scene:".Length..];
+            var scene = ScenePresets.FirstOrDefault(s => string.Equals(s.Id, sceneId, StringComparison.OrdinalIgnoreCase));
+            if (scene is not null && ActivateSceneCommand.CanExecute(scene))
+            {
+                ActivateSceneCommand.Execute(scene);
+            }
+            return;
+        }
+
+        if (actionId.StartsWith("plugin:", StringComparison.OrdinalIgnoreCase))
+        {
+            var remainder = actionId["plugin:".Length..];
+            var splitIdx = remainder.IndexOf(':');
+            if (splitIdx > 0 && splitIdx < remainder.Length - 1)
+            {
+                var pluginId = remainder[..splitIdx];
+                var pluginActionId = remainder[(splitIdx + 1)..];
+                _ = Task.Run(async () =>
+                {
+                    var result = await _pluginHost.ExecuteActionAsync(pluginId, pluginActionId);
+                    _ = _dispatcher.InvokeAsync(() => StatusMessage = result.Message);
+                });
+            }
+            return;
+        }
+
         switch (actionId)
         {
             case ShortcutActionIds.AppPlayPause or ShortcutActionIds.GlobalPlayPause:

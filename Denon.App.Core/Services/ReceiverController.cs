@@ -29,6 +29,8 @@ public sealed class ReceiverController
 
     public event Action? NonRelaySourceActivated;
 
+    public event Action<ScenePreset>? SceneActivated;
+
     public IReadOnlyList<StationPreset> GetStations() => _settingsStore.Current.Receiver.Stations;
 
     public IReadOnlyList<ScenePreset> GetScenes() => _settingsStore.Current.Receiver.Scenes;
@@ -601,7 +603,9 @@ public sealed class ReceiverController
                 }
 
                 await Task.Delay(300, token);
-                return await GetMergedStatusAsync(settings, token);
+                var updatedStatus = await GetMergedStatusAsync(settings, token);
+                SceneActivated?.Invoke(scene);
+                return updatedStatus;
             },
             markBusy: true,
             logSuccess: true,

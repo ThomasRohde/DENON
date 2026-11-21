@@ -3,8 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="Denon Cinema Companion"
-        Width="860"
-        Height="560"
+        Width="960"
+        Height="600"
         MinWidth="460"
         MinHeight="320"
         Background="{StaticResource ChassisBgBrush}"
@@ -62,13 +62,14 @@
                                 Margin="0,0,6,0"
                                 ToolTip="Hide top &amp; bottom bars for pure full-bleed cinema (press H or Esc to show again)" />
                         <Button x:Name="FullscreenButton"
-                                Content="Exit Fullscreen (F11)"
+                                Content="Fullscreen (F11)"
                                 Click="ToggleFullscreen_Click"
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 Style="{StaticResource SecondaryButton}"
                                 Padding="9,4"
                                 FontSize="11"
-                                Margin="0,0,6,0" />
+                                Margin="0,0,6,0"
+                                ToolTip="Toggle borderless monitor fullscreen for the Cinema window (F11)" />
                         <Button x:Name="PinButton"
                                 Content="Pin on Top"
                                 Click="PinButton_Click"

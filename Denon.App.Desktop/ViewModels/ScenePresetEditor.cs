@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Windows.Media;
 using Denon.App.Core.Models;
 using Denon.App.Desktop.Infrastructure;
@@ -244,6 +245,24 @@ public sealed class ScenePresetEditor : ObservableObject
         set => SetProperty(ref _isActivating, value);
     }
 
+    public ObservableCollection<ScenePluginActionStep> PluginActions { get; } = [];
+
+    public bool HasPluginActions => PluginActions.Count > 0;
+
+    public string PluginActionsBadge => PluginActions.Count switch
+    {
+        0 => string.Empty,
+        1 => "+1 plugin step",
+        var n => $"+{n} plugin steps",
+    };
+
+    public void NotifyPluginActionsChanged()
+    {
+        OnPropertyChanged(nameof(HasPluginActions));
+        OnPropertyChanged(nameof(PluginActionsBadge));
+        OnPropertyChanged(nameof(SummaryLine));
+    }
+
     public string SummaryLine
     {
         get
@@ -289,12 +308,18 @@ public sealed class ScenePresetEditor : ObservableObject
                 parts.Add($"Sleep {sleep}m");
             }
 
+            if (PluginActions.Count > 0)
+            {
+                parts.Add(PluginActionsBadge);
+            }
+
             return parts.Count > 0 ? string.Join("  •  ", parts) : "Custom AVR hardware macro";
         }
     }
 
-    public static ScenePresetEditor FromModel(ScenePreset model) =>
-        new()
+    public static ScenePresetEditor FromModel(ScenePreset model)
+    {
+        var editor = new ScenePresetEditor
         {
             Id = model.Id,
             Name = model.Name,
@@ -318,6 +343,17 @@ public sealed class ScenePresetEditor : ObservableObject
             DialogTrimText = model.DialogTrimDb?.ToString() ?? string.Empty,
             StreamUrl = model.StreamUrl ?? string.Empty,
         };
+
+        if (model.PluginActions is { Count: > 0 })
+        {
+            foreach (var step in model.PluginActions)
+            {
+                editor.PluginActions.Add(step.Clone());
+            }
+        }
+
+        return editor;
+    }
 
     public ScenePreset ToModel() =>
         new()
@@ -348,6 +384,7 @@ public sealed class ScenePresetEditor : ObservableObject
             SubwooferTrimDb = TryParseNullableInt(SubwooferTrimText),
             DialogTrimDb = TryParseNullableInt(DialogTrimText),
             StreamUrl = NullIfEmpty(StreamUrl),
+            PluginActions = PluginActions.Select(static s => s.Clone()).ToList(),
         };
 
     private static string? NullIfEmpty(string? value) =>

@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-21
+
+### Added
+- **Extensible Plugin System & Official SDK (`Denon.App.PluginSdk`)**:
+  - Added a standalone `Denon.App.PluginSdk` contract library (`IDenonPlugin`, `IPluginViewProvider`, `IPluginContext`, `IPluginStorage`, `IPluginReceiverBridge`, `PluginReceiverEvent`, `PluginActionDescriptor`) plus `PluginHostService` supporting both built-in plugins and external drop-in `.NET 10` plugin `.dll` assemblies loaded via isolated `AssemblyLoadContext` from `%LocalAppData%\DenonDesktop\plugins\external\`.
+  - Added a dedicated **Plugins** section to the main navigation sidebar with an installed plugins manager (live health badges, per-plugin enable/disable persistence, **Rescan External DLLs**, **Open Plugins Folder**, and 1-click **Plugin Actions** runner).
+  - Wired real-time Denon AVR event broadcasting (Power, Input, Sound Mode, Playback, and Smart Scene activation — including scenes triggered from the Couch Phone Remote) directly to enabled plugins.
+  - Added **Audio-Reactive & Album-Art Sync SDK Extensions** (`IAudioReactivePlugin`, zero-allocation `PluginAudioFrame`, `PluginAlbumArtPalette`, `LiveAudioAnalyzerService` 512-point Radix-2 FFT + adaptive spectral onset beat detector, and `AlbumArtPaletteService` vibrant cover-art color clustering).
+- **Smart Scenes 2.0 & Cross-Plugin Automation Engine**:
+  - **Scene → Plugin Action Chains**: attach ordered plugin actions with configurable millisecond delays directly inside the Scene Editor (e.g., `Movie Night` → `Philips Hue: Cinema Dim`, `Late Night` → `Philips Hue: Candlelight`).
+  - **Automation Rules Engine** (`AutomationEngineService` + new **Automation Rules** sub-tab under **Scenes & Acoustics**): edge-triggered **App Launch Watchers** (e.g. launching `vlc`, `Plex`, or games automatically triggers Smart Scenes & plugin actions with cooldown), **Time-of-Day / Night Guard Schedules** (`Daily` / `Weekdays` / `Weekends`), one-click **Test Run**, and a live Automation Activity Log.
+  - **Global Hotkeys for Any Smart Scene or Plugin Action**: added `+ Scene Key` and `+ Plugin Key` quick-binders to the Settings Shortcut Editor so any global Windows hotkey can fire Smart Scenes or Plugin Actions (e.g., toggle Hue Music Sync or All Lights Off) with full 4-layer collision checking.
+- **First-Party Plugin — Philips Hue Smart Lighting (`Denon.Plugin.PhilipsHue`)**:
+  - Auto-discovers Philips Hue Bridges via Hue Cloud Discovery + offline LAN SSDP M-SEARCH, supports manual Bridge IP entry, 30-second guided Link-Button pairing over HTTPS (with local private-LAN self-signed TLS validation, Entertainment `clientkey` capture, and HTTP fallback), and a built-in **Demo Simulator** mode.
+  - Full control over Master All-On/Off & brightness presets, Rooms & Zones, debounced dimmers, CIE 1931 RGB mood swatches, Hue Bridge native scenes, and individual lights (power, brightness, Kelvin warmth, color dots).
+  - **Real-Time FFT Music Sync & Album-Art Ambient Engine**: 4 beat-reactive modes (**Bass Pulse**, **Spectrum Split**, **Album-Art Ambient**, **Cinema Subtle**), live 3-band **Bass / Mid / High** FFT spectrum meters + **Beat** LED, sensitivity and brightness floor/ceiling sliders, CLIP v2 Entertainment Area detection, a 1-click **Simulate Beat** tester, and callable actions (`hue.music_sync_on/off/toggle`).
+  - Reactive **Denon AVR ↔ Hue Automations**: automatically sync Hue lighting to Denon Smart Scenes, optional Power ON / Standby sync, and **Cinema Pause Lights** (brighten on Pause, dim on Resume).
+  - Upgraded the **Analog VU Meters** to automatically tap live Windows PC WASAPI audio via `LiveAudioAnalyzerService` even when PC Audio Cast is not active.
+
+### Fixed
+- **Embedded YouTube Player Auto-Fullscreen & Chrome Removal**: Opening YouTube Cinema now keeps the Cinema window at its normal resizable desktop size (`960×600`, with optional `F11` monitor fullscreen) and automatically maximizes YouTube's embedded video player inside the viewer (triggering YouTube's native fullscreen button / `#movie_player.requestFullscreen()` with Chromium user-gesture activation via WebView2 DevTools Protocol). Fixed an early-injection null DOM race in `PureVideoModeScript` that could prevent YouTube page/player chrome CSS from applying cleanly.
+
 ## [1.1.1] - 2026-11-21
 
 ### Added
@@ -51,7 +73,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Zero-Lag Real-Time HEOS Push Events (`LIVE PUSH`) & Analog VU Meters**: Dedicated `register_for_change_events` push listener for `<50 ms` knob/remote sync and toggleable dual-channel illuminated VU dials.
 - **Automated GitHub Releases Workflow**: `.github/workflows/release.yml` builds self-contained single-file `win-x64` executables and SHA-256 checksums on version tags.
 
-[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/ThomasRohde/DENON/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/ThomasRohde/DENON/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/ThomasRohde/DENON/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/ThomasRohde/DENON/releases/tag/v1.0.0

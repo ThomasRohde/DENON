@@ -3,9 +3,12 @@ using System.Threading;
 using System.Windows;
 using Denon.App.Core.Heos;
 using Denon.App.Core.Infrastructure;
+using Denon.App.Core.Plugins;
 using Denon.App.Core.Services;
 using Denon.App.Desktop.Services;
 using Denon.App.Desktop.ViewModels;
+using Denon.App.PluginSdk;
+using Denon.Plugin.PhilipsHue;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -26,6 +29,16 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        DispatcherUnhandledException += (_, args) =>
+        {
+            try
+            {
+                _host?.Services.GetService<AppLogStore>()?.Error("Unhandled UI exception.", args.Exception);
+            }
+            catch
+            {
+            }
+        };
 
         var captureIndex = Array.FindIndex(e.Args, a => string.Equals(a, "--capture-screenshots", StringComparison.OrdinalIgnoreCase));
         var captureDir = captureIndex >= 0 && captureIndex + 1 < e.Args.Length ? e.Args[captureIndex + 1] : null;
@@ -77,6 +90,13 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<PcAudioCastService>();
             builder.Services.AddSingleton<HeosEventListenerService>();
             builder.Services.AddHostedService(sp => sp.GetRequiredService<HeosEventListenerService>());
+            builder.Services.AddSingleton<IDenonPlugin, PhilipsHuePlugin>();
+            builder.Services.AddSingleton<PluginHostService>();
+            builder.Services.AddSingleton<LiveAudioAnalyzerService>();
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<LiveAudioAnalyzerService>());
+            builder.Services.AddSingleton<AlbumArtPaletteService>();
+            builder.Services.AddSingleton<AutomationEngineService>();
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<AutomationEngineService>());
             builder.Services.AddSingleton<YouTubeCinemaWindow>();
             builder.Services.AddHostedService<ReceiverPollingService>();
             builder.Services.AddSingleton<MainViewModel>();
@@ -88,6 +108,9 @@ public partial class App : System.Windows.Application
 
             var settingsStore = _host.Services.GetRequiredService<AppSettingsStore>();
             await settingsStore.InitializeAsync();
+
+            var pluginHost = _host.Services.GetRequiredService<PluginHostService>();
+            await pluginHost.InitializeAndStartAsync();
 
             var relayServer = _host.Services.GetRequiredService<LocalAudioRelayServer>();
             relayServer.AttachWebApiHandler(_host.Services.GetRequiredService<RemoteWebApiHandler>());
@@ -339,6 +362,18 @@ public partial class App : System.Windows.Application
                 try
                 {
                     _host.Services.GetService<YouTubeCinemaWindow>()?.HideAndStopVideo();
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    var pluginHost = _host.Services.GetService<PluginHostService>();
+                    if (pluginHost is not null)
+                    {
+                        await pluginHost.StopAllAsync();
+                    }
                 }
                 catch
                 {

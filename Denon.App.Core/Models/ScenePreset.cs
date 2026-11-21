@@ -44,6 +44,8 @@ public sealed class ScenePreset
 
     public string? StreamUrl { get; set; }
 
+    public List<ScenePluginActionStep> PluginActions { get; set; } = [];
+
     public ScenePreset Clone() =>
         new()
         {
@@ -68,6 +70,7 @@ public sealed class ScenePreset
             SubwooferTrimDb = SubwooferTrimDb,
             DialogTrimDb = DialogTrimDb,
             StreamUrl = StreamUrl,
+            PluginActions = PluginActions.Select(static s => s.Clone()).ToList(),
         };
 
     public static List<ScenePreset> CreateDefaultScenes() =>
@@ -91,6 +94,15 @@ public sealed class ScenePreset
             Dimmer = "OFF",
             SubwooferTrimDb = 0,
             DialogTrimDb = 1,
+            PluginActions =
+            [
+                new ScenePluginActionStep
+                {
+                    PluginId = "philips-hue",
+                    ActionId = "hue.movie_dim",
+                    DisplayName = "Philips Hue: Cinema Dim (15%)",
+                },
+            ],
         },
         new ScenePreset
         {
@@ -110,6 +122,15 @@ public sealed class ScenePreset
             Dimmer = "DAR",
             SubwooferTrimDb = -6,
             DialogTrimDb = 3,
+            PluginActions =
+            [
+                new ScenePluginActionStep
+                {
+                    PluginId = "philips-hue",
+                    ActionId = "hue.candlelight",
+                    DisplayName = "Philips Hue: Late Night Candlelight",
+                },
+            ],
         },
         new ScenePreset
         {

@@ -704,8 +704,14 @@ public sealed partial class MainViewModel
         }
 
         var dt = Math.Clamp(deltaSeconds, 0.001, 0.08);
-        var live = _pcAudioCastService.GetLatestMeterSample();
+        _liveAudioAnalyzer?.SetVuCaptureRequested(ShowVuMeters);
 
+        var live = _pcAudioCastService.GetLatestMeterSample();
+        var analyzerFrame = !live.IsLiveSignal && _liveAudioAnalyzer is not null
+            ? _liveAudioAnalyzer.GetLatestFrame()
+            : default;
+
+        var hasLiveSignal = live.IsLiveSignal || analyzerFrame.IsLiveSignal;
         double targetL;
         double targetR;
 
@@ -713,6 +719,11 @@ public sealed partial class MainViewModel
         {
             targetL = live.Left;
             targetR = live.Right;
+        }
+        else if (analyzerFrame.IsLiveSignal)
+        {
+            targetL = analyzerFrame.LeftLevel;
+            targetR = analyzerFrame.RightLevel;
         }
         else if (IsActiveAndPlaying)
         {
@@ -739,7 +750,7 @@ public sealed partial class MainViewModel
         if (_vuLeftLevel < 0.003) _vuLeftLevel = 0;
         if (_vuRightLevel < 0.003) _vuRightLevel = 0;
 
-        _isVuLiveSignal = live.IsLiveSignal;
+        _isVuLiveSignal = hasLiveSignal;
         return (_vuLeftLevel, _vuRightLevel, _isVuLiveSignal);
     }
 
