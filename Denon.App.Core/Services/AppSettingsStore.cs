@@ -126,7 +126,63 @@ public sealed class AppSettingsStore
         normalized.Receiver.PollIntervalSeconds = Math.Clamp(normalized.Receiver.PollIntervalSeconds, 2, 60);
         normalized.Receiver.VolumePresets = NormalizeVolumePresets(normalized.Receiver.VolumePresets);
         normalized.Receiver.Stations = NormalizeStations(normalized.Receiver.Stations);
+        normalized.Receiver.Scenes = NormalizeScenes(normalized.Receiver.Scenes);
+        normalized.Media ??= new MediaRelaySettings();
+        normalized.Media.RelayPort = normalized.Media.RelayPort is >= 1024 and <= 65535
+            ? normalized.Media.RelayPort
+            : 18925;
+        normalized.Media.FfmpegPath = normalized.Media.FfmpegPath?.Trim() ?? string.Empty;
+        normalized.Media.CinemaSyncOffsetMs = Math.Clamp(normalized.Media.CinemaSyncOffsetMs, 0, 8000);
         return normalized;
+    }
+
+    private static List<ScenePreset> NormalizeScenes(IEnumerable<ScenePreset>? scenes)
+    {
+        var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var normalized = new List<ScenePreset>();
+
+        foreach (var scene in scenes ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(scene.Name))
+            {
+                continue;
+            }
+
+            var clone = scene.Clone();
+            clone.Name = clone.Name.Trim();
+            clone.Description = clone.Description?.Trim() ?? string.Empty;
+            clone.Badge = string.IsNullOrWhiteSpace(clone.Badge)
+                ? clone.Name[..Math.Min(4, clone.Name.Length)].ToUpperInvariant()
+                : clone.Badge.Trim().ToUpperInvariant()[..Math.Min(5, clone.Badge.Trim().Length)];
+            clone.AccentHex = string.IsNullOrWhiteSpace(clone.AccentHex) ? "#00D4FF" : clone.AccentHex.Trim();
+            clone.Id = EnsureUniqueAlias(
+                SlugNormalizer.Normalize(string.IsNullOrWhiteSpace(clone.Id) ? clone.Name : clone.Id),
+                seenIds);
+
+            if (clone.TargetVolume.HasValue)
+            {
+                clone.TargetVolume = Math.Clamp(clone.TargetVolume.Value, 0, 98);
+            }
+
+            if (clone.SubwooferTrimDb.HasValue)
+            {
+                clone.SubwooferTrimDb = Math.Clamp(clone.SubwooferTrimDb.Value, -12, 12);
+            }
+
+            if (clone.DialogTrimDb.HasValue)
+            {
+                clone.DialogTrimDb = Math.Clamp(clone.DialogTrimDb.Value, -12, 12);
+            }
+
+            if (clone.SleepTimerMinutes.HasValue)
+            {
+                clone.SleepTimerMinutes = Math.Clamp(clone.SleepTimerMinutes.Value, 0, 120);
+            }
+
+            normalized.Add(clone);
+        }
+
+        return normalized.Count == 0 ? ScenePreset.CreateDefaultScenes() : normalized;
     }
 
     private static string NormalizeHost(string value) =>

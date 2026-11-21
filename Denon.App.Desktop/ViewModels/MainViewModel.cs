@@ -16,7 +16,7 @@ using Color = System.Windows.Media.Color;
 
 namespace Denon.App.Desktop.ViewModels;
 
-public sealed class MainViewModel : ObservableObject
+public sealed partial class MainViewModel : ObservableObject
 {
     private static readonly Brush OnlineBrush = CreateFrozenBrush(16, 185, 129);
     private static readonly Brush StandbyBrush = CreateFrozenBrush(245, 158, 11);
@@ -118,7 +118,11 @@ public sealed class MainViewModel : ObservableObject
         AppLogStore logStore,
         DenonDiscoveryService discoveryService,
         StreamProbeService streamProbeService,
-        WindowsStartupService startupService)
+        WindowsStartupService startupService,
+        YouTubeMediaService youtubeService,
+        LocalAudioRelayServer relayServer,
+        YouTubeQueueService youtubeQueueService,
+        YouTubeCinemaWindow cinemaWindow)
     {
         _receiverController = receiverController;
         _settingsStore = settingsStore;
@@ -246,6 +250,9 @@ public sealed class MainViewModel : ObservableObject
         ResetConnectionsCommand = new AsyncRelayCommand(_ => ResetAndRefreshAsync(), CanControlReceiver);
         CopyDiagnosticReportCommand = new RelayCommand(_ => CopyDiagnosticReportToClipboard());
 
+        InitializeYouTube(youtubeService, relayServer, youtubeQueueService, cinemaWindow);
+        InitializeScenesAcoustics();
+
         LoadSettings(_settingsStore.Current);
         ApplyStateSnapshot(_stateStore.Snapshot);
         foreach (var entry in _logStore.Snapshot())
@@ -336,7 +343,14 @@ public sealed class MainViewModel : ObservableObject
     public string ActiveSection
     {
         get => _activeSection;
-        set => SetProperty(ref _activeSection, value);
+        set
+        {
+            if (SetProperty(ref _activeSection, value) &&
+                string.Equals(value, "Acoustics", StringComparison.OrdinalIgnoreCase))
+            {
+                _ = SyncAcousticsIfNeededAsync();
+            }
+        }
     }
 
     public bool IsConnected
@@ -904,6 +918,28 @@ public sealed class MainViewModel : ObservableObject
         PlayFavoriteCommand.NotifyCanExecuteChanged();
         FixSilentAudioCommand.NotifyCanExecuteChanged();
         ResetConnectionsCommand.NotifyCanExecuteChanged();
+
+        PlayYouTubeTrackCommand?.NotifyCanExecuteChanged();
+        PlayYouTubeTrackAndWatchCommand?.NotifyCanExecuteChanged();
+        PlayAllYouTubeResultsCommand?.NotifyCanExecuteChanged();
+        PlayYouTubeQueueItemCommand?.NotifyCanExecuteChanged();
+        ActivateSceneCommand?.NotifyCanExecuteChanged();
+        RefreshAcousticsCommand?.NotifyCanExecuteChanged();
+        SetMultEqCommand?.NotifyCanExecuteChanged();
+        ToggleDynamicEqCommand?.NotifyCanExecuteChanged();
+        SetDynamicVolumeCommand?.NotifyCanExecuteChanged();
+        SetRestorerCommand?.NotifyCanExecuteChanged();
+        SetDimmerCommand?.NotifyCanExecuteChanged();
+        ApplySubwooferTrimCommand?.NotifyCanExecuteChanged();
+        StepSubwooferTrimCommand?.NotifyCanExecuteChanged();
+        ToggleSubwooferTrimCommand?.NotifyCanExecuteChanged();
+        ApplyDialogTrimCommand?.NotifyCanExecuteChanged();
+        StepDialogTrimCommand?.NotifyCanExecuteChanged();
+        ToggleDialogTrimCommand?.NotifyCanExecuteChanged();
+        ToggleToneControlCommand?.NotifyCanExecuteChanged();
+        StepBassCommand?.NotifyCanExecuteChanged();
+        StepTrebleCommand?.NotifyCanExecuteChanged();
+        ResetAcousticTrimsCommand?.NotifyCanExecuteChanged();
     }
 
     private void ApplyStateSnapshot(ReceiverStateSnapshot snapshot)
@@ -953,6 +989,14 @@ public sealed class MainViewModel : ObservableObject
                 NowPlayingTitle = InputSourceDisplay;
                 NowPlayingDetail = $"External Input • Sound Mode: {SoundMode}";
                 NowPlayingImageUrl = string.Empty;
+            }
+            else if (_youtubeQueueService is not null &&
+                     _youtubeQueueService.IsYouTubePlaybackActive &&
+                     _youtubeQueueService.Snapshot.CurrentTrack is { } activeYouTubeTrack)
+            {
+                NowPlayingTitle = activeYouTubeTrack.Title;
+                NowPlayingDetail = $"{activeYouTubeTrack.Author} • YouTube Music • {activeYouTubeTrack.DurationDisplay}";
+                NowPlayingImageUrl = activeYouTubeTrack.ThumbnailUrl;
             }
             else
             {
@@ -1040,6 +1084,14 @@ public sealed class MainViewModel : ObservableObject
         SettingsLaunchAtWindowsStartup = settings.Ui.LaunchAtWindowsStartup || _startupService.IsEnabled();
         DisplayVolumeInDb = settings.Ui.DisplayVolumeInDb;
 
+        SettingsRelayPort = settings.Media.RelayPort.ToString();
+        SettingsFfmpegPath = settings.Media.FfmpegPath;
+        SettingsPreferFfmpegMp3 = settings.Media.PreferFfmpegMp3Transcode;
+        SettingsCinemaSyncOffsetMs = settings.Media.CinemaSyncOffsetMs.ToString();
+        RefreshFfmpegBadge();
+
+        LoadScenesFromSettings(settings);
+
         RebuildVolumePresets(settings.Receiver.VolumePresets);
 
         StationPresets.Clear();
@@ -1122,14 +1174,57 @@ public sealed class MainViewModel : ObservableObject
     private Task PlayPauseAsync() =>
         SetPlayStateAsync(IsPlaying ? "pause" : "play");
 
-    private Task SetPlayStateAsync(string state) =>
-        ExecuteReceiverActionAsync(() => _receiverController.SetPlayStateAsync(state), $"Transport set to {ToTitleCase(state)}.");
+    private async Task SetPlayStateAsync(string state)
+    {
+        if (string.Equals(state, "stop", StringComparison.OrdinalIgnoreCase) && _youtubeQueueService.IsYouTubePlaybackActive)
+        {
+            _youtubeQueueService.StopSession();
+        }
 
-    private Task NextTrackAsync() =>
-        ExecuteReceiverActionAsync(() => _receiverController.PlayNextAsync(), "Skipped to next track.");
+        await ExecuteReceiverActionAsync(() => _receiverController.SetPlayStateAsync(state), $"Transport set to {ToTitleCase(state)}.");
+    }
 
-    private Task PreviousTrackAsync() =>
-        ExecuteReceiverActionAsync(() => _receiverController.PlayPreviousAsync(), "Returned to previous track.");
+    private async Task NextTrackAsync()
+    {
+        if (_youtubeQueueService.IsYouTubePlaybackActive)
+        {
+            try
+            {
+                var skipped = await _youtubeQueueService.PlayNextAsync();
+                StatusMessage = skipped ? "Skipped to next YouTube track." : "Reached end of YouTube queue.";
+            }
+            catch (Exception ex)
+            {
+                LastError = ex.Message;
+                StatusMessage = ex.Message;
+            }
+
+            return;
+        }
+
+        await ExecuteReceiverActionAsync(() => _receiverController.PlayNextAsync(), "Skipped to next track.");
+    }
+
+    private async Task PreviousTrackAsync()
+    {
+        if (_youtubeQueueService.IsYouTubePlaybackActive)
+        {
+            try
+            {
+                var skipped = await _youtubeQueueService.PlayPreviousAsync();
+                StatusMessage = skipped ? "Returned to previous YouTube track." : "No previous YouTube track in queue.";
+            }
+            catch (Exception ex)
+            {
+                LastError = ex.Message;
+                StatusMessage = ex.Message;
+            }
+
+            return;
+        }
+
+        await ExecuteReceiverActionAsync(() => _receiverController.PlayPreviousAsync(), "Returned to previous track.");
+    }
 
     private Task ToggleMuteAsync() =>
         ExecuteReceiverActionAsync(() => _receiverController.ToggleMuteAsync(), IsMuted ? "Receiver unmuted." : "Receiver muted.");
@@ -1477,6 +1572,7 @@ public sealed class MainViewModel : ObservableObject
                     DefaultLowVolume = ParseInt(SettingsLowVolume, 20),
                     VolumePresets = volumePresets,
                     Stations = StationPresets.Select(static station => station.ToModel()).ToList(),
+                    Scenes = ScenePresets.Select(static scene => scene.ToModel()).ToList(),
                 },
                 Ui = new UiSettings
                 {
@@ -1486,6 +1582,13 @@ public sealed class MainViewModel : ObservableObject
                     ShowNotifications = SettingsShowNotifications,
                     DisplayVolumeInDb = SettingsDisplayVolumeInDb,
                     LaunchAtWindowsStartup = SettingsLaunchAtWindowsStartup,
+                },
+                Media = new MediaRelaySettings
+                {
+                    RelayPort = ParseInt(SettingsRelayPort, 18925),
+                    FfmpegPath = SettingsFfmpegPath?.Trim() ?? string.Empty,
+                    PreferFfmpegMp3Transcode = SettingsPreferFfmpegMp3,
+                    CinemaSyncOffsetMs = ParseInt(SettingsCinemaSyncOffsetMs, 1800),
                 },
             };
 

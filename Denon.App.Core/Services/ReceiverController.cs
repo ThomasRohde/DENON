@@ -27,7 +27,11 @@ public sealed class ReceiverController
         _logStore = logStore;
     }
 
+    public event Action? NonRelaySourceActivated;
+
     public IReadOnlyList<StationPreset> GetStations() => _settingsStore.Current.Receiver.Stations;
+
+    public IReadOnlyList<ScenePreset> GetScenes() => _settingsStore.Current.Receiver.Scenes;
 
     public Task<ReceiverStatus> RefreshAsync(CancellationToken cancellationToken = default) =>
         ExecuteAsync(
@@ -90,6 +94,7 @@ public sealed class ReceiverController
                 if (!DenonCatalog.InputMatches(sourceCode, "NET"))
                 {
                     _lastPlayedStationAlias = null;
+                    NonRelaySourceActivated?.Invoke();
                 }
 
                 await _avrClient.SetPowerAsync(settings, true, token);
@@ -252,6 +257,7 @@ public sealed class ReceiverController
 
                 await _heosClient.PlayUrlAsync(settings, preset.Url, volume: null, unmute: unmute, token);
                 _lastPlayedStationAlias = preset.Alias;
+                NonRelaySourceActivated?.Invoke();
                 return await GetMergedStatusAsync(settings, token);
             },
             markBusy: true,
@@ -284,6 +290,7 @@ public sealed class ReceiverController
 
                 await _heosClient.PlayUrlAsync(settings, url, volume: null, unmute: unmute, token);
                 _lastPlayedStationAlias = null;
+                NonRelaySourceActivated?.Invoke();
                 return await GetMergedStatusAsync(settings, token);
             },
             markBusy: true,
@@ -332,6 +339,7 @@ public sealed class ReceiverController
 
                 await _heosClient.PlayFavoriteAsync(settings, favorite.PresetIndex, token);
                 _lastPlayedStationAlias = null;
+                NonRelaySourceActivated?.Invoke();
                 return await GetMergedStatusAsync(settings, token);
             },
             markBusy: true,
@@ -402,6 +410,239 @@ public sealed class ReceiverController
         finally
         {
             _commandGate.Release();
+        }
+    }
+
+    public Task<ReceiverStatus> PlayRelayStreamAsync(
+        string relayUrl,
+        string trackTitle,
+        bool useLowVolume,
+        bool unmute,
+        CancellationToken cancellationToken = default)
+    {
+        var volume = useLowVolume ? (int?)_settingsStore.Current.Receiver.DefaultLowVolume : null;
+        return ExecuteAsync(
+            $"Cast YouTube track '{trackTitle}'",
+            async (settings, token) =>
+            {
+                await _avrClient.EnsureMainZoneNetAsync(settings, token);
+                if (volume is int level)
+                {
+                    await _avrClient.SetVolumeAsync(settings, level, token);
+                }
+
+                if (unmute)
+                {
+                    await _avrClient.SetMuteAsync(settings, false, token);
+                }
+
+                await _heosClient.PlayUrlAsync(settings, relayUrl, volume: null, unmute: unmute, token);
+                _lastPlayedStationAlias = null;
+                return await GetMergedStatusAsync(settings, token);
+            },
+            markBusy: true,
+            logSuccess: true,
+            logFailures: true,
+            cancellationToken);
+    }
+
+    public async Task<AcousticStatus> GetAcousticStatusAsync(CancellationToken cancellationToken = default)
+    {
+        await _commandGate.WaitAsync(cancellationToken);
+        try
+        {
+            var settings = _settingsStore.Current.Receiver;
+            var acoustics = await _avrClient.GetAcousticStatusAsync(settings, cancellationToken);
+            _logStore.Info("Synced acoustic & Audyssey parameters from receiver.");
+            return acoustics;
+        }
+        finally
+        {
+            _commandGate.Release();
+        }
+    }
+
+    public async Task<AcousticStatus> SetMultEqAsync(string mode, CancellationToken cancellationToken = default) =>
+        await ExecuteAcousticAsync($"Set Audyssey MultEQ to {mode}", (s, t) => _avrClient.SetMultEqAsync(s, mode, t), cancellationToken);
+
+    public async Task<AcousticStatus> SetDynamicEqAsync(bool enabled, CancellationToken cancellationToken = default) =>
+        await ExecuteAcousticAsync(enabled ? "Enable Audyssey Dynamic EQ" : "Disable Audyssey Dynamic EQ", (s, t) => _avrClient.SetDynamicEqAsync(s, enabled, t), cancellationToken);
+
+    public async Task<AcousticStatus> SetDynamicVolumeAsync(string mode, CancellationToken cancellationToken = default) =>
+        await ExecuteAcousticAsync($"Set Audyssey Dynamic Volume to {mode}", (s, t) => _avrClient.SetDynamicVolumeAsync(s, mode, t), cancellationToken);
+
+    public async Task<AcousticStatus> SetRestorerAsync(string mode, CancellationToken cancellationToken = default) =>
+        await ExecuteAcousticAsync($"Set Audio Restorer to {mode}", (s, t) => _avrClient.SetRestorerAsync(s, mode, t), cancellationToken);
+
+    public async Task<AcousticStatus> SetDimmerAsync(string mode, CancellationToken cancellationToken = default) =>
+        await ExecuteAcousticAsync($"Set Front Panel Dimmer to {mode}", (s, t) => _avrClient.SetDimmerAsync(s, mode, t), cancellationToken);
+
+    public async Task<AcousticStatus> SetSubwooferLevelAsync(bool enabled, int? trimDb, CancellationToken cancellationToken = default) =>
+        await ExecuteAcousticAsync(
+            enabled ? $"Set Subwoofer Trim to {DenonAcousticCatalog.FormatDbOffset(trimDb ?? 0)}" : "Disable Subwoofer Trim",
+            (s, t) => _avrClient.SetSubwooferLevelAsync(s, enabled, trimDb, t),
+            cancellationToken);
+
+    public async Task<AcousticStatus> SetDialogLevelAsync(bool enabled, int? trimDb, CancellationToken cancellationToken = default) =>
+        await ExecuteAcousticAsync(
+            enabled ? $"Set Dialog Enhancer to {DenonAcousticCatalog.FormatDbOffset(trimDb ?? 0)}" : "Disable Dialog Enhancer",
+            (s, t) => _avrClient.SetDialogLevelAsync(s, enabled, trimDb, t),
+            cancellationToken);
+
+    public async Task<AcousticStatus> SetToneControlAsync(bool enabled, int? bassDb, int? trebleDb, CancellationToken cancellationToken = default) =>
+        await ExecuteAcousticAsync(
+            enabled ? $"Set Tone Control (Bass {DenonAcousticCatalog.FormatDbOffset(bassDb ?? 0)}, Treble {DenonAcousticCatalog.FormatDbOffset(trebleDb ?? 0)})" : "Disable Tone Control",
+            (s, t) => _avrClient.SetToneControlAsync(s, enabled, bassDb, trebleDb, t),
+            cancellationToken);
+
+    public Task<ReceiverStatus> ApplySceneAsync(ScenePreset scene, CancellationToken cancellationToken = default) =>
+        ExecuteAsync(
+            $"Activate scene '{scene.Name}'",
+            async (settings, token) =>
+            {
+                if (scene.PowerOn)
+                {
+                    await _avrClient.SetPowerAsync(settings, true, token);
+                    await Task.Delay(350, token);
+                    await _avrClient.SetMainZonePowerAsync(settings, true, token);
+                    await Task.Delay(250, token);
+                }
+
+                if (!string.IsNullOrWhiteSpace(scene.InputSource))
+                {
+                    if (DenonCatalog.InputMatches(scene.InputSource, "NET"))
+                    {
+                        await _avrClient.EnsureMainZoneNetAsync(settings, token);
+                    }
+                    else
+                    {
+                        _lastPlayedStationAlias = null;
+                        NonRelaySourceActivated?.Invoke();
+                        await _avrClient.SetInputSourceAsync(settings, scene.InputSource, token);
+                        await Task.Delay(450, token);
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(scene.SoundMode))
+                {
+                    await TryRunSceneStepAsync(() => _avrClient.SetSoundModeAsync(settings, scene.SoundMode, token));
+                    await Task.Delay(200, token);
+                }
+
+                if (!string.IsNullOrWhiteSpace(scene.EcoMode))
+                {
+                    await TryRunSceneStepAsync(() => _avrClient.SetEcoModeAsync(settings, scene.EcoMode, token));
+                }
+
+                if (!string.IsNullOrWhiteSpace(scene.MultEq))
+                {
+                    await TryRunSceneStepAsync(() => _avrClient.SetMultEqAsync(settings, scene.MultEq, token));
+                }
+
+                if (scene.DynamicEq is bool dynEq)
+                {
+                    await TryRunSceneStepAsync(() => _avrClient.SetDynamicEqAsync(settings, dynEq, token));
+                }
+
+                if (!string.IsNullOrWhiteSpace(scene.DynamicVolume))
+                {
+                    await TryRunSceneStepAsync(() => _avrClient.SetDynamicVolumeAsync(settings, scene.DynamicVolume, token));
+                }
+
+                if (!string.IsNullOrWhiteSpace(scene.Restorer))
+                {
+                    await TryRunSceneStepAsync(() => _avrClient.SetRestorerAsync(settings, scene.Restorer, token));
+                }
+
+                if (!string.IsNullOrWhiteSpace(scene.Dimmer))
+                {
+                    await TryRunSceneStepAsync(() => _avrClient.SetDimmerAsync(settings, scene.Dimmer, token));
+                }
+
+                if (scene.SubwooferTrimDb is int swDb)
+                {
+                    await TryRunSceneStepAsync(() => _avrClient.SetSubwooferLevelAsync(settings, true, swDb, token));
+                }
+
+                if (scene.DialogTrimDb is int dilDb)
+                {
+                    await TryRunSceneStepAsync(() => _avrClient.SetDialogLevelAsync(settings, true, dilDb, token));
+                }
+
+                if (scene.SleepTimerMinutes is int sleepMins)
+                {
+                    await TryRunSceneStepAsync(() => _avrClient.SetSleepTimerAsync(settings, sleepMins <= 0 ? null : sleepMins, token));
+                }
+
+                if (scene.Unmute)
+                {
+                    await _avrClient.SetMuteAsync(settings, false, token);
+                }
+
+                if (scene.TargetVolume is int targetVol)
+                {
+                    if (scene.SmoothVolumeRamp)
+                    {
+                        var currentAvr = await _avrClient.GetStatusAsync(settings, token);
+                        await _avrClient.RampVolumeAsync(settings, currentAvr.Volume, targetVol, token);
+                    }
+                    else
+                    {
+                        await _avrClient.SetVolumeAsync(settings, targetVol, token);
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(scene.StreamUrl))
+                {
+                    await _avrClient.EnsureMainZoneNetAsync(settings, token);
+                    await _heosClient.PlayUrlAsync(settings, scene.StreamUrl.Trim(), volume: null, unmute: scene.Unmute, token);
+                    _lastPlayedStationAlias = null;
+                    NonRelaySourceActivated?.Invoke();
+                }
+
+                await Task.Delay(300, token);
+                return await GetMergedStatusAsync(settings, token);
+            },
+            markBusy: true,
+            logSuccess: true,
+            logFailures: true,
+            cancellationToken);
+
+    private async Task<AcousticStatus> ExecuteAcousticAsync(
+        string actionDescription,
+        Func<ReceiverSettings, CancellationToken, Task> operation,
+        CancellationToken cancellationToken)
+    {
+        await _commandGate.WaitAsync(cancellationToken);
+        try
+        {
+            var settings = _settingsStore.Current.Receiver;
+            await operation(settings, cancellationToken);
+            await Task.Delay(180, cancellationToken);
+            var status = await _avrClient.GetAcousticStatusAsync(settings, cancellationToken);
+            _logStore.Info($"{actionDescription} completed.");
+            return status;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logStore.Error($"{actionDescription} failed.", exception);
+            throw;
+        }
+        finally
+        {
+            _commandGate.Release();
+        }
+    }
+
+    private async Task TryRunSceneStepAsync(Func<Task> step)
+    {
+        try
+        {
+            await step();
+        }
+        catch (Exception ex)
+        {
+            _logStore.Warning($"Optional scene step skipped: {ex.Message}");
         }
     }
 

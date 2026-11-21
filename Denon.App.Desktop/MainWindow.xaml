@@ -269,6 +269,38 @@
 
                             <RadioButton GroupName="NavRail"
                                          Style="{StaticResource NavRailItem}"
+                                         IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=YouTube}"
+                                         Command="{Binding NavigateCommand}"
+                                         CommandParameter="YouTube">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="M10,15L15.19,12L10,9V15M21.56,7.17C21.69,7.64 21.78,8.27 21.84,9.07C21.91,9.87 21.94,10.56 21.94,11.16L22,12C22,14.19 21.84,15.8 21.56,16.83C21.31,17.73 20.73,18.31 19.83,18.56C19.36,18.69 18.5,18.78 17.18,18.84C15.88,18.91 14.69,18.94 13.59,18.94L12,19C7.81,19 5.2,18.84 4.17,18.56C3.27,18.31 2.69,17.73 2.44,16.83C2.31,16.36 2.22,15.73 2.16,14.93C2.09,14.13 2.06,13.44 2.06,12.84L2,12C2,9.81 2.16,8.2 2.44,7.17C2.69,6.27 3.27,5.69 4.17,5.44C4.64,5.31 5.5,5.22 6.82,5.16C8.12,5.09 9.31,5.06 10.41,5.06L12,5C16.19,5 18.8,5.16 19.83,5.44C20.73,5.69 21.31,6.27 21.56,7.17Z"
+                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                          Width="15"
+                                          Height="15"
+                                          Stretch="Uniform"
+                                          Margin="0,0,11,0" />
+                                    <TextBlock Text="YouTube &amp; Music" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                                </StackPanel>
+                            </RadioButton>
+
+                            <RadioButton GroupName="NavRail"
+                                         Style="{StaticResource NavRailItem}"
+                                         IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Acoustics}"
+                                         Command="{Binding NavigateCommand}"
+                                         CommandParameter="Acoustics">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="M3,17V19H9V17H3M3,5V7H13V5H3M13,21V19H21V17H13V15H11V21H13M7,9V11H3V13H7V15H9V9H7M21,13V11H11V13H21M15,9H17V7H21V5H17V3H15V9Z"
+                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                          Width="15"
+                                          Height="15"
+                                          Stretch="Uniform"
+                                          Margin="0,0,11,0" />
+                                    <TextBlock Text="Scenes &amp; Acoustics" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                                </StackPanel>
+                            </RadioButton>
+
+                            <RadioButton GroupName="NavRail"
+                                         Style="{StaticResource NavRailItem}"
                                          IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Stations}"
                                          Command="{Binding NavigateCommand}"
                                          CommandParameter="Stations">
@@ -445,10 +477,21 @@
                                             <Border Background="#191E2A" CornerRadius="5" Padding="7,2.5" Margin="0,0,6,0">
                                                 <TextBlock Text="{Binding SoundMode}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource AccentAmberBrush}" />
                                             </Border>
-                                            <Border Background="#191E2A" CornerRadius="5" Padding="7,2.5"
+                                            <Border Background="#191E2A" CornerRadius="5" Padding="7,2.5" Margin="0,0,6,0"
                                                     Visibility="{Binding HasSleepTimer, Converter={StaticResource BoolToVis}}">
                                                 <TextBlock Text="{Binding SleepTimerDisplay}" FontSize="10.5" FontWeight="SemiBold" Foreground="#A78BFA" />
                                             </Border>
+                                            <Border Background="#38131A" BorderBrush="#EF4444" BorderThickness="1" CornerRadius="5" Padding="7,2" Margin="0,0,6,0"
+                                                    Visibility="{Binding IsYouTubeActive, Converter={StaticResource BoolToVis}}">
+                                                <TextBlock Text="YOUTUBE CAST" FontSize="9.5" FontWeight="Bold" Foreground="#FCA5A5" />
+                                            </Border>
+                                            <Button Content="Watch Video"
+                                                    Command="{Binding OpenCinemaForCurrentTrackCommand}"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Padding="8,2.5"
+                                                    FontSize="10.5"
+                                                    ToolTip="Open synchronized YouTube Cinema Companion window"
+                                                    Visibility="{Binding IsYouTubeActive, Converter={StaticResource BoolToVis}}" />
                                         </StackPanel>
 
                                         <TextBlock Text="{Binding NowPlayingTitle}"
@@ -842,25 +885,67 @@
                                         <RowDefinition Height="*" />
                                     </Grid.RowDefinitions>
 
-                                    <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                                    <DockPanel Grid.Row="0" Margin="0,0,0,10">
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                            <TextBlock Text="QUICK STATIONS" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                                            <TextBlock Text="  •  One-click HEOS stream launch" FontSize="11.5" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+                                            <TextBlock Text="QUICK SCENES &amp; STATIONS" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                            <TextBlock Text="  •  One-click AVR macros &amp; HEOS radio" FontSize="11.5" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
                                         </StackPanel>
-                                        <Button Content="Manage All →"
-                                                HorizontalAlignment="Right"
-                                                Command="{Binding NavigateCommand}"
-                                                CommandParameter="Stations"
-                                                Style="{StaticResource SecondaryButton}"
-                                                Padding="10,5"
-                                                FontSize="11.5" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Button Content="Scenes &amp; EQ →"
+                                                    Command="{Binding NavigateCommand}"
+                                                    CommandParameter="Acoustics"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Padding="10,5"
+                                                    FontSize="11.5"
+                                                    Margin="0,0,6,0" />
+                                            <Button Content="YouTube →"
+                                                    Command="{Binding NavigateCommand}"
+                                                    CommandParameter="YouTube"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Padding="10,5"
+                                                    FontSize="11.5"
+                                                    Margin="0,0,6,0" />
+                                            <Button Content="Stations →"
+                                                    Command="{Binding NavigateCommand}"
+                                                    CommandParameter="Stations"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Padding="10,5"
+                                                    FontSize="11.5" />
+                                        </StackPanel>
                                     </DockPanel>
 
                                     <ScrollViewer Grid.Row="1"
                                                   VerticalScrollBarVisibility="Auto"
                                                   HorizontalScrollBarVisibility="Disabled"
                                                   Padding="0,0,6,0">
-                                        <ItemsControl ItemsSource="{Binding StationPresets}">
+                                        <StackPanel>
+                                            <!-- One-Click Scenes Strip -->
+                                            <ItemsControl ItemsSource="{Binding ScenePresets}" Margin="0,0,0,10">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Command="{Binding DataContext.ActivateSceneCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                Style="{StaticResource HardwareChipButton}"
+                                                                ToolTip="{Binding Description}"
+                                                                Padding="10,6"
+                                                                Margin="0,0,7,7">
+                                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <Border Background="{Binding AccentBrush}" CornerRadius="4" Padding="5,1.5" Margin="0,0,7,0">
+                                                                    <TextBlock Text="{Binding Badge}" FontSize="9.5" FontWeight="Black" Foreground="#06121A" />
+                                                                </Border>
+                                                                <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <ItemsControl ItemsSource="{Binding StationPresets}">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>
                                                     <WrapPanel />
@@ -960,9 +1045,945 @@
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
+                                        </StackPanel>
                                     </ScrollViewer>
                                 </Grid>
                             </Border>
+                    </Grid>
+
+                    <!-- ==================== VIEW 1B: YOUTUBE & MUSIC ==================== -->
+                    <Grid Margin="20,16">
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ActiveSection}" Value="YouTube">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Top YouTube Search & LAN Audio Relay Bar -->
+                        <Border Grid.Row="0" Style="{StaticResource HeroOledCard}" Padding="16,14" Margin="0,0,0,14">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,10">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Background="#38131A" BorderBrush="#EF4444" BorderThickness="1" CornerRadius="5" Padding="7,2" Margin="0,0,8,0">
+                                            <TextBlock Text="YOUTUBE CAST" FontSize="10" FontWeight="Bold" Foreground="#FCA5A5" />
+                                        </Border>
+                                        <TextBlock Text="Direct LAN Stream Bridge to Denon HEOS"
+                                                   FontSize="12.5"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <Border Background="#0E2430" BorderBrush="#1C4B63" BorderThickness="1" CornerRadius="6" Padding="8,3" Margin="0,0,8,0">
+                                            <TextBlock Text="{Binding RelayCodecBadge}" FontSize="10" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="{StaticResource AccentCyanBrush}" />
+                                        </Border>
+                                        <TextBlock Text="{Binding RelayStreamStateText}"
+                                                   FontSize="11"
+                                                   FontFamily="Cascadia Mono, Consolas"
+                                                   Foreground="{StaticResource AccentEmeraldBrush}"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBox Grid.Column="0"
+                                             Text="{Binding YouTubeSearchInput, UpdateSourceTrigger=PropertyChanged}"
+                                             KeyDown="YouTubeSearchInput_KeyDown"
+                                             Tag="Search YouTube Music, songs, videos, or paste any YouTube / playlist URL..."
+                                             ToolTip="Press Enter to search or resolve any YouTube / YouTube Music URL or playlist" />
+                                    <Button Grid.Column="2"
+                                            Content="Paste &amp; Go"
+                                            Command="{Binding PasteAndSearchYouTubeCommand}"
+                                            Style="{StaticResource SecondaryButton}"
+                                            ToolTip="Paste URL or query from clipboard and search immediately" />
+                                    <Button Grid.Column="4"
+                                            Content="Search / Load"
+                                            Command="{Binding SearchYouTubeCommand}"
+                                            Style="{StaticResource PrimaryButton}" />
+                                </Grid>
+
+                                <DockPanel Margin="0,10,0,0">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Button Content="Music"
+                                                Command="{Binding SetYouTubeSearchModeCommand}"
+                                                CommandParameter="Music"
+                                                Padding="11,5"
+                                                FontSize="11.5"
+                                                Margin="0,0,6,0">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding YouTubeSearchModeName}" Value="Music">
+                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                        <Button Content="Videos"
+                                                Command="{Binding SetYouTubeSearchModeCommand}"
+                                                CommandParameter="Videos"
+                                                Padding="11,5"
+                                                FontSize="11.5"
+                                                Margin="0,0,6,0">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding YouTubeSearchModeName}" Value="Videos">
+                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                        <Button Content="Playlists"
+                                                Command="{Binding SetYouTubeSearchModeCommand}"
+                                                CommandParameter="Playlists"
+                                                Padding="11,5"
+                                                FontSize="11.5"
+                                                Margin="0,0,14,0">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding YouTubeSearchModeName}" Value="Playlists">
+                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+
+                                        <TextBlock Text="{Binding YouTubeStatusText}"
+                                                   FontSize="11.5"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+
+                                    <TextBlock Text="{Binding RelayEndpointText}"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               FontSize="10.5"
+                                               FontFamily="Cascadia Mono, Consolas"
+                                               Foreground="{StaticResource TextMutedBrush}" />
+                                </DockPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Main Split Stage: Results (Left) + Queue & History (Right) -->
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1.28*" />
+                                <ColumnDefinition Width="14" />
+                                <ColumnDefinition Width="0.92*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Left: Search / Playlist Results -->
+                            <Border Grid.Column="0" Style="{StaticResource SurfaceCard}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+
+                                    <DockPanel Grid.Row="0" Margin="0,0,0,10">
+                                        <TextBlock Text="RESULTS &amp; TRACKS" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Button Content="▶ Play All"
+                                                    Command="{Binding PlayAllYouTubeResultsCommand}"
+                                                    Style="{StaticResource PrimaryButton}"
+                                                    Padding="10,5"
+                                                    FontSize="11"
+                                                    Margin="0,0,6,0" />
+                                            <Button Content="+ Queue All"
+                                                    Command="{Binding EnqueueAllYouTubeResultsCommand}"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Padding="10,5"
+                                                    FontSize="11" />
+                                        </StackPanel>
+                                    </DockPanel>
+
+                                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,6,0">
+                                        <StackPanel>
+                                            <!-- Playlist Results (when searching playlists) -->
+                                            <ItemsControl ItemsSource="{Binding YouTubePlaylistResults}"
+                                                          Visibility="{Binding IsPlaylistResultsVisible, Converter={StaticResource BoolToVis}}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Background="#161A24" BorderBrush="#262F42" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,0,8">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="72" />
+                                                                    <ColumnDefinition Width="12" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="10" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
+
+                                                                <Border Grid.Column="0" Width="72" Height="44" CornerRadius="6" Background="#0A0E16" ClipToBounds="True">
+                                                                    <Image Source="{Binding ThumbnailUrl, Converter={StaticResource SafeImageSource}}" Stretch="UniformToFill" />
+                                                                </Border>
+                                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding Title}" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                                    <TextBlock Text="{Binding Author, StringFormat='Playlist • {0}'}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
+                                                                </StackPanel>
+                                                                <Button Grid.Column="4"
+                                                                        Content="Open Tracks →"
+                                                                        Command="{Binding DataContext.OpenYouTubePlaylistCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource PrimaryButton}"
+                                                                        Padding="10,6"
+                                                                        FontSize="11" />
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <!-- Track / Video Results -->
+                                            <ItemsControl ItemsSource="{Binding YouTubeSearchResults}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Background="#161A24" BorderBrush="#242C3D" BorderThickness="1" CornerRadius="10" Padding="9" Margin="0,0,0,8">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="76" />
+                                                                    <ColumnDefinition Width="12" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="10" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
+
+                                                                <Border Grid.Column="0" Width="76" Height="46" CornerRadius="7" Background="#090D14" ClipToBounds="True">
+                                                                    <Grid>
+                                                                        <Image Source="{Binding ThumbnailUrl, Converter={StaticResource SafeImageSource}}" Stretch="UniformToFill" />
+                                                                        <Border Background="#CC07090D" CornerRadius="4" Padding="4,1" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="3">
+                                                                            <TextBlock Text="{Binding DurationDisplay}" FontSize="9.5" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="{StaticResource TextPrimaryBrush}" />
+                                                                        </Border>
+                                                                    </Grid>
+                                                                </Border>
+
+                                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding Title}" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                                    <TextBlock Text="{Binding Author}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                                                                </StackPanel>
+
+                                                                <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                    <Button Content="▶ Play"
+                                                                            Command="{Binding DataContext.PlayYouTubeTrackCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Style="{StaticResource PrimaryButton}"
+                                                                            Padding="10,6"
+                                                                            FontSize="11"
+                                                                            Margin="0,0,5,0"
+                                                                            ToolTip="Cast audio directly to Denon AVR" />
+                                                                    <Button Content="Video"
+                                                                            Command="{Binding DataContext.PlayYouTubeTrackAndWatchCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Style="{StaticResource SecondaryButton}"
+                                                                            Padding="9,6"
+                                                                            FontSize="11"
+                                                                            Margin="0,0,5,0"
+                                                                            ToolTip="Cast audio to Denon + open synced Cinema Video window" />
+                                                                    <Button Content="+ Q"
+                                                                            Command="{Binding DataContext.EnqueueYouTubeTrackCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Style="{StaticResource SecondaryButton}"
+                                                                            Padding="8,6"
+                                                                            FontSize="11"
+                                                                            ToolTip="Add to Up Next queue" />
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Border>
+
+                            <!-- Right: Up Next Queue + Recent History -->
+                            <Border Grid.Column="2" Style="{StaticResource SurfaceCard}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <DockPanel Grid.Row="0" Margin="0,0,0,10">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="UP NEXT QUEUE" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding YouTubeQueueCountLabel, StringFormat='  •  {0}'}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <Button Content="Clear"
+                                                HorizontalAlignment="Right"
+                                                Command="{Binding ClearYouTubeQueueCommand}"
+                                                Style="{StaticResource DangerButton}"
+                                                Padding="8,4"
+                                                FontSize="10.5" />
+                                    </DockPanel>
+
+                                    <!-- Queue Controls Bar -->
+                                    <WrapPanel Grid.Row="1" Margin="0,0,0,10">
+                                        <Button Content="Shuffle"
+                                                Command="{Binding ToggleYouTubeShuffleCommand}"
+                                                Padding="9,5"
+                                                FontSize="11"
+                                                Margin="0,0,6,6">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsYouTubeShuffleEnabled}" Value="True">
+                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                        <Button Content="{Binding YouTubeRepeatLabel}"
+                                                Command="{Binding CycleYouTubeRepeatCommand}"
+                                                Style="{StaticResource HardwareChipButton}"
+                                                Padding="9,5"
+                                                FontSize="11"
+                                                Margin="0,0,6,6" />
+                                        <Button Content="Cinema Window"
+                                                Command="{Binding OpenCinemaForCurrentTrackCommand}"
+                                                Style="{StaticResource SecondaryButton}"
+                                                Padding="9,5"
+                                                FontSize="11"
+                                                Margin="0,0,0,6"
+                                                ToolTip="Open floating YouTube video window synced to Denon audio" />
+                                    </WrapPanel>
+
+                                    <!-- Queue List -->
+                                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,0">
+                                        <ItemsControl ItemsSource="{Binding YouTubeQueue}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border CornerRadius="9" Padding="8,7" Margin="0,0,0,6" BorderThickness="1">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Background" Value="#151923" />
+                                                                <Setter Property="BorderBrush" Value="#232A3A" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                                                        <Setter Property="Background" Value="#0E2430" />
+                                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="24" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <TextBlock Grid.Column="0"
+                                                                       Text="{Binding PositionLabel}"
+                                                                       FontSize="11"
+                                                                       FontWeight="Bold"
+                                                                       FontFamily="Cascadia Mono, Consolas"
+                                                                       Foreground="{StaticResource AccentCyanBrush}"
+                                                                       VerticalAlignment="Center" />
+
+                                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,6,0">
+                                                                <TextBlock Text="{Binding Title}" FontSize="11.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis">
+                                                                    <Run Text="{Binding Author, Mode=OneWay}" />
+                                                                    <Run Text=" • " />
+                                                                    <Run Text="{Binding DurationDisplay, Mode=OneWay}" />
+                                                                </TextBlock>
+                                                            </StackPanel>
+
+                                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <Button Content="▶"
+                                                                        Command="{Binding DataContext.PlayYouTubeQueueItemCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource SecondaryButton}"
+                                                                        Padding="7,4"
+                                                                        FontSize="10"
+                                                                        Margin="0,0,3,0"
+                                                                        ToolTip="Jump to track" />
+                                                                <Button Content="↑"
+                                                                        Command="{Binding DataContext.MoveYouTubeQueueUpCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource SecondaryButton}"
+                                                                        Padding="6,4"
+                                                                        FontSize="10"
+                                                                        Margin="0,0,3,0" />
+                                                                <Button Content="↓"
+                                                                        Command="{Binding DataContext.MoveYouTubeQueueDownCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource SecondaryButton}"
+                                                                        Padding="6,4"
+                                                                        FontSize="10"
+                                                                        Margin="0,0,3,0" />
+                                                                <Button Content="✕"
+                                                                        Command="{Binding DataContext.RemoveYouTubeQueueItemCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource DangerButton}"
+                                                                        Padding="6,4"
+                                                                        FontSize="10" />
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+
+                                    <!-- Recent Played YouTube Tracks -->
+                                    <StackPanel Grid.Row="3" Margin="0,10,0,0" Visibility="{Binding HasYouTubeHistory, Converter={StaticResource BoolToVis}}">
+                                        <Border Height="1" Background="{StaticResource BorderHairlineBrush}" Margin="0,0,0,8" />
+                                        <TextBlock Text="RECENTLY CAST" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,6" />
+                                        <ScrollViewer MaxHeight="72" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                            <ItemsControl ItemsSource="{Binding YouTubeHistory}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Command="{Binding DataContext.PlayYouTubeTrackCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                Style="{StaticResource HardwareChipButton}"
+                                                                Padding="8,4"
+                                                                FontSize="10.5"
+                                                                Margin="0,0,5,5"
+                                                                MaxWidth="190"
+                                                                ToolTip="{Binding Title}">
+                                                            <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextSecondaryBrush}" />
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Grid>
+
+                    <!-- ==================== VIEW 1C: SCENES & ACOUSTICS ==================== -->
+                    <Grid Margin="20,16">
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ActiveSection}" Value="Acoustics">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="14" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Top Split: Smart Scenes Deck (Left) + Scene Macro Editor (Right) -->
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1.15*" />
+                                <ColumnDefinition Width="14" />
+                                <ColumnDefinition Width="0.85*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Smart Scenes Cards -->
+                            <Border Grid.Column="0" Style="{StaticResource SurfaceCard}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+
+                                    <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                                        <TextBlock Text="SMART SCENES &amp; MACROS" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Button Content="Capture Live"
+                                                    Command="{Binding CaptureCurrentStateToSceneCommand}"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Padding="9,5"
+                                                    FontSize="11"
+                                                    Margin="0,0,6,0"
+                                                    ToolTip="Save current receiver input, sound mode, volume &amp; acoustics as a new scene" />
+                                            <Button Content="+ New"
+                                                    Command="{Binding AddSceneCommand}"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Padding="9,5"
+                                                    FontSize="11"
+                                                    Margin="0,0,6,0" />
+                                            <Button Content="Save Scenes"
+                                                    Command="{Binding SaveSettingsCommand}"
+                                                    Style="{StaticResource PrimaryButton}"
+                                                    Padding="10,5"
+                                                    FontSize="11" />
+                                        </StackPanel>
+                                    </DockPanel>
+
+                                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,6,0">
+                                        <ItemsControl ItemsSource="{Binding ScenePresets}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="#161A24" BorderBrush="#262E40" BorderThickness="1" CornerRadius="11" Padding="12,10" Margin="0,0,0,9">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <Border Grid.Column="0"
+                                                                    Width="44"
+                                                                    Height="44"
+                                                                    CornerRadius="10"
+                                                                    Background="{Binding AccentBrush}"
+                                                                    Margin="0,0,12,0"
+                                                                    VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding Badge}" FontSize="11" FontWeight="Black" Foreground="#06121A" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                            </Border>
+
+                                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,10,0">
+                                                                <TextBlock Text="{Binding Name}" FontSize="13.5" FontWeight="Bold" />
+                                                                <TextBlock Text="{Binding Description}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,2,0,3" />
+                                                                <TextBlock Text="{Binding SummaryLine}" FontSize="10.5" FontFamily="Cascadia Mono, Consolas" Foreground="{StaticResource AccentCyanBrightBrush}" TextTrimming="CharacterEllipsis" />
+                                                            </StackPanel>
+
+                                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <Button Content="▶ Activate"
+                                                                        Command="{Binding DataContext.ActivateSceneCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource PrimaryButton}"
+                                                                        Padding="11,7"
+                                                                        FontSize="11.5"
+                                                                        Margin="0,0,6,0" />
+                                                                <Button Content="Edit"
+                                                                        Command="{Binding DataContext.SelectSceneCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource SecondaryButton}"
+                                                                        Padding="9,7"
+                                                                        FontSize="11" />
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Border>
+
+                            <!-- Scene Editor Panel -->
+                            <Border Grid.Column="2" Style="{StaticResource SurfaceCard}">
+                                <Grid DataContext="{Binding SelectedScene}">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+
+                                    <DockPanel Grid.Row="0" Margin="0,0,0,10">
+                                        <TextBlock Text="SCENE EDITOR" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Button Content="Duplicate"
+                                                    Command="{Binding DataContext.DuplicateSceneCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Padding="8,4"
+                                                    FontSize="10.5"
+                                                    Margin="0,0,5,0" />
+                                            <Button Content="Delete"
+                                                    Command="{Binding DataContext.RemoveSceneCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource DangerButton}"
+                                                    Padding="8,4"
+                                                    FontSize="10.5" />
+                                        </StackPanel>
+                                    </DockPanel>
+
+                                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,6,0">
+                                        <StackPanel>
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="2*" />
+                                                    <ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock Text="Name" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                    <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="Badge" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                    <TextBox Text="{Binding Badge, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="4">
+                                                    <TextBlock Text="Accent Hex" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                    <TextBox Text="{Binding AccentHex, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" FontFamily="Cascadia Mono, Consolas" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <TextBlock Text="Description" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                            <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" Margin="0,0,0,8" />
+
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock Text="Input (TV/NET/BD)" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                    <TextBox Text="{Binding InputSource, UpdateSourceTrigger=PropertyChanged}" Tag="Leave blank" Padding="8,6" FontSize="12" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="Sound Mode" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                    <TextBox Text="{Binding SoundMode, UpdateSourceTrigger=PropertyChanged}" Tag="MOVIE / STEREO" Padding="8,6" FontSize="12" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="4">
+                                                    <TextBlock Text="Target Vol (0-98)" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                    <TextBox Text="{Binding TargetVolumeText, UpdateSourceTrigger=PropertyChanged}" Tag="e.g. 42" Padding="8,6" FontSize="12" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock Text="DynVol (OFF/LIT/MED/HEV)" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                    <TextBox Text="{Binding DynamicVolume, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="Dimmer (BRI/DIM/DAR/OFF)" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                    <TextBox Text="{Binding Dimmer, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="4">
+                                                    <TextBlock Text="DynEQ (ON/OFF)" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                    <TextBox Text="{Binding DynamicEqChoice, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock Text="Sub Trim (-12..12)" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                    <TextBox Text="{Binding SubwooferTrimText, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="Dialog (-12..12)" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                    <TextBox Text="{Binding DialogTrimText, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="4">
+                                                    <TextBlock Text="Sleep (min)" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                    <TextBox Text="{Binding SleepTimerText, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <TextBlock Text="Optional Auto-Play Stream URL" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                            <TextBox Text="{Binding StreamUrl, UpdateSourceTrigger=PropertyChanged}" Tag="Optional http:// stream URL..." Padding="8,6" FontSize="11.5" FontFamily="Cascadia Mono, Consolas" Margin="0,0,0,6" />
+
+                                            <CheckBox Content="Smooth gentle volume ramp" IsChecked="{Binding SmoothVolumeRamp}" Style="{StaticResource ToggleSwitchStyle}" />
+                                            <CheckBox Content="Power on &amp; auto-unmute AVR" IsChecked="{Binding Unmute}" Style="{StaticResource ToggleSwitchStyle}" />
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Border>
+                        </Grid>
+
+                        <!-- Bottom: Live Acoustic Tuning Console (Telnet :23) -->
+                        <Border Grid.Row="2" Style="{StaticResource SurfaceCard}">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,12">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="LIVE ACOUSTIC TUNING &amp; AUDYSSEY" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding AcousticsStatusText, StringFormat='  •  {0}'}"
+                                                   FontSize="11.5"
+                                                   Foreground="{StaticResource AccentCyanBrightBrush}"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Button Content="Reset Trims (0 dB)"
+                                                Command="{Binding ResetAcousticTrimsCommand}"
+                                                Style="{StaticResource SecondaryButton}"
+                                                Padding="10,5"
+                                                FontSize="11"
+                                                Margin="0,0,6,0" />
+                                        <Button Content="Sync from AVR"
+                                                Command="{Binding RefreshAcousticsCommand}"
+                                                Style="{StaticResource PrimaryButton}"
+                                                Padding="11,5"
+                                                FontSize="11" />
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.12*" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="0.88*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Left Acoustic Column: Audyssey, Restorer & Dimmer -->
+                                    <StackPanel Grid.Column="0">
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="AUDYSSEY MULTEQ" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,6" />
+                                                <ItemsControl ItemsSource="{Binding MultEqModes}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Button Content="{Binding DisplayName}"
+                                                                    Style="{StaticResource ActiveAwareChipStyle}"
+                                                                    Command="{Binding DataContext.SetMultEqCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Padding="10,5"
+                                                                    FontSize="11"
+                                                                    Margin="0,0,6,0" />
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                                <TextBlock Text="DYNAMIC EQ" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,6" />
+                                                <Button Content="{Binding DynamicEqLabel}"
+                                                        Command="{Binding ToggleDynamicEqCommand}"
+                                                        Padding="11,5"
+                                                        FontSize="11">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding DynamicEqEnabled}" Value="True">
+                                                                    <Setter Property="Background" Value="#0C2D22" />
+                                                                    <Setter Property="BorderBrush" Value="{StaticResource AccentEmeraldBrush}" />
+                                                                    <Setter Property="Foreground" Value="{StaticResource AccentEmeraldBrush}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="12" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="DYNAMIC VOLUME (NIGHT COMPRESSION)" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,6" />
+                                                <ItemsControl ItemsSource="{Binding DynamicVolumeModes}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Button Content="{Binding DisplayName}"
+                                                                    Style="{StaticResource ActiveAwareChipStyle}"
+                                                                    Command="{Binding DataContext.SetDynamicVolumeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Padding="9,5"
+                                                                    FontSize="11"
+                                                                    Margin="0,0,5,5" />
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="AUDIO RESTORER (STREAMS)" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,6" />
+                                                <ItemsControl ItemsSource="{Binding RestorerModes}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Button Content="{Binding DisplayName}"
+                                                                    Style="{StaticResource ActiveAwareChipStyle}"
+                                                                    Command="{Binding DataContext.SetRestorerCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Padding="9,5"
+                                                                    FontSize="11"
+                                                                    Margin="0,0,5,5" />
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <StackPanel>
+                                            <TextBlock Text="FRONT PANEL DISPLAY DIMMER" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,6" />
+                                            <ItemsControl ItemsSource="{Binding DimmerModes}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Content="{Binding DisplayName}"
+                                                                Style="{StaticResource ActiveAwareChipStyle}"
+                                                                Command="{Binding DataContext.SetDimmerCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                Padding="11,5"
+                                                                FontSize="11"
+                                                                Margin="0,0,6,0" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!-- Right Acoustic Column: Sub Trim, Dialog Enhancer & Bass/Treble -->
+                                    <StackPanel Grid.Column="2">
+                                        <!-- Subwoofer Level Adjust -->
+                                        <Border Background="#11151E" BorderBrush="#232A3A" BorderThickness="1" CornerRadius="10" Padding="11,8" Margin="0,0,0,8">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                    <Button Content="{Binding SubwooferTrimToggleLabel}"
+                                                            Command="{Binding ToggleSubwooferTrimCommand}"
+                                                            Style="{StaticResource HardwareChipButton}"
+                                                            HorizontalAlignment="Left"
+                                                            Padding="8,3"
+                                                            FontSize="10.5" />
+                                                    <TextBlock Text="{Binding SubwooferTrimDisplay}" Style="{StaticResource OledMonoText}" FontSize="17" FontWeight="Bold" Margin="2,3,0,0" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Button Content="-3" Command="{Binding StepSubwooferTrimCommand}" CommandParameter="-3" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="11" Margin="0,0,4,0" />
+                                                    <Button Content="-1" Command="{Binding StepSubwooferTrimCommand}" CommandParameter="-1" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="11" Margin="0,0,4,0" />
+                                                    <Button Content="+1" Command="{Binding StepSubwooferTrimCommand}" CommandParameter="1" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="11" Margin="0,0,4,0" />
+                                                    <Button Content="+3" Command="{Binding StepSubwooferTrimCommand}" CommandParameter="3" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="11" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Dialog Level Adjust -->
+                                        <Border Background="#11151E" BorderBrush="#232A3A" BorderThickness="1" CornerRadius="10" Padding="11,8" Margin="0,0,0,8">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                    <Button Content="{Binding DialogTrimToggleLabel}"
+                                                            Command="{Binding ToggleDialogTrimCommand}"
+                                                            Style="{StaticResource HardwareChipButton}"
+                                                            HorizontalAlignment="Left"
+                                                            Padding="8,3"
+                                                            FontSize="10.5" />
+                                                    <TextBlock Text="{Binding DialogTrimDisplay}" Style="{StaticResource OledMonoText}" FontSize="17" FontWeight="Bold" Margin="2,3,0,0" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Button Content="-3" Command="{Binding StepDialogTrimCommand}" CommandParameter="-3" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="11" Margin="0,0,4,0" />
+                                                    <Button Content="-1" Command="{Binding StepDialogTrimCommand}" CommandParameter="-1" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="11" Margin="0,0,4,0" />
+                                                    <Button Content="+1" Command="{Binding StepDialogTrimCommand}" CommandParameter="1" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="11" Margin="0,0,4,0" />
+                                                    <Button Content="+3" Command="{Binding StepDialogTrimCommand}" CommandParameter="3" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="11" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Tone Control (Bass & Treble) -->
+                                        <Border Background="#11151E" BorderBrush="#232A3A" BorderThickness="1" CornerRadius="10" Padding="11,8">
+                                            <StackPanel>
+                                                <DockPanel Margin="0,0,0,6">
+                                                    <Button Content="{Binding ToneControlToggleLabel}"
+                                                            Command="{Binding ToggleToneControlCommand}"
+                                                            Style="{StaticResource HardwareChipButton}"
+                                                            Padding="8,3"
+                                                            FontSize="10.5" />
+                                                    <TextBlock Text="Note: disabled when Dynamic EQ is ON"
+                                                               HorizontalAlignment="Right"
+                                                               VerticalAlignment="Center"
+                                                               FontSize="10"
+                                                               Foreground="{StaticResource TextMutedBrush}" />
+                                                </DockPanel>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="10" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <DockPanel Grid.Column="0">
+                                                        <TextBlock Text="{Binding BassDisplay, StringFormat='Bass {0}'}" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource AccentAmberBrush}" VerticalAlignment="Center" />
+                                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                            <Button Content="-1" Command="{Binding StepBassCommand}" CommandParameter="-1" Style="{StaticResource SecondaryButton}" Padding="8,4" FontSize="10.5" Margin="0,0,3,0" />
+                                                            <Button Content="+1" Command="{Binding StepBassCommand}" CommandParameter="1" Style="{StaticResource SecondaryButton}" Padding="8,4" FontSize="10.5" />
+                                                        </StackPanel>
+                                                    </DockPanel>
+                                                    <DockPanel Grid.Column="2">
+                                                        <TextBlock Text="{Binding TrebleDisplay, StringFormat='Treble {0}'}" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource AccentCyanBrightBrush}" VerticalAlignment="Center" />
+                                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                            <Button Content="-1" Command="{Binding StepTrebleCommand}" CommandParameter="-1" Style="{StaticResource SecondaryButton}" Padding="8,4" FontSize="10.5" Margin="0,0,3,0" />
+                                                            <Button Content="+1" Command="{Binding StepTrebleCommand}" CommandParameter="1" Style="{StaticResource SecondaryButton}" Padding="8,4" FontSize="10.5" />
+                                                        </StackPanel>
+                                                    </DockPanel>
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
                     </Grid>
 
                     <!-- ==================== VIEW 2: STATIONS & STREAMS ==================== -->
@@ -1320,6 +2341,35 @@
                                     </StackPanel>
                                 </Border>
 
+                                <Border Style="{StaticResource SurfaceCard}" Margin="0,0,0,18">
+                                    <StackPanel>
+                                        <TextBlock Text="YOUTUBE &amp; LOCAL AUDIO RELAY" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,12" />
+
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="10" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="LAN Relay Port" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                                <TextBox Text="{Binding SettingsRelayPort, UpdateSourceTrigger=PropertyChanged}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Cinema A/V Offset (ms)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                                <TextBox Text="{Binding SettingsCinemaSyncOffsetMs, UpdateSourceTrigger=PropertyChanged}" />
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <TextBlock Text="Custom FFmpeg Path (leave empty for auto-detect)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                        <TextBox Text="{Binding SettingsFfmpegPath, UpdateSourceTrigger=PropertyChanged}" Tag="Auto-detect ffmpeg.exe (WinGet / PATH)" Margin="0,0,0,10" />
+
+                                        <CheckBox Content="Transcode YouTube audio to 320 kbps MP3 via FFmpeg (best HEOS compatibility)"
+                                                  IsChecked="{Binding SettingsPreferFfmpegMp3}"
+                                                  Style="{StaticResource ToggleSwitchStyle}" />
+                                    </StackPanel>
+                                </Border>
+
                                 <Border Style="{StaticResource SurfaceCard}">
                                     <StackPanel>
                                         <TextBlock Text="KEYBOARD SHORTCUTS &amp; TIPS" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,12" />
@@ -1349,7 +2399,7 @@
                                             <TextBlock Grid.Row="3" Grid.Column="0" Text="F5 / Ctrl+R" Style="{StaticResource OledMonoText}" FontSize="12" VerticalAlignment="Center" />
                                             <TextBlock Grid.Row="3" Grid.Column="1" Text="Force Refresh Receiver State" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
 
-                                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl + 1..4" Style="{StaticResource OledMonoText}" FontSize="12" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl + 1..6" Style="{StaticResource OledMonoText}" FontSize="12" VerticalAlignment="Center" />
                                             <TextBlock Grid.Row="4" Grid.Column="1" Text="Switch Navigation Views" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
 
                                             <TextBlock Grid.Row="5" Grid.Column="0" Text="Tray Click" Style="{StaticResource OledMonoText}" FontSize="12" VerticalAlignment="Center" />

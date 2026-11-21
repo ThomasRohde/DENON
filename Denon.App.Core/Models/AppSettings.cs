@@ -6,14 +6,37 @@ public sealed class AppSettings
 
     public UiSettings Ui { get; set; } = new();
 
+    public MediaRelaySettings Media { get; set; } = new();
+
     public AppSettings Clone() =>
         new()
         {
             Receiver = Receiver.Clone(),
             Ui = Ui.Clone(),
+            Media = Media.Clone(),
         };
 
     public static AppSettings CreateDefault() => new();
+}
+
+public sealed class MediaRelaySettings
+{
+    public int RelayPort { get; set; } = 18925;
+
+    public string FfmpegPath { get; set; } = string.Empty;
+
+    public bool PreferFfmpegMp3Transcode { get; set; } = true;
+
+    public int CinemaSyncOffsetMs { get; set; } = 1800;
+
+    public MediaRelaySettings Clone() =>
+        new()
+        {
+            RelayPort = RelayPort,
+            FfmpegPath = FfmpegPath,
+            PreferFfmpegMp3Transcode = PreferFfmpegMp3Transcode,
+            CinemaSyncOffsetMs = CinemaSyncOffsetMs,
+        };
 }
 
 public sealed class ReceiverSettings
@@ -32,6 +55,8 @@ public sealed class ReceiverSettings
 
     public List<StationPreset> Stations { get; set; } = CreateDefaultStations();
 
+    public List<ScenePreset> Scenes { get; set; } = ScenePreset.CreateDefaultScenes();
+
     public ReceiverSettings Clone() =>
         new()
         {
@@ -42,6 +67,7 @@ public sealed class ReceiverSettings
             PollIntervalSeconds = PollIntervalSeconds,
             VolumePresets = [.. VolumePresets],
             Stations = Stations.Select(static station => station.Clone()).ToList(),
+            Scenes = Scenes.Select(static scene => scene.Clone()).ToList(),
         };
 
     public static ReceiverSettings CreateDefault() => new();

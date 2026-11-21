@@ -1,0 +1,169 @@
+namespace Denon.App.Core.Models;
+
+public sealed class ScenePreset
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..8];
+
+    public string Name { get; set; } = "Custom Scene";
+
+    public string Description { get; set; } = string.Empty;
+
+    public string Badge { get; set; } = "SCN";
+
+    public string AccentHex { get; set; } = "#00D4FF";
+
+    public bool PowerOn { get; set; } = true;
+
+    public bool Unmute { get; set; } = true;
+
+    public string? InputSource { get; set; }
+
+    public string? SoundMode { get; set; }
+
+    public int? TargetVolume { get; set; }
+
+    public bool SmoothVolumeRamp { get; set; } = true;
+
+    public string? EcoMode { get; set; }
+
+    public int? SleepTimerMinutes { get; set; }
+
+    public string? MultEq { get; set; }
+
+    public bool? DynamicEq { get; set; }
+
+    public string? DynamicVolume { get; set; }
+
+    public string? Restorer { get; set; }
+
+    public string? Dimmer { get; set; }
+
+    public int? SubwooferTrimDb { get; set; }
+
+    public int? DialogTrimDb { get; set; }
+
+    public string? StreamUrl { get; set; }
+
+    public ScenePreset Clone() =>
+        new()
+        {
+            Id = Id,
+            Name = Name,
+            Description = Description,
+            Badge = Badge,
+            AccentHex = AccentHex,
+            PowerOn = PowerOn,
+            Unmute = Unmute,
+            InputSource = InputSource,
+            SoundMode = SoundMode,
+            TargetVolume = TargetVolume,
+            SmoothVolumeRamp = SmoothVolumeRamp,
+            EcoMode = EcoMode,
+            SleepTimerMinutes = SleepTimerMinutes,
+            MultEq = MultEq,
+            DynamicEq = DynamicEq,
+            DynamicVolume = DynamicVolume,
+            Restorer = Restorer,
+            Dimmer = Dimmer,
+            SubwooferTrimDb = SubwooferTrimDb,
+            DialogTrimDb = DialogTrimDb,
+            StreamUrl = StreamUrl,
+        };
+
+    public static List<ScenePreset> CreateDefaultScenes() =>
+    [
+        new ScenePreset
+        {
+            Id = "movie-night",
+            Name = "Movie Night",
+            Description = "TV/Cinema surround, Dynamic EQ on, front display blackout, smooth ramp to -32 dB.",
+            Badge = "CINE",
+            AccentHex = "#F59E0B",
+            PowerOn = true,
+            Unmute = true,
+            InputSource = "TV",
+            SoundMode = "MOVIE",
+            TargetVolume = 48,
+            SmoothVolumeRamp = true,
+            EcoMode = "OFF",
+            DynamicEq = true,
+            DynamicVolume = "OFF",
+            Dimmer = "OFF",
+            SubwooferTrimDb = 0,
+            DialogTrimDb = 1,
+        },
+        new ScenePreset
+        {
+            Id = "late-night",
+            Name = "Late Night",
+            Description = "Heavy Dynamic Volume, -6 dB subwoofer trim, +3 dB dialog boost, dark panel & 60m sleep.",
+            Badge = "NITE",
+            AccentHex = "#A78BFA",
+            PowerOn = true,
+            Unmute = true,
+            TargetVolume = 24,
+            SmoothVolumeRamp = true,
+            EcoMode = "ON",
+            SleepTimerMinutes = 60,
+            DynamicEq = true,
+            DynamicVolume = "HEV",
+            Dimmer = "DAR",
+            SubwooferTrimDb = -6,
+            DialogTrimDb = 3,
+        },
+        new ScenePreset
+        {
+            Id = "pure-audiophile",
+            Name = "Pure Hi-Fi",
+            Description = "Uncolored Pure Direct playback on HEOS with ECO off and dimmed front panel.",
+            Badge = "HIFI",
+            AccentHex = "#00D4FF",
+            PowerOn = true,
+            Unmute = true,
+            InputSource = "NET",
+            SoundMode = "PURE DIRECT",
+            EcoMode = "OFF",
+            DynamicEq = false,
+            DynamicVolume = "OFF",
+            Dimmer = "DIM",
+        },
+        new ScenePreset
+        {
+            Id = "morning-coffee",
+            Name = "Morning Jazz",
+            Description = "Gentle volume ramp to 26, Stereo + Restorer Medium, and launches DR P8 Jazz.",
+            Badge = "JAZZ",
+            AccentHex = "#10B981",
+            PowerOn = true,
+            Unmute = true,
+            InputSource = "NET",
+            SoundMode = "STEREO",
+            TargetVolume = 26,
+            SmoothVolumeRamp = true,
+            EcoMode = "AUTO",
+            DynamicVolume = "LIT",
+            Restorer = "MED",
+            Dimmer = "BRI",
+            StreamUrl = "http://live-icy.dr.dk/A/A22L.mp3",
+        },
+        new ScenePreset
+        {
+            Id = "party-room",
+            Name = "Party Multi-Ch",
+            Description = "All-channel stereo, +3 dB bass punch, Dynamic EQ on, full panel brightness.",
+            Badge = "PRTY",
+            AccentHex = "#EC4899",
+            PowerOn = true,
+            Unmute = true,
+            SoundMode = "MCH STEREO",
+            TargetVolume = 54,
+            SmoothVolumeRamp = true,
+            EcoMode = "OFF",
+            DynamicEq = true,
+            DynamicVolume = "OFF",
+            Restorer = "MED",
+            Dimmer = "BRI",
+            SubwooferTrimDb = 3,
+        },
+    ];
+}

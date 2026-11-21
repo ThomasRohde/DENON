@@ -110,6 +110,244 @@ public sealed class DenonAvrClient : IDisposable
         return SendCommandAsync(settings, $"SLP{clamped:000}", cancellationToken);
     }
 
+    public async Task<AcousticStatus> GetAcousticStatusAsync(ReceiverSettings settings, CancellationToken cancellationToken)
+    {
+        var multEqRaw = await TryQueryAsync(settings, "PSMULTEQ: ?", "PSMULTEQ:", cancellationToken);
+        var dynEqRaw = await TryQueryAsync(settings, "PSDYNEQ ?", "PSDYNEQ", cancellationToken);
+        var dynVolRaw = await TryQueryAsync(settings, "PSDYNVOL ?", "PSDYNVOL", cancellationToken);
+        var restorerRaw = await TryQueryAsync(settings, "PSRSTR ?", "PSRSTR", cancellationToken);
+        var dimmerRaw = await TryQueryAsync(settings, "DIM ?", "DIM", cancellationToken);
+
+        var swLines = await TryQueryAllMatchingAsync(settings, "PSSWL ?", "PSSWL", cancellationToken);
+        var dilLines = await TryQueryAllMatchingAsync(settings, "PSDIL ?", "PSDIL", cancellationToken);
+        var toneRaw = await TryQueryAsync(settings, "PSTONE CTRL ?", "PSTONE CTRL", cancellationToken);
+        var bassRaw = await TryQueryAsync(settings, "PSBAS ?", "PSBAS", cancellationToken);
+        var trebleRaw = await TryQueryAsync(settings, "PSTRE ?", "PSTRE", cancellationToken);
+
+        var (swEnabled, swDb) = ParseLevelAdjustLines(swLines, "PSSWL", -12, 12);
+        var (dilEnabled, dilDb) = ParseLevelAdjustLines(dilLines, "PSDIL", -12, 12);
+        var bassDb = ParseDenonOffsetDb(ParsePrefixValue(bassRaw, "PSBAS"), -6, 6);
+        var trebleDb = ParseDenonOffsetDb(ParsePrefixValue(trebleRaw, "PSTRE"), -6, 6);
+
+        return new AcousticStatus(
+            MultEq: ParsePrefixValue(multEqRaw, "PSMULTEQ:").ToUpperInvariant(),
+            DynamicEq: ParseOnOff(ParsePrefixValue(dynEqRaw, "PSDYNEQ")),
+            DynamicVolume: ParsePrefixValue(dynVolRaw, "PSDYNVOL").ToUpperInvariant(),
+            Restorer: ParsePrefixValue(restorerRaw, "PSRSTR").ToUpperInvariant(),
+            Dimmer: NormalizeDimmerCode(ParsePrefixValue(dimmerRaw, "DIM")),
+            SubwooferAdjustEnabled: swEnabled,
+            SubwooferTrimDb: swDb,
+            DialogAdjustEnabled: dilEnabled,
+            DialogTrimDb: dilDb,
+            ToneControlEnabled: ParseOnOff(ParsePrefixValue(toneRaw, "PSTONE CTRL")),
+            BassDb: bassDb,
+            TrebleDb: trebleDb,
+            RetrievedAt: DateTimeOffset.UtcNow);
+    }
+
+    public Task SetMultEqAsync(ReceiverSettings settings, string mode, CancellationToken cancellationToken)
+    {
+        var normalized = mode.Trim().ToUpperInvariant();
+        if (normalized is not ("AUDYSSEY" or "BYP.LR" or "FLAT" or "OFF"))
+        {
+            throw new ArgumentException("MultEQ mode must be AUDYSSEY, BYP.LR, FLAT, or OFF.", nameof(mode));
+        }
+
+        return SendCommandAsync(settings, $"PSMULTEQ:{normalized}", cancellationToken);
+    }
+
+    public Task SetDynamicEqAsync(ReceiverSettings settings, bool enabled, CancellationToken cancellationToken) =>
+        SendCommandAsync(settings, enabled ? "PSDYNEQ ON" : "PSDYNEQ OFF", cancellationToken);
+
+    public Task SetDynamicVolumeAsync(ReceiverSettings settings, string mode, CancellationToken cancellationToken)
+    {
+        var normalized = mode.Trim().ToUpperInvariant();
+        if (normalized is not ("OFF" or "LIT" or "MED" or "HEV"))
+        {
+            throw new ArgumentException("Dynamic Volume must be OFF, LIT, MED, or HEV.", nameof(mode));
+        }
+
+        return SendCommandAsync(settings, $"PSDYNVOL {normalized}", cancellationToken);
+    }
+
+    public Task SetRestorerAsync(ReceiverSettings settings, string mode, CancellationToken cancellationToken)
+    {
+        var normalized = mode.Trim().ToUpperInvariant();
+        if (normalized is not ("OFF" or "LOW" or "MED" or "HI"))
+        {
+            throw new ArgumentException("Restorer must be OFF, LOW, MED, or HI.", nameof(mode));
+        }
+
+        return SendCommandAsync(settings, $"PSRSTR {normalized}", cancellationToken);
+    }
+
+    public Task SetDimmerAsync(ReceiverSettings settings, string mode, CancellationToken cancellationToken)
+    {
+        var normalized = NormalizeDimmerCode(mode);
+        if (normalized is not ("BRI" or "DIM" or "DAR" or "OFF"))
+        {
+            throw new ArgumentException("Dimmer mode must be BRI, DIM, DAR, or OFF.", nameof(mode));
+        }
+
+        return SendCommandAsync(settings, $"DIM {normalized}", cancellationToken);
+    }
+
+    public async Task SetSubwooferLevelAsync(ReceiverSettings settings, bool enabled, int? trimDb, CancellationToken cancellationToken)
+    {
+        await SendCommandAsync(settings, enabled ? "PSSWL ON" : "PSSWL OFF", cancellationToken);
+        if (enabled && trimDb is int db)
+        {
+            var encoded = Math.Clamp(50 + Math.Clamp(db, -12, 12), 38, 62);
+            await SendCommandAsync(settings, $"PSSWL {encoded:00}", cancellationToken);
+        }
+    }
+
+    public async Task SetDialogLevelAsync(ReceiverSettings settings, bool enabled, int? trimDb, CancellationToken cancellationToken)
+    {
+        await SendCommandAsync(settings, enabled ? "PSDIL ON" : "PSDIL OFF", cancellationToken);
+        if (enabled && trimDb is int db)
+        {
+            var encoded = Math.Clamp(50 + Math.Clamp(db, -12, 12), 38, 62);
+            await SendCommandAsync(settings, $"PSDIL {encoded:00}", cancellationToken);
+        }
+    }
+
+    public async Task SetToneControlAsync(ReceiverSettings settings, bool enabled, int? bassDb, int? trebleDb, CancellationToken cancellationToken)
+    {
+        await SendCommandAsync(settings, enabled ? "PSTONE CTRL ON" : "PSTONE CTRL OFF", cancellationToken);
+        if (enabled && bassDb is int bass)
+        {
+            var encoded = Math.Clamp(50 + Math.Clamp(bass, -6, 6), 44, 56);
+            await SendCommandAsync(settings, $"PSBAS {encoded:00}", cancellationToken);
+        }
+
+        if (enabled && trebleDb is int treble)
+        {
+            var encoded = Math.Clamp(50 + Math.Clamp(treble, -6, 6), 44, 56);
+            await SendCommandAsync(settings, $"PSTRE {encoded:00}", cancellationToken);
+        }
+    }
+
+    public async Task RampVolumeAsync(ReceiverSettings settings, int currentVolume, int targetVolume, CancellationToken cancellationToken)
+    {
+        targetVolume = Math.Clamp(targetVolume, 0, 98);
+        currentVolume = Math.Clamp(currentVolume, 0, 98);
+        var distance = Math.Abs(targetVolume - currentVolume);
+
+        if (distance <= 3)
+        {
+            await SetVolumeAsync(settings, targetVolume, cancellationToken);
+            return;
+        }
+
+        var stepCount = Math.Clamp(distance / 3, 3, 12);
+        for (var i = 1; i <= stepCount; i++)
+        {
+            var next = i == stepCount
+                ? targetVolume
+                : (int)Math.Round(currentVolume + ((targetVolume - currentVolume) * (i / (double)stepCount)));
+            await SetVolumeAsync(settings, next, cancellationToken);
+            if (i < stepCount)
+            {
+                await Task.Delay(130, cancellationToken);
+            }
+        }
+    }
+
+    public static int ParseDenonOffsetDb(string? token, int minDb, int maxDb)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return 0;
+        }
+
+        var trimmed = token.Trim();
+        if (trimmed.Length == 3 && trimmed.All(char.IsDigit) && int.TryParse(trimmed[..2], out var whole))
+        {
+            return Math.Clamp(whole - 50, minDb, maxDb);
+        }
+
+        if (int.TryParse(trimmed, out var value))
+        {
+            return Math.Clamp(value - 50, minDb, maxDb);
+        }
+
+        return 0;
+    }
+
+    private static (bool? Enabled, int Db) ParseLevelAdjustLines(IReadOnlyList<string> lines, string prefix, int minDb, int maxDb)
+    {
+        bool? enabled = null;
+        var db = 0;
+
+        foreach (var line in lines)
+        {
+            var value = ParsePrefixValue(line, prefix).Trim().ToUpperInvariant();
+            if (value == "ON")
+            {
+                enabled = true;
+            }
+            else if (value == "OFF")
+            {
+                enabled = false;
+            }
+            else if (!string.IsNullOrWhiteSpace(value) && value.All(char.IsDigit))
+            {
+                db = ParseDenonOffsetDb(value, minDb, maxDb);
+            }
+        }
+
+        return (enabled, db);
+    }
+
+    private static bool? ParseOnOff(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var upper = value.Trim().ToUpperInvariant();
+        return upper switch
+        {
+            "ON" => true,
+            "OFF" => false,
+            _ => null,
+        };
+    }
+
+    private static string NormalizeDimmerCode(string? value)
+    {
+        var upper = (value ?? string.Empty).Trim().ToUpperInvariant();
+        return upper switch
+        {
+            "BRIGHT" or "BRI" => "BRI",
+            "DIM" => "DIM",
+            "DARK" or "DAR" => "DAR",
+            "OFF" => "OFF",
+            _ => upper,
+        };
+    }
+
+    private async Task<List<string>> TryQueryAllMatchingAsync(
+        ReceiverSettings settings,
+        string command,
+        string expectedPrefix,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var lines = await ExchangeLinesAsync(settings.Host, command, TimeSpan.FromMilliseconds(550), cancellationToken);
+            return lines
+                .Where(line => line.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
     public async Task EnsureMainZoneNetAsync(ReceiverSettings settings, CancellationToken cancellationToken)
     {
         var power = await TryQueryAsync(settings, "PW?", "PW", cancellationToken);

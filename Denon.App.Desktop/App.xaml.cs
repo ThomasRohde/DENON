@@ -60,6 +60,10 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<StreamProbeService>();
             builder.Services.AddSingleton<WindowsStartupService>();
             builder.Services.AddSingleton<ReceiverController>();
+            builder.Services.AddSingleton<YouTubeMediaService>();
+            builder.Services.AddSingleton<LocalAudioRelayServer>();
+            builder.Services.AddSingleton<YouTubeQueueService>();
+            builder.Services.AddSingleton<YouTubeCinemaWindow>();
             builder.Services.AddHostedService<ReceiverPollingService>();
             builder.Services.AddSingleton<MainViewModel>();
             builder.Services.AddSingleton<MainWindow>();
@@ -213,6 +217,14 @@ public partial class App : System.Windows.Application
 
             if (_host is not null)
             {
+                try
+                {
+                    _host.Services.GetService<YouTubeCinemaWindow>()?.HideAndStopVideo();
+                }
+                catch
+                {
+                }
+
                 _host.Services.GetRequiredService<AppLogStore>().Info("Application shutting down.");
                 await _host.StopAsync(TimeSpan.FromSeconds(5));
                 _host.Dispose();

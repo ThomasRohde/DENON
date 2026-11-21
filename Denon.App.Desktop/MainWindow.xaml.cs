@@ -88,6 +88,15 @@ public partial class MainWindow : Window
         }
     }
 
+    private void YouTubeSearchInput_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && _viewModel.SearchYouTubeCommand.CanExecute(null))
+        {
+            _viewModel.SearchYouTubeCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         var isTyping = Keyboard.FocusedElement is TextBox or PasswordBox;
@@ -113,14 +122,22 @@ public partial class MainWindow : Window
                     e.Handled = true;
                     return;
                 case Key.D2:
-                    _viewModel.ActiveSection = "Stations";
+                    _viewModel.ActiveSection = "YouTube";
                     e.Handled = true;
                     return;
                 case Key.D3:
-                    _viewModel.ActiveSection = "Settings";
+                    _viewModel.ActiveSection = "Acoustics";
                     e.Handled = true;
                     return;
                 case Key.D4:
+                    _viewModel.ActiveSection = "Stations";
+                    e.Handled = true;
+                    return;
+                case Key.D5:
+                    _viewModel.ActiveSection = "Settings";
+                    e.Handled = true;
+                    return;
+                case Key.D6:
                     _viewModel.ActiveSection = "Diagnostics";
                     e.Handled = true;
                     return;

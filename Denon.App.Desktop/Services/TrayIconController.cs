@@ -169,6 +169,18 @@ public sealed class TrayIconController : IDisposable
         _muteItem = CreateItem("Mute", onClick: () => ExecuteTrayActionAsync("Toggle mute", token => _receiverController.ToggleMuteAsync(token)));
         var lowVolumeItem = CreateItem("Safety Low Volume", onClick: () => ExecuteTrayActionAsync("Low volume", token => _receiverController.SetLowVolumeAsync(token)));
 
+        var scenesMenu = CreateItem("Activate Scene");
+        ConfigureSubMenu(scenesMenu);
+        foreach (var scene in _settingsStore.Current.Receiver.Scenes)
+        {
+            var capturedScene = scene.Clone();
+            scenesMenu.DropDownItems.Add(
+                CreateItem($"[{capturedScene.Badge}] {capturedScene.Name}", onClick: () =>
+                    ExecuteTrayActionAsync(
+                        $"Scene {capturedScene.Name}",
+                        token => _receiverController.ApplySceneAsync(capturedScene, token))));
+        }
+
         var stationMenu = CreateItem("Play Station");
         ConfigureSubMenu(stationMenu);
         foreach (var station in _settingsStore.Current.Receiver.Stations)
@@ -191,6 +203,7 @@ public sealed class TrayIconController : IDisposable
             refreshItem,
             _powerItem,
             inputsMenu,
+            scenesMenu,
             new Forms.ToolStripSeparator(),
             playItem,
             pauseItem,
