@@ -36,6 +36,7 @@ public sealed class LiveAudioAnalyzerService : BackgroundService
     private long _lastAudioTickMs;
 
     private readonly object _frameLock = new();
+    private readonly double[] _spectrum31 = new double[31];
     private PluginAudioFrame _latestFrame;
     private volatile bool _vuCaptureRequested;
 
@@ -64,6 +65,26 @@ public sealed class LiveAudioAnalyzerService : BackgroundService
             }
 
             return _latestFrame;
+        }
+    }
+
+    public bool CopySpectrumBands(double[] destination)
+    {
+        if (destination.Length < 31)
+        {
+            return false;
+        }
+
+        lock (_frameLock)
+        {
+            if (!_latestFrame.IsLiveSignal || (Environment.TickCount64 - _latestFrame.TimestampMs) > 400)
+            {
+                Array.Clear(destination, 0, 31);
+                return false;
+            }
+
+            Array.Copy(_spectrum31, destination, 31);
+            return true;
         }
     }
 
@@ -244,6 +265,39 @@ public sealed class LiveAudioAnalyzerService : BackgroundService
         var bass = Math.Clamp(Math.Pow(bassRaw * 3.4, 0.72), 0.0, 1.0);
         var mid = Math.Clamp(Math.Pow(midRaw * 5.2, 0.75), 0.0, 1.0);
         var treble = Math.Clamp(Math.Pow(trebleRaw * 9.0, 0.78), 0.0, 1.0);
+
+        // Compute 31 logarithmically spaced ISO frequency bands (25 Hz -> 16 kHz)
+        Span<double> bands31 = stackalloc double[31];
+        const double minFreq = 25.0;
+        const double maxFreq = 16000.0;
+        var ratio = Math.Pow(maxFreq / minFreq, 1.0 / 31.0);
+
+        for (var b = 0; b < 31; b++)
+        {
+            var fLow = minFreq * Math.Pow(ratio, b);
+            var fHigh = fLow * ratio;
+            var binLow = Math.Clamp((int)Math.Floor(fLow / hzPerBin), 1, halfBins - 1);
+            var binHigh = Math.Clamp((int)Math.Ceiling(fHigh / hzPerBin), binLow, halfBins - 1);
+
+            double peak = 0;
+            for (var bin = binLow; bin <= binHigh; bin++)
+            {
+                var mag = Math.Sqrt((_fftReal[bin] * _fftReal[bin]) + (_fftImag[bin] * _fftImag[bin])) / (FftSize * 0.25);
+                if (mag > peak) peak = mag;
+            }
+
+            // Gentle pink-noise tilt (+boost in mids/highs) so flat music looks balanced across all 31 bars
+            var tilt = 2.8 + (b * 0.34);
+            bands31[b] = Math.Clamp(Math.Pow(peak * tilt, 0.70), 0.0, 1.0);
+        }
+
+        lock (_frameLock)
+        {
+            for (var b = 0; b < 31; b++)
+            {
+                _spectrum31[b] = bands31[b];
+            }
+        }
 
         // Adaptive spectral onset beat detection on bass + low-mid energy
         var onsetSignal = (bass * 0.78) + (mid * 0.22);

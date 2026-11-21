@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Denon.App.Core.Models;
+using Denon.App.Core.Plugins;
 
 namespace Denon.App.Core.Services;
 
@@ -21,6 +22,7 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
     private readonly YouTubeMediaService _youtubeService;
     private readonly YouTubeQueueService _youtubeQueueService;
     private readonly LocalMediaJukeboxService _localJukeboxService;
+    private readonly PluginHostService _pluginHost;
     private readonly AppLogStore _logStore;
 
     public RemoteWebApiHandler(
@@ -30,6 +32,7 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
         YouTubeMediaService youtubeService,
         YouTubeQueueService youtubeQueueService,
         LocalMediaJukeboxService localJukeboxService,
+        PluginHostService pluginHost,
         AppLogStore logStore)
     {
         _receiverController = receiverController;
@@ -38,6 +41,7 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
         _youtubeService = youtubeService;
         _youtubeQueueService = youtubeQueueService;
         _localJukeboxService = localJukeboxService;
+        _pluginHost = pluginHost;
         _logStore = logStore;
     }
 
@@ -204,6 +208,45 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
                     _logStore.Info($"Phone Remote queued YouTube track: {queueTrack.Title}");
                     return JsonOk(new { message = $"Queued {queueTrack.Title}" });
 
+                case "/api/plugins/action":
+                    var pluginId = root.TryGetProperty("pluginId", out var pidEl) ? pidEl.GetString() : null;
+                    var pluginActionId = root.TryGetProperty("actionId", out var aidEl) ? aidEl.GetString() : null;
+                    if (string.IsNullOrWhiteSpace(pluginId) || string.IsNullOrWhiteSpace(pluginActionId))
+                    {
+                        return JsonError(400, "Missing 'pluginId' or 'actionId'.");
+                    }
+
+                    Dictionary<string, string>? actionParams = null;
+                    if (root.TryGetProperty("parameters", out var paramsEl) && paramsEl.ValueKind == JsonValueKind.Object)
+                    {
+                        actionParams = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var prop in paramsEl.EnumerateObject())
+                        {
+                            actionParams[prop.Name] = prop.Value.ToString();
+                        }
+                    }
+
+                    var actionResult = await _pluginHost.ExecuteActionAsync(pluginId, pluginActionId, actionParams, cancellationToken);
+                    if (!actionResult.Success)
+                    {
+                        return JsonError(400, actionResult.Message);
+                    }
+
+                    return JsonOk(new { message = actionResult.Message });
+
+                case "/api/plugins/toggle":
+                    var togglePluginId = root.TryGetProperty("pluginId", out var tpidEl) ? tpidEl.GetString() : null;
+                    var enabledVal = root.TryGetProperty("enabled", out var enEl) && enEl.ValueKind is JsonValueKind.True or JsonValueKind.False
+                        ? enEl.GetBoolean()
+                        : (bool?)null;
+                    if (string.IsNullOrWhiteSpace(togglePluginId) || !enabledVal.HasValue)
+                    {
+                        return JsonError(400, "Missing 'pluginId' or 'enabled'.");
+                    }
+
+                    await _pluginHost.SetPluginEnabledAsync(togglePluginId, enabledVal.Value, cancellationToken);
+                    return JsonOk(new { message = enabledVal.Value ? $"Enabled {togglePluginId}" : $"Disabled {togglePluginId}" });
+
                 default:
                     return JsonError(404, "Endpoint not found.");
             }
@@ -299,6 +342,23 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
                 author = t.Author,
                 durationDisplay = t.DurationDisplay,
                 isCurrent = ytSnap.IsActive && idx == ytSnap.CurrentIndex,
+            }),
+            plugins = _pluginHost.GetPlugins().Select(static p => new
+            {
+                id = p.Id,
+                name = p.Name,
+                category = p.Category,
+                accentHex = p.AccentHex,
+                iconGlyph = p.IconGlyph,
+                isEnabled = p.IsEnabled,
+                health = p.Health.ToString(),
+                statusText = p.StatusText,
+                actions = p.Actions.Select(static a => new
+                {
+                    actionId = a.ActionId,
+                    displayName = a.DisplayName,
+                    category = a.Category,
+                }),
             }),
         };
     }

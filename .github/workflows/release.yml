@@ -49,10 +49,43 @@ jobs:
             release-out/Denon.App.Desktop-win-x64.exe
             release-out/SHA256SUMS.txt
 
+      - name: Extract Release Notes from CHANGELOG.md
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart('v')
+          $changelog = Get-Content -Path .\CHANGELOG.md -Raw
+          $pattern = "(?ms)^##\s+\[$([regex]::Escape($version))\][^\r\n]*\r?\n(.*?)(?=^##\s+\[|^\[[^\]]+\]:|\z)"
+          $match = [regex]::Match($changelog, $pattern)
+          if ($match.Success) {
+            $sectionBody = $match.Groups[1].Value.Trim()
+          } else {
+            $sectionBody = "Release $tag of Denon Desktop."
+          }
+
+          $sha = (Get-Content .\release-out\SHA256SUMS.txt -Raw).Trim()
+          $fence = '```'
+          $lines = @(
+            $sectionBody,
+            '',
+            '---',
+            '',
+            '### Download & Verification',
+            '- **Windows x64 Single-File Executable (no .NET runtime required):** `Denon.App.Desktop-win-x64.exe`',
+            '- **SHA-256:**',
+            "${fence}text",
+            $sha,
+            $fence
+          )
+          ($lines -join "`n") | Set-Content -Path .\release-out\RELEASE_NOTES.md -Encoding utf8
+
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          name: Denon Desktop ${{ github.ref_name }}
+          body_path: release-out/RELEASE_NOTES.md
           generate_release_notes: true
           files: |
             release-out/Denon.App.Desktop-win-x64.exe

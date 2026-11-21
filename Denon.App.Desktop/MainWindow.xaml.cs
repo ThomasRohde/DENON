@@ -23,6 +23,7 @@ public partial class MainWindow : Window
 
     private readonly MainViewModel _viewModel;
     private readonly Stopwatch _vuStopwatch = Stopwatch.StartNew();
+    private readonly double[] _spectrumBandsBuffer = new double[31];
     private double _lastVuFrameSeconds;
 
     public MainWindow(MainViewModel viewModel)
@@ -39,7 +40,7 @@ public partial class MainWindow : Window
 
     private void OnCompositionRendering(object? sender, EventArgs e)
     {
-        if (!IsVisible || WindowState == WindowState.Minimized || !_viewModel.ShowVuMeters || _viewModel.ActiveSection != "Control")
+        if (!IsVisible || WindowState == WindowState.Minimized || !_viewModel.IsAnyAudioMeterVisible || _viewModel.ActiveSection != "Control")
         {
             _lastVuFrameSeconds = _vuStopwatch.Elapsed.TotalSeconds;
             return;
@@ -49,8 +50,17 @@ public partial class MainWindow : Window
         var dt = now - _lastVuFrameSeconds;
         _lastVuFrameSeconds = now;
 
-        var (left, right, isLive) = _viewModel.StepVuMeterFrame(dt);
-        HeroVuMeter.SetLevelsImmediate(left, right, isLive);
+        if (_viewModel.ShowAnalogVu)
+        {
+            var (left, right, isLive) = _viewModel.StepVuMeterFrame(dt);
+            HeroVuMeter.SetLevelsImmediate(left, right, isLive);
+        }
+
+        if (_viewModel.ShowRtaSpectrum)
+        {
+            var (isLiveRta, isSimRta) = _viewModel.StepSpectrumFrame(_spectrumBandsBuffer, dt);
+            HeroSpectrumAnalyzer.SetBandsImmediate(_spectrumBandsBuffer, dt, isLiveRta, isSimRta);
+        }
     }
 
     private void ApplyDwmStyling()

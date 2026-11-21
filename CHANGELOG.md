@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-21
+
+### Added
+- **Couch Phone Remote 2.0 — Lights & Plugins on Your Phone**:
+  - Added a dedicated **Lights** tab to the QR-code mobile web UI (`:18925`) backed by new `/api/plugins/action` and `/api/plugins/toggle` REST endpoints so anyone on Wi-Fi can control Philips Hue lights, toggle Music Sync, switch Smart TV inputs, or trigger Home Assistant actions right from their phone.
+- **True 50 Hz Philips Hue Entertainment API v2 DTLS/UDP Engine**:
+  - Built `HueEntertainmentStreamClient` using `BouncyCastle.Cryptography` DTLS 1.2 PSK (`TLS_PSK_WITH_AES_128_GCM_SHA256`) over UDP port `2100` (`HueStream v2.0` binary RGB frames) — automatically activates 50 Hz zero-lag streaming on detected Hue Entertainment Areas when Music Sync starts, with seamless fallback to LAN REST & Demo Mode.
+- **31-Band Live OLED FFT Spectrum Analyzer (RTA) & Synced Live Lyrics (`LRCLIB`)**:
+  - Extended `LiveAudioAnalyzerService` with 31 logarithmically spaced ISO frequency bands (`25 Hz–16 kHz`) rendered at 60–144 Hz VSync in `SpectrumAnalyzerControl` with peak-hold caps and a one-click **VU Meter → RTA 31 → VU + RTA** switcher on the Hero OLED deck.
+  - Added zero-API-key `LyricsService` (`lrclib.net`) with live LRC timestamp synchronization displayed in a toggleable OLED Lyrics bar right on the Hero Now Playing card.
+- **Two New Official Decoupled Plugins**:
+  - **`Denon.Plugin.SmartTv` (LG webOS + Wake-on-LAN)**: SSAP WebSocket (`:3000`) pairing & control for Power On/Off, HDMI 1/2/3 switching, YouTube/Plex launch, TV mute, on-screen toast alerts on Smart Scenes, and Demo Simulator mode.
+  - **`Denon.Plugin.HomeAssistant` (Home Assistant REST & Webhook Bridge)**: Trigger HA scenes, scripts, blinds, and smart plugs from Denon Desktop or Phone Remote, and automatically push live `sensor.denon_desktop_receiver` telemetry & webhooks to Home Assistant.
+- **1-Click Acoustic Lip-Sync Auto-Calibration (PC Mic Chirp)**:
+  - Generates a precision 1,750 Hz 3-burst chirp WAV served via `/calibrate/{token}.wav`, listens on your PC microphone with a narrowband Goertzel detector (`AcousticSyncCalibrationService`), measures the exact HEOS buffer + speaker arrival latency in milliseconds, and automatically saves it to `CinemaSyncOffsetMs`.
+- **Designer R2C5 Icon Pack & Dynamic Live System Tray Icons**:
+  - Replaced the application, taskbar, title-bar, and executable icons with the custom-designed **R2C5 Headphones + Cyan Waveform** multi-resolution icon pack (`denon_icon.ico`, `denon_icon.png`, plus 12 themed variants & editable SVGs).
+  - Upgraded `TrayIconController` to dynamically switch the Windows system tray icon in real time between **Active Playback** (`active.ico`), **Muted** (`muted.ico`), **Standby/Offline** (`power.ico`), and **Connected Idle** (`denon_tray.ico`).
+- **Full Release Notes on GitHub Releases Pages**:
+  - Upgraded `.github/workflows/release.yml` to extract each tag's full Markdown notes from `CHANGELOG.md` and publish them directly in the GitHub Release body along with inline SHA-256 verification.
+
 ## [1.2.0] - 2026-11-21
 
 ### Added
@@ -73,7 +94,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Zero-Lag Real-Time HEOS Push Events (`LIVE PUSH`) & Analog VU Meters**: Dedicated `register_for_change_events` push listener for `<50 ms` knob/remote sync and toggleable dual-channel illuminated VU dials.
 - **Automated GitHub Releases Workflow**: `.github/workflows/release.yml` builds self-contained single-file `win-x64` executables and SHA-256 checksums on version tags.
 
-[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/ThomasRohde/DENON/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/ThomasRohde/DENON/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/ThomasRohde/DENON/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/ThomasRohde/DENON/compare/v1.0.0...v1.1.0

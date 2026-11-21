@@ -1,0 +1,489 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Runtime.CompilerServices;
+using System.Text;
+using System.Text.Json;
+using System.Windows;
+using System.Windows.Input;
+using Denon.App.PluginSdk;
+
+namespace Denon.Plugin.HomeAssistant;
+
+public sealed class HomeAssistantConfig
+{
+    public string BaseUrl { get; set; } = "http://homeassistant.local:8123";
+
+    public string AccessToken { get; set; } = string.Empty;
+
+    public string WebhookId { get; set; } = string.Empty;
+
+    public bool DemoMode { get; set; }
+
+    public bool PushReceiverEventsToHa { get; set; } = true;
+}
+
+public sealed record HaEntityItem(string EntityId, string FriendlyName, string Domain, string State);
+
+public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
+{
+    private IPluginContext? _context;
+    private HttpClient? _http;
+    private HomeAssistantConfig _config = new();
+    private HomeAssistantViewModel? _viewModel;
+    private bool _isStarted;
+
+    public PluginManifest Manifest { get; } = new(
+        Id: "home-assistant",
+        Name: "Home Assistant Bridge",
+        Version: "1.3.0",
+        Author: "Denon Desktop",
+        Description: "Connect Denon Desktop to your Home Assistant server over REST & Webhooks: trigger HA scenes/scripts/switches and push real-time Denon AVR telemetry sensors.",
+        Category: "Smart Home Hub",
+        AccentHex: "#10B981",
+        IconGlyph: "HA",
+        Capabilities: PluginCapabilities.DashboardUi
+                      | PluginCapabilities.ReceiverEvents
+                      | PluginCapabilities.SceneAutomation
+                      | PluginCapabilities.Actions
+                      | PluginCapabilities.LocalNetwork);
+
+    internal HomeAssistantConfig Config => _config;
+
+    public async Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default)
+    {
+        _context = context;
+        _http = context.CreateHttpClient(allowLocalSelfSignedTls: true, timeout: TimeSpan.FromSeconds(6));
+        _config = await context.Storage.LoadConfigAsync(static () => new HomeAssistantConfig(), cancellationToken);
+        _viewModel = new HomeAssistantViewModel(this);
+        _viewModel.SyncFromConfig(_config);
+    }
+
+    public async Task StartAsync(CancellationToken cancellationToken = default)
+    {
+        _isStarted = true;
+        if (_config.DemoMode || IsConfigured)
+        {
+            try
+            {
+                await FetchEntitiesAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _context?.ReportStatus($"HA unreachable: {ex.Message}", PluginHealthState.Warning);
+            }
+        }
+        else
+        {
+            _context?.ReportStatus("Enter Home Assistant URL & Long-Lived Token (or Demo Mode)", PluginHealthState.Idle);
+        }
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken = default)
+    {
+        _isStarted = false;
+        _context?.ReportStatus("Stopped", PluginHealthState.Disabled);
+        return Task.CompletedTask;
+    }
+
+    public object? CreateDashboardView()
+    {
+        _viewModel ??= new HomeAssistantViewModel(this);
+        _viewModel.SyncFromConfig(_config);
+        return new HomeAssistantDashboardView { DataContext = _viewModel };
+    }
+
+    public IReadOnlyList<PluginActionDescriptor> GetActions() =>
+    [
+        new("ha.sync_sensor", "Push Denon Status to HA", "Update sensor.denon_desktop_receiver in Home Assistant right now.", "Telemetry"),
+        new("ha.fire_webhook", "Fire Configured Webhook", "Send a JSON event payload to your configured Home Assistant webhook.", "Webhook"),
+        new("ha.refresh", "Refresh HA Entities", "Reload scenes, scripts, and switches from Home Assistant.", "System"),
+    ];
+
+    public async Task<PluginActionResult> ExecuteActionAsync(
+        string actionId,
+        IReadOnlyDictionary<string, string>? parameters = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_isStarted)
+        {
+            return PluginActionResult.Fail("Home Assistant plugin is disabled.");
+        }
+
+        if (!_config.DemoMode && !IsConfigured)
+        {
+            return PluginActionResult.Fail("Configure Home Assistant URL & Long-Lived Access Token (or enable Demo Mode).");
+        }
+
+        try
+        {
+            switch (actionId.ToLowerInvariant())
+            {
+                case "ha.sync_sensor":
+                    await PushSensorStateAsync(_context?.Receiver.CurrentSnapshot ?? PluginReceiverSnapshot.Empty, null, cancellationToken);
+                    return PluginActionResult.Ok("Pushed live Denon AVR telemetry to Home Assistant.");
+
+                case "ha.fire_webhook":
+                    await TriggerWebhookAsync("manual_trigger", null, cancellationToken);
+                    return PluginActionResult.Ok("Fired Home Assistant webhook.");
+
+                case "ha.refresh":
+                    var entities = await FetchEntitiesAsync(cancellationToken);
+                    return PluginActionResult.Ok($"Loaded {entities.Count} Home Assistant scenes/scripts/switches.");
+
+                case "ha.trigger_entity":
+                    var entityId = parameters is not null && parameters.TryGetValue("entityId", out var eid) ? eid : null;
+                    if (string.IsNullOrWhiteSpace(entityId))
+                    {
+                        return PluginActionResult.Fail("Missing 'entityId' parameter.");
+                    }
+
+                    await TriggerEntityAsync(entityId, cancellationToken);
+                    return PluginActionResult.Ok($"Triggered Home Assistant entity '{entityId}'.");
+
+                default:
+                    return PluginActionResult.Fail($"Unknown Home Assistant action '{actionId}'.");
+            }
+        }
+        catch (Exception ex)
+        {
+            return PluginActionResult.Fail(ex.Message);
+        }
+    }
+
+    public async Task OnReceiverEventAsync(PluginReceiverEvent receiverEvent, CancellationToken cancellationToken = default)
+    {
+        if (!_isStarted || !_config.PushReceiverEventsToHa || (!_config.DemoMode && !IsConfigured))
+        {
+            return;
+        }
+
+        try
+        {
+            await PushSensorStateAsync(receiverEvent.Snapshot, receiverEvent.SceneName, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(_config.WebhookId))
+            {
+                await TriggerWebhookAsync(receiverEvent.EventType.ToString(), receiverEvent.SceneName, cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            _context?.Logger.Warning($"Home Assistant push warning: {ex.Message}");
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _http?.Dispose();
+        _http = null;
+        return ValueTask.CompletedTask;
+    }
+
+    internal async Task<IReadOnlyList<HaEntityItem>> FetchEntitiesAsync(CancellationToken ct = default)
+    {
+        if (_config.DemoMode)
+        {
+            IReadOnlyList<HaEntityItem> demo =
+            [
+                new("scene.movie_time", "Movie Time Blinds & Lights", "scene", "scening"),
+                new("scene.evening_relax", "Evening Relax", "scene", "scening"),
+                new("script.close_theater_curtains", "Close Theater Curtains", "script", "off"),
+                new("switch.subwoofer_smart_plug", "Subwoofer Smart Plug", "switch", "on"),
+                new("switch.amp_bias_strip", "Amplifier Cooling Fan", "switch", "on"),
+            ];
+            _viewModel?.ApplyEntities(demo);
+            _context?.ReportStatus($"Demo HA • {demo.Count} controllable entities", PluginHealthState.Connected);
+            return demo;
+        }
+
+        EnsureHttp();
+        using var req = BuildRequest(HttpMethod.Get, "/api/states");
+        using var resp = await _http!.SendAsync(req, ct);
+        resp.EnsureSuccessStatusCode();
+
+        var json = await resp.Content.ReadAsStringAsync(ct);
+        using var doc = JsonDocument.Parse(json);
+        var list = new List<HaEntityItem>();
+        if (doc.RootElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in doc.RootElement.EnumerateArray())
+            {
+                var id = item.TryGetProperty("entity_id", out var idEl) ? idEl.GetString() ?? string.Empty : string.Empty;
+                var dot = id.IndexOf('.');
+                if (dot <= 0) continue;
+                var domain = id[..dot].ToLowerInvariant();
+                if (domain is not ("scene" or "script" or "switch" or "light" or "input_boolean"))
+                {
+                    continue;
+                }
+
+                var state = item.TryGetProperty("state", out var stEl) ? stEl.GetString() ?? string.Empty : string.Empty;
+                var friendly = item.TryGetProperty("attributes", out var attrEl) &&
+                               attrEl.TryGetProperty("friendly_name", out var fnEl)
+                    ? fnEl.GetString() ?? id
+                    : id;
+
+                list.Add(new HaEntityItem(id, friendly, domain, state));
+            }
+        }
+
+        var ordered = list.OrderBy(static e => e.Domain).ThenBy(static e => e.FriendlyName).Take(40).ToList();
+        _viewModel?.ApplyEntities(ordered);
+        _context?.ReportStatus($"Connected • {ordered.Count} entities synced", PluginHealthState.Connected);
+        return ordered;
+    }
+
+    internal async Task TriggerEntityAsync(string entityId, CancellationToken ct = default)
+    {
+        if (_config.DemoMode)
+        {
+            _viewModel?.SetStatus($"Demo triggered '{entityId}'.");
+            return;
+        }
+
+        EnsureHttp();
+        var dot = entityId.IndexOf('.');
+        var domain = dot > 0 ? entityId[..dot].ToLowerInvariant() : "homeassistant";
+        var service = domain is "scene" or "script" ? "turn_on" : "toggle";
+
+        using var req = BuildRequest(HttpMethod.Post, $"/api/services/{domain}/{service}", new { entity_id = entityId });
+        using var resp = await _http!.SendAsync(req, ct);
+        resp.EnsureSuccessStatusCode();
+        _viewModel?.SetStatus($"Called {domain}.{service} on {entityId}.");
+    }
+
+    internal async Task SaveConfigAsync(HomeAssistantConfig updated)
+    {
+        _config = updated;
+        if (_context is not null)
+        {
+            await _context.Storage.SaveConfigAsync(_config);
+        }
+
+        if (_config.DemoMode || IsConfigured)
+        {
+            try
+            {
+                await FetchEntitiesAsync();
+            }
+            catch (Exception ex)
+            {
+                _viewModel?.SetStatus($"Saved, but connection check failed: {ex.Message}");
+            }
+        }
+        else
+        {
+            _context?.ReportStatus("Enter Home Assistant URL & Token (or Demo Mode)", PluginHealthState.Idle);
+        }
+    }
+
+    private async Task PushSensorStateAsync(PluginReceiverSnapshot snap, string? sceneName, CancellationToken ct)
+    {
+        if (_config.DemoMode)
+        {
+            _viewModel?.SetStatus($"Demo HA sensor pushed: {(snap.IsPoweredOn ? "on" : "standby")} • Vol {snap.Volume}");
+            return;
+        }
+
+        EnsureHttp();
+        var payload = new
+        {
+            state = snap.IsPoweredOn ? snap.PlayState.ToLowerInvariant() : "standby",
+            attributes = new
+            {
+                friendly_name = "Denon Desktop AVR",
+                model = snap.ModelName,
+                volume = snap.Volume,
+                muted = snap.IsMuted,
+                input_source = snap.InputSource,
+                sound_mode = snap.SoundMode,
+                now_playing = snap.NowPlayingTitle,
+                last_scene = sceneName ?? string.Empty,
+            },
+        };
+
+        using var req = BuildRequest(HttpMethod.Post, "/api/states/sensor.denon_desktop_receiver", payload);
+        using var resp = await _http!.SendAsync(req, ct);
+        resp.EnsureSuccessStatusCode();
+    }
+
+    private async Task TriggerWebhookAsync(string eventName, string? sceneName, CancellationToken ct)
+    {
+        if (_config.DemoMode)
+        {
+            _viewModel?.SetStatus($"Demo HA webhook fired: {eventName}");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_config.WebhookId))
+        {
+            throw new InvalidOperationException("Enter a Home Assistant Webhook ID first.");
+        }
+
+        EnsureHttp();
+        var baseUrl = _config.BaseUrl.Trim().TrimEnd('/');
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/api/webhook/{Uri.EscapeDataString(_config.WebhookId.Trim())}")
+        {
+            Content = new StringContent(JsonSerializer.Serialize(new
+            {
+                source = "denon_desktop",
+                event_type = eventName,
+                scene = sceneName ?? string.Empty,
+                timestamp = DateTimeOffset.Now,
+            }), Encoding.UTF8, "application/json"),
+        };
+
+        using var resp = await _http!.SendAsync(req, ct);
+        resp.EnsureSuccessStatusCode();
+    }
+
+    private HttpRequestMessage BuildRequest(HttpMethod method, string path, object? body = null)
+    {
+        var baseUrl = _config.BaseUrl.Trim().TrimEnd('/');
+        var req = new HttpRequestMessage(method, $"{baseUrl}{path}");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _config.AccessToken.Trim());
+        if (body is not null)
+        {
+            req.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+        }
+
+        return req;
+    }
+
+    private bool IsConfigured => !string.IsNullOrWhiteSpace(_config.BaseUrl) && !string.IsNullOrWhiteSpace(_config.AccessToken);
+
+    private void EnsureHttp()
+    {
+        if (_http is null) throw new InvalidOperationException("Home Assistant plugin not initialized.");
+    }
+}
+
+public sealed class HomeAssistantViewModel : INotifyPropertyChanged
+{
+    private readonly HomeAssistantPlugin _plugin;
+    private string _baseUrl = "http://homeassistant.local:8123";
+    private string _accessToken = string.Empty;
+    private string _webhookId = string.Empty;
+    private bool _demoMode;
+    private bool _pushEvents = true;
+    private string _statusMessage = "Enter your Home Assistant URL & Long-Lived Access Token, or try Demo Mode.";
+
+    public HomeAssistantViewModel(HomeAssistantPlugin plugin)
+    {
+        _plugin = plugin;
+        SaveAndConnectCommand = new AsyncCmd(_ => SaveAsync());
+        RefreshCommand = new AsyncCmd(_ => RefreshAsync());
+        ToggleDemoCommand = new AsyncCmd(_ => ToggleDemoAsync());
+        TriggerEntityCommand = new AsyncCmd(p => p is HaEntityItem item ? _plugin.TriggerEntityAsync(item.EntityId) : Task.CompletedTask);
+        PushNowCommand = new AsyncCmd(async _ =>
+        {
+            var res = await _plugin.ExecuteActionAsync("ha.sync_sensor");
+            StatusMessage = res.Message;
+        });
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public ObservableCollection<HaEntityItem> Entities { get; } = [];
+
+    public ICommand SaveAndConnectCommand { get; }
+    public ICommand RefreshCommand { get; }
+    public ICommand ToggleDemoCommand { get; }
+    public ICommand TriggerEntityCommand { get; }
+    public ICommand PushNowCommand { get; }
+
+    public string BaseUrl { get => _baseUrl; set => Set(ref _baseUrl, value); }
+    public string AccessToken { get => _accessToken; set => Set(ref _accessToken, value); }
+    public string WebhookId { get => _webhookId; set => Set(ref _webhookId, value); }
+    public bool PushEvents { get => _pushEvents; set => Set(ref _pushEvents, value); }
+    public bool DemoMode
+    {
+        get => _demoMode;
+        private set
+        {
+            if (Set(ref _demoMode, value))
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DemoButtonLabel)));
+            }
+        }
+    }
+
+    public string DemoButtonLabel => DemoMode ? "Exit Demo Mode" : "Try Demo Mode";
+    public string StatusMessage { get => _statusMessage; private set => Set(ref _statusMessage, value); }
+
+    public void SyncFromConfig(HomeAssistantConfig cfg)
+    {
+        BaseUrl = cfg.BaseUrl;
+        AccessToken = cfg.AccessToken;
+        WebhookId = cfg.WebhookId;
+        DemoMode = cfg.DemoMode;
+        PushEvents = cfg.PushReceiverEventsToHa;
+    }
+
+    public void ApplyEntities(IReadOnlyList<HaEntityItem> items) =>
+        Application.Current?.Dispatcher.InvokeAsync(() =>
+        {
+            Entities.Clear();
+            foreach (var item in items) Entities.Add(item);
+        });
+
+    public void SetStatus(string msg) =>
+        Application.Current?.Dispatcher.InvokeAsync(() => StatusMessage = $"{DateTime.Now:HH:mm:ss} • {msg}");
+
+    private async Task SaveAsync()
+    {
+        await _plugin.SaveConfigAsync(new HomeAssistantConfig
+        {
+            BaseUrl = BaseUrl.Trim(),
+            AccessToken = AccessToken.Trim(),
+            WebhookId = WebhookId.Trim(),
+            DemoMode = DemoMode,
+            PushReceiverEventsToHa = PushEvents,
+        });
+        StatusMessage = "Saved Home Assistant configuration & synced entities.";
+    }
+
+    private async Task RefreshAsync()
+    {
+        try
+        {
+            var items = await _plugin.FetchEntitiesAsync();
+            StatusMessage = $"Synced {items.Count} Home Assistant scenes, scripts & switches.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Refresh failed: {ex.Message}";
+        }
+    }
+
+    private async Task ToggleDemoAsync()
+    {
+        DemoMode = !DemoMode;
+        await SaveAsync();
+        StatusMessage = DemoMode ? "Home Assistant Demo Mode active — trigger virtual blinds, plugs & scenes!" : "Exited Demo Mode.";
+    }
+
+    private bool Set<T>(ref T field, T val, [CallerMemberName] string? prop = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, val)) return false;
+        field = val;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+        return true;
+    }
+
+    private sealed class AsyncCmd(Func<object?, Task> exec) : ICommand
+    {
+        private bool _busy;
+        public event EventHandler? CanExecuteChanged;
+        public bool CanExecute(object? p) => !_busy;
+        public async void Execute(object? p)
+        {
+            if (_busy) return;
+            _busy = true;
+            CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+            try { await exec(p); }
+            finally { _busy = false; CanExecuteChanged?.Invoke(this, EventArgs.Empty); }
+        }
+    }
+}

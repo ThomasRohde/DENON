@@ -18,6 +18,8 @@ public sealed class LocalAudioRelayServer : IDisposable
     private readonly ConcurrentDictionary<string, RegisteredLocalTrack> _localTracks = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, PcCastFormat> _livePcSessions = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeStreamTokens = new(StringComparer.Ordinal);
+    private byte[]? _calibrationWavBytes;
+    private Action<long>? _calibrationStreamStartedCallback;
 
     private IRemoteWebApiHandler? _webApiHandler;
     private Func<Stream, PcCastFormat, CancellationToken, Task>? _livePcAudioHandler;
@@ -119,6 +121,22 @@ public sealed class LocalAudioRelayServer : IDisposable
 
         _logStore.Info($"Registered PC Audio live cast URL: {streamUrl}");
         return (streamUrl, token);
+    }
+
+    public async Task<string> RegisterCalibrationWavAsync(
+        byte[] wavBytes,
+        Action<long> onStreamStartTimestamp,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureStartedAsync(cancellationToken);
+        CancelAllActiveStreams();
+
+        _calibrationWavBytes = wavBytes;
+        _calibrationStreamStartedCallback = onStreamStartTimestamp;
+
+        var token = Guid.NewGuid().ToString("N")[..8];
+        var lanIp = ResolveLocalLanIpForReceiver(_settingsStore.Current.Receiver.Host);
+        return $"http://{lanIp}:{_boundPort}/calibrate/{token}.wav";
     }
 
     public async Task<string> RegisterTrackAsync(YouTubeTrackItem track, CancellationToken cancellationToken = default)
@@ -379,6 +397,29 @@ public sealed class LocalAudioRelayServer : IDisposable
                 if (request.Path.StartsWith("/live/pc/", StringComparison.OrdinalIgnoreCase))
                 {
                     await HandleLivePcCastRequestAsync(networkStream, request, serverToken);
+                    return;
+                }
+
+                // Acoustic Lip-Sync Calibration chirp (/calibrate/{token}.wav)
+                if (request.Path.StartsWith("/calibrate/", StringComparison.OrdinalIgnoreCase))
+                {
+                    var wav = _calibrationWavBytes;
+                    if (wav is null || wav.Length == 0)
+                    {
+                        await WriteSimpleResponseAsync(networkStream, "404 Not Found", "text/plain", "No calibration chirp registered.\r\n", serverToken);
+                        return;
+                    }
+
+                    var hdr = $"HTTP/1.1 200 OK\r\nContent-Type: audio/wav\r\nContent-Length: {wav.Length}\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n";
+                    var hdrBytes = Encoding.ASCII.GetBytes(hdr);
+                    await networkStream.WriteAsync(hdrBytes, serverToken);
+                    if (!request.Method.Equals("HEAD", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _calibrationStreamStartedCallback?.Invoke(Stopwatch.GetTimestamp());
+                        await networkStream.WriteAsync(wav, serverToken);
+                    }
+
+                    await networkStream.FlushAsync(serverToken);
                     return;
                 }
 

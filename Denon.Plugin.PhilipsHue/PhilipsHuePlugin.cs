@@ -20,6 +20,7 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
 
     private IPluginContext? _context;
     private HueBridgeClient? _client;
+    private HueEntertainmentStreamClient? _entertainmentClient;
     private HueDashboardViewModel? _viewModel;
     private HuePluginConfig _config = new();
     private bool _isStarted;
@@ -63,7 +64,9 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
     public async Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default)
     {
         _context = context;
-        _client = new HueBridgeClient(context.CreateHttpClient(allowLocalSelfSignedTls: true, timeout: TimeSpan.FromSeconds(6)));
+        var sharedHttp = context.CreateHttpClient(allowLocalSelfSignedTls: true, timeout: TimeSpan.FromSeconds(6));
+        _client = new HueBridgeClient(sharedHttp);
+        _entertainmentClient = new HueEntertainmentStreamClient(sharedHttp);
         _config = await context.Storage.LoadConfigAsync(static () => new HuePluginConfig(), cancellationToken);
         _config.MusicSync ??= new HueMusicSyncConfig();
         _musicSyncActive = _config.MusicSync.Enabled;
@@ -92,12 +95,15 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
         }
     }
 
-    public Task StopAsync(CancellationToken cancellationToken = default)
+    public async Task StopAsync(CancellationToken cancellationToken = default)
     {
         _isStarted = false;
         StopDemoBeatSimulator();
+        if (_entertainmentClient is not null)
+        {
+            await _entertainmentClient.StopAsync();
+        }
         _context?.ReportStatus("Stopped", PluginHealthState.Disabled);
-        return Task.CompletedTask;
     }
 
     public object? CreateDashboardView()
@@ -287,12 +293,16 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
         }
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         StopDemoBeatSimulator();
+        if (_entertainmentClient is not null)
+        {
+            await _entertainmentClient.DisposeAsync();
+            _entertainmentClient = null;
+        }
         _client?.Dispose();
         _client = null;
-        return ValueTask.CompletedTask;
     }
 
     internal async Task<IReadOnlyList<HueDiscoveredBridge>> DiscoverBridgesAsync(CancellationToken cancellationToken = default)
@@ -386,15 +396,35 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
         if (!enabled)
         {
             StopDemoBeatSimulator();
+            if (_entertainmentClient is not null)
+            {
+                await _entertainmentClient.StopAsync();
+            }
+        }
+        else if (!_config.DemoMode && _entertainmentClient is not null && !string.IsNullOrWhiteSpace(_config.ClientKey))
+        {
+            var area = _entertainmentAreas.FirstOrDefault(a =>
+                           string.Equals(a.Id, _config.MusicSync.SelectedEntertainmentAreaId, StringComparison.OrdinalIgnoreCase))
+                       ?? _entertainmentAreas.FirstOrDefault();
+            if (area is not null)
+            {
+                var dtlsOk = await _entertainmentClient.StartAsync(_config, area, cancellationToken);
+                if (dtlsOk)
+                {
+                    _context?.Logger.Info($"Started 50 Hz Hue Entertainment DTLS stream on '{area.Name}' ({area.ChannelCount} ch).");
+                }
+            }
         }
 
         await SaveConfigAsync(cancellationToken);
+        _viewModel?.SetDtlsStreamingState(_entertainmentClient?.IsStreaming == true);
         _viewModel?.SyncFromPluginConfig(_config);
 
         var modeTag = _config.DemoMode ? "Demo Bridge" : _config.BridgeIp;
+        var transportTag = _entertainmentClient?.IsStreaming == true ? "50 Hz DTLS" : "LAN Sync";
         _context?.ReportStatus(
             enabled
-                ? $"{modeTag} • Music Sync LIVE ({_config.MusicSync.Mode})"
+                ? $"{modeTag} • {transportTag} LIVE ({_config.MusicSync.Mode})"
                 : $"{modeTag} • {_cachedLights.Count(l => l.IsOn)}/{_cachedLights.Count} lights on",
             _config.DemoMode || IsConfigured ? PluginHealthState.Connected : PluginHealthState.Idle);
     }
@@ -534,7 +564,45 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
             return;
         }
 
-        // Respect Hue Bridge LAN rate limit (~10-12 updates/sec on physical bridge, 15 Hz in Demo Mode)
+        var syncCfg = _config.MusicSync;
+        var sens = Math.Clamp(syncCfg.Sensitivity, 0.4, 2.5);
+        var minBri = Math.Clamp(syncCfg.MinBrightness, 5, 90);
+        var maxBri = Math.Clamp(syncCfg.MaxBrightness, minBri + 5, 100);
+        var bass = Math.Clamp(frame.BassEnergy * sens, 0.0, 1.0);
+        var mid = Math.Clamp(frame.MidEnergy * sens, 0.0, 1.0);
+        var treble = Math.Clamp(frame.TrebleEnergy * sens, 0.0, 1.0);
+
+        if (frame.IsBeat)
+        {
+            _paletteIndex = (_paletteIndex + 1) % BeatPalette.Length;
+        }
+
+        // Fast Path: True 50 Hz Hue Entertainment DTLS/UDP streaming (20ms cadence, zero REST overhead!)
+        if (_entertainmentClient is { IsStreaming: true })
+        {
+            var nowDtls = Environment.TickCount64;
+            if (nowDtls - _lastSyncPushTickMs < 20)
+            {
+                return;
+            }
+
+            _lastSyncPushTickMs = nowDtls;
+            var chCount = Math.Clamp(_entertainmentClient.ActiveChannelCount, 1, 20);
+            Span<(byte R, byte G, byte B)> rgbChannels = stackalloc (byte, byte, byte)[chCount];
+            for (var ch = 0; ch < chCount; ch++)
+            {
+                rgbChannels[ch] = ComputeSyncChannelRgb(syncCfg.Mode, ch, bass, mid, treble, frame.IsBeat, minBri, maxBri);
+            }
+
+            if (!_entertainmentClient.TrySendRgbFrame(rgbChannels))
+            {
+                _viewModel?.SetDtlsStreamingState(false);
+            }
+
+            return;
+        }
+
+        // Fallback Path: High-speed LAN REST staggered multi-light updates (~10-12 Hz) or Demo Mode
         var minIntervalMs = _config.DemoMode ? 65 : 95;
         if (frame.IsBeat)
         {
@@ -554,16 +622,6 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
 
         _lastSyncPushTickMs = now;
 
-        var syncCfg = _config.MusicSync;
-        var sens = Math.Clamp(syncCfg.Sensitivity, 0.4, 2.5);
-        var minBri = Math.Clamp(syncCfg.MinBrightness, 5, 90);
-        var maxBri = Math.Clamp(syncCfg.MaxBrightness, minBri + 5, 100);
-
-        if (frame.IsBeat)
-        {
-            _paletteIndex = (_paletteIndex + 1) % BeatPalette.Length;
-        }
-
         var targetLights = GetTargetSyncLightIds();
         if (targetLights.Count == 0)
         {
@@ -573,9 +631,6 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
 
         var lightIdx = _roundRobinLightIdx++ % targetLights.Count;
         var targetLightId = targetLights[lightIdx];
-        var bass = Math.Clamp(frame.BassEnergy * sens, 0.0, 1.0);
-        var mid = Math.Clamp(frame.MidEnergy * sens, 0.0, 1.0);
-        var treble = Math.Clamp(frame.TrebleEnergy * sens, 0.0, 1.0);
 
         int bri;
         double x, y;
@@ -650,6 +705,66 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
                 Interlocked.Exchange(ref _inFlightSyncPushes, 0);
             }
         });
+    }
+
+    private (byte R, byte G, byte B) ComputeSyncChannelRgb(
+        HueMusicSyncMode mode,
+        int channelIdx,
+        double bass,
+        double mid,
+        double treble,
+        bool isBeat,
+        int minBri,
+        int maxBri)
+    {
+        string hex;
+        double energy;
+
+        switch (mode)
+        {
+            case HueMusicSyncMode.SpectrumSplit:
+            {
+                var band = channelIdx % 3;
+                energy = band switch { 0 => bass, 1 => mid, _ => treble };
+                hex = band switch
+                {
+                    0 => isBeat ? "#FB7185" : "#F59E0B",
+                    1 => "#00D4FF",
+                    _ => "#818CF8",
+                };
+                break;
+            }
+
+            case HueMusicSyncMode.AlbumArtAmbient:
+                energy = Math.Clamp((bass * 0.55) + (mid * 0.35) + (treble * 0.10), 0.0, 1.0);
+                hex = (channelIdx % 2 == 0) ? _albumDominantHex : _albumSecondaryHex;
+                break;
+
+            case HueMusicSyncMode.CinemaSubtle:
+                energy = Math.Clamp((bass * 0.5) + (mid * 0.5), 0.0, 1.0) * 0.6;
+                hex = isBeat ? "#F59E0B" : "#D97706";
+                break;
+
+            default:
+                energy = isBeat ? Math.Min(1.0, bass * 1.25 + 0.15) : bass;
+                hex = BeatPalette[_paletteIndex].Hex;
+                break;
+        }
+
+        var scale = Math.Clamp((minBri + ((maxBri - minBri) * energy)) / 100.0, 0.05, 1.0);
+        var clean = hex.Trim().TrimStart('#');
+        if (clean.Length == 6 &&
+            byte.TryParse(clean[..2], System.Globalization.NumberStyles.HexNumber, null, out var r) &&
+            byte.TryParse(clean[2..4], System.Globalization.NumberStyles.HexNumber, null, out var g) &&
+            byte.TryParse(clean[4..6], System.Globalization.NumberStyles.HexNumber, null, out var b))
+        {
+            return (
+                (byte)Math.Clamp((int)Math.Round(r * scale), 0, 255),
+                (byte)Math.Clamp((int)Math.Round(g * scale), 0, 255),
+                (byte)Math.Clamp((int)Math.Round(b * scale), 0, 255));
+        }
+
+        return (0, 180, 255);
     }
 
     private IReadOnlyList<string> GetTargetSyncLightIds()

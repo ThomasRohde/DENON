@@ -72,18 +72,12 @@
 
                     <!-- Brand Emblem -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Width="26"
-                                Height="26"
-                                CornerRadius="7"
-                                Background="{StaticResource CyanAccentGradient}"
-                                Margin="0,0,10,0">
-                            <TextBlock Text="{Binding BrandMonogram}"
-                                       FontSize="15"
-                                       FontWeight="Black"
-                                       Foreground="#04151C"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center" />
-                        </Border>
+                        <Image Source="pack://application:,,,/denon_icon.png"
+                               Width="28"
+                               Height="28"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               Margin="0,0,10,0"
+                               VerticalAlignment="Center" />
                         <TextBlock Text="{Binding BrandName}"
                                    FontSize="14"
                                    FontWeight="Bold"
@@ -562,12 +556,26 @@
                                                     Margin="0,0,6,0"
                                                     ToolTip="Open synchronized YouTube Cinema Companion window"
                                                     Visibility="{Binding IsYouTubeActive, Converter={StaticResource BoolToVis}}" />
+                                            <Button Content="{Binding MeterModeButtonLabel}"
+                                                    Command="{Binding CycleMeterDisplayModeCommand}"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Padding="8,2.5"
+                                                    FontSize="10"
+                                                    Margin="0,0,5,0"
+                                                    ToolTip="Cycle studio meter mode: Analog VU → 31-Band RTA Spectrum → Both" />
+                                            <Button Content="{Binding LyricsToggleLabel}"
+                                                    Command="{Binding ToggleLiveLyricsCommand}"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Padding="8,2.5"
+                                                    FontSize="10"
+                                                    Margin="0,0,5,0"
+                                                    ToolTip="Show synced live lyrics (LRCLIB) for the currently playing track" />
                                             <Button Content="{Binding VuToggleLabel}"
                                                     Command="{Binding ToggleVuMetersCommand}"
                                                     Style="{StaticResource SecondaryButton}"
                                                     Padding="8,2.5"
                                                     FontSize="10"
-                                                    ToolTip="Toggle retro dual-channel Analog Hi-Fi VU Meters" />
+                                                    ToolTip="Show or hide audio meters" />
                                         </StackPanel>
 
                                         <TextBlock Text="{Binding NowPlayingTitle}"
@@ -645,7 +653,41 @@
                                                                LeftLevel="{Binding VuLeftLevel}"
                                                                RightLevel="{Binding VuRightLevel}"
                                                                IsLiveSignal="{Binding IsVuLiveSignal}"
-                                                               Visibility="{Binding ShowVuMeters, Converter={StaticResource BoolToVis}}" />
+                                                               Visibility="{Binding ShowAnalogVu, Converter={StaticResource BoolToVis}}" />
+
+                                <!-- Toggleable 31-Band Live OLED FFT Spectrum Analyzer (RTA) -->
+                                <controls:SpectrumAnalyzerControl x:Name="HeroSpectrumAnalyzer"
+                                                                  Margin="0,12,0,0"
+                                                                  Height="138"
+                                                                  Visibility="{Binding ShowRtaSpectrum, Converter={StaticResource BoolToVis}}" />
+
+                                <!-- Toggleable Synced Live Lyrics Bar (LRCLIB) -->
+                                <Border Background="#090D16"
+                                        BorderBrush="#1F2C40"
+                                        BorderThickness="1"
+                                        CornerRadius="10"
+                                        Padding="12,8"
+                                        Margin="0,10,0,0"
+                                        Visibility="{Binding ShowLiveLyrics, Converter={StaticResource BoolToVis}}">
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Right" Background="#122133" BorderBrush="#264060" BorderThickness="1" CornerRadius="6" Padding="7,2" VerticalAlignment="Center" Margin="10,0,0,0">
+                                            <TextBlock Text="{Binding LyricsStatusBadge}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding CurrentLyricLine}"
+                                                       FontSize="13.5"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding NextLyricLine}"
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource TextMutedBrush}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Margin="0,2,0,0"
+                                                       Visibility="{Binding NextLyricLine, Converter={StaticResource StringToVis}}" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
                                 </StackPanel>
                             </Border>
 
@@ -3314,8 +3356,30 @@
                                     <CheckBox Content="Transcode YouTube audio to 320 kbps MP3 via FFmpeg"
                                               IsChecked="{Binding SettingsPreferFfmpegMp3}"
                                               Style="{StaticResource ToggleSwitchStyle}"
-                                              Margin="0,2"
+                                              Margin="0,2,0,8"
                                               FontSize="12" />
+
+                                    <!-- 1-Click Acoustic Lip-Sync Auto-Calibration (PC Mic Chirp) -->
+                                    <Border Background="#0E121B" BorderBrush="#232B3D" BorderThickness="1" CornerRadius="10" Padding="10,8">
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right"
+                                                    Content="{Binding CalibrateSyncButtonLabel}"
+                                                    Command="{Binding RunAcousticCalibrationCommand}"
+                                                    Style="{StaticResource PrimaryButton}"
+                                                    Padding="11,5"
+                                                    FontSize="11"
+                                                    VerticalAlignment="Center"
+                                                    Margin="10,0,0,0" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="ACOUSTIC LIP-SYNC AUTO-CALIBRATION" Style="{StaticResource SectionLabelStyle}" />
+                                                <TextBlock Text="{Binding AcousticCalibrationStatus}"
+                                                           FontSize="11"
+                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           TextWrapping="Wrap"
+                                                           Margin="0,2,0,0" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Border>
                                 </StackPanel>
                             </Border>
 

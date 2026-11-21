@@ -135,7 +135,9 @@ public sealed partial class MainViewModel : ObservableObject
         PluginHostService pluginHostService,
         AutomationEngineService automationEngineService,
         LiveAudioAnalyzerService liveAudioAnalyzerService,
-        AlbumArtPaletteService albumArtPaletteService)
+        AlbumArtPaletteService albumArtPaletteService,
+        LyricsService lyricsService,
+        AcousticSyncCalibrationService calibrationService)
     {
         _receiverController = receiverController;
         _settingsStore = settingsStore;
@@ -271,7 +273,8 @@ public sealed partial class MainViewModel : ObservableObject
         InitializeShortcuts(globalHotkeyService);
         InitializePlugins(pluginHostService);
         InitializeAutomations(automationEngineService);
-        _liveAudioAnalyzer.SetVuCaptureRequested(ShowVuMeters);
+        InitializeStudioAndSync(lyricsService, calibrationService);
+        _liveAudioAnalyzer.SetVuCaptureRequested(IsAnyAudioMeterVisible);
 
         LoadSettings(_settingsStore.Current);
         ApplyStateSnapshot(_stateStore.Snapshot);
@@ -565,7 +568,13 @@ public sealed partial class MainViewModel : ObservableObject
     public string NowPlayingTitle
     {
         get => _nowPlayingTitle;
-        private set => SetProperty(ref _nowPlayingTitle, value);
+        private set
+        {
+            if (SetProperty(ref _nowPlayingTitle, value))
+            {
+                NotifyTrackChangedForLyrics(value, NowPlayingDetail);
+            }
+        }
     }
 
     public string NowPlayingDetail

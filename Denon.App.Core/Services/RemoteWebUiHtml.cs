@@ -60,8 +60,8 @@ public static class RemoteWebUiHtml
   .tsub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tacts { display: flex; gap: 5px; }
   .tacts .btn { padding: 6px 9px; font-size: 11.5px; }
-  .tabs { position: fixed; bottom: 0; left: 0; right: 0; background: #0e1016; border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(3, 1fr); padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); gap: 8px; }
-  .tab { background: transparent; border: none; color: var(--muted); font-size: 12px; font-weight: 700; padding: 8px; border-radius: 10px; cursor: pointer; }
+  .tabs { position: fixed; bottom: 0; left: 0; right: 0; background: #0e1016; border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(4, 1fr); padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); gap: 6px; }
+  .tab { background: transparent; border: none; color: var(--muted); font-size: 11.5px; font-weight: 700; padding: 8px 4px; border-radius: 10px; cursor: pointer; }
   .tab.active { background: #142330; color: var(--cyan); }
   .panel { display: none; }
   .panel.active { display: block; }
@@ -144,7 +144,14 @@ public static class RemoteWebUiHtml
   </div>
 </div>
 
-<!-- TAB 3: STATIONS -->
+<!-- TAB 3: LIGHTS & PLUGINS -->
+<div id="tab-plugins" class="panel">
+  <div id="pluginsContainer">
+    <div class="card"><div style="color:#64748b;font-size:12px">Loading plugins...</div></div>
+  </div>
+</div>
+
+<!-- TAB 4: STATIONS -->
 <div id="tab-stations" class="panel">
   <div class="card">
     <div class="label"><span>Quick Radio Stations</span><span>Preset HEOS Streams</span></div>
@@ -154,6 +161,7 @@ public static class RemoteWebUiHtml
 
 <div class="tabs">
   <button class="tab active" onclick="switchTab('remote', this)">Remote</button>
+  <button class="tab" onclick="switchTab('plugins', this)">Lights</button>
   <button class="tab" onclick="switchTab('jukebox', this)">Jukebox</button>
   <button class="tab" onclick="switchTab('stations', this)">Stations</button>
 </div>
@@ -294,6 +302,23 @@ async function refreshStatus() {
     document.getElementById('stationsBox').innerHTML = (state.stations || []).map(st =>
       `<button class="chip ${st.isPlaying ? 'active' : ''}" onclick="post('/api/station',{alias:'${esc(st.alias)}'})">▶ ${esc(st.displayName)}</button>`
     ).join('');
+
+    const plugins = state.plugins || [];
+    document.getElementById('pluginsContainer').innerHTML = plugins.length
+      ? plugins.map(p => `
+          <div class="card">
+            <div class="label">
+              <span><span class="scene-tag" style="background:${esc(p.accentHex)};margin-right:6px">${esc(p.iconGlyph)}</span>${esc(p.name)}</span>
+              <button class="pill ${p.isEnabled ? 'on' : ''}" style="padding:2px 8px;font-size:10px" onclick="post('/api/plugins/toggle',{pluginId:'${esc(p.id)}',enabled:${!p.isEnabled}})">${p.isEnabled ? 'ACTIVE' : 'OFF'}</button>
+            </div>
+            <div style="font-size:11.5px;color:#94a3b8;margin-bottom:10px">${esc(p.statusText || p.category)}</div>
+            <div class="chips">
+              ${(p.actions || []).map(a =>
+                `<button class="chip" onclick="post('/api/plugins/action',{pluginId:'${esc(p.id)}',actionId:'${esc(a.actionId)}'})">${esc(a.displayName)}</button>`
+              ).join('')}
+            </div>
+          </div>`).join('')
+      : '<div class="card"><div style="color:#64748b;font-size:12px">No plugins installed.</div></div>';
 
     const q = state.youtubeQueue || [];
     document.getElementById('qCount').textContent = q.length + (q.length === 1 ? ' track' : ' tracks');

@@ -8,7 +8,9 @@ using Denon.App.Core.Services;
 using Denon.App.Desktop.Services;
 using Denon.App.Desktop.ViewModels;
 using Denon.App.PluginSdk;
+using Denon.Plugin.HomeAssistant;
 using Denon.Plugin.PhilipsHue;
+using Denon.Plugin.SmartTv;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -91,7 +93,11 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<HeosEventListenerService>();
             builder.Services.AddHostedService(sp => sp.GetRequiredService<HeosEventListenerService>());
             builder.Services.AddSingleton<IDenonPlugin, PhilipsHuePlugin>();
+            builder.Services.AddSingleton<IDenonPlugin, SmartTvPlugin>();
+            builder.Services.AddSingleton<IDenonPlugin, HomeAssistantPlugin>();
             builder.Services.AddSingleton<PluginHostService>();
+            builder.Services.AddSingleton<LyricsService>();
+            builder.Services.AddSingleton<AcousticSyncCalibrationService>();
             builder.Services.AddSingleton<LiveAudioAnalyzerService>();
             builder.Services.AddHostedService(sp => sp.GetRequiredService<LiveAudioAnalyzerService>());
             builder.Services.AddSingleton<AlbumArtPaletteService>();

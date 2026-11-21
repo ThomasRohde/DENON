@@ -2,5 +2,7 @@
   <Project Path="Denon.App.PluginSdk/Denon.App.PluginSdk.csproj" />
   <Project Path="Denon.App.Core/Denon.App.Core.csproj" />
   <Project Path="Denon.Plugin.PhilipsHue/Denon.Plugin.PhilipsHue.csproj" />
+  <Project Path="Denon.Plugin.SmartTv/Denon.Plugin.SmartTv.csproj" />
+  <Project Path="Denon.Plugin.HomeAssistant/Denon.Plugin.HomeAssistant.csproj" />
   <Project Path="Denon.App.Desktop/Denon.App.Desktop.csproj" />
 </Solution>

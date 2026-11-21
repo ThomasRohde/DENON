@@ -4,12 +4,14 @@
     <ProjectReference Include="..\Denon.App.Core\Denon.App.Core.csproj" />
     <ProjectReference Include="..\Denon.App.PluginSdk\Denon.App.PluginSdk.csproj" />
     <ProjectReference Include="..\Denon.Plugin.PhilipsHue\Denon.Plugin.PhilipsHue.csproj" />
+    <ProjectReference Include="..\Denon.Plugin.SmartTv\Denon.Plugin.SmartTv.csproj" />
+    <ProjectReference Include="..\Denon.Plugin.HomeAssistant\Denon.Plugin.HomeAssistant.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
-    <Version>1.2.0</Version>
+    <Version>1.3.0</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
@@ -19,6 +21,11 @@
 
   <ItemGroup>
     <Resource Include="denon_icon.ico" />
+    <Resource Include="denon_icon.png" />
+    <Resource Include="Assets\Icons\denon_tray.ico" />
+    <Resource Include="Assets\Icons\variants\active.ico" />
+    <Resource Include="Assets\Icons\variants\muted.ico" />
+    <Resource Include="Assets\Icons\variants\power.ico" />
   </ItemGroup>
 
   <ItemGroup>

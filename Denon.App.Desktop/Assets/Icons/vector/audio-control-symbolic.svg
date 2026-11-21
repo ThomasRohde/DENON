@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+ <defs>
+  <radialGradient id="plate" cx="48%" cy="40%" r="65%"><stop offset="0" stop-color="#173449"/><stop offset="0.7" stop-color="#0d1b2b"/><stop offset="1" stop-color="#08111d"/></radialGradient>
+  <linearGradient id="steel" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#dceeff"/><stop offset="0.34" stop-color="#788aa6"/><stop offset="0.7" stop-color="#28384a"/><stop offset="1" stop-color="#9fb5ca"/></linearGradient>
+  <linearGradient id="cup" x1="0" x2="1"><stop offset="0" stop-color="#70889f"/><stop offset="0.22" stop-color="#1d2b3c"/><stop offset="0.64" stop-color="#101824"/><stop offset="1" stop-color="#94a9b9"/></linearGradient>
+  <linearGradient id="wave" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#87edff"/><stop offset="1" stop-color="#008df6"/></linearGradient>
+  <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9"/></filter>
+ </defs>
+ <circle cx="256" cy="256" r="230" fill="url(#plate)"/>
+ <circle cx="256" cy="256" r="227" fill="none" stroke="#35607a" stroke-width="4" opacity=".6"/>
+ <path d="M119 283V245c0-94 61-154 137-154s137 60 137 154v38" fill="none" stroke="#131b28" stroke-linecap="round" stroke-width="52"/>
+ <path d="M119 282V245c0-94 61-154 137-154s137 60 137 154v37" fill="none" stroke="url(#steel)" stroke-linecap="round" stroke-width="22"/>
+ <path d="M120 265v-21c0-81 58-133 136-133s136 52 136 133v21" fill="none" stroke="#0a192a" stroke-linecap="round" stroke-width="14"/>
+ <g stroke="url(#wave)" stroke-width="20" stroke-linecap="round" filter="url(#glow)" opacity=".75">
+ <path d="M201 238v68 M228 209v124 M256 183v172 M284 209v124 M311 238v68"/>
+ </g>
+ <g stroke="url(#wave)" stroke-width="17" stroke-linecap="round"><path d="M201 238v68 M228 209v124 M256 183v172 M284 209v124 M311 238v68"/></g>
+ <rect x="83" y="234" width="69" height="124" rx="29" fill="url(#cup)" stroke="#b0c1d2" stroke-width="5"/>
+ <rect x="360" y="234" width="69" height="124" rx="29" fill="url(#cup)" stroke="#b0c1d2" stroke-width="5"/>
+ <rect x="99" y="246" width="37" height="100" rx="17" fill="#101c2a"/>
+ <rect x="376" y="246" width="37" height="100" rx="17" fill="#101c2a"/>
+</svg>

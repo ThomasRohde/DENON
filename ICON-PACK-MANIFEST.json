@@ -1,0 +1,90 @@
+{
+  "source": "AI-generated 12-icon pack deriving from user-selected R2C5 artwork",
+  "repository": "https://github.com/ThomasRohde/DENON",
+  "default_icon": "Denon.App.Desktop/denon_icon.ico",
+  "variants": [
+    {
+      "name": "main",
+      "description": "Headphones + waveform"
+    },
+    {
+      "name": "active",
+      "description": "Listening / active"
+    },
+    {
+      "name": "muted",
+      "description": "Muted"
+    },
+    {
+      "name": "volume-up",
+      "description": "Volume up"
+    },
+    {
+      "name": "volume-down",
+      "description": "Volume down"
+    },
+    {
+      "name": "wireless",
+      "description": "Wireless connection"
+    },
+    {
+      "name": "remote",
+      "description": "Remote control"
+    },
+    {
+      "name": "settings",
+      "description": "Audio settings"
+    },
+    {
+      "name": "speaker",
+      "description": "Speaker output"
+    },
+    {
+      "name": "surround",
+      "description": "Surround / home theatre"
+    },
+    {
+      "name": "power",
+      "description": "Standby / power"
+    },
+    {
+      "name": "outline",
+      "description": "Outline / monochrome"
+    }
+  ],
+  "files": {
+    "Denon.App.Desktop/Assets/Icons/denon_tray.ico": "eb2dbf8cfc8ee319c92698b7f055ad0ec94c5b5a024a9a0edc516dcff51f38bc",
+    "Denon.App.Desktop/Assets/Icons/denon_tray.png": "c09a4866b0b5a0732a0793f3d2a9db72d8ab1518b7e05bfa73a48514edd60a21",
+    "Denon.App.Desktop/Assets/Icons/denon_tray_monochrome.png": "7164b80c57b9f48ff33f4d96eebdbf415780ac6b4a4e3d5e7b4d9a7d8c6d2623",
+    "Denon.App.Desktop/Assets/Icons/variants/active.ico": "e0a303eddfb99da8d972f34aa599470b220de9e398b13d32bb638e808f116847",
+    "Denon.App.Desktop/Assets/Icons/variants/active.png": "044c4238bc0487965f28844021049bb063bd0f5114b721f71a2f89f2bc190100",
+    "Denon.App.Desktop/Assets/Icons/variants/main.ico": "628d25367b9649c428f1c6eb9cf3abe27dbf77a76f8c74c5bb4ea944ad54e031",
+    "Denon.App.Desktop/Assets/Icons/variants/main.png": "21308ebb43d3f6f91486072e4a0cb4416dcdda6cc972a538f1604d30c637a60b",
+    "Denon.App.Desktop/Assets/Icons/variants/muted.ico": "4028d0766e28cbabc1b1b6acbfe1e772086c57a59a9a7cdd8dd8dd54aa2d7daf",
+    "Denon.App.Desktop/Assets/Icons/variants/muted.png": "45eb1f0e9e29362c9abb79d952c6d65f737fd28417af5a84acde38907ce0b722",
+    "Denon.App.Desktop/Assets/Icons/variants/outline.ico": "0625e01ed85d22f6f2948776b78579e3fcbcc85f724f00eb77acd528339c363c",
+    "Denon.App.Desktop/Assets/Icons/variants/outline.png": "5a622a8bd580cb0cc21b1febff573125bf42b60754ac690aa070a2f3028ba742",
+    "Denon.App.Desktop/Assets/Icons/variants/power.ico": "e46ef71a6181eedb5bc01265b7346f3ef69b014dc6f704214a3fe3805b03ce00",
+    "Denon.App.Desktop/Assets/Icons/variants/power.png": "6131f184bc9f93f892117e852172c01048e788af2a048d7b0ff353648affd897",
+    "Denon.App.Desktop/Assets/Icons/variants/remote.ico": "e33ecc1188c8ad8cd79e7a71244dc086d5f6e2038cadc5e20225f83ab24336ce",
+    "Denon.App.Desktop/Assets/Icons/variants/remote.png": "b3353f6cf34ff1e2377f695251b901548d918a9f70f2ea69b331c1495ae579e9",
+    "Denon.App.Desktop/Assets/Icons/variants/settings.ico": "4e2657ba06b472fecb9c2ea2402e7bf7c99b2f20812ff7c6676d831545b11b8b",
+    "Denon.App.Desktop/Assets/Icons/variants/settings.png": "5fc6c169cd5e79473a13a0112fe06f30fe1ce819f04b2be86528198d39a2932e",
+    "Denon.App.Desktop/Assets/Icons/variants/speaker.ico": "8dc6f5a07a9bcc4ca99ca7ff282e99088738dad0cc27be9cd9b8873302f3781d",
+    "Denon.App.Desktop/Assets/Icons/variants/speaker.png": "a3f71441a3c2e5c794d4c54602c54e959eb31f9c75db2359b36691ceed2ba549",
+    "Denon.App.Desktop/Assets/Icons/variants/surround.ico": "213598e7d3d6f584e0de714356d9f5f4626420ba0c214626b93e8732f1954f57",
+    "Denon.App.Desktop/Assets/Icons/variants/surround.png": "0b21d11f57e7ca0e79d3be2a1c51cc501e08187d0253a06571bb1996b2fde07d",
+    "Denon.App.Desktop/Assets/Icons/variants/volume-down.ico": "8fe8a43b0f36ffd5f66467b0dcbe6ee76b76dbc85c72ec33c4aea2afefd8913c",
+    "Denon.App.Desktop/Assets/Icons/variants/volume-down.png": "ccbde05857666c5182af7cc79fe385f0ac0cfa607281acf5b55a8cf5bfe9d63e",
+    "Denon.App.Desktop/Assets/Icons/variants/volume-up.ico": "3321c5fff8d850a3506d7d39d366cf9b5fd529e4431a30bbf5842fb685264c07",
+    "Denon.App.Desktop/Assets/Icons/variants/volume-up.png": "6cc5062d7d42455838f23aff7383d19b1af9d7fe40d66883f9226b7c9c6d0944",
+    "Denon.App.Desktop/Assets/Icons/variants/wireless.ico": "9b67f403aca0883475797c5d2e1191186f2b6f1a90dae8c4aa3d28a8cfb2982f",
+    "Denon.App.Desktop/Assets/Icons/variants/wireless.png": "565d4dddb8114617992a9be3ca3d8efbcdc212421a33505bbf16639f71708a27",
+    "Denon.App.Desktop/Assets/Icons/vector/audio-control-monochrome.svg": "ec2ec65194ff2db42cf31d66cb0527854ec0292a4a257d64bdd83434165b231f",
+    "Denon.App.Desktop/Assets/Icons/vector/audio-control-symbolic.svg": "0b2f5e9d092710e106e5fccc76bf6236d3fc91ed3a687df584dda14e84a718a7",
+    "Denon.App.Desktop/denon_icon.ico": "628d25367b9649c428f1c6eb9cf3abe27dbf77a76f8c74c5bb4ea944ad54e031",
+    "Denon.App.Desktop/denon_icon.png": "70fc5ad545dd756968d5c7ce9102046a018d6d43006635322dd165019ffedcaa",
+    "ICON-PACK-README.md": "0d743bf188f87050bc2d9355f16d430be08a80303d91baefb49c5dbcef2c8669",
+    "docs/icon-pack-preview.png": "3e355318f25cc11852ecd7333301dde5efc5d6f181df6b793da516c1bcdd0cda"
+  }
+}

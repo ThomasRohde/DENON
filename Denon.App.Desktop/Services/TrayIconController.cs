@@ -22,6 +22,11 @@ public sealed class TrayIconController : IDisposable
     private Forms.ToolStripMenuItem? _statusItem;
     private Forms.ToolStripMenuItem? _powerItem;
     private Forms.ToolStripMenuItem? _muteItem;
+    private Icon? _trayDefaultIcon;
+    private Icon? _trayActiveIcon;
+    private Icon? _trayMutedIcon;
+    private Icon? _trayStandbyIcon;
+    private string _currentIconState = string.Empty;
 
     public TrayIconController(
         ReceiverController receiverController,
@@ -53,11 +58,16 @@ public sealed class TrayIconController : IDisposable
         _exitAsync = exitAsync;
         _flyoutWindow.Configure(() => _ = ShowWindowAsync());
 
-        var iconStream = System.Windows.Application.GetResourceStream(new Uri("pack://application:,,,/denon_icon.ico"))?.Stream;
+        _trayDefaultIcon = LoadResourceIcon("Assets/Icons/denon_tray.ico")
+                           ?? LoadResourceIcon("denon_icon.ico")
+                           ?? SystemIcons.Application;
+        _trayActiveIcon = LoadResourceIcon("Assets/Icons/variants/active.ico") ?? _trayDefaultIcon;
+        _trayMutedIcon = LoadResourceIcon("Assets/Icons/variants/muted.ico") ?? _trayDefaultIcon;
+        _trayStandbyIcon = LoadResourceIcon("Assets/Icons/variants/power.ico") ?? _trayDefaultIcon;
 
         _notifyIcon = new Forms.NotifyIcon
         {
-            Icon = iconStream is not null ? new Icon(iconStream) : SystemIcons.Application,
+            Icon = _trayDefaultIcon,
             Visible = true,
             Text = "Denon Desktop",
         };
@@ -130,6 +140,11 @@ public sealed class TrayIconController : IDisposable
             _notifyIcon.Dispose();
             _notifyIcon = null;
         }
+
+        DisposeIconSafe(ref _trayActiveIcon, _trayDefaultIcon);
+        DisposeIconSafe(ref _trayMutedIcon, _trayDefaultIcon);
+        DisposeIconSafe(ref _trayStandbyIcon, _trayDefaultIcon);
+        DisposeIconSafe(ref _trayDefaultIcon, null);
     }
 
     private void RebuildMenu()
@@ -276,6 +291,62 @@ public sealed class TrayIconController : IDisposable
         }
 
         _notifyIcon.Text = Truncate(statusText, 63);
+
+        // Swap live tray icon to reflect real-time AVR state (Muted / Playing / Standby / Idle)
+        var nextState = !snapshot.IsConnected || !isAwake
+            ? "standby"
+            : snapshot.Status?.IsMuted == true
+                ? "muted"
+                : string.Equals(snapshot.Status?.PlayState, "play", StringComparison.OrdinalIgnoreCase)
+                    ? "active"
+                    : "default";
+
+        if (!string.Equals(_currentIconState, nextState, StringComparison.Ordinal))
+        {
+            _currentIconState = nextState;
+            var nextIcon = nextState switch
+            {
+                "muted" => _trayMutedIcon,
+                "active" => _trayActiveIcon,
+                "standby" => _trayStandbyIcon,
+                _ => _trayDefaultIcon,
+            };
+            if (nextIcon is not null)
+            {
+                _notifyIcon.Icon = nextIcon;
+            }
+        }
+    }
+
+    private static Icon? LoadResourceIcon(string relativeResourcePath)
+    {
+        try
+        {
+            var stream = System.Windows.Application.GetResourceStream(new Uri($"pack://application:,,,/{relativeResourcePath}"))?.Stream;
+            if (stream is null)
+            {
+                return null;
+            }
+
+            using (stream)
+            {
+                return new Icon(stream);
+            }
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static void DisposeIconSafe(ref Icon? icon, Icon? sharedFallback)
+    {
+        if (icon is not null && !ReferenceEquals(icon, sharedFallback) && !ReferenceEquals(icon, SystemIcons.Application))
+        {
+            try { icon.Dispose(); } catch { }
+        }
+
+        icon = null;
     }
 
     private async Task ExitAsync()

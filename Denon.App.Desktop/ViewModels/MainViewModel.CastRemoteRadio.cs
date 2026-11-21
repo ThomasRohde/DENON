@@ -347,6 +347,9 @@ public sealed partial class MainViewModel
             if (SetProperty(ref _showVuMeters, value))
             {
                 OnPropertyChanged(nameof(VuToggleLabel));
+                OnPropertyChanged(nameof(ShowAnalogVu));
+                OnPropertyChanged(nameof(ShowRtaSpectrum));
+                OnPropertyChanged(nameof(IsAnyAudioMeterVisible));
             }
         }
     }
