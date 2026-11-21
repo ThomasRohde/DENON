@@ -757,4 +757,137 @@ public sealed partial class MainViewModel
         if (VuLeftLevel < 0.004) VuLeftLevel = 0;
         if (VuRightLevel < 0.004) VuRightLevel = 0;
     }
+
+    public void LoadShowcaseStateForScreenshots()
+    {
+        var demoPlayer = new ReceiverPlayerInfo(
+            Name: "Denon AVR-X2400H",
+            PlayerId: 1001,
+            Model: "Denon AVR-X2400H",
+            Version: "3.139.175",
+            IpAddress: "192.168.1.3",
+            Network: "wired",
+            LineOut: 0,
+            Serial: "DEMO");
+
+        var demoStatus = new ReceiverStatus(
+            Player: demoPlayer,
+            PlayState: "play",
+            Volume: 42,
+            IsMuted: false,
+            NowPlaying: new NowPlayingMedia("station", "Radio Paradise — Main Mix", "Eclectic Hi-Fi Radio", "FLAC / 320 kbps AAC", string.Empty, string.Empty, string.Empty, null, null),
+            RetrievedAt: DateTimeOffset.Now,
+            IsPoweredOn: true,
+            IsMainZoneOn: true,
+            InputSource: "NET",
+            SoundMode: "STEREO",
+            EcoMode: "AUTO",
+            SleepTimerMinutes: 60,
+            IsZone2On: false,
+            MaxVolume: 98,
+            VolumeExact: 42.0,
+            ActiveStationAlias: StationPresets.FirstOrDefault()?.Alias);
+
+        ApplyStateSnapshot(new ReceiverStateSnapshot
+        {
+            IsConnected = true,
+            Status = demoStatus,
+            LastSuccessfulRefresh = DateTimeOffset.Now,
+            LastAttemptedRefresh = DateTimeOffset.Now,
+        });
+
+        _hasLoadedAcousticsOnce = true;
+        _vuTimer?.Stop();
+
+        IsLivePushConnected = true;
+        ShowVuMeters = true;
+        VuLeftLevel = 0.68;
+        VuRightLevel = 0.74;
+        IsVuLiveSignal = true;
+
+        // Populate Acoustics showcase
+        ApplyAcousticStatus(new AcousticStatus(
+            MultEq: "AUDYSSEY",
+            DynamicEq: true,
+            DynamicVolume: "LIT",
+            Restorer: "MED",
+            Dimmer: "DIM",
+            SubwooferAdjustEnabled: true,
+            SubwooferTrimDb: 2,
+            DialogAdjustEnabled: true,
+            DialogTrimDb: 1,
+            ToneControlEnabled: false,
+            BassDb: 0,
+            TrebleDb: 0,
+            RetrievedAt: DateTimeOffset.Now));
+        AcousticsStatusText = "Synced from Denon AVR-X2400H (Audyssey MultEQ Active)";
+
+        // Populate YouTube Music & Queue showcase
+        YouTubeSearchInput = "Daft Punk Random Access Memories";
+        YouTubeStatusText = "Found 5 YouTube Music results • Direct LAN 320 kbps MP3 Relay ready.";
+        YouTubeSearchResults.Clear();
+        YouTubeTrackItem[] demoTracks =
+        [
+            new("5NV6Rdv1a3I", "Daft Punk - Get Lucky (Official Audio) ft. Pharrell Williams", "Daft Punk", TimeSpan.FromSeconds(248), string.Empty, "https://www.youtube.com/watch?v=5NV6Rdv1a3I"),
+            new("a5uQMwRMHcs", "Daft Punk - Instant Crush (Video) ft. Julian Casablancas", "Daft Punk", TimeSpan.FromSeconds(339), string.Empty, "https://www.youtube.com/watch?v=a5uQMwRMHcs"),
+            new("zhlGrammar1", "Daft Punk - Giorgio by Moroder (Official Audio)", "Daft Punk", TimeSpan.FromSeconds(544), string.Empty, "https://www.youtube.com/watch?v=zhlGrammar1"),
+            new("NF-kLy44Hls", "Daft Punk - Lose Yourself to Dance (Official Audio)", "Daft Punk", TimeSpan.FromSeconds(353), string.Empty, "https://www.youtube.com/watch?v=NF-kLy44Hls"),
+            new("6QVtHogFrI0", "Daft Punk - Touch (Official Audio) ft. Paul Williams", "Daft Punk", TimeSpan.FromSeconds(498), string.Empty, "https://www.youtube.com/watch?v=6QVtHogFrI0"),
+        ];
+        foreach (var t in demoTracks)
+        {
+            YouTubeSearchResults.Add(t);
+        }
+
+        YouTubeQueue.Clear();
+        for (var i = 0; i < 4; i++)
+        {
+            YouTubeQueue.Add(new YouTubeQueueItemViewModel(demoTracks[i], i + 1, isCurrent: i == 0));
+        }
+
+        OnPropertyChanged(nameof(YouTubeQueueCountLabel));
+
+        // Populate Phone Remote QR + Local FLAC showcase
+        UpdateRemoteQrFromRelay(new RelayStatusSnapshot(
+            IsRunning: true,
+            EndpointBaseUrl: "http://192.168.1.31:18925",
+            TranscodeMode: "FFmpeg MP3 320k",
+            HasFfmpeg: true,
+            FfmpegPath: "ffmpeg.exe",
+            StreamState: "Listening",
+            ActiveTrackTitle: null,
+            BytesStreamed: 0,
+            LastError: null));
+        ApplyRelayStatus(new RelayStatusSnapshot(
+            IsRunning: true,
+            EndpointBaseUrl: "http://192.168.1.31:18925",
+            TranscodeMode: "FFmpeg MP3 320k",
+            HasFfmpeg: true,
+            FfmpegPath: "ffmpeg.exe",
+            StreamState: "Streaming to Denon (MP3 320k)",
+            ActiveTrackTitle: "Daft Punk - Get Lucky",
+            BytesStreamed: 4_820_000,
+            LastError: null));
+
+        LocalTracks.Clear();
+        LocalTracks.Add(new LocalTrackItemViewModel(new LocalAudioTrackItem("1", @"C:\Music\01 - Give Life Back to Music.flac", "01 - Give Life Back to Music.flac", "Give Life Back to Music", "Daft Punk", ".flac", 32_400_000), 1, true));
+        LocalTracks.Add(new LocalTrackItemViewModel(new LocalAudioTrackItem("2", @"C:\Music\02 - So What.flac", "02 - So What.flac", "So What (24-bit Master)", "Miles Davis", ".flac", 48_900_000), 2, false));
+        LocalTracks.Add(new LocalTrackItemViewModel(new LocalAudioTrackItem("3", @"C:\Music\03 - Time.wav", "03 - Time.wav", "Time (Inception OST)", "Hans Zimmer", ".wav", 45_100_000), 3, false));
+        OnPropertyChanged(nameof(LocalTrackCountLabel));
+
+        AudioOutputDevices.Clear();
+        AudioOutputDevices.Add(new AudioOutputDeviceOption(string.Empty, "Default System Output (All PC Audio)", true));
+        AudioOutputDevices.Add(new AudioOutputDeviceOption("dac", "Speakers (USB Hi-Fi DAC)", false));
+        AudioOutputDevices.Add(new AudioOutputDeviceOption("hp", "Headphones (Studio Reference)", false));
+        SelectedAudioDevice = AudioOutputDevices[0];
+
+        // Populate Global Radio Explorer showcase
+        RadioBrowserResults.Clear();
+        RadioBrowserResults.Add(new RadioBrowserStation("1", "Radio Paradise — Main Mix (FLAC)", "http://stream.radioparadise.com/flac", string.Empty, "United States", "eclectic, rock, indie", "FLAC", 1411, 18420));
+        RadioBrowserResults.Add(new RadioBrowserStation("2", "Classic Vinyl HD", "https://icecast.walmradio.com:8443/classic", string.Empty, "United States", "jazz, classic, hi-fi", "MP3", 320, 9640));
+        RadioBrowserResults.Add(new RadioBrowserStation("3", "SomaFM Groove Salad", "http://ice2.somafm.com/groovesalad-256-mp3", string.Empty, "United States", "ambient, chillout, downtempo", "MP3", 256, 14210));
+        RadioBrowserResults.Add(new RadioBrowserStation("4", "DR P8 Jazz", "http://live-icy.dr.dk/A/A22L.mp3", string.Empty, "Denmark", "jazz, danish public radio", "MP3", 192, 5320));
+        RadioBrowserResults.Add(new RadioBrowserStation("5", "Nightride FM", "https://stream.nightride.fm/nightride.mp3", string.Empty, "Germany", "synthwave, retrowave, electronic", "MP3", 320, 7890));
+        RadioBrowserStatusText = "Showing 5 of 40,000+ live global stations — click ▶ Play or + Save to add to presets.";
+    }
 }

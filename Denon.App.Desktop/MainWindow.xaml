@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:controls="clr-namespace:Denon.App.Desktop.Controls"
         mc:Ignorable="d"
-        Title="Denon Desktop"
+        Title="{Binding WindowTitle}"
         Width="1200"
         Height="820"
         MinWidth="920"
@@ -77,14 +77,14 @@
                                 CornerRadius="7"
                                 Background="{StaticResource CyanAccentGradient}"
                                 Margin="0,0,10,0">
-                            <TextBlock Text="D"
+                            <TextBlock Text="{Binding BrandMonogram}"
                                        FontSize="15"
                                        FontWeight="Black"
                                        Foreground="#04151C"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center" />
                         </Border>
-                        <TextBlock Text="DENON"
+                        <TextBlock Text="{Binding BrandName}"
                                    FontSize="14"
                                    FontWeight="Bold"
                                    Foreground="{StaticResource TextPrimaryBrush}"
@@ -95,8 +95,9 @@
                                 CornerRadius="5"
                                 Padding="6,2"
                                 Margin="8,0,0,0"
-                                VerticalAlignment="Center">
-                            <TextBlock Text="PRECISION"
+                                VerticalAlignment="Center"
+                                ToolTip="Auto-detected Denon / Marantz receiver model">
+                            <TextBlock Text="{Binding DetectedModelBadge}"
                                        FontSize="9.5"
                                        FontWeight="Bold"
                                        Foreground="{StaticResource AccentCyanBrightBrush}" />
@@ -1349,8 +1350,15 @@
                                                                     <ColumnDefinition Width="Auto" />
                                                                 </Grid.ColumnDefinitions>
 
-                                                                <Border Grid.Column="0" Width="76" Height="46" CornerRadius="7" Background="#090D14" ClipToBounds="True">
+                                                                <Border Grid.Column="0" Width="76" Height="46" CornerRadius="7" Background="#0C111B" BorderBrush="#212B3E" BorderThickness="1" ClipToBounds="True">
                                                                     <Grid>
+                                                                        <Path Data="M12,3V13.55C11.41,13.21 10.73,13 10,13A4,4 0 0,0 6,17A4,4 0 0,0 10,21A4,4 0 0,0 14,17V7H18V3H12Z"
+                                                                              Fill="#22324A"
+                                                                              Width="18"
+                                                                              Height="18"
+                                                                              Stretch="Uniform"
+                                                                              HorizontalAlignment="Center"
+                                                                              VerticalAlignment="Center" />
                                                                         <Image Source="{Binding ThumbnailUrl, Converter={StaticResource SafeImageSource}}" Stretch="UniformToFill" />
                                                                         <Border Background="#CC07090D" CornerRadius="4" Padding="4,1" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="3">
                                                                             <TextBlock Text="{Binding DurationDisplay}" FontSize="9.5" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="{StaticResource TextPrimaryBrush}" />
@@ -1763,11 +1771,11 @@
                                                     <ColumnDefinition Width="*" />
                                                 </Grid.ColumnDefinitions>
                                                 <StackPanel Grid.Column="0">
-                                                    <TextBlock Text="DynVol (OFF/LIT/MED/HEV)" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                    <TextBlock Text="DynVol (OFF/LIT/HEV)" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
                                                     <TextBox Text="{Binding DynamicVolume, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="2">
-                                                    <TextBlock Text="Dimmer (BRI/DIM/DAR/OFF)" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                                    <TextBlock Text="Dimmer (BRI/DIM/OFF)" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
                                                     <TextBox Text="{Binding Dimmer, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="4">
@@ -2713,8 +2721,17 @@
                                                             <ColumnDefinition Width="Auto" />
                                                         </Grid.ColumnDefinitions>
 
-                                                        <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="#0A0E16" BorderBrush="#232D40" BorderThickness="1" ClipToBounds="True">
-                                                            <Image Source="{Binding Favicon, Converter={StaticResource SafeImageSource}}" Stretch="UniformToFill" />
+                                                        <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="#0C1320" BorderBrush="#233148" BorderThickness="1" ClipToBounds="True">
+                                                            <Grid>
+                                                                <Path Data="M20,6H8.3L16.56,2.59L15.81,0.74L3.24,5.96C2.5,6.27 2,7 2,7.8V20A2,2 0 0,0 4,22H20A2,2 0 0,0 22,20V8A2,2 0 0,0 20,6M7,20A3,3 0 0,1 4,17A3,3 0 0,1 7,14A3,3 0 0,1 10,17A3,3 0 0,1 7,20M20,12H18V10H16V12H4V8H20V12Z"
+                                                                      Fill="#27405E"
+                                                                      Width="16"
+                                                                      Height="16"
+                                                                      Stretch="Uniform"
+                                                                      HorizontalAlignment="Center"
+                                                                      VerticalAlignment="Center" />
+                                                                <Image Source="{Binding Favicon, Converter={StaticResource SafeImageSource}}" Stretch="UniformToFill" />
+                                                            </Grid>
                                                         </Border>
 
                                                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
@@ -2821,8 +2838,8 @@
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Grid.Column="0">
-                                                <TextBlock Text="Receiver IP / Host" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
-                                                <TextBox Text="{Binding SettingsHost, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+                                                <TextBlock Text="Receiver IP / Host (leave blank to auto-detect)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                                <TextBox Text="{Binding SettingsHost, UpdateSourceTrigger=PropertyChanged}" Tag="Auto-detect via LAN SSDP scan..." Margin="0,0,0,12" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="2">
                                                 <TextBlock Text="HEOS Port" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
@@ -2830,8 +2847,8 @@
                                             </StackPanel>
                                         </Grid>
 
-                                        <TextBlock Text="HEOS Player Name" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
-                                        <TextBox Text="{Binding SettingsPlayerName, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+                                        <TextBlock Text="HEOS Player Name (leave blank to auto-detect model)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                        <TextBox Text="{Binding SettingsPlayerName, UpdateSourceTrigger=PropertyChanged}" Tag="Auto-detect receiver model name..." Margin="0,0,0,12" />
 
                                         <Grid>
                                             <Grid.ColumnDefinitions>

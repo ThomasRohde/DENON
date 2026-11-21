@@ -274,7 +274,19 @@ public sealed class HeosClient : IDisposable
             throw new InvalidOperationException("No HEOS players were found.");
         }
 
-        var requested = settings.PlayerName.Trim();
+        var requested = settings.PlayerName?.Trim() ?? string.Empty;
+
+        // Auto-detect mode: when PlayerName is left blank, match the receiver's own IP or pick the first player
+        if (string.IsNullOrWhiteSpace(requested))
+        {
+            var byIp = players.FirstOrDefault(p =>
+                string.Equals(p.IpAddress, settings.Host, StringComparison.OrdinalIgnoreCase));
+            var detected = byIp ?? players[0];
+            _cachedPlayer = detected;
+            _cachedPlayerKey = cacheKey;
+            return detected;
+        }
+
         var normalizedTarget = SlugNormalizer.Normalize(requested);
 
         foreach (var player in players)

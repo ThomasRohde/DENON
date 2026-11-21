@@ -41,11 +41,11 @@ public sealed class MediaRelaySettings
 
 public sealed class ReceiverSettings
 {
-    public string Host { get; set; } = "192.168.1.3";
+    public string Host { get; set; } = string.Empty;
 
     public int Port { get; set; } = 1255;
 
-    public string PlayerName { get; set; } = "Denon AVR-X2400H";
+    public string PlayerName { get; set; } = string.Empty;
 
     public int DefaultLowVolume { get; set; } = 20;
 
@@ -74,13 +74,12 @@ public sealed class ReceiverSettings
 
     public static List<StationPreset> CreateDefaultStations() =>
     [
-        new StationPreset("dr-p1", "DR P1", "http://live-icy.dr.dk/A/A03L.mp3"),
-        new StationPreset("dr-p2", "DR P2", "http://live-icy.dr.dk/A/A04L.mp3"),
-        new StationPreset("dr-p3", "DR P3", "http://live-icy.dr.dk/A/A05L.mp3"),
-        new StationPreset("dr-p4-kbh", "DR P4 København", "http://live-icy.dr.dk/A/A08L.mp3"),
-        new StationPreset("dr-p5-kbh", "DR P5 København", "http://live-icy.dr.dk/A/A28L.mp3"),
-        new StationPreset("dr-p6", "DR P6 Beat", "http://live-icy.dr.dk/A/A29L.mp3"),
-        new StationPreset("dr-p8", "DR P8 Jazz", "http://live-icy.dr.dk/A/A22L.mp3"),
+        new StationPreset("radio-paradise", "Radio Paradise (Main)", "http://stream.radioparadise.com/aac-320"),
+        new StationPreset("somafm-groove", "SomaFM Groove Salad", "http://ice2.somafm.com/groovesalad-256-mp3"),
+        new StationPreset("somafm-secret", "SomaFM Secret Agent", "http://ice2.somafm.com/secretagent-128-mp3"),
+        new StationPreset("somafm-drone", "SomaFM Drone Zone", "http://ice2.somafm.com/dronezone-256-mp3"),
+        new StationPreset("nightride-fm", "Nightride FM (Synthwave)", "https://stream.nightride.fm/nightride.mp3"),
+        new StationPreset("dr-p8-jazz", "DR P8 Jazz", "http://live-icy.dr.dk/A/A22L.mp3"),
     ];
 }
 

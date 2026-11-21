@@ -27,22 +27,29 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
 
-        // Enforce single instance: if already running, signal the running instance to surface its window
-        _singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var createdNew);
-        if (!createdNew)
-        {
-            try
-            {
-                using var existingSignal = EventWaitHandle.OpenExisting(SingleInstanceSignalName);
-                existingSignal.Set();
-            }
-            catch
-            {
-                // Ignore if existing instance hasn't created signal yet
-            }
+        var captureIndex = Array.FindIndex(e.Args, a => string.Equals(a, "--capture-screenshots", StringComparison.OrdinalIgnoreCase));
+        var captureDir = captureIndex >= 0 && captureIndex + 1 < e.Args.Length ? e.Args[captureIndex + 1] : null;
+        var isScreenshotMode = !string.IsNullOrWhiteSpace(captureDir);
 
-            Shutdown();
-            return;
+        if (!isScreenshotMode)
+        {
+            // Enforce single instance: if already running, signal the running instance to surface its window
+            _singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var createdNew);
+            if (!createdNew)
+            {
+                try
+                {
+                    using var existingSignal = EventWaitHandle.OpenExisting(SingleInstanceSignalName);
+                    existingSignal.Set();
+                }
+                catch
+                {
+                    // Ignore if existing instance hasn't created signal yet
+                }
+
+                Shutdown();
+                return;
+            }
         }
 
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -85,26 +92,42 @@ public partial class App : System.Windows.Application
             relayServer.AttachWebApiHandler(_host.Services.GetRequiredService<RemoteWebApiHandler>());
             _ = _host.Services.GetRequiredService<PcAudioCastService>(); // ensures live PC audio handler is attached
 
-            await _host.StartAsync();
-
-            _ = Task.Run(async () =>
+            if (!isScreenshotMode)
             {
-                try
-                {
-                    await relayServer.EnsureStartedAsync();
-                }
-                catch (Exception ex)
-                {
-                    _host.Services.GetRequiredService<AppLogStore>().Warning($"Local audio relay startup deferred: {ex.Message}");
-                }
-            });
+                await _host.StartAsync();
 
-            _host.Services.GetRequiredService<AppLogStore>().Info("Denon Desktop started.");
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await relayServer.EnsureStartedAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _host.Services.GetRequiredService<AppLogStore>().Warning($"Local audio relay startup deferred: {ex.Message}");
+                    }
+                });
+
+                _host.Services.GetRequiredService<AppLogStore>().Info("Denon Desktop started.");
+            }
 
             var window = _host.Services.GetRequiredService<MainWindow>();
             MainWindow = window;
             window.Closing += OnMainWindowClosing;
             window.StateChanged += OnMainWindowStateChanged;
+
+            if (isScreenshotMode)
+            {
+                var vm = _host.Services.GetRequiredService<MainViewModel>();
+                vm.LoadShowcaseStateForScreenshots();
+                window.Width = 1240;
+                window.Height = 840;
+                window.ShowActivated = false;
+                window.Show();
+                await CaptureScreenshotsAsync(window, vm, captureDir!);
+                await ExitApplicationAsync();
+                return;
+            }
 
             _trayIconController = _host.Services.GetRequiredService<TrayIconController>();
             _trayIconController.Initialize(window, ExitApplicationAsync);
@@ -132,6 +155,46 @@ public partial class App : System.Windows.Application
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
             await ExitApplicationAsync();
+        }
+    }
+
+    private static async Task CaptureScreenshotsAsync(MainWindow window, MainViewModel vm, string outputDir)
+    {
+        System.IO.Directory.CreateDirectory(outputDir);
+
+        (string Section, string? StationsTab, string FileName)[] shots =
+        [
+            ("Control", null, "01-control-deck.png"),
+            ("YouTube", null, "02-youtube-music.png"),
+            ("Acoustics", null, "03-scenes-acoustics.png"),
+            ("CastRemote", null, "04-cast-phone-remote.png"),
+            ("Stations", "Explorer", "05-global-radio-explorer.png"),
+        ];
+
+        foreach (var (section, stationsTab, fileName) in shots)
+        {
+            vm.ActiveSection = section;
+            if (!string.IsNullOrWhiteSpace(stationsTab))
+            {
+                vm.StationsSubTab = stationsTab;
+            }
+
+            window.UpdateLayout();
+            await Task.Delay(320);
+            window.UpdateLayout();
+
+            var root = window.Content as System.Windows.FrameworkElement ?? window;
+            var width = Math.Max(1, (int)Math.Round(root.ActualWidth));
+            var height = Math.Max(1, (int)Math.Round(root.ActualHeight));
+
+            var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(width, height, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+            rtb.Render(root);
+
+            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(rtb));
+
+            await using var fs = System.IO.File.Create(System.IO.Path.Combine(outputDir, fileName));
+            encoder.Save(fs);
         }
     }
 

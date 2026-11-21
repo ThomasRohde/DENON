@@ -64,8 +64,8 @@ public sealed record LocalAudioTrackItem(
     public string CodecBadge => Extension.TrimStart('.').ToUpperInvariant();
 
     public string SizeDisplay => FileSizeBytes >= 1024 * 1024
-        ? $"{FileSizeBytes / (1024.0 * 1024.0):0.1} MB"
-        : $"{Math.Max(1, FileSizeBytes / 1024.0):0} KB";
+        ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{FileSizeBytes / (1024.0 * 1024.0):0.1} MB")
+        : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{Math.Max(1, FileSizeBytes / 1024.0):0} KB");
 
     public bool IsNativeHeosFormat =>
         Extension.Equals(".flac", StringComparison.OrdinalIgnoreCase) ||

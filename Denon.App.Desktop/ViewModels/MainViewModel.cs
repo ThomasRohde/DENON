@@ -49,8 +49,9 @@ public sealed partial class MainViewModel : ObservableObject
     private bool _isBusy;
     private string _connectionBadgeText = "OFFLINE";
     private Brush _connectionBadgeBrush = OfflineBrush;
-    private string _statusMessage = "Connecting to receiver...";
-    private string _receiverTitle = "Denon AVR-X2400H";
+    private string _statusMessage = "Discovering receiver on local network...";
+    private string _receiverTitle = "Denon / Marantz AVR";
+    private string _detectedModelName = string.Empty;
     private string _receiverDetails = "Waiting for telemetry...";
     private string _firmwareVersion = string.Empty;
     private string _inputSourceCode = string.Empty;
@@ -87,9 +88,9 @@ public sealed partial class MainViewModel : ObservableObject
     private string _discoveryStatusText = "Scan your local network to detect Denon & Marantz HEOS receivers.";
 
     // Settings editor fields
-    private string _settingsHost = "192.168.1.3";
+    private string _settingsHost = string.Empty;
     private string _settingsPort = "1255";
-    private string _settingsPlayerName = "Denon AVR-X2400H";
+    private string _settingsPlayerName = string.Empty;
     private string _settingsPollIntervalSeconds = "5";
     private string _settingsLowVolume = "20";
     private string _settingsVolumePresetsText = "15, 28, 42, 55";
@@ -439,8 +440,60 @@ public sealed partial class MainViewModel : ObservableObject
     public string ReceiverTitle
     {
         get => _receiverTitle;
-        private set => SetProperty(ref _receiverTitle, value);
+        private set
+        {
+            if (SetProperty(ref _receiverTitle, value))
+            {
+                OnPropertyChanged(nameof(WindowTitle));
+            }
+        }
     }
+
+    public string DetectedModelName
+    {
+        get => _detectedModelName;
+        private set
+        {
+            if (SetProperty(ref _detectedModelName, value))
+            {
+                OnPropertyChanged(nameof(BrandName));
+                OnPropertyChanged(nameof(BrandMonogram));
+                OnPropertyChanged(nameof(DetectedModelBadge));
+                OnPropertyChanged(nameof(WindowTitle));
+            }
+        }
+    }
+
+    public string BrandName =>
+        DetectedModelName.Contains("Marantz", StringComparison.OrdinalIgnoreCase) ||
+        ReceiverTitle.Contains("Marantz", StringComparison.OrdinalIgnoreCase)
+            ? "MARANTZ"
+            : "DENON";
+
+    public string BrandMonogram => BrandName[..1];
+
+    public string DetectedModelBadge
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(DetectedModelName))
+            {
+                return "PRECISION";
+            }
+
+            var cleaned = DetectedModelName
+                .Replace("Denon ", string.Empty, StringComparison.OrdinalIgnoreCase)
+                .Replace("Marantz ", string.Empty, StringComparison.OrdinalIgnoreCase)
+                .Trim();
+
+            return string.IsNullOrWhiteSpace(cleaned) ? "PRECISION" : cleaned.ToUpperInvariant();
+        }
+    }
+
+    public string WindowTitle =>
+        string.IsNullOrWhiteSpace(DetectedModelName)
+            ? "Denon Desktop"
+            : $"{ReceiverTitle} — Denon Desktop";
 
     public string ReceiverDetails
     {
@@ -958,7 +1011,13 @@ public sealed partial class MainViewModel : ObservableObject
 
         if (snapshot.Status is { } status)
         {
-            ReceiverTitle = string.IsNullOrWhiteSpace(status.Player.Name) ? _settingsStore.Current.Receiver.PlayerName : status.Player.Name;
+            var configuredName = _settingsStore.Current.Receiver.PlayerName;
+            ReceiverTitle = !string.IsNullOrWhiteSpace(status.Player.Name)
+                ? status.Player.Name
+                : (!string.IsNullOrWhiteSpace(status.Player.Model)
+                    ? status.Player.Model
+                    : (string.IsNullOrWhiteSpace(configuredName) ? "Denon / Marantz AVR" : configuredName));
+            DetectedModelName = status.Player.Model ?? string.Empty;
             FirmwareVersion = string.IsNullOrWhiteSpace(status.Player.Version) ? string.Empty : $"FW {status.Player.Version}";
             IsPoweredOn = status.IsPoweredOn;
             IsMainZoneOn = status.IsMainZoneOn;

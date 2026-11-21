@@ -119,9 +119,7 @@ public sealed class AppSettingsStore
         var normalized = settings.Clone();
         normalized.Receiver.Host = NormalizeHost(normalized.Receiver.Host);
         normalized.Receiver.Port = NormalizePort(normalized.Receiver.Port);
-        normalized.Receiver.PlayerName = string.IsNullOrWhiteSpace(normalized.Receiver.PlayerName)
-            ? "Denon AVR-X2400H"
-            : normalized.Receiver.PlayerName.Trim();
+        normalized.Receiver.PlayerName = normalized.Receiver.PlayerName?.Trim() ?? string.Empty;
         normalized.Receiver.DefaultLowVolume = Math.Clamp(normalized.Receiver.DefaultLowVolume, 0, 98);
         normalized.Receiver.PollIntervalSeconds = Math.Clamp(normalized.Receiver.PollIntervalSeconds, 2, 60);
         normalized.Receiver.VolumePresets = NormalizeVolumePresets(normalized.Receiver.VolumePresets);
@@ -185,8 +183,8 @@ public sealed class AppSettingsStore
         return normalized.Count == 0 ? ScenePreset.CreateDefaultScenes() : normalized;
     }
 
-    private static string NormalizeHost(string value) =>
-        string.IsNullOrWhiteSpace(value) ? "192.168.1.3" : value.Trim();
+    private static string NormalizeHost(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
 
     private static int NormalizePort(int value) => value is > 0 and <= 65535 ? value : 1255;
 

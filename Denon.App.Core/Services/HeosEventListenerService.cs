@@ -49,6 +49,19 @@ public sealed class HeosEventListenerService : BackgroundService
             _reconnectTriggerCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             var loopToken = _reconnectTriggerCts.Token;
 
+            if (string.IsNullOrWhiteSpace(settings.Host))
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(3), loopToken);
+                }
+                catch (OperationCanceledException)
+                {
+                }
+
+                continue;
+            }
+
             try
             {
                 using var tcp = new TcpClient { NoDelay = true };

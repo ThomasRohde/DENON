@@ -5,6 +5,7 @@ namespace Denon.App.Core.Services;
 public sealed class ReceiverPollingService : BackgroundService
 {
     private readonly ReceiverController _receiverController;
+    private readonly DenonDiscoveryService _discoveryService;
     private readonly AppSettingsStore _settingsStore;
     private readonly AppLogStore _logStore;
     private string? _lastPollFailure;
@@ -12,10 +13,12 @@ public sealed class ReceiverPollingService : BackgroundService
 
     public ReceiverPollingService(
         ReceiverController receiverController,
+        DenonDiscoveryService discoveryService,
         AppSettingsStore settingsStore,
         AppLogStore logStore)
     {
         _receiverController = receiverController;
+        _discoveryService = discoveryService;
         _settingsStore = settingsStore;
         _logStore = logStore;
     }
@@ -28,6 +31,26 @@ public sealed class ReceiverPollingService : BackgroundService
         {
             try
             {
+                var currentSettings = _settingsStore.Current;
+                if (string.IsNullOrWhiteSpace(currentSettings.Receiver.Host))
+                {
+                    _logStore.Info("No receiver IP configured — scanning local network for Denon / Marantz HEOS receivers...");
+                    var discovered = await _discoveryService.DiscoverAsync(TimeSpan.FromSeconds(3.5), stoppingToken);
+                    if (discovered.Count > 0)
+                    {
+                        var first = discovered[0];
+                        currentSettings.Receiver.Host = first.IpAddress;
+                        currentSettings.Receiver.Port = first.Port;
+                        currentSettings.Receiver.PlayerName = first.Name;
+                        await _settingsStore.SaveAsync(currentSettings, stoppingToken);
+                        _logStore.Info($"Auto-detected receiver: {first.Name} ({first.Model}) at {first.IpAddress}.");
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("No Denon / Marantz HEOS receiver found automatically. Open Settings to Scan LAN or enter your receiver IP.");
+                    }
+                }
+
                 await _receiverController.RefreshAsync(stoppingToken);
                 if (_consecutiveFailures > 0)
                 {
