@@ -1,0 +1,727 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+
+namespace Denon.Plugin.SmartTv;
+
+public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
+{
+    private static readonly SolidColorBrush LiveBrush = Freeze(Color.FromRgb(16, 185, 129));
+    private static readonly SolidColorBrush DemoBrush = Freeze(Color.FromRgb(56, 189, 248));
+    private static readonly SolidColorBrush WarnBrush = Freeze(Color.FromRgb(245, 158, 11));
+    private static readonly SolidColorBrush MutedBrush = Freeze(Color.FromRgb(100, 116, 139));
+
+    private static readonly IReadOnlyList<LgTvInputInfo> DefaultOfflineInputs =
+    [
+        new("HDMI_1", "com.webos.app.hdmi1", "HDMI 1", false, false, "Offline"),
+        new("HDMI_2", "com.webos.app.hdmi2", "HDMI 2 (eARC)", false, false, "Offline"),
+        new("HDMI_3", "com.webos.app.hdmi3", "HDMI 3", false, false, "Offline"),
+        new("HDMI_4", "com.webos.app.hdmi4", "HDMI 4", false, false, "Offline"),
+    ];
+
+    private static readonly IReadOnlyList<LgTvAppInfo> DefaultOfflineApps =
+    [
+        new("youtube.leanback.v4", "YouTube", "Google", false, false, "YT"),
+        new("netflix", "Netflix", "Netflix", false, false, "NF"),
+        new("cdp-30", "Plex", "Plex", false, false, "PX"),
+        new("com.disney.disneyplus-prod", "Disney+", "Disney", false, false, "D+"),
+        new("spotify-beehive", "Spotify", "Spotify", false, false, "SP"),
+        new("amazon", "Prime Video", "Amazon", false, false, "PV"),
+        new("com.webos.app.livetv", "Live TV", "LG", true, false, "TV"),
+    ];
+
+    private readonly SmartTvPlugin _plugin;
+    private IReadOnlyList<LgTvAppInfo> _allApps = DefaultOfflineApps;
+    private CancellationTokenSource? _volumeDebounceCts;
+    private bool _suppressVolumeSend;
+
+    private string _tvName = "Living Room OLED TV";
+    private string _tvIp = string.Empty;
+    private string _macAddress = string.Empty;
+    private bool _demoMode;
+    private bool _wakeWithDenon;
+    private bool _offWithStandby;
+    private bool _showSceneToast = true;
+    private bool _switchToArcOnDenon;
+    private bool _muteSpeakersOnDenon;
+    private bool _screenOffOnMusicScene;
+
+    private bool _isLiveConnected;
+    private string _connectionBadgeText = "STANDBY / OFFLINE";
+    private Brush _connectionBadgeBrush = MutedBrush;
+    private string _modelSummary = "Not paired yet";
+    private string _nowShowingText = "TV Standby / Offline";
+    private string _soundOutputText = "—";
+    private string _soundOutputRaw = string.Empty;
+    private string _screenStateText = "Panel Ready";
+    private bool _isScreenOff;
+    private int _tvVolume;
+    private bool _isTvMuted;
+    private string _appSearchQuery = string.Empty;
+    private string _keyboardText = string.Empty;
+    private string _youtubeUrlOrId = string.Empty;
+    private string _toastText = "Denon Desktop • Home Theater Ready";
+    private string _statusMessage = "Click Auto-Discover TV or enter your LG webOS TV IP & click Pair.";
+    private string _appsCountBadge = "7 quick apps";
+    private bool _isBusy;
+
+    public SmartTvDashboardViewModel(SmartTvPlugin plugin)
+    {
+        _plugin = plugin;
+
+        DiscoverCommand = new AsyncRelayCommand(_ => DiscoverAsync());
+        AutoMacCommand = new AsyncRelayCommand(_ => ResolveMacAsync());
+        PairCommand = new AsyncRelayCommand(_ => PairAsync(forcePairing: false));
+        RePairCommand = new AsyncRelayCommand(_ => PairAsync(forcePairing: true));
+        RefreshCommand = new AsyncRelayCommand(_ => RefreshStateAsync());
+        SaveCommand = new AsyncRelayCommand(_ => SaveAsync());
+        ToggleDemoCommand = new AsyncRelayCommand(_ => ToggleDemoAsync());
+        RunActionCommand = new AsyncRelayCommand(p => p is string act ? RunActionAsync(act) : Task.CompletedTask);
+        SwitchInputCommand = new AsyncRelayCommand(p => p is string input ? SwitchInputAsync(input) : Task.CompletedTask);
+        LaunchAppCommand = new AsyncRelayCommand(p => p is string appId ? LaunchAppAsync(appId) : Task.CompletedTask);
+        SendButtonCommand = new AsyncRelayCommand(p => p is string btn ? SendButtonAsync(btn) : Task.CompletedTask);
+        SendMediaCommand = new AsyncRelayCommand(p => p is string cmd ? SendMediaAsync(cmd) : Task.CompletedTask);
+        SetAudioOutputCommand = new AsyncRelayCommand(p => p is string outId ? SetAudioOutputAsync(outId) : Task.CompletedTask);
+        ToggleTvMuteCommand = new AsyncRelayCommand(_ => ToggleTvMuteAsync());
+        StepTvVolumeCommand = new AsyncRelayCommand(p => StepTvVolumeAsync(p?.ToString() == "+"));
+        SendKeyboardCommand = new AsyncRelayCommand(p => SendKeyboardAsync(p?.ToString() != "noenter"));
+        BackspaceKeyboardCommand = new AsyncRelayCommand(_ => BackspaceKeyboardAsync());
+        CastYouTubeCommand = new AsyncRelayCommand(_ => CastYouTubeAsync());
+        SendCustomToastCommand = new AsyncRelayCommand(_ => SendCustomToastAsync());
+
+        foreach (var inp in DefaultOfflineInputs) Inputs.Add(inp);
+        RebuildFilteredApps();
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public ObservableCollection<LgTvInputInfo> Inputs { get; } = [];
+    public ObservableCollection<LgTvAppInfo> FilteredApps { get; } = [];
+
+    public ICommand DiscoverCommand { get; }
+    public ICommand AutoMacCommand { get; }
+    public ICommand PairCommand { get; }
+    public ICommand RePairCommand { get; }
+    public ICommand RefreshCommand { get; }
+    public ICommand SaveCommand { get; }
+    public ICommand ToggleDemoCommand { get; }
+    public ICommand RunActionCommand { get; }
+    public ICommand SwitchInputCommand { get; }
+    public ICommand LaunchAppCommand { get; }
+    public ICommand SendButtonCommand { get; }
+    public ICommand SendMediaCommand { get; }
+    public ICommand SetAudioOutputCommand { get; }
+    public ICommand ToggleTvMuteCommand { get; }
+    public ICommand StepTvVolumeCommand { get; }
+    public ICommand SendKeyboardCommand { get; }
+    public ICommand BackspaceKeyboardCommand { get; }
+    public ICommand CastYouTubeCommand { get; }
+    public ICommand SendCustomToastCommand { get; }
+
+    public string TvName { get => _tvName; set => Set(ref _tvName, value); }
+    public string TvIp { get => _tvIp; set => Set(ref _tvIp, value); }
+    public string MacAddress { get => _macAddress; set => Set(ref _macAddress, value); }
+    public bool IsBusy { get => _isBusy; private set => Set(ref _isBusy, value); }
+
+    public bool DemoMode
+    {
+        get => _demoMode;
+        private set
+        {
+            if (Set(ref _demoMode, value))
+            {
+                Raise(nameof(DemoButtonLabel));
+            }
+        }
+    }
+
+    public string DemoButtonLabel => DemoMode ? "Exit Demo" : "Try Demo";
+
+    public bool WakeWithDenon { get => _wakeWithDenon; set => Set(ref _wakeWithDenon, value); }
+    public bool OffWithStandby { get => _offWithStandby; set => Set(ref _offWithStandby, value); }
+    public bool ShowSceneToast { get => _showSceneToast; set => Set(ref _showSceneToast, value); }
+    public bool SwitchToArcOnDenon { get => _switchToArcOnDenon; set => Set(ref _switchToArcOnDenon, value); }
+    public bool MuteSpeakersOnDenon { get => _muteSpeakersOnDenon; set => Set(ref _muteSpeakersOnDenon, value); }
+    public bool ScreenOffOnMusicScene { get => _screenOffOnMusicScene; set => Set(ref _screenOffOnMusicScene, value); }
+
+    public bool IsLiveConnected { get => _isLiveConnected; private set => Set(ref _isLiveConnected, value); }
+    public string ConnectionBadgeText { get => _connectionBadgeText; private set => Set(ref _connectionBadgeText, value); }
+    public Brush ConnectionBadgeBrush { get => _connectionBadgeBrush; private set => Set(ref _connectionBadgeBrush, value); }
+    public string ModelSummary { get => _modelSummary; private set => Set(ref _modelSummary, value); }
+    public string NowShowingText { get => _nowShowingText; private set => Set(ref _nowShowingText, value); }
+    public string SoundOutputText { get => _soundOutputText; private set => Set(ref _soundOutputText, value); }
+    public string ScreenStateText { get => _screenStateText; private set => Set(ref _screenStateText, value); }
+    public bool IsScreenOff { get => _isScreenOff; private set => Set(ref _isScreenOff, value); }
+    public string AppsCountBadge { get => _appsCountBadge; private set => Set(ref _appsCountBadge, value); }
+
+    public bool IsAudioArcActive => _soundOutputRaw.Equals("external_arc", StringComparison.OrdinalIgnoreCase);
+    public bool IsAudioSpeakersActive => _soundOutputRaw.Equals("tv_speaker", StringComparison.OrdinalIgnoreCase);
+    public bool IsAudioOpticalActive => _soundOutputRaw.Equals("external_optical", StringComparison.OrdinalIgnoreCase);
+    public bool IsAudioBluetoothActive => _soundOutputRaw.Contains("bt", StringComparison.OrdinalIgnoreCase) || _soundOutputRaw.Contains("bluetooth", StringComparison.OrdinalIgnoreCase);
+
+    public int TvVolume
+    {
+        get => _tvVolume;
+        set
+        {
+            var clamped = Math.Clamp(value, 0, 100);
+            if (Set(ref _tvVolume, clamped))
+            {
+                Raise(nameof(TvVolumeLabel));
+                if (!_suppressVolumeSend)
+                {
+                    ScheduleVolumeSend(clamped);
+                }
+            }
+        }
+    }
+
+    public bool IsTvMuted
+    {
+        get => _isTvMuted;
+        private set
+        {
+            if (Set(ref _isTvMuted, value))
+            {
+                Raise(nameof(TvVolumeLabel));
+                Raise(nameof(MuteButtonLabel));
+            }
+        }
+    }
+
+    public string TvVolumeLabel => IsTvMuted ? $"MUTED ({TvVolume})" : $"{TvVolume}";
+    public string MuteButtonLabel => IsTvMuted ? "Unmute" : "Mute";
+
+    public string AppSearchQuery
+    {
+        get => _appSearchQuery;
+        set
+        {
+            if (Set(ref _appSearchQuery, value))
+            {
+                RebuildFilteredApps();
+            }
+        }
+    }
+
+    public string KeyboardText { get => _keyboardText; set => Set(ref _keyboardText, value); }
+    public string YouTubeUrlOrId { get => _youtubeUrlOrId; set => Set(ref _youtubeUrlOrId, value); }
+    public string ToastText { get => _toastText; set => Set(ref _toastText, value); }
+    public string StatusMessage { get => _statusMessage; private set => Set(ref _statusMessage, value); }
+
+    public void SyncFromConfig(SmartTvConfig cfg)
+    {
+        void Apply()
+        {
+            TvName = cfg.TvName;
+            TvIp = cfg.TvIp;
+            MacAddress = cfg.MacAddress;
+            DemoMode = cfg.DemoMode;
+            WakeWithDenon = cfg.WakeWithDenonPowerOn;
+            OffWithStandby = cfg.TurnOffWithDenonStandby;
+            ShowSceneToast = cfg.ShowSceneToastOnTv;
+            SwitchToArcOnDenon = cfg.SwitchToArcOnDenonPowerOn;
+            MuteSpeakersOnDenon = cfg.MuteTvSpeakersOnDenonPowerOn;
+            ScreenOffOnMusicScene = cfg.ScreenOffOnMusicScene;
+
+            if (!string.IsNullOrWhiteSpace(cfg.LastModelName) && ModelSummary == "Not paired yet")
+            {
+                ModelSummary = string.IsNullOrWhiteSpace(cfg.LastWebOsVersion)
+                    ? cfg.LastModelName
+                    : $"{cfg.LastModelName} • {cfg.LastWebOsVersion}";
+            }
+        }
+
+        RunOnUi(Apply);
+    }
+
+    public void ApplyLiveState(LgTvLiveState state)
+    {
+        RunOnUi(() =>
+        {
+            IsLiveConnected = state.IsConnected;
+
+            if (state.IsDemo)
+            {
+                ConnectionBadgeText = "DEMO SIMULATOR";
+                ConnectionBadgeBrush = DemoBrush;
+            }
+            else if (state.IsConnected)
+            {
+                ConnectionBadgeText = $"LIVE • {state.TransportLabel}";
+                ConnectionBadgeBrush = LiveBrush;
+            }
+            else if (!string.IsNullOrWhiteSpace(_plugin.Config.ClientKey))
+            {
+                ConnectionBadgeText = "PAIRED • STANDBY";
+                ConnectionBadgeBrush = MutedBrush;
+            }
+            else if (!string.IsNullOrWhiteSpace(_plugin.Config.TvIp))
+            {
+                ConnectionBadgeText = "NEEDS PAIRING";
+                ConnectionBadgeBrush = WarnBrush;
+            }
+            else
+            {
+                ConnectionBadgeText = "NOT CONFIGURED";
+                ConnectionBadgeBrush = MutedBrush;
+            }
+
+            if (!string.IsNullOrWhiteSpace(state.ModelName) || !string.IsNullOrWhiteSpace(state.WebOsVersion))
+            {
+                ModelSummary = string.Join(" • ", new[] { state.ModelName, state.WebOsVersion }.Where(s => !string.IsNullOrWhiteSpace(s)));
+            }
+            else if (!string.IsNullOrWhiteSpace(_plugin.Config.LastModelName))
+            {
+                ModelSummary = string.Join(" • ", new[] { _plugin.Config.LastModelName, _plugin.Config.LastWebOsVersion }.Where(s => !string.IsNullOrWhiteSpace(s)));
+            }
+
+            NowShowingText = state.NowShowingSummary;
+            _soundOutputRaw = state.SoundOutput;
+            SoundOutputText = state.SoundOutputLabel;
+            Raise(nameof(IsAudioArcActive));
+            Raise(nameof(IsAudioSpeakersActive));
+            Raise(nameof(IsAudioOpticalActive));
+            Raise(nameof(IsAudioBluetoothActive));
+
+            IsScreenOff = state.IsScreenOff;
+            ScreenStateText = !state.IsConnected && !state.IsDemo
+                ? "Standby"
+                : (state.IsScreenOff ? "OLED Screen OFF (Audio)" : "Panel ON");
+
+            _suppressVolumeSend = true;
+            try
+            {
+                TvVolume = state.Volume;
+                IsTvMuted = state.IsMuted;
+            }
+            finally
+            {
+                _suppressVolumeSend = false;
+            }
+
+            var targetInputs = state.Inputs.Count > 0 ? state.Inputs : DefaultOfflineInputs;
+            Inputs.Clear();
+            foreach (var inp in targetInputs)
+            {
+                Inputs.Add(inp);
+            }
+
+            _allApps = state.Apps.Count > 0 ? state.Apps : DefaultOfflineApps;
+            AppsCountBadge = state.Apps.Count > 0 ? $"{state.Apps.Count} installed apps" : "7 quick apps (pair to load all)";
+            RebuildFilteredApps();
+        });
+    }
+
+    public void SetLastActivity(string msg) =>
+        RunOnUi(() => StatusMessage = $"{DateTime.Now:HH:mm:ss} • {msg}");
+
+    private void RebuildFilteredApps()
+    {
+        var query = (_appSearchQuery ?? string.Empty).Trim();
+        var filtered = string.IsNullOrWhiteSpace(query)
+            ? _allApps
+            : _allApps.Where(a =>
+                a.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                a.Id.Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        FilteredApps.Clear();
+        foreach (var app in filtered)
+        {
+            FilteredApps.Add(app);
+        }
+    }
+
+    private void ScheduleVolumeSend(int targetVolume)
+    {
+        _volumeDebounceCts?.Cancel();
+        _volumeDebounceCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        _volumeDebounceCts = cts;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(140, cts.Token);
+                await _plugin.Client.SetVolumeAsync(targetVolume, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Newer slider drag superseded this one.
+            }
+            catch (Exception ex)
+            {
+                SetLastActivity($"⚠ Volume error: {ex.Message}");
+            }
+        });
+    }
+
+    private async Task DiscoverAsync()
+    {
+        IsBusy = true;
+        StatusMessage = "Scanning local LAN for LG webOS Smart TVs (SSDP + ARP)...";
+        try
+        {
+            var found = await _plugin.DiscoverTvsAsync();
+            if (found.Count == 0)
+            {
+                if (!string.IsNullOrWhiteSpace(TvIp))
+                {
+                    var mac = await LgTvDiscoveryService.ResolveMacAddressAsync(TvIp);
+                    if (!string.IsNullOrWhiteSpace(mac))
+                    {
+                        MacAddress = mac;
+                        StatusMessage = $"No SSDP broadcast reply, but resolved MAC {mac} for {TvIp} via ARP! Click Pair while TV is ON.";
+                        return;
+                    }
+                }
+
+                StatusMessage = "No LG webOS TV answered SSDP multicast (some routers filter multicast). Enter the TV IP manually and click Pair — MAC will auto-fill via ARP.";
+                return;
+            }
+
+            var first = found[0];
+            TvName = first.FriendlyName;
+            TvIp = first.IpAddress;
+            if (!string.IsNullOrWhiteSpace(first.MacAddress))
+            {
+                MacAddress = first.MacAddress;
+            }
+
+            await SaveAsync();
+            StatusMessage = $"Discovered {first.FriendlyName} at {first.IpAddress} (MAC: {(string.IsNullOrWhiteSpace(first.MacAddress) ? "not resolved" : first.MacAddress)}). Click Pair with LG TV!";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Discovery failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task ResolveMacAsync()
+    {
+        if (string.IsNullOrWhiteSpace(TvIp))
+        {
+            StatusMessage = "Enter your TV LAN IP first to auto-resolve its MAC address.";
+            return;
+        }
+
+        StatusMessage = $"Resolving hardware MAC address for {TvIp} via ARP...";
+        var mac = await LgTvDiscoveryService.ResolveMacAddressAsync(TvIp);
+        if (string.IsNullOrWhiteSpace(mac))
+        {
+            StatusMessage = $"Could not resolve MAC for {TvIp} via ARP (make sure TV is awake on the same subnet).";
+            return;
+        }
+
+        MacAddress = mac;
+        await SaveAsync();
+        StatusMessage = $"✓ Auto-filled Wake-on-LAN MAC address: {mac}";
+    }
+
+    private async Task PairAsync(bool forcePairing)
+    {
+        if (string.IsNullOrWhiteSpace(TvIp))
+        {
+            StatusMessage = "Enter your LG webOS TV IP address first (or click Auto-Discover TV).";
+            return;
+        }
+
+        IsBusy = true;
+        StatusMessage = forcePairing
+            ? $"Re-pairing with full permissions at {TvIp}... Accept the Denon Desktop prompt on your TV screen."
+            : $"Connecting to LG TV at {TvIp} (wss://:3001)... Accept the prompt on your TV screen if shown.";
+        try
+        {
+            StatusMessage = $"✓ {await _plugin.PairTvAsync(TvIp, forcePairing)}";
+            SyncFromConfig(_plugin.Config);
+            ApplyLiveState(_plugin.Client.CurrentState);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ Pairing failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task RefreshStateAsync()
+    {
+        IsBusy = true;
+        StatusMessage = "Refreshing live LG webOS TV state, HDMI inputs & installed apps...";
+        try
+        {
+            await _plugin.Client.RefreshStateAsync();
+            ApplyLiveState(_plugin.Client.CurrentState);
+            StatusMessage = $"✓ Synced live state ({_plugin.Client.CurrentState.Inputs.Count} inputs, {_plugin.Client.CurrentState.Apps.Count} installed apps).";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ Refresh failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        await _plugin.SaveConfigAsync(new SmartTvConfig
+        {
+            TvName = TvName.Trim(),
+            TvIp = TvIp.Trim(),
+            MacAddress = MacAddress.Trim(),
+            ClientKey = _plugin.Config.ClientKey,
+            DemoMode = DemoMode,
+            WakeWithDenonPowerOn = WakeWithDenon,
+            TurnOffWithDenonStandby = OffWithStandby,
+            ShowSceneToastOnTv = ShowSceneToast,
+            SwitchToArcOnDenonPowerOn = SwitchToArcOnDenon,
+            MuteTvSpeakersOnDenonPowerOn = MuteSpeakersOnDenon,
+            ScreenOffOnMusicScene = ScreenOffOnMusicScene,
+            MovieNightInputAppId = _plugin.Config.MovieNightInputAppId,
+            LastModelName = _plugin.Config.LastModelName,
+            LastWebOsVersion = _plugin.Config.LastWebOsVersion,
+        });
+        StatusMessage = "✓ Saved Smart TV settings.";
+    }
+
+    private async Task ToggleDemoAsync()
+    {
+        DemoMode = !DemoMode;
+        await SaveAsync();
+        ApplyLiveState(_plugin.Client.CurrentState);
+        StatusMessage = DemoMode
+            ? "Smart TV Demo Simulator active — test HDMI inputs, installed apps, Magic Remote D-Pad, OLED Screen Off & Audio Output!"
+            : "Exited Demo Mode.";
+    }
+
+    private async Task RunActionAsync(string actionId)
+    {
+        var result = await _plugin.ExecuteActionAsync(actionId);
+        StatusMessage = result.Success ? $"✓ {result.Message}" : $"⚠ {result.Message}";
+    }
+
+    private async Task SwitchInputAsync(string inputIdOrAppId)
+    {
+        try
+        {
+            await _plugin.Client.SwitchInputAsync(inputIdOrAppId);
+            var label = Inputs.FirstOrDefault(i => i.AppId.Equals(inputIdOrAppId, StringComparison.OrdinalIgnoreCase) || i.Id.Equals(inputIdOrAppId, StringComparison.OrdinalIgnoreCase))?.Label ?? inputIdOrAppId;
+            StatusMessage = $"✓ Switched TV input to {label}.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ Input switch failed: {ex.Message}";
+        }
+    }
+
+    private async Task LaunchAppAsync(string appId)
+    {
+        try
+        {
+            var title = await _plugin.Client.LaunchAppAsync(appId);
+            StatusMessage = $"✓ Launched {title} ({appId}) on TV.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ App launch failed: {ex.Message}";
+        }
+    }
+
+    private async Task SendButtonAsync(string button)
+    {
+        try
+        {
+            await _plugin.Client.SendButtonAsync(button);
+            StatusMessage = $"✓ Sent remote key: {button.ToUpperInvariant()}";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ Remote button failed: {ex.Message}";
+        }
+    }
+
+    private async Task SendMediaAsync(string mediaAction)
+    {
+        try
+        {
+            await _plugin.Client.SendMediaControlAsync(mediaAction);
+            StatusMessage = $"✓ Sent TV media command: {mediaAction}";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ Media command failed: {ex.Message}";
+        }
+    }
+
+    private async Task SetAudioOutputAsync(string outputId)
+    {
+        try
+        {
+            await _plugin.Client.SetSoundOutputAsync(outputId);
+            StatusMessage = $"✓ TV audio output → {LgTvLiveState.FormatSoundOutput(outputId)}";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ Audio output change failed: {ex.Message}";
+        }
+    }
+
+    private async Task ToggleTvMuteAsync()
+    {
+        try
+        {
+            var next = !IsTvMuted;
+            await _plugin.Client.SetMuteAsync(next);
+            StatusMessage = next ? "✓ Muted TV audio." : "✓ Unmuted TV audio.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ Mute toggle failed: {ex.Message}";
+        }
+    }
+
+    private async Task StepTvVolumeAsync(bool up)
+    {
+        try
+        {
+            await _plugin.Client.StepVolumeAsync(up);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ Volume step failed: {ex.Message}";
+        }
+    }
+
+    private async Task SendKeyboardAsync(bool pressEnter)
+    {
+        if (string.IsNullOrWhiteSpace(KeyboardText))
+        {
+            StatusMessage = "Type text first (while an on-screen TV search/input field is focused).";
+            return;
+        }
+
+        try
+        {
+            var payload = KeyboardText;
+            await _plugin.Client.SendKeyboardTextAsync(payload, pressEnter);
+            KeyboardText = string.Empty;
+            StatusMessage = pressEnter
+                ? $"✓ Typed \"{payload}\" + Enter on TV keyboard."
+                : $"✓ Typed \"{payload}\" on TV keyboard.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ Keyboard input failed (make sure a text box is open on TV): {ex.Message}";
+        }
+    }
+
+    private async Task BackspaceKeyboardAsync()
+    {
+        try
+        {
+            await _plugin.Client.DeleteKeyboardCharactersAsync(1);
+            StatusMessage = "✓ Sent Backspace to TV keyboard.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ Backspace failed: {ex.Message}";
+        }
+    }
+
+    private async Task CastYouTubeAsync()
+    {
+        var input = (YouTubeUrlOrId ?? string.Empty).Trim();
+        try
+        {
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                var title = await _plugin.Client.LaunchAppAsync("youtube");
+                StatusMessage = $"✓ Launched {title} on TV.";
+            }
+            else
+            {
+                var vid = LgWebOsClient.ExtractYouTubeVideoId(input);
+                await _plugin.Client.LaunchAppAsync("youtube", vid);
+                StatusMessage = $"✓ Cast YouTube video ({vid}) to LG TV!";
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ YouTube cast failed: {ex.Message}";
+        }
+    }
+
+    private async Task SendCustomToastAsync()
+    {
+        var msg = string.IsNullOrWhiteSpace(ToastText) ? "Denon Desktop connected to LG webOS TV" : ToastText.Trim();
+        try
+        {
+            await _plugin.Client.SendToastAsync(msg);
+            StatusMessage = $"✓ Displayed TV toast: \"{msg}\"";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ Toast failed: {ex.Message}";
+        }
+    }
+
+    private static void RunOnUi(Action action)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            action();
+        }
+        else
+        {
+            dispatcher.InvokeAsync(action);
+        }
+    }
+
+    private bool Set<T>(ref T field, T val, [CallerMemberName] string? prop = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, val)) return false;
+        field = val;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+        return true;
+    }
+
+    private void Raise(string prop) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+
+    private static SolidColorBrush Freeze(Color c)
+    {
+        var b = new SolidColorBrush(c);
+        b.Freeze();
+        return b;
+    }
+
+    private sealed class AsyncRelayCommand(Func<object?, Task> exec) : ICommand
+    {
+        public event EventHandler? CanExecuteChanged { add { } remove { } }
+        public bool CanExecute(object? p) => true;
+        public async void Execute(object? p)
+        {
+            try
+            {
+                await exec(p);
+            }
+            catch
+            {
+                // Individual command handlers report user-visible errors via StatusMessage.
+            }
+        }
+    }
+}

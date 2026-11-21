@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-21
+
+### Added
+- **Smart TV Control (LG webOS) 2.0 Overhaul (`Denon.Plugin.SmartTv`)**:
+  - **Persistent, Auto-Reconnecting SSAP WebSocket Engine (`wss://:3001` & `ws://:3000`)** with multiplexed request correlation, strict SSAP error validation, and zero-lag real-time push subscriptions (`getForegroundAppInfo`, `audio/getStatus`, `audio/getSoundOutput`, `getPowerState`, `getExternalInputList`, `getCurrentChannel`).
+  - **Dynamic Installed Apps & Real HDMI Inputs Discovery**: queries `listLaunchPoints` and `getExternalInputList` directly from your LG TV to show every real installed app (searchable, favorites-pinned, live active highlight) and every physical HDMI port with its actual label & live signal indicator dot.
+  - **Virtual Magic Remote & PC → TV Keyboard**: connects to LG's secondary pointer input socket (`getPointerInputSocket`) for a full D-Pad (`Up`/`Down`/`Left`/`Right`/`OK`), `Home`/`Back`/`Exit`/`Settings`/`Info`/`Guide`/`Ch ±`, Media Transport (`Rew`/`Play`/`Pause`/`Stop`/`FF`), and live IME text entry (`insertText`, `sendEnterKey`, `deleteCharacters`).
+  - **OLED Screen Off (Audio-Only Mode) & Audio Output Switcher**: one-click **OLED Screen Off** (`turnOffScreen`) to blank the panel while keeping music/eARC playing with zero burn-in, plus one-click switching between **HDMI ARC/eARC**, **TV Speakers**, **Optical**, and **Bluetooth**, and a debounced TV Volume slider.
+  - **YouTube URL / Video ID Caster**: paste any YouTube link or 11-character video ID to deep-link directly on your LG TV (`contentId: "v=..."`).
+  - **Multi-Interface SSDP Auto-Discovery + Win32 ARP MAC Lookup + Multi-NIC Wake-on-LAN**: auto-discover LG webOS TVs on the LAN, auto-fill their Wake-on-LAN MAC address via ARP, and auto-reconnect after Wake-on-LAN.
+  - **Expanded Denon AVR Coordination (24 Plugin Actions)**: auto-switch LG TV audio to **HDMI ARC/eARC** on Denon Power ON, auto-mute TV speakers, optional **OLED Screen Off** on Music Smart Scenes, and full availability across Smart Scenes 2.0, Global Hotkeys, and Couch Phone Remote.
+
+### Fixed
+- **LG webOS YouTube Launch Bounce-Back & Lost Pairing Key**: Switched standard app launches to `ssap://com.webos.applicationManager/launch` over the persistent WebSocket (eliminating the short-lived socket teardown that caused apps like YouTube to briefly flash and return to Live TV), added dynamic installed app ID resolution, validated SSAP error responses instead of silently ignoring failures, and immediately persisted returned `client-key` credentials to `config.json`.
+
 ## [1.4.0] - 2026-11-21
 
 ### Added
@@ -103,7 +118,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Zero-Lag Real-Time HEOS Push Events (`LIVE PUSH`) & Analog VU Meters**: Dedicated `register_for_change_events` push listener for `<50 ms` knob/remote sync and toggleable dual-channel illuminated VU dials.
 - **Automated GitHub Releases Workflow**: `.github/workflows/release.yml` builds self-contained single-file `win-x64` executables and SHA-256 checksums on version tags.
 
-[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/ThomasRohde/DENON/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/ThomasRohde/DENON/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/ThomasRohde/DENON/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/ThomasRohde/DENON/compare/v1.1.1...v1.2.0
