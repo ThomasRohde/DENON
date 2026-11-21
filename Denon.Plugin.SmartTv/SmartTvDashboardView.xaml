@@ -4,6 +4,7 @@
              Foreground="#F1F5F9"
              FontFamily="Segoe UI Variable Display, Segoe UI">
     <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="TvBoolToVis" />
         <Style x:Key="TvCard" TargetType="Border">
             <Setter Property="Background" Value="#13161E" />
             <Setter Property="BorderBrush" Value="#232836" />
@@ -79,12 +80,7 @@
             <Setter Property="FontSize" Value="13" />
         </Style>
 
-        <Style x:Key="TvInput" TargetType="TextBox">
-            <Setter Property="Background" Value="#0C0F16" />
-            <Setter Property="Foreground" Value="#F1F5F9" />
-            <Setter Property="CaretBrush" Value="#38BDF8" />
-            <Setter Property="BorderBrush" Value="#2A3244" />
-            <Setter Property="BorderThickness" Value="1" />
+        <Style x:Key="TvInput" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
             <Setter Property="Padding" Value="9,6" />
             <Setter Property="FontSize" Value="12" />
         </Style>
@@ -170,44 +166,58 @@
                         </StackPanel>
 
                         <WrapPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center">
-                            <Button Content="Auto-Discover" Command="{Binding DiscoverCommand}" Style="{StaticResource TvBtn}" Margin="0,0,6,4" ToolTip="Scan LAN via SSDP + ARP to find LG webOS TVs" />
-                            <Button Content="{Binding DemoButtonLabel}" Command="{Binding ToggleDemoCommand}" Style="{StaticResource TvBtn}" Margin="0,0,6,4" />
                             <Button Content="Refresh" Command="{Binding RefreshCommand}" Style="{StaticResource TvBtn}" Margin="0,0,6,4" ToolTip="Re-sync live TV apps, inputs, audio &amp; power state" />
-                            <Button Content="Save" Command="{Binding SaveCommand}" Style="{StaticResource TvBtn}" Margin="0,0,6,4" />
+                            <Button Content="{Binding DemoButtonLabel}" Command="{Binding ToggleDemoCommand}" Style="{StaticResource TvBtn}" Margin="0,0,6,4" />
+                            <Button Content="{Binding SetupToggleLabel}" Command="{Binding ToggleSetupCommand}" Style="{StaticResource TvBtn}" Margin="0,0,6,4" ToolTip="Show or hide TV IP, MAC &amp; pairing setup fields" />
                             <Button Content="Pair with LG TV" Command="{Binding PairCommand}" Style="{StaticResource TvPrimaryBtn}" Margin="0,0,0,4" />
                         </WrapPanel>
                     </Grid>
 
-                    <!-- Connection Inputs -->
-                    <Grid Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="1.0*" />
-                            <ColumnDefinition Width="10" />
-                            <ColumnDefinition Width="0.95*" />
-                            <ColumnDefinition Width="10" />
-                            <ColumnDefinition Width="1.15*" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="TV NAME" FontSize="10" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,4" />
-                            <TextBox Text="{Binding TvName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TvInput}" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="TV LAN IP ADDRESS" FontSize="10" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,4" />
-                            <TextBox Text="{Binding TvIp, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TvInput}" FontFamily="Cascadia Mono, Consolas" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="4">
-                            <TextBlock Text="MAC ADDRESS (WAKE-ON-LAN)" FontSize="10" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,4" />
-                            <Grid>
+                    <!-- Collapsible Connection Setup Row (automatically collapses once paired!) -->
+                    <Border Background="#0D111A"
+                            BorderBrush="#1F2739"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="12,10"
+                            Margin="0,0,0,12"
+                            Visibility="{Binding IsSetupExpanded, Converter={StaticResource TvBoolToVis}}">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="6" />
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="1.0*" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="0.95*" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="1.25*" />
                                 </Grid.ColumnDefinitions>
-                                <TextBox Grid.Column="0" Text="{Binding MacAddress, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TvInput}" FontFamily="Cascadia Mono, Consolas" />
-                                <Button Grid.Column="2" Content="Auto-MAC" Command="{Binding AutoMacCommand}" Style="{StaticResource TvBtn}" Padding="9,5" FontSize="11" ToolTip="Resolve MAC address automatically from the TV IP via ARP" />
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="TV NAME" FontSize="10" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,4" />
+                                    <TextBox Text="{Binding TvName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TvInput}" Tag="e.g. Living Room OLED TV" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="TV LAN IP ADDRESS" FontSize="10" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,4" />
+                                    <TextBox Text="{Binding TvIp, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TvInput}" FontFamily="Cascadia Mono, Consolas" Tag="192.168.1.28" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="4">
+                                    <TextBlock Text="MAC ADDRESS (WAKE-ON-LAN)" FontSize="10" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,4" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="6" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" Text="{Binding MacAddress, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TvInput}" FontFamily="Cascadia Mono, Consolas" Tag="AA:BB:CC:DD:EE:FF" />
+                                        <Button Grid.Column="2" Content="Auto-MAC" Command="{Binding AutoMacCommand}" Style="{StaticResource TvBtn}" Padding="9,5" FontSize="11" ToolTip="Resolve MAC address automatically from the TV IP via ARP" />
+                                    </Grid>
+                                </StackPanel>
                             </Grid>
+                            <WrapPanel>
+                                <Button Content="Auto-Discover TV" Command="{Binding DiscoverCommand}" Style="{StaticResource TvBtn}" Padding="10,4.5" FontSize="11.5" Margin="0,0,6,0" ToolTip="Scan LAN via SSDP + ARP to find LG webOS TVs" />
+                                <Button Content="Save Settings" Command="{Binding SaveCommand}" Style="{StaticResource TvPrimaryBtn}" Padding="10,4.5" FontSize="11.5" Margin="0,0,6,0" />
+                                <Button Content="Re-Pair (Full Permissions)" Command="{Binding RePairCommand}" Style="{StaticResource TvBtn}" Padding="10,4.5" FontSize="11.5" ToolTip="Force a fresh LG TV prompt to grant pointer remote &amp; installed-app permissions" />
+                            </WrapPanel>
                         </StackPanel>
-                    </Grid>
+                    </Border>
 
                     <!-- Live Telemetry Strip -->
                     <Grid Margin="0,0,0,10">
@@ -441,7 +451,11 @@
                                 <ColumnDefinition Width="6" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBox Grid.Column="0" Text="{Binding YouTubeUrlOrId, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TvInput}" ToolTip="Paste any YouTube URL or 11-char video ID (leave blank to just open YouTube)" />
+                            <TextBox Grid.Column="0" Text="{Binding YouTubeUrlOrId, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TvInput}" Tag="Paste YouTube URL or video ID &amp; press Enter..." ToolTip="Paste any YouTube URL or 11-char video ID (leave blank to open YouTube)" >
+                                <TextBox.InputBindings>
+                                    <KeyBinding Key="Return" Command="{Binding CastYouTubeCommand}" />
+                                </TextBox.InputBindings>
+                            </TextBox>
                             <Button Grid.Column="2" Content="Cast YT" Command="{Binding CastYouTubeCommand}" Style="{StaticResource TvPrimaryBtn}" Padding="11,5" />
                         </Grid>
 
@@ -455,7 +469,11 @@
                                 <ColumnDefinition Width="5" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBox Grid.Column="0" Text="{Binding KeyboardText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TvInput}" ToolTip="Focus any search box on the TV, type here, and press Send" />
+                            <TextBox Grid.Column="0" Text="{Binding KeyboardText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TvInput}" Tag="Type here &amp; press Enter to send to TV..." ToolTip="Focus any search box on the TV, type here, and press Enter">
+                                <TextBox.InputBindings>
+                                    <KeyBinding Key="Return" Command="{Binding SendKeyboardCommand}" />
+                                </TextBox.InputBindings>
+                            </TextBox>
                             <Button Grid.Column="2" Content="Send ↵" Command="{Binding SendKeyboardCommand}" Style="{StaticResource TvBtn}" Padding="10,5" />
                             <Button Grid.Column="4" Content="⌫" Command="{Binding BackspaceKeyboardCommand}" Style="{StaticResource TvBtn}" Padding="9,5" ToolTip="Delete 1 character on TV keyboard" />
                         </Grid>
@@ -468,7 +486,11 @@
                                 <ColumnDefinition Width="6" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBox Grid.Column="0" Text="{Binding ToastText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TvInput}" />
+                            <TextBox Grid.Column="0" Text="{Binding ToastText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TvInput}" Tag="Message to display on TV screen...">
+                                <TextBox.InputBindings>
+                                    <KeyBinding Key="Return" Command="{Binding SendCustomToastCommand}" />
+                                </TextBox.InputBindings>
+                            </TextBox>
                             <Button Grid.Column="2" Content="Toast" Command="{Binding SendCustomToastCommand}" Style="{StaticResource TvBtn}" Padding="11,5" />
                         </Grid>
                     </StackPanel>
@@ -503,6 +525,7 @@
                                      Style="{StaticResource TvInput}"
                                      Padding="8,4"
                                      FontSize="11.5"
+                                     Tag="Filter installed apps..."
                                      ToolTip="Filter installed LG webOS apps by name or ID" />
                         </Grid>
 
@@ -584,14 +607,9 @@
                         <CheckBox Content="Switch TV audio to HDMI ARC/eARC on Denon ON" IsChecked="{Binding SwitchToArcOnDenon}" Foreground="#E2E8F0" Margin="0,0,0,8" />
                         <CheckBox Content="Mute internal TV speakers on Denon ON" IsChecked="{Binding MuteSpeakersOnDenon}" Foreground="#E2E8F0" Margin="0,0,0,8" />
                         <CheckBox Content="Show on-screen TV toast on Smart Scenes" IsChecked="{Binding ShowSceneToast}" Foreground="#E2E8F0" Margin="0,0,0,8" />
-                        <CheckBox Content="OLED Screen Off on Music / Listening scenes" IsChecked="{Binding ScreenOffOnMusicScene}" Foreground="#E2E8F0" Margin="0,0,0,12" />
+                        <CheckBox Content="OLED Screen Off on Music / Listening scenes" IsChecked="{Binding ScreenOffOnMusicScene}" Foreground="#E2E8F0" Margin="0,0,0,10" />
 
-                        <WrapPanel Margin="0,0,0,8">
-                            <Button Content="Save Coordination" Command="{Binding SaveCommand}" Style="{StaticResource TvPrimaryBtn}" Margin="0,0,6,6" Padding="10,5" FontSize="11.5" />
-                            <Button Content="Re-Pair (Full Permissions)" Command="{Binding RePairCommand}" Style="{StaticResource TvBtn}" Margin="0,0,0,6" Padding="10,5" FontSize="11.5" ToolTip="Force a fresh LG TV prompt to grant pointer remote &amp; installed-app permissions" />
-                        </WrapPanel>
-
-                        <TextBlock Text="All 24 Smart TV actions (OLED Screen Off, eARC, HDMI 1–4, YouTube, Netflix, Plex, Play/Pause, Toasts) are also available in Smart Scenes 2.0, Global Hotkeys &amp; Couch Phone Remote!"
+                        <TextBlock Text="Changes save automatically. All 24 Smart TV actions (OLED Screen Off, eARC, HDMI 1–4, YouTube, Netflix, Plex, Play/Pause, Toasts) are also available in Smart Scenes 2.0, Global Hotkeys &amp; Couch Phone Remote!"
                                    FontSize="11"
                                    Foreground="#94A3B8"
                                    TextWrapping="Wrap" />

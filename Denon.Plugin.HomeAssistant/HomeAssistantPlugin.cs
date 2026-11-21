@@ -24,7 +24,27 @@ public sealed class HomeAssistantConfig
     public bool PushReceiverEventsToHa { get; set; } = true;
 }
 
-public sealed record HaEntityItem(string EntityId, string FriendlyName, string Domain, string State);
+public sealed record HaEntityItem(string EntityId, string FriendlyName, string Domain, string State)
+{
+    public string DomainBadge => Domain.ToLowerInvariant() switch
+    {
+        "scene" => "SC",
+        "script" => "SR",
+        "switch" => "SW",
+        "light" => "LT",
+        "input_boolean" => "TG",
+        _ => "HA",
+    };
+
+    public bool IsOn => State.Equals("on", StringComparison.OrdinalIgnoreCase);
+
+    public string StateLabel => Domain.ToLowerInvariant() switch
+    {
+        "scene" => "Activate",
+        "script" => "Run",
+        _ => IsOn ? "ON" : "OFF",
+    };
+}
 
 public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
 {
@@ -238,6 +258,13 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
     {
         if (_config.DemoMode)
         {
+            var current = _viewModel?.GetEntity(entityId);
+            if (current is not null && current.Domain is "switch" or "light" or "input_boolean")
+            {
+                var nextState = current.IsOn ? "off" : "on";
+                _viewModel?.UpdateEntityState(entityId, nextState);
+            }
+
             _viewModel?.SetStatus($"Demo triggered '{entityId}'.");
             return;
         }
@@ -251,6 +278,15 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
         using var resp = await _http!.SendAsync(req, ct);
         resp.EnsureSuccessStatusCode();
         _viewModel?.SetStatus($"Called {domain}.{service} on {entityId}.");
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(500, CancellationToken.None);
+                await FetchEntitiesAsync(CancellationToken.None);
+            }
+            catch { }
+        });
     }
 
     internal async Task SaveConfigAsync(HomeAssistantConfig updated)
@@ -351,6 +387,8 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
         return req;
     }
 
+    internal PluginReceiverSnapshot CurrentReceiverSnapshot => _context?.Receiver.CurrentSnapshot ?? PluginReceiverSnapshot.Empty;
+
     private bool IsConfigured => !string.IsNullOrWhiteSpace(_config.BaseUrl) && !string.IsNullOrWhiteSpace(_config.AccessToken);
 
     private void EnsureHttp()
@@ -362,11 +400,16 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
 public sealed class HomeAssistantViewModel : INotifyPropertyChanged
 {
     private readonly HomeAssistantPlugin _plugin;
+    private readonly List<HaEntityItem> _allEntities = [];
     private string _baseUrl = "http://homeassistant.local:8123";
     private string _accessToken = string.Empty;
     private string _webhookId = string.Empty;
     private bool _demoMode;
     private bool _pushEvents = true;
+    private bool _isSetupExpanded = true;
+    private bool _suppressAutoSave;
+    private string _selectedDomainFilter = "all";
+    private string _searchQuery = string.Empty;
     private string _statusMessage = "Enter your Home Assistant URL & Long-Lived Access Token, or try Demo Mode.";
 
     public HomeAssistantViewModel(HomeAssistantPlugin plugin)
@@ -375,11 +418,22 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
         SaveAndConnectCommand = new AsyncCmd(_ => SaveAsync());
         RefreshCommand = new AsyncCmd(_ => RefreshAsync());
         ToggleDemoCommand = new AsyncCmd(_ => ToggleDemoAsync());
+        ToggleSetupCommand = new AsyncCmd(_ =>
+        {
+            IsSetupExpanded = !IsSetupExpanded;
+            return Task.CompletedTask;
+        });
+        SetDomainFilterCommand = new AsyncCmd(p =>
+        {
+            SelectedDomainFilter = p?.ToString() ?? "all";
+            return Task.CompletedTask;
+        });
         TriggerEntityCommand = new AsyncCmd(p => p is HaEntityItem item ? _plugin.TriggerEntityAsync(item.EntityId) : Task.CompletedTask);
         PushNowCommand = new AsyncCmd(async _ =>
         {
             var res = await _plugin.ExecuteActionAsync("ha.sync_sensor");
-            StatusMessage = res.Message;
+            StatusMessage = res.Success ? $"✓ {res.Message}" : $"⚠ {res.Message}";
+            Raise(nameof(TelemetryPreviewText));
         });
     }
 
@@ -390,13 +444,27 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
     public ICommand SaveAndConnectCommand { get; }
     public ICommand RefreshCommand { get; }
     public ICommand ToggleDemoCommand { get; }
+    public ICommand ToggleSetupCommand { get; }
+    public ICommand SetDomainFilterCommand { get; }
     public ICommand TriggerEntityCommand { get; }
     public ICommand PushNowCommand { get; }
 
     public string BaseUrl { get => _baseUrl; set => Set(ref _baseUrl, value); }
     public string AccessToken { get => _accessToken; set => Set(ref _accessToken, value); }
     public string WebhookId { get => _webhookId; set => Set(ref _webhookId, value); }
-    public bool PushEvents { get => _pushEvents; set => Set(ref _pushEvents, value); }
+
+    public bool PushEvents
+    {
+        get => _pushEvents;
+        set
+        {
+            if (Set(ref _pushEvents, value) && !_suppressAutoSave)
+            {
+                _ = SaveAsync(quiet: true);
+            }
+        }
+    }
+
     public bool DemoMode
     {
         get => _demoMode;
@@ -404,34 +472,150 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
         {
             if (Set(ref _demoMode, value))
             {
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DemoButtonLabel)));
+                Raise(nameof(DemoButtonLabel));
+                Raise(nameof(ConnectionBadgeText));
+                Raise(nameof(IsConnectedOrDemo));
             }
         }
     }
 
-    public string DemoButtonLabel => DemoMode ? "Exit Demo Mode" : "Try Demo Mode";
+    public bool IsSetupExpanded
+    {
+        get => _isSetupExpanded;
+        set
+        {
+            if (Set(ref _isSetupExpanded, value))
+            {
+                Raise(nameof(SetupToggleLabel));
+            }
+        }
+    }
+
+    public string SetupToggleLabel => IsSetupExpanded ? "Hide Setup ▴" : "Setup ▾";
+
+    public bool IsConnectedOrDemo => DemoMode || _allEntities.Count > 0;
+
+    public bool HasEntities => Entities.Count > 0;
+
+    public string EntitiesCountLabel => _allEntities.Count > 0 ? $"{_allEntities.Count} synced" : "Not synced yet";
+
+    public string ConnectionBadgeText => DemoMode
+        ? "DEMO SIMULATOR"
+        : (_allEntities.Count > 0 ? "CONNECTED" : "NEEDS SETUP");
+
+    public string SelectedDomainFilter
+    {
+        get => _selectedDomainFilter;
+        set
+        {
+            if (Set(ref _selectedDomainFilter, value))
+            {
+                RebuildFilteredEntities();
+            }
+        }
+    }
+
+    public string SearchQuery
+    {
+        get => _searchQuery;
+        set
+        {
+            if (Set(ref _searchQuery, value))
+            {
+                RebuildFilteredEntities();
+            }
+        }
+    }
+
+    public string TelemetryPreviewText
+    {
+        get
+        {
+            var s = _plugin.CurrentReceiverSnapshot;
+            var state = s.IsPoweredOn ? s.PlayState.ToLowerInvariant() : "standby";
+            return $"sensor.denon_desktop_receiver → state: \"{state}\" • model: \"{s.ModelName}\" • vol: {s.Volume} • input: \"{s.InputSource}\" • mode: \"{s.SoundMode}\"";
+        }
+    }
+
+    public string DemoButtonLabel => DemoMode ? "Exit Demo" : "Try Demo";
     public string StatusMessage { get => _statusMessage; private set => Set(ref _statusMessage, value); }
 
     public void SyncFromConfig(HomeAssistantConfig cfg)
     {
-        BaseUrl = cfg.BaseUrl;
-        AccessToken = cfg.AccessToken;
-        WebhookId = cfg.WebhookId;
-        DemoMode = cfg.DemoMode;
-        PushEvents = cfg.PushReceiverEventsToHa;
+        _suppressAutoSave = true;
+        try
+        {
+            BaseUrl = cfg.BaseUrl;
+            AccessToken = cfg.AccessToken;
+            WebhookId = cfg.WebhookId;
+            DemoMode = cfg.DemoMode;
+            PushEvents = cfg.PushReceiverEventsToHa;
+            IsSetupExpanded = !(cfg.DemoMode || (!string.IsNullOrWhiteSpace(cfg.BaseUrl) && !string.IsNullOrWhiteSpace(cfg.AccessToken)));
+            Raise(nameof(TelemetryPreviewText));
+        }
+        finally
+        {
+            _suppressAutoSave = false;
+        }
+    }
+
+    public HaEntityItem? GetEntity(string entityId) =>
+        _allEntities.FirstOrDefault(e => e.EntityId.Equals(entityId, StringComparison.OrdinalIgnoreCase));
+
+    public void UpdateEntityState(string entityId, string newState)
+    {
+        Application.Current?.Dispatcher.InvokeAsync(() =>
+        {
+            var idx = _allEntities.FindIndex(e => e.EntityId.Equals(entityId, StringComparison.OrdinalIgnoreCase));
+            if (idx >= 0)
+            {
+                _allEntities[idx] = _allEntities[idx] with { State = newState };
+                RebuildFilteredEntities();
+            }
+        });
     }
 
     public void ApplyEntities(IReadOnlyList<HaEntityItem> items) =>
         Application.Current?.Dispatcher.InvokeAsync(() =>
         {
-            Entities.Clear();
-            foreach (var item in items) Entities.Add(item);
+            _allEntities.Clear();
+            _allEntities.AddRange(items);
+            RebuildFilteredEntities();
+            if (_allEntities.Count > 0)
+            {
+                IsSetupExpanded = false;
+            }
+
+            Raise(nameof(ConnectionBadgeText));
+            Raise(nameof(IsConnectedOrDemo));
+            Raise(nameof(EntitiesCountLabel));
+            Raise(nameof(TelemetryPreviewText));
         });
 
     public void SetStatus(string msg) =>
         Application.Current?.Dispatcher.InvokeAsync(() => StatusMessage = $"{DateTime.Now:HH:mm:ss} • {msg}");
 
-    private async Task SaveAsync()
+    private void RebuildFilteredEntities()
+    {
+        var domain = (_selectedDomainFilter ?? "all").ToLowerInvariant();
+        var q = (_searchQuery ?? string.Empty).Trim();
+
+        var filtered = _allEntities.Where(e =>
+            (domain == "all" || e.Domain.Equals(domain, StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrWhiteSpace(q) ||
+             e.FriendlyName.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+             e.EntityId.Contains(q, StringComparison.OrdinalIgnoreCase))).ToList();
+
+        Entities.Clear();
+        foreach (var item in filtered)
+        {
+            Entities.Add(item);
+        }
+
+        Raise(nameof(HasEntities));
+    }
+
+    private async Task SaveAsync(bool quiet = false)
     {
         await _plugin.SaveConfigAsync(new HomeAssistantConfig
         {
@@ -441,7 +625,9 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
             DemoMode = DemoMode,
             PushReceiverEventsToHa = PushEvents,
         });
-        StatusMessage = "Saved Home Assistant configuration & synced entities.";
+        StatusMessage = quiet
+            ? "✓ Home Assistant event push setting saved."
+            : "✓ Saved Home Assistant configuration & synced entities.";
     }
 
     private async Task RefreshAsync()
@@ -449,11 +635,11 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
         try
         {
             var items = await _plugin.FetchEntitiesAsync();
-            StatusMessage = $"Synced {items.Count} Home Assistant scenes, scripts & switches.";
+            StatusMessage = $"✓ Synced {items.Count} Home Assistant scenes, scripts & switches.";
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Refresh failed: {ex.Message}";
+            StatusMessage = $"⚠ Refresh failed: {ex.Message}";
         }
     }
 
@@ -471,6 +657,9 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
         return true;
     }
+
+    private void Raise(string prop) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
 
     private sealed class AsyncCmd(Func<object?, Task> exec) : ICommand
     {

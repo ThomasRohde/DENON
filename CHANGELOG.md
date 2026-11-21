@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-21
+
+### Changed
+- **Full-Width Plugins Workspace & Live Ecosystem Quick-Jump Sidebar**: Replaced the cramped 290px inner plugin sidebar with a sleek horizontal **Top Plugin Switcher Strip** (reclaiming +300px of horizontal screen space for Philips Hue, LG webOS TV, and Home Assistant dashboards) and added a **LIVE ECOSYSTEM** quick-jump list in the main left sidebar with live health dots for 1-click access from anywhere in the app.
+- **Obsidian Dark Theme Controls Across All Plugins**: Added app-wide implicit Obsidian dark `Slider` (`IsMoveToPointEnabled`), rounded `CheckBox`, and rounded `ProgressBar` styles in `DenonTheme.xaml`, plus inherited dark focus-ring `TextBox` watermark placeholders (`Tag`) across every plugin.
+- **Smart Collapsible Setup Panels (`Setup ▾`) & Instant Auto-Save**: Philips Hue, LG webOS Smart TV, and Home Assistant now automatically collapse their IP/pairing/token setup rows once connected so daily controls, telemetry, rooms, lights, apps, and Magic Remote sit front-and-center; Smart TV & Home Assistant coordination checkboxes now auto-save immediately, and Smart TV inputs support pressing `Enter` directly for YouTube Casting, TV Keyboard, and Toasts.
+- **Philips Hue Responsive Multi-Column Lights Grid & Quick Header Bar**: Switched Individual Lights to a responsive multi-column card layout (`WrapPanel`) with instant `All On`, `All Off`, and `Sync` right in the top bar.
+- **Home Assistant Bridge 2.0 UX Upgrade**: Added live connection badge, domain filter pills (`All`, `Scenes`, `Scripts`, `Switches`, `Lights`), entity search box, live ON/OFF entity state pills, live `sensor.denon_desktop_receiver` telemetry preview, and guided Long-Lived Access Token setup tip.
+
 ## [1.5.0] - 2026-11-21
 
 ### Added
@@ -118,7 +127,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Zero-Lag Real-Time HEOS Push Events (`LIVE PUSH`) & Analog VU Meters**: Dedicated `register_for_change_events` push listener for `<50 ms` knob/remote sync and toggleable dual-channel illuminated VU dials.
 - **Automated GitHub Releases Workflow**: `.github/workflows/release.yml` builds self-contained single-file `win-x64` executables and SHA-256 checksums on version tags.
 
-[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/ThomasRohde/DENON/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/ThomasRohde/DENON/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/ThomasRohde/DENON/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/ThomasRohde/DENON/compare/v1.2.0...v1.3.0

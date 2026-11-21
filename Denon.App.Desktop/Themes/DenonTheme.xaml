@@ -561,6 +561,157 @@
         </Setter>
     </Style>
 
+    <!-- Implicit Sleek Dark Slider (applies across Control Deck, Acoustics, & all Plugins) -->
+    <Style TargetType="Slider">
+        <Setter Property="Height" Value="24" />
+        <Setter Property="IsMoveToPointEnabled" Value="True" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid VerticalAlignment="Center">
+                        <Border Height="6"
+                                CornerRadius="3"
+                                Background="#0B0E14"
+                                BorderBrush="#242B3D"
+                                BorderThickness="1" />
+                        <Track x:Name="PART_Track">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="{x:Static Slider.DecreaseLarge}">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="RepeatButton">
+                                            <Border Height="6"
+                                                    CornerRadius="3,0,0,3"
+                                                    Background="{StaticResource VolumeTrackGradient}" />
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="{x:Static Slider.IncreaseLarge}">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="RepeatButton">
+                                            <Border Height="6" Background="Transparent" />
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Width="16" Height="16">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border x:Name="Knob"
+                                                    Width="16"
+                                                    Height="16"
+                                                    CornerRadius="8"
+                                                    Background="#E2E8F0"
+                                                    BorderBrush="{StaticResource AccentCyanBrush}"
+                                                    BorderThickness="2">
+                                                <Border.Effect>
+                                                    <DropShadowEffect Color="#00D4FF" BlurRadius="8" ShadowDepth="0" Opacity="0.45" />
+                                                </Border.Effect>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Knob" Property="Background" Value="#FFFFFF" />
+                                                </Trigger>
+                                                <Trigger Property="IsDragging" Value="True">
+                                                    <Setter TargetName="Knob" Property="Background" Value="{StaticResource AccentCyanBrightBrush}" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Implicit Sleek Dark CheckBox (replaces jarring bright-white Windows Classic boxes) -->
+    <Style TargetType="CheckBox">
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Grid Background="Transparent">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border x:Name="Box"
+                                Grid.Column="0"
+                                Width="18"
+                                Height="18"
+                                CornerRadius="5"
+                                Background="#0C0F16"
+                                BorderBrush="#334155"
+                                BorderThickness="1.5"
+                                Margin="0,1,10,0"
+                                VerticalAlignment="Top">
+                            <Path x:Name="CheckMark"
+                                  Data="M2,6.5 L5.5,10 L12,2.5"
+                                  Width="10"
+                                  Height="10"
+                                  Stretch="Uniform"
+                                  Stroke="#0A0C10"
+                                  StrokeThickness="2.2"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round"
+                                  Visibility="Collapsed"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center" />
+                        </Border>
+                        <ContentPresenter Grid.Column="1"
+                                          VerticalAlignment="Center"
+                                          RecognizesAccessKey="True" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Box" Property="Background" Value="{StaticResource AccentCyanBrush}" />
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource AccentCyanBrightBrush}" />
+                            <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource AccentCyanBrightBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Implicit Rounded Dark ProgressBar -->
+    <Style TargetType="ProgressBar">
+        <Setter Property="Background" Value="#141925" />
+        <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Border x:Name="PART_Track"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="4"
+                            ClipToBounds="True">
+                        <Border x:Name="PART_Indicator"
+                                HorizontalAlignment="Left"
+                                Background="{TemplateBinding Foreground}"
+                                CornerRadius="4" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Modern Dark TextBox (supports subtle placeholder via Tag) -->
     <Style TargetType="TextBox">
         <Setter Property="Background" Value="#0C0F15" />

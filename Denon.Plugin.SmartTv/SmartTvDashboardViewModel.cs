@@ -67,6 +67,8 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     private string _statusMessage = "Click Auto-Discover TV or enter your LG webOS TV IP & click Pair.";
     private string _appsCountBadge = "7 quick apps";
     private bool _isBusy;
+    private bool _isSetupExpanded = true;
+    private bool _suppressAutoSave;
 
     public SmartTvDashboardViewModel(SmartTvPlugin plugin)
     {
@@ -79,6 +81,11 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
         RefreshCommand = new AsyncRelayCommand(_ => RefreshStateAsync());
         SaveCommand = new AsyncRelayCommand(_ => SaveAsync());
         ToggleDemoCommand = new AsyncRelayCommand(_ => ToggleDemoAsync());
+        ToggleSetupCommand = new AsyncRelayCommand(_ =>
+        {
+            IsSetupExpanded = !IsSetupExpanded;
+            return Task.CompletedTask;
+        });
         RunActionCommand = new AsyncRelayCommand(p => p is string act ? RunActionAsync(act) : Task.CompletedTask);
         SwitchInputCommand = new AsyncRelayCommand(p => p is string input ? SwitchInputAsync(input) : Task.CompletedTask);
         LaunchAppCommand = new AsyncRelayCommand(p => p is string appId ? LaunchAppAsync(appId) : Task.CompletedTask);
@@ -108,6 +115,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     public ICommand RefreshCommand { get; }
     public ICommand SaveCommand { get; }
     public ICommand ToggleDemoCommand { get; }
+    public ICommand ToggleSetupCommand { get; }
     public ICommand RunActionCommand { get; }
     public ICommand SwitchInputCommand { get; }
     public ICommand LaunchAppCommand { get; }
@@ -140,12 +148,55 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 
     public string DemoButtonLabel => DemoMode ? "Exit Demo" : "Try Demo";
 
-    public bool WakeWithDenon { get => _wakeWithDenon; set => Set(ref _wakeWithDenon, value); }
-    public bool OffWithStandby { get => _offWithStandby; set => Set(ref _offWithStandby, value); }
-    public bool ShowSceneToast { get => _showSceneToast; set => Set(ref _showSceneToast, value); }
-    public bool SwitchToArcOnDenon { get => _switchToArcOnDenon; set => Set(ref _switchToArcOnDenon, value); }
-    public bool MuteSpeakersOnDenon { get => _muteSpeakersOnDenon; set => Set(ref _muteSpeakersOnDenon, value); }
-    public bool ScreenOffOnMusicScene { get => _screenOffOnMusicScene; set => Set(ref _screenOffOnMusicScene, value); }
+    public bool IsSetupExpanded
+    {
+        get => _isSetupExpanded;
+        set
+        {
+            if (Set(ref _isSetupExpanded, value))
+            {
+                Raise(nameof(SetupToggleLabel));
+            }
+        }
+    }
+
+    public string SetupToggleLabel => IsSetupExpanded ? "Hide Setup ▴" : "Setup ▾";
+
+    public bool WakeWithDenon
+    {
+        get => _wakeWithDenon;
+        set { if (Set(ref _wakeWithDenon, value)) TriggerAutoSave(); }
+    }
+
+    public bool OffWithStandby
+    {
+        get => _offWithStandby;
+        set { if (Set(ref _offWithStandby, value)) TriggerAutoSave(); }
+    }
+
+    public bool ShowSceneToast
+    {
+        get => _showSceneToast;
+        set { if (Set(ref _showSceneToast, value)) TriggerAutoSave(); }
+    }
+
+    public bool SwitchToArcOnDenon
+    {
+        get => _switchToArcOnDenon;
+        set { if (Set(ref _switchToArcOnDenon, value)) TriggerAutoSave(); }
+    }
+
+    public bool MuteSpeakersOnDenon
+    {
+        get => _muteSpeakersOnDenon;
+        set { if (Set(ref _muteSpeakersOnDenon, value)) TriggerAutoSave(); }
+    }
+
+    public bool ScreenOffOnMusicScene
+    {
+        get => _screenOffOnMusicScene;
+        set { if (Set(ref _screenOffOnMusicScene, value)) TriggerAutoSave(); }
+    }
 
     public bool IsLiveConnected { get => _isLiveConnected; private set => Set(ref _isLiveConnected, value); }
     public string ConnectionBadgeText { get => _connectionBadgeText; private set => Set(ref _connectionBadgeText, value); }
@@ -216,26 +267,47 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     {
         void Apply()
         {
-            TvName = cfg.TvName;
-            TvIp = cfg.TvIp;
-            MacAddress = cfg.MacAddress;
-            DemoMode = cfg.DemoMode;
-            WakeWithDenon = cfg.WakeWithDenonPowerOn;
-            OffWithStandby = cfg.TurnOffWithDenonStandby;
-            ShowSceneToast = cfg.ShowSceneToastOnTv;
-            SwitchToArcOnDenon = cfg.SwitchToArcOnDenonPowerOn;
-            MuteSpeakersOnDenon = cfg.MuteTvSpeakersOnDenonPowerOn;
-            ScreenOffOnMusicScene = cfg.ScreenOffOnMusicScene;
-
-            if (!string.IsNullOrWhiteSpace(cfg.LastModelName) && ModelSummary == "Not paired yet")
+            _suppressAutoSave = true;
+            try
             {
-                ModelSummary = string.IsNullOrWhiteSpace(cfg.LastWebOsVersion)
-                    ? cfg.LastModelName
-                    : $"{cfg.LastModelName} • {cfg.LastWebOsVersion}";
+                TvName = cfg.TvName;
+                TvIp = cfg.TvIp;
+                MacAddress = cfg.MacAddress;
+                DemoMode = cfg.DemoMode;
+                WakeWithDenon = cfg.WakeWithDenonPowerOn;
+                OffWithStandby = cfg.TurnOffWithDenonStandby;
+                ShowSceneToast = cfg.ShowSceneToastOnTv;
+                SwitchToArcOnDenon = cfg.SwitchToArcOnDenonPowerOn;
+                MuteSpeakersOnDenon = cfg.MuteTvSpeakersOnDenonPowerOn;
+                ScreenOffOnMusicScene = cfg.ScreenOffOnMusicScene;
+
+                var isConfigured = cfg.DemoMode || (!string.IsNullOrWhiteSpace(cfg.TvIp) && !string.IsNullOrWhiteSpace(cfg.ClientKey));
+                IsSetupExpanded = !isConfigured;
+
+                if (!string.IsNullOrWhiteSpace(cfg.LastModelName) && ModelSummary == "Not paired yet")
+                {
+                    ModelSummary = string.IsNullOrWhiteSpace(cfg.LastWebOsVersion)
+                        ? cfg.LastModelName
+                        : $"{cfg.LastModelName} • {cfg.LastWebOsVersion}";
+                }
+            }
+            finally
+            {
+                _suppressAutoSave = false;
             }
         }
 
         RunOnUi(Apply);
+    }
+
+    private void TriggerAutoSave()
+    {
+        if (_suppressAutoSave)
+        {
+            return;
+        }
+
+        _ = SaveAsync(quiet: true);
     }
 
     public void ApplyLiveState(LgTvLiveState state)
@@ -362,6 +434,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 
     private async Task DiscoverAsync()
     {
+        IsSetupExpanded = true;
         IsBusy = true;
         StatusMessage = "Scanning local LAN for LG webOS Smart TVs (SSDP + ARP)...";
         try
@@ -442,6 +515,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
         {
             StatusMessage = $"✓ {await _plugin.PairTvAsync(TvIp, forcePairing)}";
             SyncFromConfig(_plugin.Config);
+            IsSetupExpanded = false;
             ApplyLiveState(_plugin.Client.CurrentState);
         }
         catch (Exception ex)
@@ -474,7 +548,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
         }
     }
 
-    private async Task SaveAsync()
+    private async Task SaveAsync(bool quiet = false)
     {
         await _plugin.SaveConfigAsync(new SmartTvConfig
         {
@@ -493,7 +567,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
             LastModelName = _plugin.Config.LastModelName,
             LastWebOsVersion = _plugin.Config.LastWebOsVersion,
         });
-        StatusMessage = "✓ Saved Smart TV settings.";
+        StatusMessage = quiet ? "✓ Coordination setting saved automatically." : "✓ Saved Smart TV settings.";
     }
 
     private async Task ToggleDemoAsync()

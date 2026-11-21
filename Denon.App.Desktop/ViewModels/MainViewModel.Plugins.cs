@@ -41,6 +41,14 @@ public sealed class PluginCardViewModel : ObservableObject
 
     public string Name { get; }
 
+    public string ShortName => Id.ToLowerInvariant() switch
+    {
+        "philips-hue" => "Philips Hue",
+        "smart-tv" => "LG webOS TV",
+        "home-assistant" => "Home Assistant",
+        _ => Name,
+    };
+
     public string Version { get; }
 
     public string VersionTag => $"v{Version}";
@@ -190,6 +198,7 @@ public sealed partial class MainViewModel
     public ObservableCollection<PluginActionDescriptor> SelectedPluginActions { get; } = [];
 
     public RelayCommand SelectPluginCommand { get; private set; } = null!;
+    public RelayCommand OpenPluginCommand { get; private set; } = null!;
     public AsyncRelayCommand TogglePluginEnabledCommand { get; private set; } = null!;
     public AsyncRelayCommand RescanPluginsCommand { get; private set; } = null!;
     public RelayCommand OpenExternalPluginsFolderCommand { get; private set; } = null!;
@@ -256,6 +265,15 @@ public sealed partial class MainViewModel
             if (param is PluginCardViewModel card)
             {
                 SelectedPlugin = card;
+            }
+        });
+
+        OpenPluginCommand = new RelayCommand(param =>
+        {
+            if (param is PluginCardViewModel card)
+            {
+                SelectedPlugin = card;
+                ActiveSection = "Plugins";
             }
         });
 

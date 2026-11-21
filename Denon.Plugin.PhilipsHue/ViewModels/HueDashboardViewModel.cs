@@ -493,6 +493,7 @@ public sealed class HueDashboardViewModel : HueObservableObject
             return Task.CompletedTask;
         }, _ => IsConnectedOrDemo);
         ToggleDemoBeatCommand = new HueCommand(_ => _plugin.ToggleDemoBeatSimulator(), _ => IsConnectedOrDemo);
+        ToggleSetupCommand = new HueCommand(_ => IsSetupExpanded = !IsSetupExpanded);
     }
 
     public ObservableCollection<HueDiscoveredBridge> DiscoveredBridges { get; } = [];
@@ -521,6 +522,26 @@ public sealed class HueDashboardViewModel : HueObservableObject
     public HueAsyncCommand ToggleMusicSyncCommand { get; }
     public HueAsyncCommand SetMusicSyncModeCommand { get; }
     public HueCommand ToggleDemoBeatCommand { get; }
+    public HueCommand ToggleSetupCommand { get; }
+
+    private bool _isSetupExpanded;
+
+    public bool IsSetupExpanded
+    {
+        get => _isSetupExpanded;
+        set
+        {
+            if (SetProperty(ref _isSetupExpanded, value))
+            {
+                RaisePropertyChanged(nameof(ShowSetupControls));
+                RaisePropertyChanged(nameof(SetupToggleLabel));
+            }
+        }
+    }
+
+    public bool ShowSetupControls => IsSetupExpanded || !IsConnectedOrDemo || IsPairing;
+
+    public string SetupToggleLabel => ShowSetupControls ? "Hide Setup ▴" : "Bridge Setup ▾";
 
     public string BridgeIpInput
     {
@@ -549,6 +570,8 @@ public sealed class HueDashboardViewModel : HueObservableObject
             {
                 RaisePropertyChanged(nameof(DemoModeButtonLabel));
                 RaisePropertyChanged(nameof(IsConnectedOrDemo));
+                RaisePropertyChanged(nameof(ShowSetupControls));
+                RaisePropertyChanged(nameof(SetupToggleLabel));
                 RefreshCommandStates();
             }
         }
@@ -564,6 +587,8 @@ public sealed class HueDashboardViewModel : HueObservableObject
             if (SetProperty(ref _isPaired, value))
             {
                 RaisePropertyChanged(nameof(IsConnectedOrDemo));
+                RaisePropertyChanged(nameof(ShowSetupControls));
+                RaisePropertyChanged(nameof(SetupToggleLabel));
                 RefreshCommandStates();
             }
         }
@@ -580,6 +605,8 @@ public sealed class HueDashboardViewModel : HueObservableObject
             {
                 StartPairingCommand.RaiseCanExecuteChanged();
                 CancelPairingCommand.RaiseCanExecuteChanged();
+                RaisePropertyChanged(nameof(ShowSetupControls));
+                RaisePropertyChanged(nameof(SetupToggleLabel));
             }
         }
     }
