@@ -609,7 +609,8 @@
                                 </Grid>
 
                                 <!-- Toggleable Retro Hi-Fi Analog VU Meters -->
-                                <controls:AnalogVuMeterControl Margin="0,12,0,0"
+                                <controls:AnalogVuMeterControl x:Name="HeroVuMeter"
+                                                               Margin="0,12,0,0"
                                                                Height="76"
                                                                LeftLevel="{Binding VuLeftLevel}"
                                                                RightLevel="{Binding VuRightLevel}"

@@ -62,19 +62,22 @@
                         <!-- Peak LED -->
                         <Ellipse x:Name="PeakLedLeft" Canvas.Left="180" Canvas.Top="8" Width="7" Height="7" Fill="#3B1518" />
 
-                        <!-- Animated Needle -->
-                        <Line X1="100" Y1="94" X2="100" Y2="14"
-                              Stroke="#F8FAFC"
-                              StrokeThickness="1.9"
-                              StrokeStartLineCap="Round"
-                              StrokeEndLineCap="Round">
-                            <Line.RenderTransform>
+                        <!-- Hardware-accelerated Dual-Stroke Needle (zero DropShadowEffect lag) -->
+                        <Canvas RenderTransformOrigin="0,0">
+                            <Canvas.RenderTransform>
                                 <RotateTransform x:Name="LeftNeedleTransform" CenterX="100" CenterY="94" Angle="-44" />
-                            </Line.RenderTransform>
-                            <Line.Effect>
-                                <DropShadowEffect Color="#F59E0B" BlurRadius="6" ShadowDepth="0" Opacity="0.6" />
-                            </Line.Effect>
-                        </Line>
+                            </Canvas.RenderTransform>
+                            <Line X1="100" Y1="94" X2="100" Y2="14"
+                                  Stroke="#66F59E0B"
+                                  StrokeThickness="5"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round" />
+                            <Line X1="100" Y1="94" X2="100" Y2="14"
+                                  Stroke="#F8FAFC"
+                                  StrokeThickness="1.8"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round" />
+                        </Canvas>
 
                         <!-- Pivot Cap -->
                         <Ellipse Canvas.Left="88" Canvas.Top="78" Width="24" Height="24" Fill="#1E2433" Stroke="#3B455E" StrokeThickness="1" />
@@ -131,18 +134,21 @@
 
                         <Ellipse x:Name="PeakLedRight" Canvas.Left="180" Canvas.Top="8" Width="7" Height="7" Fill="#3B1518" />
 
-                        <Line X1="100" Y1="94" X2="100" Y2="14"
-                              Stroke="#F8FAFC"
-                              StrokeThickness="1.9"
-                              StrokeStartLineCap="Round"
-                              StrokeEndLineCap="Round">
-                            <Line.RenderTransform>
+                        <Canvas RenderTransformOrigin="0,0">
+                            <Canvas.RenderTransform>
                                 <RotateTransform x:Name="RightNeedleTransform" CenterX="100" CenterY="94" Angle="-44" />
-                            </Line.RenderTransform>
-                            <Line.Effect>
-                                <DropShadowEffect Color="#00D4FF" BlurRadius="6" ShadowDepth="0" Opacity="0.6" />
-                            </Line.Effect>
-                        </Line>
+                            </Canvas.RenderTransform>
+                            <Line X1="100" Y1="94" X2="100" Y2="14"
+                                  Stroke="#6600D4FF"
+                                  StrokeThickness="5"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round" />
+                            <Line X1="100" Y1="94" X2="100" Y2="14"
+                                  Stroke="#F8FAFC"
+                                  StrokeThickness="1.8"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round" />
+                        </Canvas>
 
                         <Ellipse Canvas.Left="88" Canvas.Top="78" Width="24" Height="24" Fill="#1E2433" Stroke="#3B455E" StrokeThickness="1" />
                     </Canvas>

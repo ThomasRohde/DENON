@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 using Denon.App.Desktop.ViewModels;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 using TextBox = System.Windows.Controls.TextBox;
@@ -20,6 +22,8 @@ public partial class MainWindow : Window
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
     private readonly MainViewModel _viewModel;
+    private readonly Stopwatch _vuStopwatch = Stopwatch.StartNew();
+    private double _lastVuFrameSeconds;
 
     public MainWindow(MainViewModel viewModel)
     {
@@ -28,7 +32,25 @@ public partial class MainWindow : Window
         DataContext = viewModel;
 
         StateChanged += OnWindowStateChanged;
+        Loaded += (_, _) => CompositionTarget.Rendering += OnCompositionRendering;
+        Unloaded += (_, _) => CompositionTarget.Rendering -= OnCompositionRendering;
         ApplyDwmStyling();
+    }
+
+    private void OnCompositionRendering(object? sender, EventArgs e)
+    {
+        if (!IsVisible || WindowState == WindowState.Minimized || !_viewModel.ShowVuMeters || _viewModel.ActiveSection != "Control")
+        {
+            _lastVuFrameSeconds = _vuStopwatch.Elapsed.TotalSeconds;
+            return;
+        }
+
+        var now = _vuStopwatch.Elapsed.TotalSeconds;
+        var dt = now - _lastVuFrameSeconds;
+        _lastVuFrameSeconds = now;
+
+        var (left, right, isLive) = _viewModel.StepVuMeterFrame(dt);
+        HeroVuMeter.SetLevelsImmediate(left, right, isLive);
     }
 
     private void ApplyDwmStyling()

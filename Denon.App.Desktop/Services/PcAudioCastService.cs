@@ -25,6 +25,11 @@ public sealed class PcAudioCastService : IDisposable
     private PcCastFormat _selectedFormat = PcCastFormat.Mp3_320k;
     private CancellationTokenSource? _castCts;
 
+    // Lock-free sub-millisecond meter state read directly on VSync by the VU control
+    private double _liveLeft;
+    private double _liveRight;
+    private long _liveSampleTick;
+
     public PcAudioCastService(
         LocalAudioRelayServer relayServer,
         ReceiverController receiverController,
@@ -45,6 +50,20 @@ public sealed class PcAudioCastService : IDisposable
     public event Action<AudioMeterSample>? AudioMeterUpdated;
 
     public bool IsCasting => _isCasting;
+
+    public AudioMeterSample GetLatestMeterSample()
+    {
+        var tick = Volatile.Read(ref _liveSampleTick);
+        if (tick <= 0 || (Environment.TickCount64 - tick) > 350)
+        {
+            return new AudioMeterSample(0, 0, false);
+        }
+
+        return new AudioMeterSample(
+            Volatile.Read(ref _liveLeft),
+            Volatile.Read(ref _liveRight),
+            IsLiveSignal: true);
+    }
 
     public IReadOnlyList<AudioOutputDeviceOption> EnumerateOutputDevices()
     {
@@ -151,7 +170,7 @@ public sealed class PcAudioCastService : IDisposable
         if (wasCasting)
         {
             _relayServer.CancelAllActiveStreams();
-            AudioMeterUpdated?.Invoke(new AudioMeterSample(0, 0, false));
+            PublishMeter(0, 0, isLive: false);
             CastStateChanged?.Invoke(false, "PC Audio Cast stopped.");
             _logStore.Info("Stopped PC Audio Cast.");
         }
@@ -197,7 +216,6 @@ public sealed class PcAudioCastService : IDisposable
             });
 
             var lastAudioTick = Environment.TickCount64;
-            var lastMeterTick = 0L;
 
             capture.DataAvailable += (_, args) =>
             {
@@ -207,17 +225,14 @@ public sealed class PcAudioCastService : IDisposable
                 }
 
                 lastAudioTick = Environment.TickCount64;
+
+                // Zero-throttle, zero-allocation peak+RMS meter computation on every ~10ms WASAPI packet
+                var (left, right) = ComputeStereoLevels(args.Buffer, args.BytesRecorded, waveFormat);
+                PublishMeter(left, right, isLive: true);
+
                 var copy = new byte[args.BytesRecorded];
                 Buffer.BlockCopy(args.Buffer, 0, copy, 0, args.BytesRecorded);
                 pcmChannel.Writer.TryWrite(copy);
-
-                var now = Environment.TickCount64;
-                if (now - lastMeterTick >= 33)
-                {
-                    lastMeterTick = now;
-                    var (left, right) = ComputeStereoLevels(copy, waveFormat);
-                    AudioMeterUpdated?.Invoke(new AudioMeterSample(left, right, IsLiveSignal: true));
-                }
             };
 
             capture.RecordingStopped += (_, _) => pcmChannel.Writer.TryComplete();
@@ -232,11 +247,15 @@ public sealed class PcAudioCastService : IDisposable
                 {
                     while (!ct.IsCancellationRequested)
                     {
-                        await Task.Delay(100, ct);
+                        await Task.Delay(50, ct);
+                        if (Environment.TickCount64 - lastAudioTick > 90)
+                        {
+                            PublishMeter(0, 0, isLive: true);
+                        }
+
                         if (Environment.TickCount64 - lastAudioTick > 160)
                         {
                             pcmChannel.Writer.TryWrite(silenceBuffer);
-                            AudioMeterUpdated?.Invoke(new AudioMeterSample(0, 0, IsLiveSignal: true));
                         }
                     }
                 }
@@ -262,7 +281,7 @@ public sealed class PcAudioCastService : IDisposable
                 try { capture.StopRecording(); } catch { }
                 pcmChannel.Writer.TryComplete();
                 try { await silenceTask; } catch { }
-                AudioMeterUpdated?.Invoke(new AudioMeterSample(0, 0, IsLiveSignal: false));
+                PublishMeter(0, 0, isLive: false);
             }
         }
     }
@@ -412,15 +431,23 @@ public sealed class PcAudioCastService : IDisposable
         }
     }
 
-    private static (double Left, double Right) ComputeStereoLevels(byte[] buffer, WaveFormat format)
+    private void PublishMeter(double left, double right, bool isLive)
     {
-        if (buffer.Length < 8 || format.Encoding != WaveFormatEncoding.IeeeFloat)
+        Volatile.Write(ref _liveLeft, left);
+        Volatile.Write(ref _liveRight, right);
+        Volatile.Write(ref _liveSampleTick, isLive ? Environment.TickCount64 : 0);
+        AudioMeterUpdated?.Invoke(new AudioMeterSample(left, right, isLive));
+    }
+
+    private static (double Left, double Right) ComputeStereoLevels(byte[] buffer, int bytesRecorded, WaveFormat format)
+    {
+        if (bytesRecorded < 8 || format.Encoding != WaveFormatEncoding.IeeeFloat)
         {
             return (0, 0);
         }
 
         var channels = Math.Max(1, format.Channels);
-        var floatCount = buffer.Length / 4;
+        var floatCount = bytesRecorded / 4;
         var frames = floatCount / channels;
         if (frames <= 0)
         {
@@ -429,13 +456,17 @@ public sealed class PcAudioCastService : IDisposable
 
         double sumL = 0;
         double sumR = 0;
-        var step = Math.Max(1, frames / 128);
+        double peakL = 0;
+        double peakR = 0;
+        var step = Math.Max(1, frames / 256);
         var samples = 0;
 
         for (var f = 0; f < frames; f += step)
         {
-            var l = BitConverter.ToSingle(buffer, (f * channels) * 4);
-            var r = channels > 1 ? BitConverter.ToSingle(buffer, ((f * channels) + 1) * 4) : l;
+            var l = Math.Abs(BitConverter.ToSingle(buffer, (f * channels) * 4));
+            var r = channels > 1 ? Math.Abs(BitConverter.ToSingle(buffer, ((f * channels) + 1) * 4)) : l;
+            if (l > peakL) peakL = l;
+            if (r > peakR) peakR = r;
             sumL += l * l;
             sumR += r * r;
             samples++;
@@ -449,19 +480,20 @@ public sealed class PcAudioCastService : IDisposable
         var rmsL = Math.Sqrt(sumL / samples);
         var rmsR = Math.Sqrt(sumR / samples);
 
-        // Convert linear RMS to perceptual VU meter scale (0..1)
-        static double ToVu(double rms)
+        // Blend fast Peak transient with RMS loudness for instantaneous yet musical VU response
+        static double ToVu(double peak, double rms)
         {
-            if (rms <= 0.0005)
+            var blended = (peak * 0.58) + (rms * 0.42);
+            if (blended <= 0.0006)
             {
                 return 0;
             }
 
-            var db = 20.0 * Math.Log10(rms); // typically -50..0 dBFS
-            return Math.Clamp((db + 42.0) / 42.0, 0.0, 1.0);
+            var db = 20.0 * Math.Log10(blended);
+            return Math.Clamp((db + 40.0) / 40.0, 0.0, 1.0);
         }
 
-        return (ToVu(rmsL), ToVu(rmsR));
+        return (ToVu(peakL, rmsL), ToVu(peakR, rmsR));
     }
 
     private void OnExternalSourceActivated()

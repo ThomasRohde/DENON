@@ -83,17 +83,14 @@ public sealed partial class MainViewModel
     private bool _isSearchingRadioBrowser;
     private string _radioBrowserStatusText = "Search 40,000+ global internet radio stations by name, genre, country, or Hi-Res/FLAC.";
 
-    // Live Push Events & Analog VU Meters
+    // Live Push Events & Analog VU Meters (VSync-driven zero-lag state)
     private bool _isLivePushConnected;
     private bool _showVuMeters = true;
     private double _vuLeftLevel;
     private double _vuRightLevel;
     private bool _isVuLiveSignal;
-    private double _targetLiveLeft;
-    private double _targetLiveRight;
-    private long _lastLiveSampleTick;
     private double _simPhase;
-    private DispatcherTimer? _vuTimer;
+    private bool _freezeVuForScreenshots;
 
     public ObservableCollection<AudioOutputDeviceOption> AudioOutputDevices { get; } = [];
     public ObservableCollection<LocalTrackItemViewModel> LocalTracks { get; } = [];
@@ -186,12 +183,6 @@ public sealed partial class MainViewModel
             PcCastStatusText = msg;
             ApplyStateSnapshot(_stateStore.Snapshot);
         });
-        _pcAudioCastService.AudioMeterUpdated += sample =>
-        {
-            _targetLiveLeft = sample.Left;
-            _targetLiveRight = sample.Right;
-            _lastLiveSampleTick = sample.IsLiveSignal ? Environment.TickCount64 : 0;
-        };
         _heosEventListener.PushConnectionChanged += connected => _ = _dispatcher.InvokeAsync(() => IsLivePushConnected = connected);
         IsLivePushConnected = _heosEventListener.IsPushConnected;
 
@@ -200,7 +191,6 @@ public sealed partial class MainViewModel
 
         RefreshAudioDevices();
         ApplyLocalJukeboxSnapshot(_localJukeboxService.Snapshot);
-        StartVuAnimationTimer();
     }
 
     public string RemoteWebUrl
@@ -702,45 +692,36 @@ public sealed partial class MainViewModel
         RadioBrowserStatusText = $"Saved '{station.Name}' to your preset stations!";
     }
 
-    private void StartVuAnimationTimer()
+    /// <summary>
+    /// Computes the next VU needle position on DWM VSync (60-144 Hz) with sub-10ms attack ballistics
+    /// and zero WPF PropertyChanged/binding allocations per frame.
+    /// </summary>
+    public (double Left, double Right, bool IsLive) StepVuMeterFrame(double deltaSeconds)
     {
-        _vuTimer = new DispatcherTimer(DispatcherPriority.Render, _dispatcher)
+        if (_freezeVuForScreenshots)
         {
-            Interval = TimeSpan.FromMilliseconds(33),
-        };
-
-        _vuTimer.Tick += (_, _) => UpdateVuMeterFrame();
-        _vuTimer.Start();
-    }
-
-    private void UpdateVuMeterFrame()
-    {
-        if (!ShowVuMeters && !IsPcCastActive)
-        {
-            return;
+            return (_vuLeftLevel, _vuRightLevel, _isVuLiveSignal);
         }
 
-        var now = Environment.TickCount64;
-        var hasLiveSignal = _lastLiveSampleTick > 0 && (now - _lastLiveSampleTick) < 450;
-        IsVuLiveSignal = hasLiveSignal;
+        var dt = Math.Clamp(deltaSeconds, 0.001, 0.08);
+        var live = _pcAudioCastService.GetLatestMeterSample();
 
         double targetL;
         double targetR;
 
-        if (hasLiveSignal)
+        if (live.IsLiveSignal)
         {
-            targetL = _targetLiveLeft;
-            targetR = _targetLiveRight;
+            targetL = live.Left;
+            targetR = live.Right;
         }
         else if (IsActiveAndPlaying)
         {
-            // Smooth, musical Hi-Fi ballistic envelope scaled by AVR master volume
-            _simPhase += 0.17;
-            var volScale = Math.Clamp(0.28 + (LiveVolume / 98.0) * 0.68, 0.25, 0.92);
-            var grooveL = 0.52 + (0.28 * Math.Sin(_simPhase * 1.3)) + (0.16 * Math.Sin(_simPhase * 3.7)) + (0.08 * Math.Cos(_simPhase * 6.1));
-            var grooveR = 0.50 + (0.27 * Math.Sin((_simPhase * 1.3) + 0.55)) + (0.17 * Math.Cos(_simPhase * 3.2)) + (0.08 * Math.Sin(_simPhase * 5.4));
-            targetL = Math.Clamp(grooveL * volScale, 0.06, 0.94);
-            targetR = Math.Clamp(grooveR * volScale, 0.06, 0.94);
+            _simPhase += dt * 7.2;
+            var volScale = Math.Clamp(0.30 + (LiveVolume / 98.0) * 0.66, 0.28, 0.94);
+            var grooveL = 0.50 + (0.28 * Math.Sin(_simPhase * 1.4)) + (0.17 * Math.Sin(_simPhase * 3.9)) + (0.09 * Math.Cos(_simPhase * 6.7));
+            var grooveR = 0.48 + (0.27 * Math.Sin((_simPhase * 1.4) + 0.52)) + (0.18 * Math.Cos(_simPhase * 3.3)) + (0.09 * Math.Sin(_simPhase * 5.9));
+            targetL = Math.Clamp(grooveL * volScale, 0.05, 0.95);
+            targetR = Math.Clamp(grooveR * volScale, 0.05, 0.95);
         }
         else
         {
@@ -748,14 +729,18 @@ public sealed partial class MainViewModel
             targetR = 0;
         }
 
-        // Authentic VU meter ballistics: snappy attack, smooth release
-        var attack = 0.36;
-        var release = 0.14;
-        VuLeftLevel += (targetL - VuLeftLevel) * (targetL > VuLeftLevel ? attack : release);
-        VuRightLevel += (targetR - VuRightLevel) * (targetR > VuRightLevel ? attack : release);
+        // Frame-rate independent exponential ballistics: ultra-fast 8ms attack, crisp 85ms decay
+        var alphaAttack = 1.0 - Math.Exp(-dt / 0.008);
+        var alphaRelease = 1.0 - Math.Exp(-dt / 0.085);
 
-        if (VuLeftLevel < 0.004) VuLeftLevel = 0;
-        if (VuRightLevel < 0.004) VuRightLevel = 0;
+        _vuLeftLevel += (targetL - _vuLeftLevel) * (targetL > _vuLeftLevel ? alphaAttack : alphaRelease);
+        _vuRightLevel += (targetR - _vuRightLevel) * (targetR > _vuRightLevel ? alphaAttack : alphaRelease);
+
+        if (_vuLeftLevel < 0.003) _vuLeftLevel = 0;
+        if (_vuRightLevel < 0.003) _vuRightLevel = 0;
+
+        _isVuLiveSignal = live.IsLiveSignal;
+        return (_vuLeftLevel, _vuRightLevel, _isVuLiveSignal);
     }
 
     public void LoadShowcaseStateForScreenshots()
@@ -797,7 +782,7 @@ public sealed partial class MainViewModel
         });
 
         _hasLoadedAcousticsOnce = true;
-        _vuTimer?.Stop();
+        _freezeVuForScreenshots = true;
 
         IsLivePushConnected = true;
         ShowVuMeters = true;
