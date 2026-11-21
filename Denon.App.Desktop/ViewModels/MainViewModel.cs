@@ -73,7 +73,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     // Custom stream & stations
     private string _customStreamUrl = string.Empty;
-    private bool _useLowVolumeForStreams = true;
+    private bool _useLowVolumeForStreams = false;
     private bool _unmuteBeforePlay = true;
     private string _customStreamProbeStatus = string.Empty;
     private bool? _customStreamProbeSuccess;

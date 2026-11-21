@@ -190,7 +190,7 @@ public sealed class TrayIconController : IDisposable
                 CreateItem(capturedStation.DisplayName, onClick: () =>
                     ExecuteTrayActionAsync(
                         $"Play {capturedStation.DisplayName}",
-                        token => _receiverController.PlayPresetAsync(capturedStation, useLowVolume: true, unmute: true, token))));
+                        token => _receiverController.PlayPresetAsync(capturedStation, useLowVolume: false, unmute: true, token))));
         }
 
         var exitItem = CreateItem("Exit Denon Desktop", onClick: ExitAsync);

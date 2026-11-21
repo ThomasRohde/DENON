@@ -499,7 +499,7 @@ public sealed partial class MainViewModel
                 dev?.DeviceId,
                 dev?.FriendlyName ?? "Default System Output",
                 SelectedPcCastFormat,
-                UseLowVolumeForStreams,
+                useLowVolume: false,
                 UnmuteBeforePlay);
             StatusMessage = "Casting live PC Audio to Denon AVR.";
         }
@@ -552,7 +552,7 @@ public sealed partial class MainViewModel
             _youtubeQueueService.StopSession();
             await _pcAudioCastService.StopCastingAsync();
             LocalJukeboxStatusText = $"Streaming \"{item.Title}\" ({item.CodecBadge}) to Denon AVR...";
-            await _localJukeboxService.PlayTrackAsync(item.TrackId, UseLowVolumeForStreams, UnmuteBeforePlay);
+            await _localJukeboxService.PlayTrackAsync(item.TrackId, useLowVolume: false, UnmuteBeforePlay);
             LocalJukeboxStatusText = $"Playing local {item.CodecBadge}: {item.Title}";
         }
         catch (Exception ex)
@@ -573,7 +573,7 @@ public sealed partial class MainViewModel
         {
             _youtubeQueueService.StopSession();
             await _pcAudioCastService.StopCastingAsync();
-            await _localJukeboxService.PlayAllAsync(UseLowVolumeForStreams, UnmuteBeforePlay);
+            await _localJukeboxService.PlayAllAsync(useLowVolume: false, UnmuteBeforePlay);
             LocalJukeboxStatusText = $"Playing {LocalTracks.Count} local audio tracks.";
         }
         catch (Exception ex)
@@ -672,7 +672,7 @@ public sealed partial class MainViewModel
         }
 
         await ExecuteReceiverActionAsync(
-            () => _receiverController.PlayCustomUrlAsync(station.UrlResolved, UseLowVolumeForStreams, UnmuteBeforePlay),
+            () => _receiverController.PlayCustomUrlAsync(station.UrlResolved, useLowVolume: false, UnmuteBeforePlay),
             $"Streaming {station.Name} ({station.CodecBadge})");
     }
 

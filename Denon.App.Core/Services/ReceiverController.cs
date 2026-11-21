@@ -422,7 +422,7 @@ public sealed class ReceiverController
     {
         var volume = useLowVolume ? (int?)_settingsStore.Current.Receiver.DefaultLowVolume : null;
         return ExecuteAsync(
-            $"Cast YouTube track '{trackTitle}'",
+            $"Cast LAN audio '{trackTitle}'",
             async (settings, token) =>
             {
                 await _avrClient.EnsureMainZoneNetAsync(settings, token);

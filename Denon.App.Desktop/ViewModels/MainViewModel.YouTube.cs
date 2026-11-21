@@ -419,7 +419,7 @@ public sealed partial class MainViewModel
 
             YouTubeStatusText = $"Casting \"{track.Title}\" to Denon AVR...";
             StatusMessage = $"Casting YouTube: {track.Title}";
-            await _youtubeQueueService.PlayNowAsync(track, UseLowVolumeForStreams, UnmuteBeforePlay);
+            await _youtubeQueueService.PlayNowAsync(track, useLowVolume: false, UnmuteBeforePlay);
             YouTubeStatusText = $"Now casting \"{track.Title}\" on Denon AVR.";
             StatusMessage = $"Playing YouTube: {track.Title}";
         }
@@ -475,7 +475,7 @@ public sealed partial class MainViewModel
         {
             var items = YouTubeSearchResults.ToList();
             YouTubeStatusText = $"Starting queue with {items.Count} tracks...";
-            await _youtubeQueueService.PlayAllAsync(items, UseLowVolumeForStreams, UnmuteBeforePlay);
+            await _youtubeQueueService.PlayAllAsync(items, useLowVolume: false, UnmuteBeforePlay);
             YouTubeStatusText = $"Playing queue ({items.Count} tracks) on Denon AVR.";
         }
         catch (Exception ex)
