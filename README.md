@@ -40,6 +40,11 @@ Browse and filter 40,000+ worldwide internet radio stations by name, genre, coun
 
 ![Global Radio Explorer](docs/screenshots/05-global-radio-explorer.png)
 
+### Settings, Auto-Discovery & Shortcut Collision Checker
+Auto-detect receiver IP & model name, configure LAN relay / FFmpeg / Cinema A/V sync offset, and customize global Windows hotkeys & in-app shortcuts with real-time internal and Win32 OS collision detection.
+
+![Settings & Shortcut Editor](docs/screenshots/06-settings-shortcuts.png)
+
 ---
 
 ## Key Features
