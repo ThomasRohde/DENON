@@ -129,6 +129,7 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
         new("hue.music_sync_on", "Start Hue Music Sync", "Enable real-time FFT beat-reactive Hue lighting.", "Music Sync"),
         new("hue.music_sync_off", "Stop Hue Music Sync", "Disable real-time FFT beat-reactive Hue lighting.", "Music Sync"),
         new("hue.music_sync_toggle", "Toggle Hue Music Sync", "Toggle real-time beat-reactive Hue lighting on or off.", "Music Sync"),
+        new("hue.set_color", "Set Custom Hue Color / Warmth", "Set any custom hex color (#RRGGBB), Kelvin warmth (2000-6500K), and brightness % on a room or all lights.", "Ambience"),
         new("hue.refresh", "Sync Bridge State", "Refresh rooms, lights, and scenes from the Hue Bridge.", "System"),
     ];
 
@@ -189,6 +190,43 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
             case "hue.music_sync_toggle":
                 await SetMusicSyncEnabledAsync(!_musicSyncActive, cancellationToken);
                 return PluginActionResult.Ok(_musicSyncActive ? "Hue Music Sync started." : "Hue Music Sync stopped.");
+
+            case "hue.set_color":
+            {
+                var groupId = ResolveRequestedGroupId(parameters, targetRoom);
+                int? brightness = parameters is not null && parameters.TryGetValue("brightness", out var briStr) && int.TryParse(briStr, out var briVal)
+                    ? Math.Clamp(briVal, 1, 100)
+                    : null;
+                double? x = null;
+                double? y = null;
+                int? mirek = null;
+
+                if (parameters is not null && parameters.TryGetValue("hex", out var hex) && !string.IsNullOrWhiteSpace(hex))
+                {
+                    var xy = HueColorConverter.HexToXy(hex.Trim());
+                    x = xy.X;
+                    y = xy.Y;
+                }
+                else if (parameters is not null && parameters.TryGetValue("kelvin", out var kStr) && int.TryParse(kStr, out var kelvin) && kelvin > 0)
+                {
+                    mirek = Math.Clamp((int)Math.Round(1_000_000.0 / kelvin), 153, 500);
+                }
+
+                await SetGroupStateAsync(
+                    groupId,
+                    isOn: true,
+                    brightnessPercent: brightness,
+                    colorTempMirek: mirek,
+                    x: x,
+                    y: y,
+                    cancellationToken: cancellationToken);
+
+                var parts = new List<string>();
+                if (x.HasValue) parts.Add($"hex {parameters!["hex"]}");
+                if (mirek.HasValue) parts.Add($"{parameters!["kelvin"]}K");
+                if (brightness.HasValue) parts.Add($"{brightness.Value}%");
+                return PluginActionResult.Ok($"Set Philips Hue group '{groupId}' to {(parts.Count > 0 ? string.Join(" @ ", parts) : "ON")}.");
+            }
 
             case "hue.refresh":
                 await RefreshBridgeStateAsync(cancellationToken);
@@ -829,6 +867,26 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
         var preset = HueColorPreset.Defaults.FirstOrDefault(p => string.Equals(p.Id, presetId, StringComparison.OrdinalIgnoreCase))
                      ?? HueColorPreset.Defaults[0];
         await ApplyColorPresetAsync(groupId, preset, cancellationToken);
+    }
+
+    private string ResolveRequestedGroupId(IReadOnlyDictionary<string, string>? parameters, string fallbackGroupId)
+    {
+        if (parameters is null || !parameters.TryGetValue("room", out var roomRaw) || string.IsNullOrWhiteSpace(roomRaw))
+        {
+            return fallbackGroupId;
+        }
+
+        var trimmed = roomRaw.Trim();
+        if (trimmed.Equals("all", StringComparison.OrdinalIgnoreCase) || trimmed == "0")
+        {
+            return "0";
+        }
+
+        var matched = _cachedRooms.FirstOrDefault(r =>
+            r.Id.Equals(trimmed, StringComparison.OrdinalIgnoreCase) ||
+            r.Name.Equals(trimmed, StringComparison.OrdinalIgnoreCase));
+
+        return matched?.Id ?? fallbackGroupId;
     }
 
     private string ResolveAutomationGroupId()

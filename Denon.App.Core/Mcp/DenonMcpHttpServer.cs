@@ -19,7 +19,7 @@ namespace Denon.App.Core.Mcp;
 public sealed partial class DenonMcpHttpServer : IAsyncDisposable
 {
     private const string ServerName = "denon-desktop-mcp";
-    private const string ServerVersion = "1.8.1";
+    private const string ServerVersion = "1.9.0";
     private const string DefaultProtocolVersion = "2025-11-25";
 
     private static readonly JsonSerializerOptions JsonOutOptions = new()
@@ -36,12 +36,14 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
 
     private readonly AppSettingsStore _settingsStore;
     private readonly ReceiverController _receiverController;
+    private readonly ReceiverStateStore _stateStore;
     private readonly PluginHostService _pluginHost;
     private readonly RoomIntelligenceService _intelligence;
     private readonly RadioBrowserService _radioBrowser;
     private readonly YouTubeMediaService _youtubeService;
     private readonly LocalAudioRelayServer _relayServer;
     private readonly YouTubeQueueService _queueService;
+    private readonly LyricsService _lyricsService;
     private readonly AppLogStore _logStore;
 
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
@@ -58,22 +60,26 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
     public DenonMcpHttpServer(
         AppSettingsStore settingsStore,
         ReceiverController receiverController,
+        ReceiverStateStore stateStore,
         PluginHostService pluginHost,
         RoomIntelligenceService intelligence,
         RadioBrowserService radioBrowser,
         YouTubeMediaService youtubeService,
         LocalAudioRelayServer relayServer,
         YouTubeQueueService queueService,
+        LyricsService lyricsService,
         AppLogStore logStore)
     {
         _settingsStore = settingsStore;
         _receiverController = receiverController;
+        _stateStore = stateStore;
         _pluginHost = pluginHost;
         _intelligence = intelligence;
         _radioBrowser = radioBrowser;
         _youtubeService = youtubeService;
         _relayServer = relayServer;
         _queueService = queueService;
+        _lyricsService = lyricsService;
         _logStore = logStore;
 
         _intelligence.RoomGraphChanged += BroadcastRoomUpdatedNotification;
@@ -356,6 +362,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                     maxSafeVolume = _settingsStore.Current.Mcp.MaxSafeVolume,
                     toolsCount = RegisteredToolCount,
                     resourcesCount = 4,
+                    resourceTemplatesCount = 2,
                     promptsCount = 4,
                 });
                 return;
@@ -573,14 +580,19 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                 "tools/list" => new { tools = BuildToolDefinitions() },
                 "tools/call" => await HandleToolCallAsync(hasParams ? paramsEl : default, ct),
                 "resources/list" => HandleResourcesList(),
+                "resources/templates/list" => HandleResourceTemplatesList(),
                 "resources/read" => HandleResourceRead(hasParams ? paramsEl : default),
+                "resources/subscribe" => new { },
+                "resources/unsubscribe" => new { },
                 "prompts/list" => HandlePromptsList(),
                 "prompts/get" => HandlePromptGet(hasParams ? paramsEl : default),
+                "completion/complete" => HandleCompletionComplete(hasParams ? paramsEl : default),
+                "logging/setLevel" => new { },
                 _ => throw new McpMethodNotFoundException($"Method '{method}' not found."),
             };
 
             sw.Stop();
-            if (method is not ("ping" or "tools/list" or "resources/list" or "prompts/list"))
+            if (method is not ("ping" or "tools/list" or "resources/list" or "resources/templates/list" or "prompts/list" or "completion/complete" or "logging/setLevel"))
             {
                 var detail = method == "tools/call" && hasParams && paramsEl.TryGetProperty("name", out var nEl)
                     ? nEl.GetString() ?? method
@@ -647,8 +659,10 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
             capabilities = new
             {
                 tools = new { listChanged = true },
-                resources = new { subscribe = false, listChanged = true },
+                resources = new { subscribe = true, listChanged = true },
                 prompts = new { listChanged = false },
+                completions = new { },
+                logging = new { },
             },
             serverInfo = new
             {
@@ -695,17 +709,87 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         },
     };
 
+    private static object HandleResourceTemplatesList() => new
+    {
+        resourceTemplates = new object[]
+        {
+            new
+            {
+                uriTemplate = "denon://plugins/{pluginId}",
+                name = "Plugin Details & Actions",
+                description = "Inspect live health, status, capabilities, and actions for a specific plugin (e.g. philips-hue, smart-tv, home-assistant).",
+                mimeType = "application/json",
+            },
+            new
+            {
+                uriTemplate = "denon://scenes/{sceneId}",
+                name = "Smart Scene Configuration",
+                description = "Read the complete AVR, acoustic, and chained plugin action configuration for a specific Smart Scene (e.g. movie-night, late-night).",
+                mimeType = "application/json",
+            },
+        },
+    };
+
     private object HandleResourceRead(JsonElement paramsEl)
     {
         var uri = GetString(paramsEl, "uri");
-        object payload = uri.ToLowerInvariant() switch
+        var lower = uri.ToLowerInvariant();
+        object payload;
+
+        if (lower == "denon://room/state")
         {
-            "denon://room/state" => _intelligence.BuildRoomStatePayload(),
-            "denon://diagnostics/health" => _intelligence.BuildDiagnosticsPayload(),
-            "denon://catalog/capabilities" => _intelligence.BuildCapabilitiesPayload(),
-            "denon://memory/habits" => _intelligence.BuildHabitsPayload(),
-            _ => throw new McpInvalidParamsException($"Unknown resource URI '{uri}'."),
-        };
+            payload = _intelligence.BuildRoomStatePayload();
+        }
+        else if (lower == "denon://diagnostics/health")
+        {
+            payload = _intelligence.BuildDiagnosticsPayload();
+        }
+        else if (lower == "denon://catalog/capabilities")
+        {
+            payload = _intelligence.BuildCapabilitiesPayload();
+        }
+        else if (lower == "denon://memory/habits")
+        {
+            payload = _intelligence.BuildHabitsPayload();
+        }
+        else if (lower.StartsWith("denon://plugins/", StringComparison.Ordinal))
+        {
+            var pluginId = Uri.UnescapeDataString(uri["denon://plugins/".Length..].Trim('/'));
+            var plugin = _pluginHost.GetPlugins().FirstOrDefault(p => p.Id.Equals(pluginId, StringComparison.OrdinalIgnoreCase))
+                ?? throw new McpInvalidParamsException($"Plugin '{pluginId}' not found.");
+            payload = new
+            {
+                id = plugin.Id,
+                name = plugin.Name,
+                version = plugin.Version,
+                category = plugin.Category,
+                enabled = plugin.IsEnabled,
+                health = plugin.Health.ToString(),
+                status = plugin.StatusText,
+                lastError = plugin.LastError,
+                actions = plugin.Actions.Select(a => new
+                {
+                    id = a.ActionId,
+                    mcpToolName = BuildPluginToolName(plugin.Id, a.ActionId),
+                    name = a.DisplayName,
+                    description = a.Description,
+                    category = a.Category,
+                }).ToArray(),
+            };
+        }
+        else if (lower.StartsWith("denon://scenes/", StringComparison.Ordinal))
+        {
+            var sceneId = Uri.UnescapeDataString(uri["denon://scenes/".Length..].Trim('/'));
+            var scene = _settingsStore.Current.Receiver.Scenes.FirstOrDefault(s =>
+                s.Id.Equals(sceneId, StringComparison.OrdinalIgnoreCase) ||
+                s.Name.Equals(sceneId, StringComparison.OrdinalIgnoreCase))
+                ?? throw new McpInvalidParamsException($"Smart Scene '{sceneId}' not found.");
+            payload = scene;
+        }
+        else
+        {
+            throw new McpInvalidParamsException($"Unknown resource URI '{uri}'.");
+        }
 
         return new
         {
@@ -717,6 +801,43 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                     mimeType = "application/json",
                     text = JsonSerializer.Serialize(payload, JsonPrettyOptions),
                 },
+            },
+        };
+    }
+
+    private object HandleCompletionComplete(JsonElement paramsEl)
+    {
+        var argName = string.Empty;
+        var argVal = string.Empty;
+        if (paramsEl.ValueKind == JsonValueKind.Object &&
+            paramsEl.TryGetProperty("argument", out var argEl) &&
+            argEl.ValueKind == JsonValueKind.Object)
+        {
+            argName = GetString(argEl, "name");
+            argVal = GetString(argEl, "value");
+        }
+
+        IEnumerable<string> candidates = argName.ToLowerInvariant() switch
+        {
+            "pluginid" => _pluginHost.GetPlugins().Select(p => p.Id),
+            "sceneid" => _settingsStore.Current.Receiver.Scenes.Select(s => s.Id),
+            "vibe" => ["cozy rainy jazz night", "sci-fi cinema night", "late night reading", "upbeat party sync"],
+            "goal" => ["clearer movie dialogue at night", "pure audiophile stereo", "punchier subwoofer bass"],
+            _ => [],
+        };
+
+        var values = candidates
+            .Where(c => string.IsNullOrWhiteSpace(argVal) || c.Contains(argVal, StringComparison.OrdinalIgnoreCase))
+            .Take(20)
+            .ToArray();
+
+        return new
+        {
+            completion = new
+            {
+                values,
+                total = values.Length,
+                hasMore = false,
             },
         };
     }
@@ -805,13 +926,48 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
     {
         var tools = new List<object>
         {
-            Tool("get_room_state", "Get the complete live living-room state graph: Denon AVR, Now Playing, Queue, Philips Hue, LG webOS TV, Home Assistant, Room Doctor Insights, Undo state, and safety ceiling.", EmptySchema()),
-            Tool("diagnose_room", "Run the cross-device Self-Healing Room Doctor to detect mismatches (muted while playing, late-night volume, TV eARC vs speaker mismatch, OLED burn-in risk, plugin warnings).", EmptySchema()),
-            Tool("fix_room_issue", "Execute a Room Doctor auto-fix key (e.g. 'avr.unmute', 'avr.safe_volume', 'avr.late_night_comfort', 'room.route_tv_earc', 'tv.screen_off', 'avr.fix_silent', 'avr.refresh').",
-                ObjSchema(("fix_action_key", "string", "The fixActionKey returned by diagnose_room", true))),
-            Tool("get_listening_habits", "Read locally learned listening habits (average volume by Morning/Afternoon/Evening/LateNight, top inputs, sound modes, scenes, and plugin actions).", EmptySchema()),
-            Tool("restore_previous_state", "1-click Undo: restore the Denon AVR state captured before the most recent AI / atmosphere / scene mutation.", EmptySchema()),
-            Tool("apply_atmosphere", "High-level semantic multi-device orchestrator. Captures an Undo snapshot first, enforces MaxSafeVolume, and coordinates Denon AVR + Philips Hue + LG webOS TV in one call.",
+            // Room Intelligence & Diagnostics
+            Tool("get_room_state",
+                "Get the complete live living-room state graph: Denon AVR, Now Playing, Queue, Philips Hue, LG webOS TV, Home Assistant, Room Doctor Insights, Undo state, and safety ceiling.",
+                EmptySchema(),
+                title: "Get Live Room State",
+                readOnly: true, idempotent: true,
+                outputSchema: OutputObjSchema(
+                    ("timestamp", "string"),
+                    ("avr", "object"),
+                    ("queue", "object"),
+                    ("plugins", "array"),
+                    ("insights", "array"),
+                    ("safety", "object"))),
+            Tool("diagnose_room",
+                "Run the cross-device Self-Healing Room Doctor to detect mismatches (muted while playing, late-night volume, TV eARC vs speaker mismatch, OLED burn-in risk, plugin warnings).",
+                EmptySchema(),
+                title: "Diagnose Living Room",
+                readOnly: true, idempotent: true,
+                outputSchema: OutputObjSchema(
+                    ("count", "integer"),
+                    ("insights", "array"))),
+            Tool("fix_room_issue",
+                "Execute a Room Doctor auto-fix key (e.g. 'avr.unmute', 'avr.safe_volume', 'avr.late_night_comfort', 'room.route_tv_earc', 'tv.screen_off', 'avr.fix_silent', 'avr.refresh').",
+                ObjSchema(("fix_action_key", "string", "The fixActionKey returned by diagnose_room", true)),
+                title: "Auto-Fix Room Issue",
+                idempotent: true),
+            Tool("get_listening_habits",
+                "Read locally learned listening habits (average volume by Morning/Afternoon/Evening/LateNight, top inputs, sound modes, scenes, and plugin actions).",
+                EmptySchema(),
+                title: "Get Listening Habits",
+                readOnly: true, idempotent: true,
+                outputSchema: OutputObjSchema(
+                    ("summary", "string"),
+                    ("totalSessions", "integer"),
+                    ("preferredVolumeByBucket", "object"))),
+            Tool("restore_previous_state",
+                "1-click Undo: restore the Denon AVR state captured before the most recent AI / atmosphere / scene mutation.",
+                EmptySchema(),
+                title: "Restore Previous AVR State",
+                idempotent: true),
+            Tool("apply_atmosphere",
+                "High-level semantic multi-device orchestrator. Captures an Undo snapshot first, enforces MaxSafeVolume, and coordinates Denon AVR + Philips Hue + LG webOS TV in one call.",
                 ObjSchema(
                     ("reason", "string", "Short description of the atmosphere (shown in Undo history & optional TV toast)", false),
                     ("volume", "integer", "Target master volume (0-98, automatically capped by MaxSafeVolume)", false),
@@ -821,28 +977,75 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                     ("hue_action", "string", "Optional Philips Hue actionId (e.g. hue.movie_dim, hue.candlelight, hue.all_on, hue.all_off, hue.music_sync_on)", false),
                     ("tv_action", "string", "Optional LG webOS TV actionId (e.g. tv.hdmi1, tv.hdmi2, tv.audio_earc, tv.youtube, tv.plex, tv.screen_off)", false),
                     ("oled_screen_off", "boolean", "If true, blanks LG OLED panel (Audio-Only Mode) to prevent burn-in during music", false),
-                    ("tv_toast", "string", "Optional short message to display as an on-screen toast banner on the LG TV", false))),
+                    ("tv_toast", "string", "Optional short message to display as an on-screen toast banner on the LG TV", false)),
+                title: "Apply Multi-Device Atmosphere",
+                idempotent: true,
+                outputSchema: OutputObjSchema(
+                    ("applied", "string"),
+                    ("undoAvailable", "boolean"),
+                    ("steps", "array"))),
 
-            // AVR Core Controls
-            Tool("avr_set_power", "Power the Denon/Marantz AVR ON or put it into Standby.",
-                ObjSchema(("power_on", "boolean", "true to power ON, false for Standby", true))),
-            Tool("avr_set_volume", "Set Denon AVR master volume (0-98 scale, where 80 = 0.0 dB, 50 = -30.0 dB). Enforces the configured MaxSafeVolume safety ceiling.",
-                ObjSchema(("volume", "integer", "Target volume (0-98)", true))),
-            Tool("avr_set_mute", "Mute or unmute Denon AVR master audio.",
-                ObjSchema(("muted", "boolean", "true to mute, false to unmute", true))),
-            Tool("avr_set_input", "Switch Denon AVR input source (e.g. TV, GAME, MPLAY, CBL/SAT, DVD, BD, CD, NET, BT, TUNER, AUX1).",
-                ObjSchema(("input_source", "string", "AVR input source code", true))),
-            Tool("avr_set_sound_mode", "Switch Denon AVR sound mode (e.g. STEREO, DIRECT, PURE DIRECT, MOVIE, MUSIC, GAME, AUTO, MCH STEREO).",
-                ObjSchema(("sound_mode", "string", "Sound mode code", true))),
-            Tool("avr_playback_control", "Control HEOS playback transport.",
-                ObjSchema(("action", "string", "One of: play, pause, stop, next, previous", true))),
-            Tool("avr_set_zone2", "Turn Zone 2 power ON or OFF.",
-                ObjSchema(("power_on", "boolean", "true for Zone 2 ON, false for OFF", true))),
-            Tool("avr_set_eco_mode", "Set Denon ECO power mode (ON, AUTO, OFF).",
-                ObjSchema(("mode", "string", "ON, AUTO, or OFF", true))),
-            Tool("avr_set_sleep_timer", "Set or cancel the AVR sleep timer in minutes (0 or omitted cancels sleep timer).",
-                ObjSchema(("minutes", "integer", "Sleep timer minutes (0 to cancel, or 10-120)", true))),
-            Tool("avr_tune_acoustics", "Adjust live Denon AVR acoustic settings over Telnet :23 (any omitted parameter is left unchanged).",
+            // AVR Core Controls & Acoustics
+            Tool("avr_set_power",
+                "Power the Denon/Marantz AVR ON or put it into Standby.",
+                ObjSchema(("power_on", "boolean", "true to power ON, false for Standby", true)),
+                title: "Set AVR Power",
+                destructive: true, idempotent: true),
+            Tool("avr_set_volume",
+                "Set Denon AVR master volume (0-98 scale, where 80 = 0.0 dB, 50 = -30.0 dB). Enforces the configured MaxSafeVolume safety ceiling.",
+                ObjSchema(("volume", "integer", "Target volume (0-98)", true)),
+                title: "Set AVR Volume",
+                idempotent: true),
+            Tool("avr_set_mute",
+                "Mute or unmute Denon AVR master audio.",
+                ObjSchema(("muted", "boolean", "true to mute, false to unmute", true)),
+                title: "Set AVR Mute",
+                idempotent: true),
+            Tool("avr_set_input",
+                "Switch Denon AVR input source (e.g. TV, GAME, MPLAY, CBL/SAT, DVD, BD, CD, NET, BT, TUNER, AUX1).",
+                ObjSchema(("input_source", "string", "AVR input source code", true)),
+                title: "Switch AVR Input",
+                idempotent: true),
+            Tool("avr_set_sound_mode",
+                "Switch Denon AVR sound mode (e.g. STEREO, DIRECT, PURE DIRECT, MOVIE, MUSIC, GAME, AUTO, MCH STEREO).",
+                ObjSchema(("sound_mode", "string", "Sound mode code", true)),
+                title: "Switch AVR Sound Mode",
+                idempotent: true),
+            Tool("avr_playback_control",
+                "Control HEOS playback transport.",
+                ObjSchema(("action", "string", "One of: play, pause, stop, next, previous", true)),
+                title: "HEOS Playback Transport"),
+            Tool("avr_set_zone2",
+                "Turn Zone 2 power ON or OFF.",
+                ObjSchema(("power_on", "boolean", "true for Zone 2 ON, false for OFF", true)),
+                title: "Set Zone 2 Power",
+                idempotent: true),
+            Tool("avr_set_eco_mode",
+                "Set Denon ECO power mode (ON, AUTO, OFF).",
+                ObjSchema(("mode", "string", "ON, AUTO, or OFF", true)),
+                title: "Set AVR ECO Mode",
+                idempotent: true),
+            Tool("avr_set_sleep_timer",
+                "Set or cancel the AVR sleep timer in minutes (0 or omitted cancels sleep timer).",
+                ObjSchema(("minutes", "integer", "Sleep timer minutes (0 to cancel, or 10-120)", true)),
+                title: "Set AVR Sleep Timer",
+                idempotent: true),
+            Tool("avr_get_acoustics",
+                "Read live Denon AVR acoustic configuration over Telnet :23 (Audyssey MultEQ, Dynamic EQ, Dynamic Volume, Compressed Audio Restorer, Dimmer, Subwoofer/Dialog trims, and Tone Control).",
+                EmptySchema(),
+                title: "Get AVR Acoustics",
+                readOnly: true, idempotent: true,
+                outputSchema: OutputObjSchema(
+                    ("multEq", "string"),
+                    ("dynamicVolume", "string"),
+                    ("restorer", "string"),
+                    ("dimmer", "string"),
+                    ("subwooferTrimDb", "integer"),
+                    ("dialogTrimDb", "integer"),
+                    ("bassDb", "integer"),
+                    ("trebleDb", "integer"))),
+            Tool("avr_tune_acoustics",
+                "Adjust live Denon AVR acoustic settings over Telnet :23 (any omitted parameter is left unchanged).",
                 ObjSchema(
                     ("multeq", "string", "Audyssey MultEQ: AUDYSSEY, BYP.LR, FLAT, or OFF", false),
                     ("dynamic_eq", "boolean", "Enable/disable Audyssey Dynamic EQ", false),
@@ -852,35 +1055,128 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                     ("subwoofer_trim_db", "integer", "Subwoofer trim in dB (-12 to +12)", false),
                     ("dialog_trim_db", "integer", "Dialog enhancer trim in dB (-12 to +12)", false),
                     ("bass_db", "integer", "Tone Bass trim in dB (-6 to +6)", false),
-                    ("treble_db", "integer", "Tone Treble trim in dB (-6 to +6)", false))),
+                    ("treble_db", "integer", "Tone Treble trim in dB (-6 to +6)", false)),
+                title: "Tune AVR Acoustics",
+                idempotent: true),
 
-            // Media & Music DJ
-            Tool("media_search_radio", "Search 40,000+ global internet radio stations via Radio Browser.",
+            // Media, Lyrics & Queue DJ
+            Tool("media_search_radio",
+                "Search 40,000+ global internet radio stations via Radio Browser.",
                 ObjSchema(
                     ("query", "string", "Station name or keyword", false),
                     ("tag", "string", "Genre/style tag (e.g. jazz, ambient, synthwave, classical)", false),
                     ("hi_res_only", "boolean", "Only return lossless FLAC / high-bitrate stations", false),
-                    ("limit", "integer", "Max results (default 10)", false))),
-            Tool("media_play_station_url", "Play any direct HTTP/HTTPS internet radio or audio stream URL on the Denon AVR.",
+                    ("limit", "integer", "Max results (default 10)", false)),
+                title: "Search Internet Radio",
+                readOnly: true, idempotent: true, openWorld: true,
+                outputSchema: OutputObjSchema(
+                    ("count", "integer"),
+                    ("stations", "array"))),
+            Tool("media_play_station_url",
+                "Play any direct HTTP/HTTPS internet radio or audio stream URL on the Denon AVR.",
                 ObjSchema(
                     ("url", "string", "Direct stream URL", true),
                     ("title", "string", "Friendly station/track title", false),
-                    ("low_volume", "boolean", "If true, sets safe low volume before playing", false))),
-            Tool("media_search_youtube", "Search YouTube / YouTube Music for songs, mixes, or live sets playable on Denon HEOS.",
+                    ("low_volume", "boolean", "If true, sets safe low volume before playing", false)),
+                title: "Play Internet Radio Stream",
+                openWorld: true),
+            Tool("media_search_youtube",
+                "Search YouTube / YouTube Music for songs, mixes, or live sets playable on Denon HEOS.",
                 ObjSchema(
                     ("query", "string", "Search query or YouTube URL", true),
                     ("music_mode", "boolean", "Prioritize music tracks (default true)", false),
-                    ("limit", "integer", "Max results (default 6)", false))),
-            Tool("media_play_youtube", "Resolve a YouTube search query or URL and stream it directly to Denon HEOS via the local LAN audio relay.",
+                    ("limit", "integer", "Max results (default 6)", false)),
+                title: "Search YouTube Music",
+                readOnly: true, idempotent: true, openWorld: true,
+                outputSchema: OutputObjSchema(
+                    ("count", "integer"),
+                    ("tracks", "array"))),
+            Tool("media_play_youtube",
+                "Resolve a YouTube search query or URL and stream it directly to Denon HEOS via the local LAN audio relay.",
                 ObjSchema(
                     ("query_or_url", "string", "YouTube video URL or search phrase (plays top match)", true),
-                    ("queue_only", "boolean", "If true, adds to Up-Next queue instead of interrupting current track", false))),
+                    ("queue_only", "boolean", "If true, adds to Up-Next queue instead of interrupting current track", false)),
+                title: "Play or Queue YouTube Track",
+                openWorld: true),
+            Tool("media_get_now_playing_lyrics",
+                "Fetch synced/plain lyrics via LRCLIB for the currently playing track (or an explicitly supplied title & artist).",
+                ObjSchema(
+                    ("title", "string", "Optional track title (defaults to the AVR's live Now Playing track)", false),
+                    ("artist", "string", "Optional artist name (defaults to the AVR's live Now Playing artist)", false)),
+                title: "Get Now Playing Lyrics",
+                readOnly: true, idempotent: true, openWorld: true,
+                outputSchema: OutputObjSchema(
+                    ("found", "boolean"),
+                    ("title", "string"),
+                    ("artist", "string"),
+                    ("isSynced", "boolean"),
+                    ("lineCount", "integer"),
+                    ("lyrics", "string"))),
+            Tool("media_get_queue",
+                "Inspect the current Denon Desktop YouTube Up-Next queue, shuffle/repeat settings, active track, and history count.",
+                EmptySchema(),
+                title: "Get Up-Next Queue",
+                readOnly: true, idempotent: true,
+                outputSchema: OutputObjSchema(
+                    ("isActive", "boolean"),
+                    ("currentIndex", "integer"),
+                    ("isShuffleEnabled", "boolean"),
+                    ("repeatMode", "string"),
+                    ("queueCount", "integer"),
+                    ("queue", "array"))),
+            Tool("media_manage_queue",
+                "Manage the YouTube Up-Next playback queue: clear, toggle_shuffle, cycle_repeat, remove (by entry_id), play_index (0-based index), next, or previous.",
+                ObjSchema(
+                    ("action", "string", "One of: clear, toggle_shuffle, cycle_repeat, remove, play_index, next, previous", true),
+                    ("entry_id", "string", "Queue entryId (required when action is 'remove')", false),
+                    ("index", "integer", "0-based queue index (required when action is 'play_index')", false)),
+                title: "Manage Up-Next Queue",
+                destructive: true),
+
+            // Curated Smart Lighting & LG webOS TV Direct Tools
+            Tool("hue_set_color",
+                "Set Philips Hue lights to a custom hex color (#RRGGBB), white warmth in Kelvin (2000-6500K), and/or brightness (1-100%), optionally targeting a specific Hue room/zone.",
+                ObjSchema(
+                    ("hex", "string", "Optional hex color (e.g. '#FF6B2B', '#00D4FF')", false),
+                    ("kelvin", "integer", "Optional white color temperature in Kelvin (2000 warm candlelight to 6500 crisp daylight)", false),
+                    ("brightness", "integer", "Optional brightness percentage (1-100)", false),
+                    ("room", "string", "Optional Hue room/zone name or 'all' (defaults to active target room)", false)),
+                title: "Set Philips Hue Color & Warmth",
+                idempotent: true),
+            Tool("tv_cast_youtube",
+                "Launch the YouTube app on the LG webOS Smart TV and directly cast/play a specific YouTube video URL or 11-character video ID.",
+                ObjSchema(
+                    ("video_url_or_id", "string", "YouTube watch URL, youtu.be link, or 11-character video ID", true)),
+                title: "Cast YouTube Video to LG TV",
+                openWorld: true),
+            Tool("tv_remote_button",
+                "Send a Magic Remote button press to the LG webOS Smart TV over the persistent pointer socket.",
+                ObjSchema(
+                    ("button", "string", "Button name: UP, DOWN, LEFT, RIGHT, ENTER, BACK, HOME, MENU, EXIT, PLAY, PAUSE, VOLUMEUP, VOLUMEDOWN, MUTE, RED, GREEN, YELLOW, BLUE", true)),
+                title: "Press LG TV Remote Button"),
+            Tool("tv_type_text",
+                "Type text directly into an active search box or keyboard field on the LG webOS Smart TV.",
+                ObjSchema(
+                    ("text", "string", "Text to type on the TV", true),
+                    ("press_enter", "boolean", "Whether to submit/press Enter after typing (default true)", false)),
+                title: "Type Text on LG TV"),
 
             // Generative Smart Scene & Automation Architect
-            Tool("list_scenes_and_rules", "List all configured Smart Scenes and Automation Rules.", EmptySchema()),
-            Tool("activate_smart_scene", "Activate an existing Smart Scene by ID or Name (including its chained plugin actions).",
-                ObjSchema(("scene_id_or_name", "string", "Smart Scene ID or Name (e.g. 'movie-night' or 'Late Night')", true))),
-            Tool("create_or_update_scene", "Create or update a persistent Smart Scene in settings.json with AVR settings and optional Hue/TV/HA plugin action.",
+            Tool("list_scenes_and_rules",
+                "List all configured Smart Scenes and Automation Rules.",
+                EmptySchema(),
+                title: "List Smart Scenes & Automations",
+                readOnly: true, idempotent: true,
+                outputSchema: OutputObjSchema(
+                    ("scenes", "array"),
+                    ("automations", "array"))),
+            Tool("activate_smart_scene",
+                "Activate an existing Smart Scene by ID or Name (including its chained plugin actions).",
+                ObjSchema(("scene_id_or_name", "string", "Smart Scene ID or Name (e.g. 'movie-night' or 'Late Night')", true)),
+                title: "Activate Smart Scene",
+                idempotent: true),
+            Tool("create_or_update_scene",
+                "Create or update a persistent Smart Scene in settings.json with AVR settings and optional Hue/TV/HA plugin action.",
                 ObjSchema(
                     ("id", "string", "Stable slug ID (e.g. 'blade-runner-night')", true),
                     ("name", "string", "Display name (e.g. 'Blade Runner Night')", true),
@@ -890,8 +1186,11 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                     ("target_volume", "integer", "Target volume (0-98, capped by MaxSafeVolume)", false),
                     ("dynamic_volume", "string", "OFF, LIT, MED, or HEV", false),
                     ("plugin_id", "string", "Optional plugin ID to chain (e.g. 'philips-hue', 'smart-tv', 'home-assistant')", false),
-                    ("plugin_action_id", "string", "Optional plugin action ID to chain (e.g. 'hue.movie_dim', 'tv.screen_off')", false))),
-            Tool("create_automation_rule", "Create a persistent Automation Rule (App Launch Watcher or Time-of-Day Schedule) in settings.json.",
+                    ("plugin_action_id", "string", "Optional plugin action ID to chain (e.g. 'hue.movie_dim', 'tv.screen_off')", false)),
+                title: "Create or Update Smart Scene",
+                idempotent: true),
+            Tool("create_automation_rule",
+                "Create a persistent Automation Rule (App Launch Watcher or Time-of-Day Schedule) in settings.json.",
                 ObjSchema(
                     ("name", "string", "Friendly rule name", true),
                     ("trigger_type", "string", "'AppLaunch' or 'TimeOfDay'", true),
@@ -899,15 +1198,30 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                     ("process_names", "string", "For AppLaunch: comma-separated process names without .exe (e.g. 'vlc, Plex')", false),
                     ("schedule_time", "string", "For TimeOfDay: 24-hour HH:mm local time (e.g. '22:30')", false),
                     ("days_filter", "string", "Daily, Weekdays, or Weekends (default Daily)", false),
-                    ("target_scene_id", "string", "Smart Scene ID to activate when triggered", false))),
+                    ("target_scene_id", "string", "Smart Scene ID to activate when triggered", false)),
+                title: "Create Automation Rule"),
         };
 
-        // Zero-config auto-bridge: expose EVERY enabled plugin action as a typed MCP tool!
+        // Zero-config auto-bridge: expose enabled plugin actions as annotated MCP tools
+        // (Skip hue.set_color since curated hue_set_color already exposes its full typed schema)
         foreach (var plugin in _pluginHost.GetPlugins().Where(p => p.IsEnabled))
         {
             foreach (var action in plugin.Actions)
             {
+                if (action.ActionId.Equals("hue.set_color", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
                 var toolName = BuildPluginToolName(plugin.Id, action.ActionId);
+                var isReadOnly = action.ActionId.EndsWith(".refresh", StringComparison.OrdinalIgnoreCase);
+                var isDestructive = action.ActionId.Contains("power_off", StringComparison.OrdinalIgnoreCase) ||
+                                    action.ActionId.Contains("all_off", StringComparison.OrdinalIgnoreCase) ||
+                                    action.ActionId.Contains("close_app", StringComparison.OrdinalIgnoreCase);
+                var isIdempotent = !action.ActionId.Contains("toggle", StringComparison.OrdinalIgnoreCase) &&
+                                   !action.ActionId.Contains("toast", StringComparison.OrdinalIgnoreCase) &&
+                                   !action.ActionId.Contains("webhook", StringComparison.OrdinalIgnoreCase);
+
                 tools.Add(Tool(
                     toolName,
                     $"[{plugin.Name}] {action.DisplayName}: {action.Description}",
@@ -915,7 +1229,11 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                         ("message", "string", "Optional text/toast message parameter (if supported by this action)", false),
                         ("contentId", "string", "Optional YouTube video URL/ID (for tv.youtube)", false),
                         ("entityId", "string", "Optional Home Assistant entity ID (for ha.trigger_entity)", false),
-                        ("button", "string", "Optional LG remote button name (e.g. HOME, BACK, ENTER)", false))));
+                        ("button", "string", "Optional LG remote button name (e.g. HOME, BACK, ENTER)", false)),
+                    title: $"{plugin.Name}: {action.DisplayName}",
+                    readOnly: isReadOnly,
+                    destructive: isDestructive,
+                    idempotent: isIdempotent));
             }
         }
 
@@ -935,7 +1253,10 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                 return BuildToolJson(_intelligence.BuildRoomStatePayload());
 
             case "diagnose_room":
-                return BuildToolJson(new { insights = _intelligence.DiagnoseRoom() });
+            {
+                var insights = _intelligence.DiagnoseRoom();
+                return BuildToolJson(new { count = insights.Count, insights });
+            }
 
             case "get_listening_habits":
                 return BuildToolJson(_intelligence.BuildHabitsPayload());
@@ -947,6 +1268,124 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                     automations = _settingsStore.Current.Automations,
                 });
 
+            case "avr_get_acoustics":
+            {
+                var acoustics = await _receiverController.GetAcousticStatusAsync(ct);
+                return BuildToolJson(new
+                {
+                    multEq = acoustics.MultEq,
+                    dynamicEq = acoustics.DynamicEq,
+                    dynamicVolume = acoustics.DynamicVolume,
+                    restorer = acoustics.Restorer,
+                    dimmer = acoustics.Dimmer,
+                    subwooferAdjustEnabled = acoustics.SubwooferAdjustEnabled,
+                    subwooferTrimDb = acoustics.SubwooferTrimDb,
+                    dialogAdjustEnabled = acoustics.DialogAdjustEnabled,
+                    dialogTrimDb = acoustics.DialogTrimDb,
+                    toneControlEnabled = acoustics.ToneControlEnabled,
+                    bassDb = acoustics.BassDb,
+                    trebleDb = acoustics.TrebleDb,
+                    retrievedAt = acoustics.RetrievedAt,
+                });
+            }
+
+            case "media_get_now_playing_lyrics":
+            {
+                var title = GetString(args, "title");
+                var artist = GetString(args, "artist");
+                if (string.IsNullOrWhiteSpace(title))
+                {
+                    var np = _stateStore.Snapshot.Status?.NowPlaying;
+                    var qTrack = _queueService.Snapshot.CurrentTrack;
+                    title = !string.IsNullOrWhiteSpace(np?.Song) ? np!.Song : (qTrack?.Title ?? string.Empty);
+                    if (string.IsNullOrWhiteSpace(artist))
+                    {
+                        artist = !string.IsNullOrWhiteSpace(np?.Artist) ? np!.Artist : (qTrack?.Author ?? string.Empty);
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(title))
+                {
+                    return BuildToolJson(new
+                    {
+                        found = false,
+                        title = string.Empty,
+                        artist = string.Empty,
+                        isSynced = false,
+                        lineCount = 0,
+                        lyrics = "No track is currently playing and no title was provided.",
+                        lines = Array.Empty<object>(),
+                    });
+                }
+
+                var doc = await _lyricsService.FetchLyricsAsync(title, string.IsNullOrWhiteSpace(artist) ? null : artist, ct);
+                if (doc is null)
+                {
+                    return BuildToolJson(new
+                    {
+                        found = false,
+                        title,
+                        artist,
+                        isSynced = false,
+                        lineCount = 0,
+                        lyrics = $"No lyrics found on LRCLIB for '{title}'{(string.IsNullOrWhiteSpace(artist) ? string.Empty : $" by {artist}")}.",
+                        lines = Array.Empty<object>(),
+                    });
+                }
+
+                var combined = string.Join("\n", doc.Lines.Select(l => l.Text));
+                return BuildToolJson(new
+                {
+                    found = true,
+                    title = doc.TrackName,
+                    artist = doc.ArtistName,
+                    isSynced = doc.IsSynced,
+                    lineCount = doc.Lines.Count,
+                    lyrics = combined,
+                    lines = doc.Lines.Select(l => new
+                    {
+                        timestampSeconds = Math.Round(l.TimestampSeconds, 2),
+                        text = l.Text,
+                    }).ToArray(),
+                });
+            }
+
+            case "media_get_queue":
+            {
+                var snap = _queueService.Snapshot;
+                return BuildToolJson(new
+                {
+                    isActive = snap.IsActive,
+                    currentIndex = snap.CurrentIndex,
+                    isShuffleEnabled = snap.IsShuffleEnabled,
+                    repeatMode = snap.RepeatMode.ToString(),
+                    queueCount = snap.Queue.Count,
+                    historyCount = snap.History.Count,
+                    currentTrack = snap.CurrentTrack is { } cur
+                        ? new
+                        {
+                            entryId = cur.EntryId,
+                            videoId = cur.VideoId,
+                            title = cur.Title,
+                            author = cur.Author,
+                            duration = cur.Duration?.ToString(@"m\:ss") ?? "LIVE",
+                            url = cur.WatchUrl,
+                        }
+                        : null,
+                    queue = snap.Queue.Select((t, idx) => new
+                    {
+                        index = idx,
+                        isCurrent = snap.IsActive && idx == snap.CurrentIndex,
+                        entryId = t.EntryId,
+                        videoId = t.VideoId,
+                        title = t.Title,
+                        author = t.Author,
+                        duration = t.Duration?.ToString(@"m\:ss") ?? "LIVE",
+                        url = t.WatchUrl,
+                    }).ToArray(),
+                });
+            }
+
             case "media_search_radio":
             {
                 var query = GetString(args, "query");
@@ -954,7 +1393,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                 var hiRes = GetBool(args, "hi_res_only") ?? false;
                 var limit = Math.Clamp(GetInt(args, "limit") ?? 10, 1, 30);
                 var stations = await _radioBrowser.SearchStationsAsync(query, tag, null, hiRes, limit, ct);
-                return BuildToolJson(stations.Select(s => new
+                var mapped = stations.Select(s => new
                 {
                     name = s.Name,
                     url = s.UrlResolved,
@@ -962,7 +1401,12 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                     bitrate = s.Bitrate,
                     country = s.Country,
                     tags = s.Tags,
-                }));
+                }).ToArray();
+                return BuildToolJson(new
+                {
+                    count = mapped.Length,
+                    stations = mapped,
+                });
             }
 
             case "media_search_youtube":
@@ -1114,6 +1558,97 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                 await _relayServer.EnsureStartedAsync(ct);
                 await _queueService.PlayNowAsync(track, useLowVolume: false, unmute: true, ct);
                 return BuildToolText($"Now playing YouTube track '{track.Title}' by {track.Author} on Denon HEOS.");
+            }
+
+            case "media_manage_queue":
+            {
+                var action = RequireString(args, "action").ToLowerInvariant();
+                switch (action)
+                {
+                    case "clear":
+                        _queueService.ClearQueue();
+                        return BuildToolText("Cleared the YouTube Up-Next queue.");
+                    case "toggle_shuffle":
+                        _queueService.ToggleShuffle();
+                        return BuildToolText($"Queue shuffle is now {(_queueService.Snapshot.IsShuffleEnabled ? "ON" : "OFF")}.");
+                    case "cycle_repeat":
+                        _queueService.CycleRepeatMode();
+                        return BuildToolText($"Queue repeat mode is now {_queueService.Snapshot.RepeatMode}.");
+                    case "remove":
+                    {
+                        var entryId = RequireString(args, "entry_id");
+                        _queueService.RemoveFromQueue(entryId);
+                        return BuildToolText($"Removed queue entry '{entryId}'.");
+                    }
+                    case "play_index":
+                    {
+                        var idx = GetInt(args, "index") ?? throw new McpInvalidParamsException("Missing integer 'index' (0-based).");
+                        var snap = _queueService.Snapshot;
+                        if (idx < 0 || idx >= snap.Queue.Count)
+                        {
+                            throw new McpInvalidParamsException($"Queue index {idx} is out of range (queue count: {snap.Queue.Count}).");
+                        }
+
+                        var target = snap.Queue[idx];
+                        await _relayServer.EnsureStartedAsync(ct);
+                        await _queueService.PlayQueueEntryAsync(target.EntryId, useLowVolume: false, unmute: true, ct);
+                        return BuildToolText($"Now playing queue item #{idx}: '{target.Title}' by {target.Author}.");
+                    }
+                    case "next":
+                    {
+                        var moved = await _queueService.PlayNextAsync(ct);
+                        return BuildToolText(moved ? "Skipped to next track in Up-Next queue." : "Already at end of Up-Next queue.");
+                    }
+                    case "previous":
+                    {
+                        var moved = await _queueService.PlayPreviousAsync(ct);
+                        return BuildToolText(moved ? "Returned to previous track in Up-Next queue." : "Up-Next queue is empty.");
+                    }
+                    default:
+                        throw new McpInvalidParamsException($"Unknown queue action '{action}'. Use clear, toggle_shuffle, cycle_repeat, remove, play_index, next, or previous.");
+                }
+            }
+
+            case "hue_set_color":
+            {
+                var p = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                if (GetString(args, "hex") is { Length: > 0 } hex) p["hex"] = hex;
+                if (GetInt(args, "kelvin") is { } kelvin) p["kelvin"] = kelvin.ToString();
+                if (GetInt(args, "brightness") is { } bri) p["brightness"] = bri.ToString();
+                if (GetString(args, "room") is { Length: > 0 } room) p["room"] = room;
+
+                var res = await _pluginHost.ExecuteActionAsync("philips-hue", "hue.set_color", p, ct);
+                _intelligence.RecordPluginActionUsed("philips-hue", "hue.set_color");
+                return res.Success ? BuildToolText(res.Message) : BuildToolError(res.Message);
+            }
+
+            case "tv_cast_youtube":
+            {
+                var video = RequireString(args, "video_url_or_id");
+                var res = await _pluginHost.ExecuteActionAsync("smart-tv", "tv.youtube", new Dictionary<string, string> { ["contentId"] = video }, ct);
+                _intelligence.RecordPluginActionUsed("smart-tv", "tv.youtube");
+                return res.Success ? BuildToolText(res.Message) : BuildToolError(res.Message);
+            }
+
+            case "tv_remote_button":
+            {
+                var button = RequireString(args, "button").ToUpperInvariant();
+                var res = await _pluginHost.ExecuteActionAsync("smart-tv", "tv.button", new Dictionary<string, string> { ["button"] = button }, ct);
+                _intelligence.RecordPluginActionUsed("smart-tv", "tv.button");
+                return res.Success ? BuildToolText(res.Message) : BuildToolError(res.Message);
+            }
+
+            case "tv_type_text":
+            {
+                var text = RequireString(args, "text");
+                var pressEnter = GetBool(args, "press_enter") ?? true;
+                var res = await _pluginHost.ExecuteActionAsync("smart-tv", "tv.type_text", new Dictionary<string, string>
+                {
+                    ["text"] = text,
+                    ["enter"] = pressEnter ? "true" : "false",
+                }, ct);
+                _intelligence.RecordPluginActionUsed("smart-tv", "tv.type_text");
+                return res.Success ? BuildToolText(res.Message) : BuildToolError(res.Message);
             }
 
             case "activate_smart_scene":
@@ -1430,12 +1965,55 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
     private static string Slugify(string raw) =>
         NonAlnumRegex().Replace((raw ?? string.Empty).Trim().ToLowerInvariant(), "_").Trim('_');
 
-    private static object Tool(string name, string description, object inputSchema) => new
+    private static object Tool(
+        string name,
+        string description,
+        object inputSchema,
+        string? title = null,
+        bool readOnly = false,
+        bool destructive = false,
+        bool idempotent = false,
+        bool openWorld = false,
+        object? outputSchema = null)
     {
-        name,
-        description,
-        inputSchema,
-    };
+        var def = new Dictionary<string, object>
+        {
+            ["name"] = name,
+            ["description"] = description,
+            ["inputSchema"] = inputSchema,
+            ["annotations"] = new
+            {
+                title = string.IsNullOrWhiteSpace(title) ? name : title,
+                readOnlyHint = readOnly,
+                destructiveHint = destructive,
+                idempotentHint = idempotent,
+                openWorldHint = openWorld,
+            },
+        };
+
+        if (outputSchema is not null)
+        {
+            def["outputSchema"] = outputSchema;
+        }
+
+        return def;
+    }
+
+    private static object OutputObjSchema(params (string Name, string Type)[] fields)
+    {
+        var props = new Dictionary<string, object>();
+        foreach (var (name, type) in fields)
+        {
+            props[name] = new { type };
+        }
+
+        return new
+        {
+            type = "object",
+            properties = props,
+            additionalProperties = true,
+        };
+    }
 
     private static object EmptySchema() => new
     {
@@ -1470,6 +2048,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
     private static object BuildToolJson(object data) => new
     {
         content = new[] { new { type = "text", text = JsonSerializer.Serialize(data, JsonPrettyOptions) } },
+        structuredContent = data,
         isError = false,
     };
 

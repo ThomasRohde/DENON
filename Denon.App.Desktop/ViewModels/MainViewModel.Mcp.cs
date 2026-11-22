@@ -22,7 +22,7 @@ public sealed partial class MainViewModel
     private bool _isMcpRunning;
     private string _mcpStatusBadgeText = "STOPPED";
     private string _mcpEndpointText = "http://127.0.0.1:18926/mcp";
-    private string _mcpToolsSummaryText = "0 tools • 4 resources • 4 prompts";
+    private string _mcpToolsSummaryText = "0 tools • 4 resources • 2 templates • 4 prompts";
     private string _mcpClientConfigPreview = string.Empty;
     private string _mcpStatusMessage = "Streamable HTTP MCP Server ready.";
     private string _learnedHabitsSummary = "Learning your local listening patterns (100% local, zero cloud).";
@@ -264,7 +264,7 @@ public sealed partial class MainViewModel
             ? $"LISTENING • {cfg.PermissionTier}"
             : (!cfg.Enabled ? "DISABLED" : "STOPPED");
 
-        McpToolsSummaryText = $"{_mcpServer.RegisteredToolCount} tools (AVR + Media + Intelligence + Plugins) • 4 resources • 4 prompts";
+        McpToolsSummaryText = $"{_mcpServer.RegisteredToolCount} tools • 4 resources • 2 templates • 4 prompts";
         McpClientConfigPreview = _mcpServer.BuildClientConfigJson();
 
         if (!string.IsNullOrWhiteSpace(_mcpServer.LastError))

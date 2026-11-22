@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-22
+
+### Added
+- **2026 MCP Protocol Upgrades (Tool Annotations, Typed Structured Outputs & Resource Templates)**:
+  - Added full MCP `annotations` (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) across all core and auto-bridged plugin tools so AI clients like Antigravity, Claude, and Cursor know which calls are safe to auto-run vs. power-off or queue-destructive.
+  - Added typed `outputSchema` definitions and dual `structuredContent` + backwards-compatible text `content` responses on core query & intelligence tools (`get_room_state`, `diagnose_room`, `get_listening_habits`, `apply_atmosphere`, `avr_get_acoustics`, `media_get_now_playing_lyrics`, `media_get_queue`, `media_search_radio`, `media_search_youtube`, `list_scenes_and_rules`).
+  - Added live **Resource Templates** (`denon://plugins/{pluginId}`, `denon://scenes/{sceneId}`), **Argument Completions** (`completion/complete`), **Resource Subscriptions** (`resources/subscribe`, `resources/unsubscribe`), and `logging/setLevel` for full MCP Inspector compatibility.
+- **8 New Curated Living-Room MCP Tools**:
+  - `avr_get_acoustics`: Read live Audyssey MultEQ, Dynamic EQ, Dynamic Volume, Compressed Audio Restorer, Front Panel Dimmer, Subwoofer/Dialog trims, and Tone Control over Telnet `:23`.
+  - `media_get_now_playing_lyrics`: Fetch synced/plain lyrics via LRCLIB for the currently playing track (or an explicit `title`/`artist`).
+  - `media_get_queue` & `media_manage_queue`: Inspect and control the YouTube Up-Next playback queue (`clear`, `toggle_shuffle`, `cycle_repeat`, `remove`, `play_index`, `next`, `previous`).
+  - `hue_set_color`: Set Philips Hue lights to any custom hex color (`#RRGGBB`), white warmth in Kelvin (`2000–6500K`), and brightness (`1–100%`), optionally targeting a specific Hue room/zone (`hue.set_color` plugin action).
+  - `tv_cast_youtube`, `tv_remote_button`, `tv_type_text`: Direct LG webOS 2.0 YouTube casting, Magic Remote button presses, and TV keyboard text entry over the persistent SSAP pointer socket.
+
+### Fixed
+- **MCP Inspector `resources/templates/list` Error**: Implemented `resources/templates/list` and companion protocol methods so MCP Inspector loads all tabs cleanly with zero errors.
+
 ## [1.8.1] - 2026-11-22
 
 ### Fixed
@@ -150,7 +167,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Zero-Lag Real-Time HEOS Push Events (`LIVE PUSH`) & Analog VU Meters**: Dedicated `register_for_change_events` push listener for `<50 ms` knob/remote sync and toggleable dual-channel illuminated VU dials.
 - **Automated GitHub Releases Workflow**: `.github/workflows/release.yml` builds self-contained single-file `win-x64` executables and SHA-256 checksums on version tags.
 
-[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.8.1...HEAD
+[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/ThomasRohde/DENON/compare/v1.8.1...v1.9.0
 [1.8.1]: https://github.com/ThomasRohde/DENON/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/ThomasRohde/DENON/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/ThomasRohde/DENON/compare/v1.6.0...v1.7.0
