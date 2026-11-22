@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-11-22
+
+### Changed
+- **Denon Front-Panel Volume Scale by Default (`28.0` instead of `-52.0 dB`)**: Defaulted `DisplayVolumeInDb` to `false`, formatted the main volume display to exact `0.0` Denon front-panel steps (e.g. `28.0` / `28.5`), and persisted clicking the volume readout to `settings.json` immediately (dB mode remains 1 click away).
+- **Calibrated LG webOS Pointer Targeting & Built-In `settings` App Alias**: Updated `MovePointerToNormalizedAsync` to the empirically verified `1280×720` LG webOS logical pointer plane with smaller uniform `24 px` steps to avoid high-velocity pointer acceleration drift; added `"settings"` / `"indstillinger"` → `com.palm.app.settings` alias and wired the Smart TV **Settings** remote button to launch it directly.
+
 ## [1.10.0] - 2026-11-22
 
 ### Added
@@ -180,7 +186,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Zero-Lag Real-Time HEOS Push Events (`LIVE PUSH`) & Analog VU Meters**: Dedicated `register_for_change_events` push listener for `<50 ms` knob/remote sync and toggleable dual-channel illuminated VU dials.
 - **Automated GitHub Releases Workflow**: `.github/workflows/release.yml` builds self-contained single-file `win-x64` executables and SHA-256 checksums on version tags.
 
-[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.10.0...HEAD
+[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.10.1...HEAD
+[1.10.1]: https://github.com/ThomasRohde/DENON/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/ThomasRohde/DENON/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/ThomasRohde/DENON/compare/v1.8.1...v1.9.0
 [1.8.1]: https://github.com/ThomasRohde/DENON/compare/v1.8.0...v1.8.1

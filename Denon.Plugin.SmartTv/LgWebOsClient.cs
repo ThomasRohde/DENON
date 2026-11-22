@@ -82,8 +82,9 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
         Timeout = TimeSpan.FromSeconds(8),
     };
 
-    private const int LogicalScreenWidth = 1920;
-    private const int LogicalScreenHeight = 1080;
+    // Empirically calibrated LG webOS pointer logical coordinate space (1280x720 with uniform small deltas).
+    private const int LogicalScreenWidth = 1280;
+    private const int LogicalScreenHeight = 720;
 
     private readonly SemaphoreSlim _connectGate = new(1, 1);
     private readonly SemaphoreSlim _sendGate = new(1, 1);
@@ -758,10 +759,10 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
 
             if (needsHome)
             {
-                // Slam smoothly into the top-left corner (0, 0) to establish a known anchor point.
-                for (var i = 0; i < 14; i++)
+                // Slam smoothly into the top-left corner (0, 0) using moderate steps to stay predictable.
+                for (var i = 0; i < 16; i++)
                 {
-                    await SendPointerFrameLockedAsync("type:move\ndx:-180\ndy:-110\ndown:0\n\n", ct);
+                    await SendPointerFrameLockedAsync("type:move\ndx:-100\ndy:-60\ndown:0\n\n", ct);
                     await Task.Delay(10, ct);
                 }
 
@@ -779,7 +780,7 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
             var dy = targetPxY - startY;
             if (dx != 0 || dy != 0)
             {
-                await SendChunkedMoveLockedAsync(dx, dy, drag: false, maxStepPx: 45, delayMs: 12, ct);
+                await SendChunkedMoveLockedAsync(dx, dy, drag: false, maxStepPx: 24, delayMs: 10, ct);
             }
 
             lock (_stateLock)
@@ -1754,6 +1755,7 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
             "appletv" or "com.apple.appletv" => "apple",
             "livetv" or "com.webos.app.livetv" => "livetv",
             "browser" or "web" or "webbrowser" or "com.webos.app.browser" => "browser",
+            "settings" or "setting" or "indstillinger" or "quicksettings" or "systemsettings" or "com.palm.app.settings" => "com.palm.app.settings",
             _ => lower,
         };
 
@@ -1779,6 +1781,7 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
             "appletv" => "com.apple.appletv",
             "livetv" => "com.webos.app.livetv",
             "browser" or "web" or "webbrowser" => "com.webos.app.browser",
+            "settings" or "setting" or "indstillinger" or "quicksettings" or "systemsettings" => "com.palm.app.settings",
             _ => token,
         };
     }

@@ -601,7 +601,7 @@
                                 <Button Content="Home" Command="{Binding SendButtonCommand}" CommandParameter="HOME" Style="{StaticResource TvChipBtn}" Margin="0,0,6,6" />
                                 <Button Content="Back" Command="{Binding SendButtonCommand}" CommandParameter="BACK" Style="{StaticResource TvChipBtn}" Margin="0,0,6,6" />
                                 <Button Content="Exit" Command="{Binding SendButtonCommand}" CommandParameter="EXIT" Style="{StaticResource TvChipBtn}" Margin="0,0,6,6" />
-                                <Button Content="Settings" Command="{Binding SendButtonCommand}" CommandParameter="MENU" Style="{StaticResource TvChipBtn}" Margin="0,0,6,6" />
+                                <Button Content="Settings" Command="{Binding LaunchAppCommand}" CommandParameter="settings" Style="{StaticResource TvChipBtn}" Margin="0,0,6,6" ToolTip="Open LG webOS TV Settings" />
                                 <Button Content="Info" Command="{Binding SendButtonCommand}" CommandParameter="INFO" Style="{StaticResource TvChipBtn}" Margin="0,0,6,6" />
                                 <Button Content="Guide" Command="{Binding SendButtonCommand}" CommandParameter="GUIDE" Style="{StaticResource TvChipBtn}" Margin="0,0,6,6" />
                                 <Button Content="Ch ▲" Command="{Binding SendButtonCommand}" CommandParameter="CHANNELUP" Style="{StaticResource TvChipBtn}" Margin="0,0,6,6" />

@@ -119,7 +119,7 @@ public sealed class UiSettings
 
     public bool ShowNotifications { get; set; } = true;
 
-    public bool DisplayVolumeInDb { get; set; } = true;
+    public bool DisplayVolumeInDb { get; set; } = false;
 
     public bool LaunchAtWindowsStartup { get; set; } = false;
 

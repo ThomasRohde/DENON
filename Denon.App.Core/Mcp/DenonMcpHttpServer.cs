@@ -19,7 +19,7 @@ namespace Denon.App.Core.Mcp;
 public sealed partial class DenonMcpHttpServer : IAsyncDisposable
 {
     private const string ServerName = "denon-desktop-mcp";
-    private const string ServerVersion = "1.10.0";
+    private const string ServerVersion = "1.10.1";
     private const string DefaultProtocolVersion = "2025-11-25";
 
     private static readonly JsonSerializerOptions JsonOutOptions = new()
@@ -1792,7 +1792,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                 description = "Operation to perform on the LG webOS TV. Use 'screenshot' to see the screen, 'open_url' for the Web Browser, 'move_to'/'click'/'move'/'scroll' for the Magic Remote pointer, 'button' for D-pad/Home/Back, 'type'/'backspace' for keyboard input, or 'batch' to chain multiple steps in one round-trip.",
             },
             ["url"] = new { type = "string", description = "URL to open in the LG webOS Web Browser (for action='open_url')." },
-            ["app"] = new { type = "string", description = "App name, alias, or webOS appId (e.g. 'youtube', 'browser', 'plex', 'netflix', 'livetv', 'com.webos.app.hdmi1') for action='launch_app'." },
+            ["app"] = new { type = "string", description = "App name, alias, or webOS appId (e.g. 'settings', 'youtube', 'browser', 'plex', 'netflix', 'livetv', 'com.webos.app.hdmi1') for action='launch_app'. Use 'settings' to open LG webOS Settings directly." },
             ["content_id"] = new { type = "string", description = "Optional deep-link content ID (e.g. YouTube URL or 11-char video ID) for action='launch_app'." },
             ["x"] = new { type = "integer", description = "Normalized horizontal screen coordinate 0..1000 (0=left, 1000=right) for 'move_to' or 'click'." },
             ["y"] = new { type = "integer", description = "Normalized vertical screen coordinate 0..1000 (0=top, 1000=bottom) for 'move_to' or 'click'." },

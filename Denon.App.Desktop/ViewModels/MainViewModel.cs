@@ -71,7 +71,7 @@ public sealed partial class MainViewModel : ObservableObject
     private int _liveVolume;
     private double _liveVolumeExact;
     private int _maxVolume = 98;
-    private bool _displayVolumeInDb = true;
+    private bool _displayVolumeInDb;
     private string _lastUpdatedText = "Not synced yet";
     private string _lastError = string.Empty;
 
@@ -102,7 +102,7 @@ public sealed partial class MainViewModel : ObservableObject
     private bool _settingsMinimizeToTray = true;
     private bool _settingsCloseToTray = true;
     private bool _settingsShowNotifications = true;
-    private bool _settingsDisplayVolumeInDb = true;
+    private bool _settingsDisplayVolumeInDb;
     private bool _settingsLaunchAtWindowsStartup;
 
     // Diagnostics & Console
@@ -215,7 +215,14 @@ public sealed partial class MainViewModel : ObservableObject
         VolumeFineUpCommand = new AsyncRelayCommand(_ => StepVolumeAsync(1), CanControlReceiver);
         VolumeFineDownCommand = new AsyncRelayCommand(_ => StepVolumeAsync(-1), CanControlReceiver);
         SetVolumePresetCommand = new AsyncRelayCommand(SetVolumePresetAsync, CanControlReceiver);
-        ToggleVolumeDisplayModeCommand = new RelayCommand(_ => DisplayVolumeInDb = !DisplayVolumeInDb);
+        ToggleVolumeDisplayModeCommand = new RelayCommand(_ =>
+        {
+            DisplayVolumeInDb = !DisplayVolumeInDb;
+            SettingsDisplayVolumeInDb = DisplayVolumeInDb;
+            var updated = _settingsStore.Current.Clone();
+            updated.Ui.DisplayVolumeInDb = DisplayVolumeInDb;
+            _ = _settingsStore.SaveAsync(updated);
+        });
 
         SelectInputCommand = new AsyncRelayCommand(SelectInputAsync, CanControlReceiver);
         SelectSoundModeCommand = new AsyncRelayCommand(SelectSoundModeAsync, CanControlReceiver);
@@ -643,7 +650,13 @@ public sealed partial class MainViewModel : ObservableObject
     public double LiveVolumeExact
     {
         get => _liveVolumeExact;
-        private set => SetProperty(ref _liveVolumeExact, value);
+        private set
+        {
+            if (SetProperty(ref _liveVolumeExact, value))
+            {
+                OnPropertyChanged(nameof(PrimaryVolumeText));
+            }
+        }
     }
 
     public int MaxVolume
@@ -669,9 +682,23 @@ public sealed partial class MainViewModel : ObservableObject
 
     public string VolumeAbsoluteLabel => $"{TargetVolume} / {MaxVolume}";
 
-    public string PrimaryVolumeText => DisplayVolumeInDb ? VolumeDbLabel : $"{TargetVolume}";
+    public string PrimaryVolumeText
+    {
+        get
+        {
+            if (DisplayVolumeInDb)
+            {
+                return VolumeDbLabel;
+            }
 
-    public string SecondaryVolumeText => DisplayVolumeInDb ? $"VOL {TargetVolume} / {MaxVolume}" : VolumeDbLabel;
+            var displayVal = Math.Abs(LiveVolumeExact - TargetVolume) < 1.0 && LiveVolumeExact > 0
+                ? LiveVolumeExact
+                : TargetVolume;
+            return displayVal.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
+
+    public string SecondaryVolumeText => DisplayVolumeInDb ? $"VOL {TargetVolume} / {MaxVolume}" : $"VOL / {MaxVolume} • {VolumeDbLabel}";
 
     public bool IsMuted
     {
