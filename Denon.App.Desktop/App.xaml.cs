@@ -76,6 +76,7 @@ public partial class App : System.Windows.Application
             var builder = Host.CreateApplicationBuilder();
             builder.Services.AddSingleton<AppLogStore>();
             builder.Services.AddSingleton<AppSettingsStore>();
+            builder.Services.AddSingleton<EventTelemetryLog>();
             builder.Services.AddSingleton<ReceiverStateStore>();
             builder.Services.AddSingleton<HeosClient>();
             builder.Services.AddSingleton<DenonAvrClient>();
@@ -97,6 +98,8 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<IDenonPlugin, SmartTvPlugin>();
             builder.Services.AddSingleton<IDenonPlugin, HomeAssistantPlugin>();
             builder.Services.AddSingleton<PluginHostService>();
+            builder.Services.AddSingleton<EventTelemetryMonitorService>();
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<EventTelemetryMonitorService>());
             builder.Services.AddSingleton<RoomIntelligenceService>();
             builder.Services.AddSingleton<DenonMcpHttpServer>();
             builder.Services.AddSingleton<LyricsService>();

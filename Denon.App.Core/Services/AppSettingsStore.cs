@@ -148,6 +148,14 @@ public sealed class AppSettingsStore
             normalized.Mcp.BearerToken = McpServerSettings.GenerateSecureToken();
         }
 
+        normalized.Telemetry ??= new TelemetrySettings();
+        normalized.Telemetry.RetentionDays = Math.Clamp(normalized.Telemetry.RetentionDays, 7, 365);
+        normalized.Telemetry.MediaDwellSeconds = Math.Clamp(normalized.Telemetry.MediaDwellSeconds, 5, 120);
+        normalized.Telemetry.VolumeSettleMs = Math.Clamp(normalized.Telemetry.VolumeSettleMs, 1000, 10000);
+        normalized.Telemetry.ActiveProbeIntervalSeconds = Math.Clamp(normalized.Telemetry.ActiveProbeIntervalSeconds, 10, 120);
+        normalized.Telemetry.StandbyProbeIntervalSeconds = Math.Clamp(normalized.Telemetry.StandbyProbeIntervalSeconds, 30, 300);
+        normalized.Telemetry.MaxTotalSizeMb = Math.Clamp(normalized.Telemetry.MaxTotalSizeMb, 5, 500);
+
         return normalized;
     }
 

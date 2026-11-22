@@ -225,6 +225,20 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
                 if (x.HasValue) parts.Add($"hex {parameters!["hex"]}");
                 if (mirek.HasValue) parts.Add($"{parameters!["kelvin"]}K");
                 if (brightness.HasValue) parts.Add($"{brightness.Value}%");
+                if (!_config.DemoMode)
+                {
+                    _context?.Events.RecordEvent(
+                        "color.set",
+                        new Dictionary<string, object?>
+                        {
+                            ["groupId"] = groupId,
+                            ["hex"] = x.HasValue ? parameters!["hex"] : null,
+                            ["kelvin"] = mirek.HasValue ? parameters!["kelvin"] : null,
+                            ["brightness"] = brightness,
+                        },
+                        origin: "plugin");
+                }
+
                 return PluginActionResult.Ok($"Set Philips Hue group '{groupId}' to {(parts.Count > 0 ? string.Join(" @ ", parts) : "ON")}.");
             }
 
@@ -460,6 +474,19 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
 
         var modeTag = _config.DemoMode ? "Demo Bridge" : _config.BridgeIp;
         var transportTag = _entertainmentClient?.IsStreaming == true ? "50 Hz DTLS" : "LAN Sync";
+        if (!_config.DemoMode)
+        {
+            _context?.Events.RecordEvent(
+                "music_sync.changed",
+                new Dictionary<string, object?>
+                {
+                    ["enabled"] = enabled,
+                    ["mode"] = _config.MusicSync.Mode.ToString(),
+                    ["transport"] = transportTag,
+                },
+                origin: "plugin");
+        }
+
         _context?.ReportStatus(
             enabled
                 ? $"{modeTag} • {transportTag} LIVE ({_config.MusicSync.Mode})"
@@ -867,6 +894,18 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
         var preset = HueColorPreset.Defaults.FirstOrDefault(p => string.Equals(p.Id, presetId, StringComparison.OrdinalIgnoreCase))
                      ?? HueColorPreset.Defaults[0];
         await ApplyColorPresetAsync(groupId, preset, cancellationToken);
+        if (!_config.DemoMode)
+        {
+            _context?.Events.RecordEvent(
+                "preset.applied",
+                new Dictionary<string, object?>
+                {
+                    ["groupId"] = groupId,
+                    ["presetId"] = preset.Id,
+                    ["presetName"] = preset.Name,
+                },
+                origin: "plugin");
+        }
     }
 
     private string ResolveRequestedGroupId(IReadOnlyDictionary<string, string>? parameters, string fallbackGroupId)

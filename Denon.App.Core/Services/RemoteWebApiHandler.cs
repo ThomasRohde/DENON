@@ -23,6 +23,7 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
     private readonly YouTubeQueueService _youtubeQueueService;
     private readonly LocalMediaJukeboxService _localJukeboxService;
     private readonly PluginHostService _pluginHost;
+    private readonly EventTelemetryLog _telemetry;
     private readonly AppLogStore _logStore;
 
     public RemoteWebApiHandler(
@@ -33,6 +34,7 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
         YouTubeQueueService youtubeQueueService,
         LocalMediaJukeboxService localJukeboxService,
         PluginHostService pluginHost,
+        EventTelemetryLog telemetry,
         AppLogStore logStore)
     {
         _receiverController = receiverController;
@@ -42,6 +44,7 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
         _youtubeQueueService = youtubeQueueService;
         _localJukeboxService = localJukeboxService;
         _pluginHost = pluginHost;
+        _telemetry = telemetry;
         _logStore = logStore;
     }
 
@@ -89,6 +92,13 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
                 ? JsonDocument.Parse("{}")
                 : JsonDocument.Parse(body);
             var root = doc.RootElement;
+
+            _telemetry.MarkOrigin("avr", "phone_remote", "remote.api", new Dictionary<string, object?>
+            {
+                ["path"] = path,
+            });
+            _telemetry.MarkOrigin("tv", "phone_remote");
+            _telemetry.MarkOrigin("lighting", "phone_remote");
 
             switch (path.ToLowerInvariant())
             {

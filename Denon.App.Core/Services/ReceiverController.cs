@@ -10,6 +10,7 @@ public sealed class ReceiverController
     private readonly DenonAvrClient _avrClient;
     private readonly AppSettingsStore _settingsStore;
     private readonly ReceiverStateStore _stateStore;
+    private readonly EventTelemetryLog _telemetry;
     private readonly AppLogStore _logStore;
     private string? _lastPlayedStationAlias;
 
@@ -18,12 +19,14 @@ public sealed class ReceiverController
         DenonAvrClient avrClient,
         AppSettingsStore settingsStore,
         ReceiverStateStore stateStore,
+        EventTelemetryLog telemetry,
         AppLogStore logStore)
     {
         _heosClient = heosClient;
         _avrClient = avrClient;
         _settingsStore = settingsStore;
         _stateStore = stateStore;
+        _telemetry = telemetry;
         _logStore = logStore;
     }
 
@@ -610,6 +613,15 @@ public sealed class ReceiverController
 
                 await Task.Delay(300, token);
                 var updatedStatus = await GetMergedStatusAsync(settings, token);
+                _telemetry.MarkOrigin("avr", "smart_scene", "scene.activated", new Dictionary<string, object?>
+                {
+                    ["sceneId"] = scene.Id,
+                    ["sceneName"] = scene.Name,
+                    ["input"] = scene.InputSource,
+                    ["volume"] = scene.TargetVolume,
+                }, overwriteRecent: false);
+                _telemetry.MarkOrigin("tv", "smart_scene", overwriteRecent: false);
+                _telemetry.MarkOrigin("lighting", "smart_scene", overwriteRecent: false);
                 SceneActivated?.Invoke(scene);
                 return updatedStatus;
             },
@@ -692,6 +704,7 @@ public sealed class ReceiverController
         {
             if (markBusy)
             {
+                _telemetry.MarkOrigin("avr", "desktop_ui", overwriteRecent: false);
                 _stateStore.SetBusy(true);
             }
 

@@ -13,6 +13,7 @@ public sealed class AutomationEngineService : BackgroundService
     private readonly AppSettingsStore _settingsStore;
     private readonly ReceiverController _receiverController;
     private readonly PluginHostService _pluginHost;
+    private readonly EventTelemetryLog _telemetry;
     private readonly AppLogStore _logStore;
 
     private readonly Dictionary<string, DateTimeOffset> _lastAppTriggerByRule = new(StringComparer.OrdinalIgnoreCase);
@@ -24,11 +25,13 @@ public sealed class AutomationEngineService : BackgroundService
         AppSettingsStore settingsStore,
         ReceiverController receiverController,
         PluginHostService pluginHost,
+        EventTelemetryLog telemetry,
         AppLogStore logStore)
     {
         _settingsStore = settingsStore;
         _receiverController = receiverController;
         _pluginHost = pluginHost;
+        _telemetry = telemetry;
         _logStore = logStore;
     }
 
@@ -44,6 +47,14 @@ public sealed class AutomationEngineService : BackgroundService
 
         try
         {
+            _telemetry.MarkOrigin("avr", "automation", "automation.triggered", new Dictionary<string, object?>
+            {
+                ["ruleName"] = rule.Name,
+                ["trigger"] = triggerDetail,
+            });
+            _telemetry.MarkOrigin("tv", "automation");
+            _telemetry.MarkOrigin("lighting", "automation");
+
             ScenePreset? targetScene = null;
             if (!string.IsNullOrWhiteSpace(rule.TargetSceneId))
             {

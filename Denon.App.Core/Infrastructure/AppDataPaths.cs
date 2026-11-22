@@ -7,6 +7,10 @@ public static class AppDataPaths
 
     public static string LogsDirectory { get; } = Path.Combine(RootDirectory, "logs");
 
+    public static string EventsLogsDirectory { get; } = Path.Combine(LogsDirectory, "events");
+
+    public static string PluginEventsLogsDirectory { get; } = Path.Combine(EventsLogsDirectory, "plugins");
+
     public static string PluginsDirectory { get; } = Path.Combine(RootDirectory, "plugins");
 
     public static string ExternalPluginsDirectory { get; } = Path.Combine(PluginsDirectory, "external");
@@ -32,6 +36,8 @@ public static class AppDataPaths
     {
         Directory.CreateDirectory(RootDirectory);
         Directory.CreateDirectory(LogsDirectory);
+        Directory.CreateDirectory(EventsLogsDirectory);
+        Directory.CreateDirectory(PluginEventsLogsDirectory);
         Directory.CreateDirectory(PluginsDirectory);
         Directory.CreateDirectory(ExternalPluginsDirectory);
     }

@@ -14,6 +14,8 @@ public sealed class AppSettings
 
     public McpServerSettings Mcp { get; set; } = new();
 
+    public TelemetrySettings Telemetry { get; set; } = new();
+
     public List<AutomationRule> Automations { get; set; } = AutomationRule.CreateDefaults();
 
     public AppSettings Clone() =>
@@ -25,6 +27,7 @@ public sealed class AppSettings
             Shortcuts = Shortcuts.Clone(),
             Plugins = Plugins.Clone(),
             Mcp = Mcp.Clone(),
+            Telemetry = Telemetry.Clone(),
             Automations = Automations.Select(static a => a.Clone()).ToList(),
         };
 
@@ -155,4 +158,33 @@ public sealed class StationPreset
     public string Url { get; set; } = string.Empty;
 
     public StationPreset Clone() => new(Alias, DisplayName, Url);
+}
+
+public sealed class TelemetrySettings
+{
+    public bool Enabled { get; set; } = true;
+
+    public int RetentionDays { get; set; } = 90;
+
+    public int MediaDwellSeconds { get; set; } = 15;
+
+    public int VolumeSettleMs { get; set; } = 3000;
+
+    public int ActiveProbeIntervalSeconds { get; set; } = 15;
+
+    public int StandbyProbeIntervalSeconds { get; set; } = 60;
+
+    public int MaxTotalSizeMb { get; set; } = 50;
+
+    public TelemetrySettings Clone() =>
+        new()
+        {
+            Enabled = Enabled,
+            RetentionDays = RetentionDays,
+            MediaDwellSeconds = MediaDwellSeconds,
+            VolumeSettleMs = VolumeSettleMs,
+            ActiveProbeIntervalSeconds = ActiveProbeIntervalSeconds,
+            StandbyProbeIntervalSeconds = StandbyProbeIntervalSeconds,
+            MaxTotalSizeMb = MaxTotalSizeMb,
+        };
 }

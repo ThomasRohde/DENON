@@ -3485,6 +3485,44 @@
                                         </WrapPanel>
                                     </StackPanel>
                                 </Border>
+
+                                <Border Style="{StaticResource SurfaceCard}" Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="SMART EVENT &amp; HABIT LOGGING" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,10" />
+                                        <CheckBox Content="Record smart device, media &amp; external remote events locally"
+                                                  IsChecked="{Binding SettingsTelemetryEnabled}"
+                                                  Style="{StaticResource ToggleSwitchStyle}"
+                                                  FontSize="12"
+                                                  Margin="0,0,0,10" />
+
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="10" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Retention (days)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                                <TextBox Text="{Binding SettingsTelemetryRetentionDays, UpdateSourceTrigger=PropertyChanged}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Media dwell filter (sec)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                                <TextBox Text="{Binding SettingsTelemetryMediaDwellSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <TextBlock Text="{Binding TelemetryStatsSummaryText}"
+                                                   FontSize="11.5"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,12" />
+
+                                        <WrapPanel>
+                                            <Button Content="Open Events Folder" Command="{Binding OpenEventsFolderCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,8,4" />
+                                            <Button Content="Clear Event History" Command="{Binding ClearTelemetryHistoryCommand}" Style="{StaticResource DangerButton}" Margin="0,0,0,4" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
                         </ScrollViewer>
 

@@ -16,6 +16,8 @@ public sealed record AppLogEntry(DateTimeOffset Timestamp, AppLogLevel Level, st
 public sealed class AppLogStore
 {
     private const int MaxEntries = 500;
+    private const long MaxLogFileBytes = 5 * 1024 * 1024; // 5 MB rotation cap
+    private const int MaxRotatedFiles = 4;
     private readonly ConcurrentQueue<AppLogEntry> _entries = new();
     private readonly object _fileLock = new();
 
@@ -56,10 +58,43 @@ public sealed class AppLogStore
     {
         lock (_fileLock)
         {
-            File.AppendAllText(
-                AppDataPaths.LogFilePath,
-                FormatEntry(entry) + Environment.NewLine,
-                Encoding.UTF8);
+            try
+            {
+                RotateIfNeededLocked();
+                File.AppendAllText(
+                    AppDataPaths.LogFilePath,
+                    FormatEntry(entry) + Environment.NewLine,
+                    Encoding.UTF8);
+            }
+            catch
+            {
+                // Never crash app on transient file lock.
+            }
+        }
+    }
+
+    private static void RotateIfNeededLocked()
+    {
+        var path = AppDataPaths.LogFilePath;
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        var info = new FileInfo(path);
+        if (info.Length < MaxLogFileBytes)
+        {
+            return;
+        }
+
+        for (var i = MaxRotatedFiles; i >= 1; i--)
+        {
+            var src = i == 1 ? path : $"{path}.{i - 1}";
+            var dst = $"{path}.{i}";
+            if (File.Exists(src))
+            {
+                File.Move(src, dst, overwrite: true);
+            }
         }
     }
 }

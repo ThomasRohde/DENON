@@ -28,6 +28,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly AppSettingsStore _settingsStore;
     private readonly ReceiverStateStore _stateStore;
     private readonly AppLogStore _logStore;
+    private readonly EventTelemetryLog _telemetryLog;
     private readonly DenonDiscoveryService _discoveryService;
     private readonly StreamProbeService _streamProbeService;
     private readonly WindowsStartupService _startupService;
@@ -104,6 +105,10 @@ public sealed partial class MainViewModel : ObservableObject
     private bool _settingsShowNotifications = true;
     private bool _settingsDisplayVolumeInDb;
     private bool _settingsLaunchAtWindowsStartup;
+    private bool _settingsTelemetryEnabled = true;
+    private string _settingsTelemetryRetentionDays = "90";
+    private string _settingsTelemetryMediaDwellSeconds = "15";
+    private string _telemetryStatsSummaryText = "Smart event logging active (90-day retention • 15s media dwell filter).";
 
     // Diagnostics & Console
     private string _logFilterLevel = "All";
@@ -140,12 +145,14 @@ public sealed partial class MainViewModel : ObservableObject
         LyricsService lyricsService,
         AcousticSyncCalibrationService calibrationService,
         RoomIntelligenceService roomIntelligenceService,
-        DenonMcpHttpServer mcpServer)
+        DenonMcpHttpServer mcpServer,
+        EventTelemetryLog telemetryLog)
     {
         _receiverController = receiverController;
         _settingsStore = settingsStore;
         _stateStore = stateStore;
         _logStore = logStore;
+        _telemetryLog = telemetryLog;
         _discoveryService = discoveryService;
         _streamProbeService = streamProbeService;
         _startupService = startupService;
@@ -250,6 +257,8 @@ public sealed partial class MainViewModel : ObservableObject
         ExportSettingsCommand = new RelayCommand(_ => ExportSettings());
         ImportSettingsCommand = new AsyncRelayCommand(_ => ImportSettingsAsync());
         OpenDataFolderCommand = new RelayCommand(_ => OpenFolder(AppDataPaths.RootDirectory));
+        OpenEventsFolderCommand = new RelayCommand(_ => OpenFolder(AppDataPaths.EventsLogsDirectory));
+        ClearTelemetryHistoryCommand = new AsyncRelayCommand(_ => ClearTelemetryHistoryAsync());
 
         // Diagnostics & Console
         SetLogFilterCommand = new RelayCommand(param =>
@@ -297,6 +306,8 @@ public sealed partial class MainViewModel : ObservableObject
 
         _stateStore.StateChanged += snapshot => _ = _dispatcher.InvokeAsync(() => ApplyStateSnapshot(snapshot));
         _settingsStore.SettingsChanged += settings => _ = _dispatcher.InvokeAsync(() => LoadSettings(settings));
+        _telemetryLog.StatsChanged += () => _ = _dispatcher.InvokeAsync(RefreshTelemetryStats);
+        RefreshTelemetryStats();
         _logStore.EntryAdded += entry => _ = _dispatcher.InvokeAsync(() =>
         {
             LogEntries.Add(entry);
@@ -362,6 +373,8 @@ public sealed partial class MainViewModel : ObservableObject
     public RelayCommand ExportSettingsCommand { get; }
     public AsyncRelayCommand ImportSettingsCommand { get; }
     public RelayCommand OpenDataFolderCommand { get; }
+    public RelayCommand OpenEventsFolderCommand { get; }
+    public AsyncRelayCommand ClearTelemetryHistoryCommand { get; }
     public RelayCommand SetLogFilterCommand { get; }
     public RelayCommand ClearLogsCommand { get; }
     public RelayCommand CopyLogsCommand { get; }
@@ -901,6 +914,30 @@ public sealed partial class MainViewModel : ObservableObject
         set => SetProperty(ref _settingsLaunchAtWindowsStartup, value);
     }
 
+    public bool SettingsTelemetryEnabled
+    {
+        get => _settingsTelemetryEnabled;
+        set => SetProperty(ref _settingsTelemetryEnabled, value);
+    }
+
+    public string SettingsTelemetryRetentionDays
+    {
+        get => _settingsTelemetryRetentionDays;
+        set => SetProperty(ref _settingsTelemetryRetentionDays, value);
+    }
+
+    public string SettingsTelemetryMediaDwellSeconds
+    {
+        get => _settingsTelemetryMediaDwellSeconds;
+        set => SetProperty(ref _settingsTelemetryMediaDwellSeconds, value);
+    }
+
+    public string TelemetryStatsSummaryText
+    {
+        get => _telemetryStatsSummaryText;
+        private set => SetProperty(ref _telemetryStatsSummaryText, value);
+    }
+
     public string LogFilterLevel
     {
         get => _logFilterLevel;
@@ -1230,6 +1267,11 @@ public sealed partial class MainViewModel : ObservableObject
         SettingsDisplayVolumeInDb = settings.Ui.DisplayVolumeInDb;
         SettingsLaunchAtWindowsStartup = settings.Ui.LaunchAtWindowsStartup || _startupService.IsEnabled();
         DisplayVolumeInDb = settings.Ui.DisplayVolumeInDb;
+
+        SettingsTelemetryEnabled = settings.Telemetry.Enabled;
+        SettingsTelemetryRetentionDays = settings.Telemetry.RetentionDays.ToString();
+        SettingsTelemetryMediaDwellSeconds = settings.Telemetry.MediaDwellSeconds.ToString();
+        RefreshTelemetryStats();
 
         SettingsRelayPort = settings.Media.RelayPort.ToString();
         SettingsFfmpegPath = settings.Media.FfmpegPath;
@@ -1761,44 +1803,46 @@ public sealed partial class MainViewModel : ObservableObject
             }
 
             var volumePresets = ParseVolumePresets(SettingsVolumePresetsText);
-            var settings = new AppSettings
+            var settings = _settingsStore.Current.Clone();
+            settings.Receiver = new ReceiverSettings
             {
-                Receiver = new ReceiverSettings
-                {
-                    Host = SettingsHost,
-                    Port = ParseInt(SettingsPort, 1255),
-                    PlayerName = SettingsPlayerName,
-                    PollIntervalSeconds = ParseInt(SettingsPollIntervalSeconds, 5),
-                    DefaultLowVolume = ParseInt(SettingsLowVolume, 20),
-                    VolumePresets = volumePresets,
-                    Stations = StationPresets.Select(static station => station.ToModel()).ToList(),
-                    Scenes = ScenePresets.Select(static scene => scene.ToModel()).ToList(),
-                },
-                Ui = new UiSettings
-                {
-                    StartMinimizedToTray = SettingsStartMinimizedToTray,
-                    MinimizeToTray = SettingsMinimizeToTray,
-                    CloseToTray = SettingsCloseToTray,
-                    ShowNotifications = SettingsShowNotifications,
-                    DisplayVolumeInDb = SettingsDisplayVolumeInDb,
-                    LaunchAtWindowsStartup = SettingsLaunchAtWindowsStartup,
-                },
-                Media = new MediaRelaySettings
-                {
-                    RelayPort = ParseInt(SettingsRelayPort, 18925),
-                    FfmpegPath = SettingsFfmpegPath?.Trim() ?? string.Empty,
-                    PreferFfmpegMp3Transcode = SettingsPreferFfmpegMp3,
-                    CinemaSyncOffsetMs = ParseInt(SettingsCinemaSyncOffsetMs, 1800),
-                },
-                Shortcuts = new ShortcutSettings
-                {
-                    Bindings = ShortcutEditors.Select(static s => s.ToModel()).ToList(),
-                },
+                Host = SettingsHost,
+                Port = ParseInt(SettingsPort, 1255),
+                PlayerName = SettingsPlayerName,
+                PollIntervalSeconds = ParseInt(SettingsPollIntervalSeconds, 5),
+                DefaultLowVolume = ParseInt(SettingsLowVolume, 20),
+                VolumePresets = volumePresets,
+                Stations = StationPresets.Select(static station => station.ToModel()).ToList(),
+                Scenes = ScenePresets.Select(static scene => scene.ToModel()).ToList(),
             };
+            settings.Ui = new UiSettings
+            {
+                StartMinimizedToTray = SettingsStartMinimizedToTray,
+                MinimizeToTray = SettingsMinimizeToTray,
+                CloseToTray = SettingsCloseToTray,
+                ShowNotifications = SettingsShowNotifications,
+                DisplayVolumeInDb = SettingsDisplayVolumeInDb,
+                LaunchAtWindowsStartup = SettingsLaunchAtWindowsStartup,
+            };
+            settings.Media = new MediaRelaySettings
+            {
+                RelayPort = ParseInt(SettingsRelayPort, 18925),
+                FfmpegPath = SettingsFfmpegPath?.Trim() ?? string.Empty,
+                PreferFfmpegMp3Transcode = SettingsPreferFfmpegMp3,
+                CinemaSyncOffsetMs = ParseInt(SettingsCinemaSyncOffsetMs, 1800),
+            };
+            settings.Shortcuts = new ShortcutSettings
+            {
+                Bindings = ShortcutEditors.Select(static s => s.ToModel()).ToList(),
+            };
+            settings.Telemetry.Enabled = SettingsTelemetryEnabled;
+            settings.Telemetry.RetentionDays = ParseInt(SettingsTelemetryRetentionDays, 90);
+            settings.Telemetry.MediaDwellSeconds = ParseInt(SettingsTelemetryMediaDwellSeconds, 15);
 
             _startupService.SetEnabled(SettingsLaunchAtWindowsStartup);
             _receiverController.ResetConnections();
             await _settingsStore.SaveAsync(settings);
+            RefreshTelemetryStats();
             StatusMessage = "Settings saved. Syncing with receiver...";
             await _receiverController.RefreshAsync();
         }
@@ -1807,6 +1851,25 @@ public sealed partial class MainViewModel : ObservableObject
             LastError = exception.Message;
             StatusMessage = exception.Message;
         }
+    }
+
+    private void RefreshTelemetryStats()
+    {
+        var stats = _telemetryLog.GetStats();
+        var sizeLabel = stats.TotalBytes >= 1024 * 1024
+            ? $"{stats.TotalBytes / (1024.0 * 1024.0):0.0} MB"
+            : $"{Math.Max(0, (int)Math.Round(stats.TotalBytes / 1024.0))} KB";
+
+        TelemetryStatsSummaryText = stats.Enabled
+            ? $"{stats.EventsRecordedThisSession} events this session • {stats.Streams.Count} stream(s) • {sizeLabel} on disk • {stats.RetentionDays}d retention"
+            : $"Paused • {stats.Streams.Count} stream(s) • {sizeLabel} on disk";
+    }
+
+    private async Task ClearTelemetryHistoryAsync()
+    {
+        await _telemetryLog.ClearAllAsync();
+        RefreshTelemetryStats();
+        StatusMessage = "Cleared all structured event history files.";
     }
 
     private void LoadDefaultSettingsIntoEditor()

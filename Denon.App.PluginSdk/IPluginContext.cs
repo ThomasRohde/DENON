@@ -9,6 +9,19 @@ public interface IPluginLogger
     void Error(string message, Exception? exception = null);
 }
 
+public interface IPluginEventLogger
+{
+    /// <summary>
+    /// Emits a structured, habit-ready JSONL telemetry event into this plugin's event stream
+    /// (or a shared domain stream such as "tv", "lighting", or "media").
+    /// </summary>
+    void RecordEvent(
+        string eventName,
+        IReadOnlyDictionary<string, object?>? data = null,
+        string? stream = null,
+        string origin = "plugin");
+}
+
 public interface IPluginStorage
 {
     string PluginDataDirectory { get; }
@@ -30,6 +43,8 @@ public interface IPluginContext
     string PluginId { get; }
 
     IPluginLogger Logger { get; }
+
+    IPluginEventLogger Events { get; }
 
     IPluginStorage Storage { get; }
 

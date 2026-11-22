@@ -16,6 +16,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
     private IPluginContext? _context;
     private SmartTvConfig _config = new();
     private SmartTvDashboardViewModel? _viewModel;
+    private LgTvLiveState? _lastTelemetryState;
     private bool _isStarted;
 
     public SmartTvPlugin()
@@ -491,7 +492,99 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
         }
 
         _viewModel?.ApplyLiveState(state);
+        EmitTvTelemetryDeltas(state);
         UpdateHealthStatus();
+    }
+
+    private void EmitTvTelemetryDeltas(LgTvLiveState state)
+    {
+        if (state.IsDemo || _context is null)
+        {
+            return;
+        }
+
+        var prev = _lastTelemetryState;
+        _lastTelemetryState = state;
+        if (prev is null)
+        {
+            return;
+        }
+
+        if (prev.IsConnected != state.IsConnected)
+        {
+            _context.Events.RecordEvent(
+                "power.changed",
+                new Dictionary<string, object?>
+                {
+                    ["from"] = prev.IsConnected ? "on" : "standby",
+                    ["to"] = state.IsConnected ? "on" : "standby",
+                    ["powerState"] = state.PowerState,
+                    ["model"] = state.ModelName,
+                },
+                origin: "auto");
+        }
+
+        if (!state.IsConnected)
+        {
+            return;
+        }
+
+        if (prev.IsScreenOff != state.IsScreenOff)
+        {
+            _context.Events.RecordEvent(
+                "screen.changed",
+                new Dictionary<string, object?>
+                {
+                    ["screenOff"] = state.IsScreenOff,
+                    ["model"] = state.ModelName,
+                },
+                origin: "auto");
+        }
+
+        if (!string.Equals(prev.ForegroundAppId, state.ForegroundAppId, StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(state.ForegroundAppId))
+        {
+            _context.Events.RecordEvent(
+                "app.changed",
+                new Dictionary<string, object?>
+                {
+                    ["fromAppId"] = prev.ForegroundAppId,
+                    ["toAppId"] = state.ForegroundAppId,
+                    ["appTitle"] = state.ForegroundAppTitle,
+                    ["model"] = state.ModelName,
+                },
+                origin: "auto");
+        }
+
+        var prevChan = $"{prev.CurrentChannelNumber}|{prev.CurrentChannelName}";
+        var curChan = $"{state.CurrentChannelNumber}|{state.CurrentChannelName}";
+        if (!string.Equals(prevChan, curChan, StringComparison.OrdinalIgnoreCase) &&
+            (!string.IsNullOrWhiteSpace(state.CurrentChannelNumber) || !string.IsNullOrWhiteSpace(state.CurrentChannelName)))
+        {
+            _context.Events.RecordEvent(
+                "channel.changed",
+                new Dictionary<string, object?>
+                {
+                    ["channelNumber"] = state.CurrentChannelNumber,
+                    ["channelName"] = state.CurrentChannelName,
+                    ["model"] = state.ModelName,
+                },
+                origin: "auto");
+        }
+
+        if (!string.Equals(prev.SoundOutput, state.SoundOutput, StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(state.SoundOutput))
+        {
+            _context.Events.RecordEvent(
+                "audio_output.changed",
+                new Dictionary<string, object?>
+                {
+                    ["from"] = prev.SoundOutput,
+                    ["to"] = state.SoundOutput,
+                    ["label"] = state.SoundOutputLabel,
+                },
+                origin: "auto");
+        }
     }
 
     private async Task<PluginActionResult> ExecuteTvComputerAsync(string payloadJson, CancellationToken ct)

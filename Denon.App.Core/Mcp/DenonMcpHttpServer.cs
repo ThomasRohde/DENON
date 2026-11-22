@@ -19,7 +19,7 @@ namespace Denon.App.Core.Mcp;
 public sealed partial class DenonMcpHttpServer : IAsyncDisposable
 {
     private const string ServerName = "denon-desktop-mcp";
-    private const string ServerVersion = "1.11.1";
+    private const string ServerVersion = "1.12.0";
     private const string DefaultProtocolVersion = "2025-11-25";
 
     private static readonly JsonSerializerOptions JsonOutOptions = new()
@@ -44,6 +44,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
     private readonly LocalAudioRelayServer _relayServer;
     private readonly YouTubeQueueService _queueService;
     private readonly LyricsService _lyricsService;
+    private readonly EventTelemetryLog _telemetry;
     private readonly AppLogStore _logStore;
 
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
@@ -68,6 +69,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         LocalAudioRelayServer relayServer,
         YouTubeQueueService queueService,
         LyricsService lyricsService,
+        EventTelemetryLog telemetry,
         AppLogStore logStore)
     {
         _settingsStore = settingsStore;
@@ -80,6 +82,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         _relayServer = relayServer;
         _queueService = queueService;
         _lyricsService = lyricsService;
+        _telemetry = telemetry;
         _logStore = logStore;
 
         _intelligence.RoomGraphChanged += BroadcastRoomUpdatedNotification;
@@ -362,7 +365,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                     maxSafeVolume = _settingsStore.Current.Mcp.MaxSafeVolume,
                     toolsCount = RegisteredToolCount,
                     resourcesCount = 4,
-                    resourceTemplatesCount = 2,
+                    resourceTemplatesCount = 3,
                     promptsCount = 4,
                 });
                 return;
@@ -727,6 +730,13 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                 description = "Read the complete AVR, acoustic, and chained plugin action configuration for a specific Smart Scene (e.g. movie-night, late-night).",
                 mimeType = "application/json",
             },
+            new
+            {
+                uriTemplate = "denon://logs/events/{stream}",
+                name = "Smart Event & Habit Telemetry Stream",
+                description = "Read recent habit-ready structured events from a telemetry stream (media, avr, tv, lighting, control, all, or plugin:<id>).",
+                mimeType = "application/json",
+            },
         },
     };
 
@@ -786,6 +796,20 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                 ?? throw new McpInvalidParamsException($"Smart Scene '{sceneId}' not found.");
             payload = scene;
         }
+        else if (lower.StartsWith("denon://logs/events/", StringComparison.Ordinal))
+        {
+            var streamName = Uri.UnescapeDataString(uri["denon://logs/events/".Length..].Trim('/'));
+            var events = _telemetry.QueryRecentEvents(streamName, hours: 72, limit: 120);
+            payload = new
+            {
+                stream = string.IsNullOrWhiteSpace(streamName) ? "all" : streamName,
+                hours = 72,
+                count = events.Count,
+                availableStreams = _telemetry.ListAvailableStreams(),
+                stats = _telemetry.GetStats(),
+                events,
+            };
+        }
         else
         {
             throw new McpInvalidParamsException($"Unknown resource URI '{uri}'.");
@@ -821,6 +845,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         {
             "pluginid" => _pluginHost.GetPlugins().Select(p => p.Id),
             "sceneid" => _settingsStore.Current.Receiver.Scenes.Select(s => s.Id),
+            "stream" => new[] { "all" }.Concat(_telemetry.ListAvailableStreams()),
             "vibe" => ["cozy rainy jazz night", "sci-fi cinema night", "late night reading", "upbeat party sync"],
             "goal" => ["clearer movie dialogue at night", "pure audiophile stereo", "punchier subwoofer bass"],
             _ => [],
@@ -961,6 +986,22 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                     ("summary", "string"),
                     ("totalSessions", "integer"),
                     ("preferredVolumeByBucket", "object"))),
+            Tool("get_activity_history",
+                "Query structured habit-ready event logs (media sessions with 15s dwell filter, AVR power/input/settled-volume deltas, LG TV apps/channels, Philips Hue lighting, and control origins distinguishing app commands vs physical remotes/phone streams).",
+                ObjSchema(
+                    ("stream", "string", "Event stream: 'all', 'media', 'avr', 'tv', 'lighting', 'control', or 'plugin:<id>' (default: 'all')", false),
+                    ("hours", "integer", "Lookback window in hours (1-2160, default: 24)", false),
+                    ("limit", "integer", "Maximum events to return, newest first (1-500, default: 80)", false),
+                    ("origin", "string", "Optional origin filter: 'external', 'desktop_ui', 'mcp_agent', 'phone_remote', 'automation', 'smart_scene'", false)),
+                title: "Get Activity & Media History",
+                readOnly: true, idempotent: true,
+                outputSchema: OutputObjSchema(
+                    ("stream", "string"),
+                    ("hours", "integer"),
+                    ("count", "integer"),
+                    ("availableStreams", "array"),
+                    ("stats", "object"),
+                    ("events", "array"))),
             Tool("restore_previous_state",
                 "1-click Undo: restore the Denon AVR state captured before the most recent AI / atmosphere / scene mutation.",
                 EmptySchema(),
@@ -1417,6 +1458,30 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                     tracks = res.Tracks.Select(t => new { id = t.VideoId, title = t.Title, author = t.Author, duration = t.Duration?.ToString(@"m\:ss") ?? "LIVE", url = t.WatchUrl }),
                 });
             }
+            case "get_activity_history":
+            {
+                var stream = GetString(args, "stream");
+                if (string.IsNullOrWhiteSpace(stream))
+                {
+                    stream = "all";
+                }
+
+                var hours = Math.Clamp(GetInt(args, "hours") ?? 24, 1, 24 * 90);
+                var limit = Math.Clamp(GetInt(args, "limit") ?? 80, 1, 500);
+                var origin = GetString(args, "origin");
+                var events = _telemetry.QueryRecentEvents(stream, hours, limit, string.IsNullOrWhiteSpace(origin) ? null : origin);
+
+                return BuildToolJson(new
+                {
+                    stream,
+                    hours,
+                    count = events.Count,
+                    availableStreams = _telemetry.ListAvailableStreams(),
+                    stats = _telemetry.GetStats(),
+                    events,
+                });
+            }
+
             case "tv_computer":
                 return await ExecuteTvComputerToolAsync(args, cfg, ct);
         }
@@ -1426,6 +1491,10 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         {
             throw new UnauthorizedAccessException($"MCP Permission Tier is 'Observer' (read-only). Change to SafeControl or FullOrchestration in Denon Desktop Settings to run '{toolName}'.");
         }
+
+        _telemetry.MarkOrigin("avr", "mcp_agent", "mcp.tool", new Dictionary<string, object?> { ["tool"] = toolName });
+        _telemetry.MarkOrigin("tv", "mcp_agent");
+        _telemetry.MarkOrigin("lighting", "mcp_agent");
 
         switch (toolName)
         {
@@ -1706,6 +1775,11 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         else
         {
             payloadJson = "{\"action\":\"screenshot\"}";
+        }
+
+        if (!isReadOnlyAction)
+        {
+            _telemetry.MarkOrigin("tv", "mcp_agent", "mcp.tv_computer", new Dictionary<string, object?> { ["action"] = action });
         }
 
         var res = await _pluginHost.ExecuteActionAsync(

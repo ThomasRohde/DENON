@@ -61,6 +61,7 @@ public sealed class PluginHostService : IAsyncDisposable
     private readonly AppSettingsStore _settingsStore;
     private readonly ReceiverStateStore _stateStore;
     private readonly ReceiverController _receiverController;
+    private readonly EventTelemetryLog _telemetry;
     private readonly AppLogStore _logStore;
     private readonly object _syncRoot = new();
     private readonly List<ManagedPluginEntry> _entries = [];
@@ -76,12 +77,14 @@ public sealed class PluginHostService : IAsyncDisposable
         AppSettingsStore settingsStore,
         ReceiverStateStore stateStore,
         ReceiverController receiverController,
+        EventTelemetryLog telemetry,
         AppLogStore logStore)
     {
         _builtInPlugins = builtInPlugins.ToList();
         _settingsStore = settingsStore;
         _stateStore = stateStore;
         _receiverController = receiverController;
+        _telemetry = telemetry;
         _logStore = logStore;
     }
 
@@ -214,6 +217,13 @@ public sealed class PluginHostService : IAsyncDisposable
 
         try
         {
+            var isReadOnlyRefresh = actionId.EndsWith(".refresh", StringComparison.OrdinalIgnoreCase);
+            var domain = MapPluginToDomain(entry.Manifest.Id);
+            if (!isReadOnlyRefresh)
+            {
+                _telemetry.MarkOrigin(domain, "desktop_ui", overwriteRecent: false);
+            }
+
             var result = await entry.Plugin.ExecuteActionAsync(actionId, parameters, cancellationToken);
             if (!result.Success)
             {
@@ -222,6 +232,20 @@ public sealed class PluginHostService : IAsyncDisposable
             else
             {
                 _logStore.Info($"[Plugin:{entry.Manifest.Id}] Action '{actionId}': {result.Message}");
+                if (!isReadOnlyRefresh)
+                {
+                    var effectiveOrigin = _telemetry.ResolveOrigin(domain, fallback: "desktop_ui");
+                    _telemetry.Record(
+                        EventTelemetryLog.StreamControl,
+                        entry.Manifest.Id,
+                        "plugin.action",
+                        effectiveOrigin,
+                        new Dictionary<string, object?>
+                        {
+                            ["pluginId"] = entry.Manifest.Id,
+                            ["actionId"] = actionId,
+                        });
+                }
             }
 
             return result;
@@ -521,6 +545,7 @@ public sealed class PluginHostService : IAsyncDisposable
             new PluginLoggerImpl(manifest.Id, _logStore),
             new PluginStorageImpl(AppDataPaths.GetPluginDataDirectory(manifest.Id)),
             new PluginReceiverBridgeImpl(_stateStore),
+            new PluginEventLoggerImpl(manifest.Id, _telemetry),
             (statusText, health) =>
             {
                 entry.StatusText = statusText;
@@ -898,11 +923,46 @@ public sealed class PluginHostService : IAsyncDisposable
         public PluginReceiverSnapshot CurrentSnapshot => MapSnapshot(stateStore.Snapshot);
     }
 
+    private sealed class PluginEventLoggerImpl(string pluginId, EventTelemetryLog telemetry) : IPluginEventLogger
+    {
+        public void RecordEvent(
+            string eventName,
+            IReadOnlyDictionary<string, object?>? data = null,
+            string? stream = null,
+            string origin = "plugin")
+        {
+            var defaultDomain = MapPluginToDomain(pluginId);
+            var targetStream = !string.IsNullOrWhiteSpace(stream)
+                ? stream
+                : defaultDomain is EventTelemetryLog.StreamTv or EventTelemetryLog.StreamLighting
+                    ? defaultDomain
+                    : $"plugin:{pluginId}";
+
+            var resolvedOrigin = string.IsNullOrWhiteSpace(origin) ||
+                                 origin.Equals("auto", StringComparison.OrdinalIgnoreCase) ||
+                                 origin.Equals("external", StringComparison.OrdinalIgnoreCase)
+                ? telemetry.ResolveOrigin(defaultDomain, fallback: "external")
+                : origin.Equals("plugin", StringComparison.OrdinalIgnoreCase)
+                    ? telemetry.ResolveOrigin(defaultDomain, fallback: "plugin")
+                    : origin;
+
+            telemetry.Record(targetStream, pluginId, eventName, resolvedOrigin, data);
+        }
+    }
+
+    private static string MapPluginToDomain(string pluginId) => pluginId.Trim().ToLowerInvariant() switch
+    {
+        "smart-tv" => EventTelemetryLog.StreamTv,
+        "philips-hue" => EventTelemetryLog.StreamLighting,
+        _ => $"plugin:{pluginId.Trim().ToLowerInvariant()}",
+    };
+
     private sealed class PluginContextImpl(
         string pluginId,
         IPluginLogger logger,
         IPluginStorage storage,
         IPluginReceiverBridge receiver,
+        IPluginEventLogger events,
         Action<string, PluginHealthState> reportStatus) : IPluginContext
     {
         public string PluginId { get; } = pluginId;
@@ -912,6 +972,8 @@ public sealed class PluginHostService : IAsyncDisposable
         public IPluginStorage Storage { get; } = storage;
 
         public IPluginReceiverBridge Receiver { get; } = receiver;
+
+        public IPluginEventLogger Events { get; } = events;
 
         public HttpClient CreateHttpClient(bool allowLocalSelfSignedTls = false, TimeSpan? timeout = null)
         {

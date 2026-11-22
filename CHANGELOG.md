@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-11-22
+
+### Added
+- **Comprehensive Smart Event Telemetry & Habit-Ready Logging System**:
+  - **Split Monthly NDJSON Event Streams (`%LocalAppData%\DenonDesktop\logs\events\`)**: Non-blocking bounded-channel writer (`EventTelemetryLog`) writes structured `.jsonl` files separated by domain and plugin (`media-yyyy-MM.jsonl`, `avr-yyyy-MM.jsonl`, `tv-yyyy-MM.jsonl`, `lighting-yyyy-MM.jsonl`, `control-yyyy-MM.jsonl`, and `plugins/<plugin-id>-yyyy-MM.jsonl`) with automatic 90-day / 50 MB retention pruning and automatic 5 MB log rotation for `app.log`.
+  - **Zero-Noise Smart Delta & Session Engine (`EventTelemetryMonitorService`)**:
+    - Records **only real state transitions** across Denon AVR (`power.changed`, `zone2.changed`, `input.changed`, `sound_mode.changed`, `mute.changed`, `eco.changed`, `sleep_timer.changed`), LG webOS TV (`power.changed`, `app.changed`, `channel.changed`, `audio_output.changed`, `screen.changed`), and Philips Hue (`lighting.state_changed`, `preset.applied`, `color.set`, `music_sync.changed`).
+    - **3-Second Volume Coalescer**: Absorbs rapid remote/UI volume steps into a single `volume.settled` event (`from`, `to`, `delta`, `input`, `soundMode`).
+    - **15-Second Media Dwell Filter**: Tracks both AVR/HEOS sessions (YouTube, Internet Radio, external Spotify Connect / AirPlay / TuneIn / HEOS phone streams, and active AVR inputs) and LG TV watching sessions (Live TV channels & streaming apps), recording `session.started` / `session.ended` (`durationSec`, `avgVolume`, `reason`) only after dwelling ≥ 15 seconds — discarding rapid channel surfing and track skips cleanly.
+    - **Adaptive Background Probing & External Capture**: Polls active devices every 15s (60s in standby) plus periodic Hue bridge sync (60s active / 5m standby) to capture external physical remote, phone cast, and wall-switch/Hue-app activity.
+  - **Automatic Origin Attribution**: 6-second origin watermarks accurately tag every event with its real source: `desktop_ui`, `mcp_agent`, `phone_remote`, `automation`, `smart_scene`, or `external`.
+  - **Plugin SDK Event Hooks (`IPluginContext.Events`)**: First-class `IPluginEventLogger` in `Denon.App.PluginSdk` automatically routes built-in and third-party plugin events to their dedicated streams.
+  - **Agent-Ready MCP Tool & Resource Template**: Added read-only MCP tool `get_activity_history` (`stream`, `hours`, `limit`, `origin` filters + live stats) and resource template `denon://logs/events/{stream}` with `stream` completions so AI agents can derive rich viewing/listening habits.
+  - **Settings UI Controls**: Added a **Smart Event & Habit Logging** card in Settings with enable toggle, configurable retention days & media dwell filter, live session/disk stats, **Open Events Folder**, and **Clear Event History** (plus fixed Settings save to preserve MCP/Plugin/Automation configs cleanly).
+
 ## [1.11.1] - 2026-11-22
 
 ### Fixed
