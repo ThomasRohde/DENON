@@ -2,7 +2,7 @@ namespace Denon.Plugin.SmartTv;
 
 public sealed class SmartTvConfig
 {
-    public string TvName { get; set; } = "Living Room OLED TV";
+    public string TvName { get; set; } = "Living Room Smart TV";
 
     public string TvIp { get; set; } = string.Empty;
 
@@ -77,6 +77,8 @@ public sealed record LgTvLiveState
     public string TransportLabel { get; init; } = "OFFLINE";
 
     public string ModelName { get; init; } = string.Empty;
+
+    public bool IsOledModel => ModelName.Contains("OLED", StringComparison.OrdinalIgnoreCase);
 
     public string WebOsVersion { get; init; } = string.Empty;
 

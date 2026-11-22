@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using Denon.App.Core.Models;
 using YoutubeExplode;
@@ -210,15 +211,44 @@ public sealed class YouTubeMediaService
     public ValueTask<Stream> OpenAudioStreamAsync(IStreamInfo streamInfo, CancellationToken cancellationToken = default) =>
         _client.Videos.Streams.GetAsync(streamInfo, cancellationToken);
 
+    private static readonly ConcurrentDictionary<string, bool> FfmpegRunnableCache = new(StringComparer.OrdinalIgnoreCase);
+
     public string? FindFfmpegPath()
     {
         var configured = _settingsStore.Current.Media.FfmpegPath;
         if (!string.IsNullOrWhiteSpace(configured) && File.Exists(configured))
         {
-            return configured;
+            var resolved = ResolveExecutableTarget(configured);
+            if (IsFfmpegRunnable(resolved))
+            {
+                return resolved;
+            }
         }
 
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+        // Prefer real WinGet Packages binary directly (WinGet\Links symlinks can trigger Windows
+        // "untrusted mount point" errors when spawned from non-elevated GUI processes).
+        try
+        {
+            var wingetPackages = Path.Combine(localAppData, "Microsoft", "WinGet", "Packages");
+            if (Directory.Exists(wingetPackages))
+            {
+                foreach (var pkgDir in Directory.EnumerateDirectories(wingetPackages, "*FFmpeg*"))
+                {
+                    var match = Directory.EnumerateFiles(pkgDir, "ffmpeg.exe", SearchOption.AllDirectories).FirstOrDefault();
+                    if (!string.IsNullOrWhiteSpace(match) && File.Exists(match) && IsFfmpegRunnable(match))
+                    {
+                        return match;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Ignore filesystem enumeration errors.
+        }
+
         string[] candidatePaths =
         [
             Path.Combine(localAppData, "Microsoft", "WinGet", "Links", "ffmpeg.exe"),
@@ -232,7 +262,11 @@ public sealed class YouTubeMediaService
         {
             if (File.Exists(path))
             {
-                return path;
+                var resolved = ResolveExecutableTarget(path);
+                if (IsFfmpegRunnable(resolved))
+                {
+                    return resolved;
+                }
             }
         }
 
@@ -244,7 +278,11 @@ public sealed class YouTubeMediaService
                 var candidate = Path.Combine(dir, "ffmpeg.exe");
                 if (File.Exists(candidate))
                 {
-                    return candidate;
+                    var resolved = ResolveExecutableTarget(candidate);
+                    if (IsFfmpegRunnable(resolved))
+                    {
+                        return resolved;
+                    }
                 }
             }
             catch
@@ -254,6 +292,63 @@ public sealed class YouTubeMediaService
         }
 
         return null;
+    }
+
+    private static bool IsFfmpegRunnable(string path)
+    {
+        return FfmpegRunnableCache.GetOrAdd(path, static candidate =>
+        {
+            try
+            {
+                using var proc = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = candidate,
+                        Arguments = "-version",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                    },
+                };
+
+                if (!proc.Start())
+                {
+                    return false;
+                }
+
+                if (!proc.WaitForExit(2500))
+                {
+                    try { proc.Kill(entireProcessTree: true); } catch { }
+                    return false;
+                }
+
+                return proc.ExitCode == 0;
+            }
+            catch
+            {
+                return false;
+            }
+        });
+    }
+
+    private static string ResolveExecutableTarget(string path)
+    {
+        try
+        {
+            var info = new FileInfo(path);
+            if (info.ResolveLinkTarget(returnFinalTarget: true) is FileInfo target && target.Exists)
+            {
+                return target.FullName;
+            }
+        }
+        catch
+        {
+            // Fall back to original path if symlink resolution isn't permitted.
+        }
+
+        return path;
     }
 
     public static bool IsYouTubeUrl(string? input)

@@ -159,7 +159,7 @@
                                                Foreground="{Binding ConnectionBadgeBrush}" />
                                 </Border>
                             </StackPanel>
-                            <TextBlock Text="Persistent SSAP WebSocket (wss://:3001 &amp; ws://:3000) • Live Subscriptions, Magic Remote, OLED Screen Off, eARC &amp; Installed Apps"
+                            <TextBlock Text="Persistent SSAP WebSocket • Live Subscriptions, Magic Remote, Screen Off, eARC &amp; Installed Apps"
                                        FontSize="11.5"
                                        Foreground="#94A3B8"
                                        TextWrapping="Wrap" />
@@ -251,7 +251,7 @@
                         </Border>
                         <Border Grid.Column="6" Style="{StaticResource TelemetryTile}">
                             <StackPanel>
-                                <TextBlock Text="OLED PANEL &amp; VOL" FontSize="9.5" FontWeight="Bold" Foreground="#64748B" />
+                                <TextBlock Text="DISPLAY &amp; VOL" FontSize="9.5" FontWeight="Bold" Foreground="#64748B" />
                                 <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                                     <TextBlock Text="{Binding ScreenStateText}" FontSize="12" FontWeight="SemiBold" Foreground="#E2E8F0" />
                                     <TextBlock Text=" • " FontSize="12" Foreground="#475569" />
@@ -486,11 +486,11 @@
                     <!-- Power, OLED & Audio Output Card -->
                     <Border Style="{StaticResource TvCard}" Margin="0,0,0,14">
                         <StackPanel>
-                            <TextBlock Text="POWER &amp; OLED PANEL" FontSize="10.5" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,9" />
+                            <TextBlock Text="POWER &amp; DISPLAY" FontSize="10.5" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,9" />
                             <WrapPanel Margin="0,0,0,10">
                                 <Button Content="Wake TV (WoL)" Command="{Binding RunActionCommand}" CommandParameter="tv.power_on" Style="{StaticResource TvPrimaryBtn}" Margin="0,0,7,7" />
                                 <Button Content="Power Off" Command="{Binding RunActionCommand}" CommandParameter="tv.power_off" Style="{StaticResource TvDangerBtn}" Margin="0,0,7,7" />
-                                <Button Content="OLED Screen Off" Command="{Binding RunActionCommand}" CommandParameter="tv.screen_off" Style="{StaticResource TvOledBtn}" Margin="0,0,7,7" ToolTip="Blank the OLED screen while keeping eARC / music audio playing (zero burn-in!)" />
+                                <Button Content="Screen Off" Command="{Binding RunActionCommand}" CommandParameter="tv.screen_off" Style="{StaticResource TvOledBtn}" Margin="0,0,7,7" ToolTip="Blank the TV display while keeping eARC / music audio playing" />
                                 <Button Content="Wake Screen" Command="{Binding RunActionCommand}" CommandParameter="tv.screen_on" Style="{StaticResource TvBtn}" Margin="0,0,7,7" />
                                 <Button Content="Live TV" Command="{Binding RunActionCommand}" CommandParameter="tv.livetv" Style="{StaticResource TvBtn}" Margin="0,0,7,7" />
                                 <Button Content="Close App" Command="{Binding RunActionCommand}" CommandParameter="tv.close_app" Style="{StaticResource TvBtn}" Margin="0,0,7,7" />
@@ -815,9 +815,9 @@
                         <CheckBox Content="Switch TV audio to HDMI ARC/eARC on Denon ON" IsChecked="{Binding SwitchToArcOnDenon}" Foreground="#E2E8F0" Margin="0,0,0,8" />
                         <CheckBox Content="Mute internal TV speakers on Denon ON" IsChecked="{Binding MuteSpeakersOnDenon}" Foreground="#E2E8F0" Margin="0,0,0,8" />
                         <CheckBox Content="Show on-screen TV toast on Smart Scenes" IsChecked="{Binding ShowSceneToast}" Foreground="#E2E8F0" Margin="0,0,0,8" />
-                        <CheckBox Content="OLED Screen Off on Music / Listening scenes" IsChecked="{Binding ScreenOffOnMusicScene}" Foreground="#E2E8F0" Margin="0,0,0,10" />
+                        <CheckBox Content="Turn TV screen off on Music / Listening scenes" IsChecked="{Binding ScreenOffOnMusicScene}" Foreground="#E2E8F0" Margin="0,0,0,10" />
 
-                        <TextBlock Text="Changes save automatically. All 24 Smart TV actions (OLED Screen Off, eARC, HDMI 1–4, YouTube, Netflix, Plex, Play/Pause, Toasts) are also available in Smart Scenes 2.0, Global Hotkeys &amp; Couch Phone Remote!"
+                        <TextBlock Text="Changes save automatically. All 24 Smart TV actions (Screen Off, eARC, HDMI 1–4, YouTube, Netflix, Plex, Play/Pause, Toasts) are also available in Smart Scenes 2.0, Global Hotkeys &amp; Couch Phone Remote!"
                                    FontSize="11"
                                    Foreground="#94A3B8"
                                    TextWrapping="Wrap" />

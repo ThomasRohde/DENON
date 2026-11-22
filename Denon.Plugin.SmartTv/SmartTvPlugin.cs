@@ -82,8 +82,8 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
     [
         new("tv.power_on", "TV Wake-on-LAN (Power On)", "Send multi-interface Wake-on-LAN magic packets to power on the LG TV.", "Power"),
         new("tv.power_off", "TV Power Off", "Put the LG webOS TV into standby.", "Power"),
-        new("tv.screen_off", "OLED Screen Off (Audio Only)", "Blank the OLED panel while keeping HDMI eARC / music audio playing.", "Display"),
-        new("tv.screen_on", "OLED Screen On", "Wake the TV screen back on from Audio-Only Screen Off mode.", "Display"),
+        new("tv.screen_off", "Screen Off (Audio Only)", "Blank the TV screen while keeping HDMI eARC / music audio playing.", "Display"),
+        new("tv.screen_on", "Screen On", "Wake the TV screen back on from Audio-Only Screen Off mode.", "Display"),
         new("tv.audio_earc", "TV Audio → HDMI ARC / eARC", "Switch LG TV audio output to HDMI ARC / eARC (Denon AVR).", "Audio"),
         new("tv.audio_speakers", "TV Audio → Internal Speakers", "Switch LG TV audio output to internal TV speakers.", "Audio"),
         new("tv.audio_optical", "TV Audio → Optical Out", "Switch LG TV audio output to Digital Optical.", "Audio"),
@@ -153,7 +153,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
 
                 case "tv.screen_off":
                     await _client.TurnOffScreenAsync(cancellationToken);
-                    return ReportAction("Turned OLED Screen OFF (Audio-Only Mode).");
+                    return ReportAction("Turned TV screen OFF (Audio-Only Mode).");
 
                 case "tv.screen_on":
                     await _client.TurnOnScreenAsync(cancellationToken);

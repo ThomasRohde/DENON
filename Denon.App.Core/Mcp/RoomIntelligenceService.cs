@@ -349,25 +349,41 @@ public sealed class RoomIntelligenceService
                 var tvIsLiveApp = tvStatus.Contains("LIVE", StringComparison.OrdinalIgnoreCase) &&
                                   !tvStatus.Contains("Screen Off", StringComparison.OrdinalIgnoreCase);
 
-                // 4a. OLED burn-in protection when listening to audio-only HEOS / Radio / FLAC
-                var isAudioOnlySource =
+                // 4a. Power-saving / OLED care when listening to dedicated audio-only sources (never when watching TV/video!)
+                var isDedicatedAudioInput =
                     status.InputSource.Equals("NET", StringComparison.OrdinalIgnoreCase) ||
                     status.InputSource.Equals("TUNER", StringComparison.OrdinalIgnoreCase) ||
                     status.InputSource.Equals("BT", StringComparison.OrdinalIgnoreCase) ||
-                    isPlaying;
+                    status.InputSource.Equals("CD", StringComparison.OrdinalIgnoreCase) ||
+                    status.InputSource.Equals("PHONO", StringComparison.OrdinalIgnoreCase);
 
-                if (status.IsPoweredOn && isAudioOnlySource && tvIsLiveApp &&
-                    !tvStatus.Contains("YouTube", StringComparison.OrdinalIgnoreCase) &&
-                    !tvStatus.Contains("Netflix", StringComparison.OrdinalIgnoreCase) &&
-                    !tvStatus.Contains("Plex", StringComparison.OrdinalIgnoreCase))
+                var tvShowingVideoOrBrowser =
+                    tvStatus.Contains("Live TV", StringComparison.OrdinalIgnoreCase) ||
+                    tvStatus.Contains("YouTube", StringComparison.OrdinalIgnoreCase) ||
+                    tvStatus.Contains("Netflix", StringComparison.OrdinalIgnoreCase) ||
+                    tvStatus.Contains("Plex", StringComparison.OrdinalIgnoreCase) ||
+                    tvStatus.Contains("Disney", StringComparison.OrdinalIgnoreCase) ||
+                    tvStatus.Contains("DRTV", StringComparison.OrdinalIgnoreCase) ||
+                    tvStatus.Contains("Viaplay", StringComparison.OrdinalIgnoreCase) ||
+                    tvStatus.Contains("Apple TV", StringComparison.OrdinalIgnoreCase) ||
+                    tvStatus.Contains("Prime Video", StringComparison.OrdinalIgnoreCase) ||
+                    tvStatus.Contains("YouSee", StringComparison.OrdinalIgnoreCase) ||
+                    tvStatus.Contains("SkyShowtime", StringComparison.OrdinalIgnoreCase) ||
+                    tvStatus.Contains("HDMI", StringComparison.OrdinalIgnoreCase) ||
+                    tvStatus.Contains("Browser", StringComparison.OrdinalIgnoreCase);
+
+                if (status.IsPoweredOn && isDedicatedAudioInput && isPlaying && tvIsLiveApp && !tvShowingVideoOrBrowser)
                 {
+                    var isOledTv = tvStatus.Contains("OLED", StringComparison.OrdinalIgnoreCase);
                     list.Add(new RoomInsight(
-                        Id: "oled-burnin-music",
+                        Id: "tv-screen-off-music",
                         Severity: "Info",
-                        Category: "OLED Care",
-                        Title: "Music is playing while your LG TV panel is ON",
-                        Explanation: "Blank the LG OLED panel (Audio-Only Mode) to prevent burn-in and save power while audio keeps playing.",
-                        FixLabel: "OLED Screen Off",
+                        Category: isOledTv ? "OLED Care" : "Display",
+                        Title: "Music is playing while your LG TV screen is idle",
+                        Explanation: isOledTv
+                            ? "Blank the LG OLED panel (Audio-Only Mode) to prevent burn-in and save power while music keeps playing."
+                            : "Turn off the LG TV display (Audio-Only Mode) to save power while music keeps playing.",
+                        FixLabel: "Screen Off",
                         FixActionKey: "tv.screen_off"));
                 }
 

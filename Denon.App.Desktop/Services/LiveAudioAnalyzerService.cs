@@ -3,6 +3,7 @@ using Denon.App.Core.Plugins;
 using Denon.App.Core.Services;
 using Denon.App.PluginSdk;
 using Microsoft.Extensions.Hosting;
+using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
 namespace Denon.App.Desktop.Services;
@@ -120,8 +121,13 @@ public sealed class LiveAudioAnalyzerService : BackgroundService
 
     private async Task RunCaptureLoopAsync(CancellationToken ct)
     {
+        using var enumerator = new MMDeviceEnumerator();
+        using var device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+        var capturedDeviceId = device.ID;
+        var capturedDeviceName = device.FriendlyName;
+
 #pragma warning disable CS0618
-        using var capture = new WasapiLoopbackCapture();
+        using var capture = new WasapiLoopbackCapture(device);
 #pragma warning restore CS0618
 
         var waveFormat = capture.WaveFormat;
@@ -148,11 +154,38 @@ public sealed class LiveAudioAnalyzerService : BackgroundService
 
         try
         {
+            var ticksSinceDeviceCheck = 0;
             while (!ct.IsCancellationRequested && !stoppedTcs.Task.IsCompleted)
             {
                 if (!_pluginHost.HasActiveAudioReactivePlugins() && !_vuCaptureRequested)
                 {
                     break;
+                }
+
+                // Periodically detect Windows default audio output switches (e.g. turning HDMI TV on/off,
+                // switching speakers/headphones) so VU meters & 31-band RTA seamlessly rebind to the active device.
+                if (++ticksSinceDeviceCheck >= 20)
+                {
+                    ticksSinceDeviceCheck = 0;
+                    try
+                    {
+                        if (device.State != DeviceState.Active)
+                        {
+                            _logStore.Info($"Audio endpoint '{capturedDeviceName}' became inactive — rebinding VU/FFT capture...");
+                            break;
+                        }
+
+                        using var currentDefault = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                        if (!string.Equals(currentDefault.ID, capturedDeviceId, StringComparison.OrdinalIgnoreCase))
+                        {
+                            _logStore.Info($"Windows default audio changed ('{capturedDeviceName}' → '{currentDefault.FriendlyName}') — rebinding VU/FFT capture...");
+                            break;
+                        }
+                    }
+                    catch
+                    {
+                        break;
+                    }
                 }
 
                 // Publish smooth zero-decay frames when Windows audio goes silent

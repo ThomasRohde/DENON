@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-11-22
+
+### Fixed
+- **VU Meters & 31-Band RTA Auto-Rebind on Windows Audio Device Switch**: `LiveAudioAnalyzerService` now monitors the active Windows Default Audio Render Endpoint (`MMDeviceEnumerator`) and automatically rebinds `WasapiLoopbackCapture` when turning an HDMI TV on/off or switching speakers/headphones, preventing VU meters from freezing.
+- **LG webOS 23/24 Screen Off Cascade & Accurate Display Wording**: Updated `TurnOffScreenAsync` / `TurnOnScreenAsync` with a multi-endpoint cascade (`tvpower/power/turnOffScreen` with `standbyMode`, empty `{}` payload for webOS 23/24, and `settings/setSystemSettings` `energySaving: "screen_off"` fallback); replaced blanket "OLED" labels with universal **Screen Off / TV Display** wording (only mentioning OLED burn-in on actual OLED model IDs) and prevented Room Doctor from suggesting Screen Off while watching Live TV / video apps or when AVR input is `TV`.
+- **YouTube Playback Falling Back to Previous Radio Station & Source-Switching Hardening**:
+  - `YouTubeMediaService.FindFfmpegPath()` now prefers the real `WinGet\Packages\...\ffmpeg.exe` binary, resolves symlinks (`ResolveLinkTarget`), and verifies FFmpeg launches cleanly (`-version`) before advertising `.mp3` relay URLs — fixing Windows *"untrusted mount point"* crashes on WinGet symlinks.
+  - `LocalAudioRelayServer.StreamTranscodedMp3Async` now starts FFmpeg **before** writing HTTP `200 OK` headers and automatically falls back to Direct M4A streaming if FFmpeg ever fails to spawn (preventing 0-byte HTTP drops that caused HEOS to fall back to the previously loaded radio station).
+  - `ReceiverController` now cleanly stops stale HEOS playback (`state=stop`) before switching to `SINET` for YouTube / Radio / Favorites and when switching away from `NET` to `TV` / `HDMI` / Smart Scenes so old radio stations never auto-resume during source switches.
+
 ## [1.11.0] - 2026-11-22
 
 ### Added
@@ -202,7 +212,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Zero-Lag Real-Time HEOS Push Events (`LIVE PUSH`) & Analog VU Meters**: Dedicated `register_for_change_events` push listener for `<50 ms` knob/remote sync and toggleable dual-channel illuminated VU dials.
 - **Automated GitHub Releases Workflow**: `.github/workflows/release.yml` builds self-contained single-file `win-x64` executables and SHA-256 checksums on version tags.
 
-[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.11.0...HEAD
+[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.11.1...HEAD
+[1.11.1]: https://github.com/ThomasRohde/DENON/compare/v1.11.0...v1.11.1
 [1.11.0]: https://github.com/ThomasRohde/DENON/compare/v1.10.1...v1.11.0
 [1.10.1]: https://github.com/ThomasRohde/DENON/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/ThomasRohde/DENON/compare/v1.9.0...v1.10.0

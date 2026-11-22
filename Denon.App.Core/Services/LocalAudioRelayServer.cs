@@ -516,28 +516,42 @@ public sealed class LocalAudioRelayServer : IDisposable
             preferMp4Direct: false,
             cancellationToken);
 
+        Process ffmpeg;
+        try
+        {
+            ffmpeg = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = registered.FfmpegPath!,
+                    Arguments = "-hide_banner -loglevel error -i pipe:0 -vn -c:a libmp3lame -b:a 320k -ar 44100 -ac 2 -f mp3 pipe:1",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                },
+            };
+
+            if (!ffmpeg.Start())
+            {
+                ffmpeg.Dispose();
+                throw new InvalidOperationException("Failed to start FFmpeg transcoding process.");
+            }
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Never close with 0 bytes after 200 OK (which causes HEOS to fall back to the previous radio station):
+            // fall back cleanly to Direct M4A streaming before headers are written!
+            _logStore.Warning($"FFmpeg launch failed ({ex.Message}); falling back automatically to Direct M4A stream.");
+            return await StreamDirectMp4Async(networkStream, registered, rangeHeader: null, cancellationToken);
+        }
+
+        using (ffmpeg)
+        {
         var headers = BuildStreamHeaders("audio/mpeg", registered.Track, contentLength: null, isRange: false);
         await networkStream.WriteAsync(Encoding.ASCII.GetBytes(headers), cancellationToken);
         await networkStream.FlushAsync(cancellationToken);
-
-        using var ffmpeg = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = registered.FfmpegPath!,
-                Arguments = "-hide_banner -loglevel error -i pipe:0 -vn -c:a libmp3lame -b:a 320k -ar 44100 -ac 2 -f mp3 pipe:1",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-            },
-        };
-
-        if (!ffmpeg.Start())
-        {
-            throw new InvalidOperationException("Failed to start FFmpeg transcoding process.");
-        }
 
         UpdateStatus(_status with { StreamState = "Streaming to Denon (MP3 320k)" });
 
@@ -626,6 +640,7 @@ public sealed class LocalAudioRelayServer : IDisposable
             {
                 // Ignore cleanup failure
             }
+        }
         }
     }
 

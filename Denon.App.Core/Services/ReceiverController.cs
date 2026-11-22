@@ -97,6 +97,7 @@ public sealed class ReceiverController
                 {
                     _lastPlayedStationAlias = null;
                     NonRelaySourceActivated?.Invoke();
+                    await TryStopHeosPlaybackAsync(settings, token);
                 }
 
                 await _avrClient.SetPowerAsync(settings, true, token);
@@ -246,6 +247,7 @@ public sealed class ReceiverController
             $"Play preset {preset.DisplayName}",
             async (settings, token) =>
             {
+                await TryStopHeosPlaybackAsync(settings, token);
                 await _avrClient.EnsureMainZoneNetAsync(settings, token);
                 if (volume is int level)
                 {
@@ -279,6 +281,7 @@ public sealed class ReceiverController
             "Play custom stream",
             async (settings, token) =>
             {
+                await TryStopHeosPlaybackAsync(settings, token);
                 await _avrClient.EnsureMainZoneNetAsync(settings, token);
                 if (volume is int level)
                 {
@@ -328,6 +331,7 @@ public sealed class ReceiverController
             $"Play HEOS favorite {favorite.Name}",
             async (settings, token) =>
             {
+                await TryStopHeosPlaybackAsync(settings, token);
                 await _avrClient.EnsureMainZoneNetAsync(settings, token);
                 if (volume is int level)
                 {
@@ -427,6 +431,7 @@ public sealed class ReceiverController
             $"Cast LAN audio '{trackTitle}'",
             async (settings, token) =>
             {
+                await TryStopHeosPlaybackAsync(settings, token);
                 await _avrClient.EnsureMainZoneNetAsync(settings, token);
                 if (volume is int level)
                 {
@@ -520,6 +525,7 @@ public sealed class ReceiverController
                     {
                         _lastPlayedStationAlias = null;
                         NonRelaySourceActivated?.Invoke();
+                        await TryStopHeosPlaybackAsync(settings, token);
                         await _avrClient.SetInputSourceAsync(settings, scene.InputSource, token);
                         await Task.Delay(450, token);
                     }
@@ -769,5 +775,19 @@ public sealed class ReceiverController
         }
 
         return _lastPlayedStationAlias;
+    }
+
+    private async Task TryStopHeosPlaybackAsync(ReceiverSettings settings, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var stopCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            stopCts.CancelAfter(TimeSpan.FromMilliseconds(1500));
+            await _heosClient.SetPlayStateAsync(settings, "stop", stopCts.Token);
+        }
+        catch
+        {
+            // Best effort — never block source switching if HEOS is already stopped or waking up.
+        }
     }
 }

@@ -424,13 +424,39 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
         }
 
         await EnsureConnectedAsync(allowInteractivePairing: false, forcePairing: false, ct: ct);
-        try
+
+        var attempts = new (string Uri, object Payload)[]
         {
-            await SendRequestCoreAsync("ssap://com.webos.service.tvpower/power/turnOffScreen", new { standbyMode = "active" }, ct);
+            ("ssap://com.webos.service.tvpower/power/turnOffScreen", new { standbyMode = "active" }),
+            ("ssap://com.webos.service.tvpower/power/turnOffScreen", new { }),
+            ("ssap://settings/setSystemSettings", new { category = "picture", settings = new { energySaving = "screen_off" } }),
+            ("ssap://com.webos.settingsservice/setSystemSettings", new { category = "picture", settings = new { energySaving = "screen_off" } }),
+            ("ssap://com.webos.service.tv.power/turnOffScreen", new { standbyMode = "active" }),
+        };
+
+        Exception? firstError = null;
+        var succeeded = false;
+        foreach (var (uri, payload) in attempts)
+        {
+            try
+            {
+                await SendRequestCoreAsync(uri, payload, ct);
+                succeeded = true;
+                break;
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                firstError ??= ex;
+                DiagnosticLog?.Invoke($"Screen Off attempt ({uri}) failed: {ex.Message}");
+            }
         }
-        catch
+
+        if (!succeeded)
         {
-            await SendRequestCoreAsync("ssap://com.webos.service.tv.power/turnOffScreen", new { standbyMode = "active" }, ct);
+            var hint = firstError?.Message.Contains("401", StringComparison.OrdinalIgnoreCase) == true
+                ? " Try clicking 'Re-Pair (Full Permissions)' in Setup, or your TV firmware may restrict remote Screen Off."
+                : " This LG TV firmware/model may restrict remote Screen Off over SSAP.";
+            throw new InvalidOperationException($"TV rejected Screen Off ({firstError?.Message}).{hint}", firstError);
         }
 
         UpdateState(s => s with { IsScreenOff = true, PowerState = "Screen Off" });
@@ -445,13 +471,45 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
         }
 
         await EnsureConnectedAsync(allowInteractivePairing: false, forcePairing: false, ct: ct);
-        try
+
+        var attempts = new (string Uri, object Payload)[]
         {
-            await SendRequestCoreAsync("ssap://com.webos.service.tvpower/power/turnOnScreen", new { standbyMode = "active" }, ct);
+            ("ssap://com.webos.service.tvpower/power/turnOnScreen", new { standbyMode = "active" }),
+            ("ssap://com.webos.service.tvpower/power/turnOnScreen", new { }),
+            ("ssap://settings/setSystemSettings", new { category = "picture", settings = new { energySaving = "off" } }),
+            ("ssap://com.webos.settingsservice/setSystemSettings", new { category = "picture", settings = new { energySaving = "off" } }),
+            ("ssap://com.webos.service.tv.power/turnOnScreen", new { standbyMode = "active" }),
+        };
+
+        Exception? firstError = null;
+        var succeeded = false;
+        foreach (var (uri, payload) in attempts)
+        {
+            try
+            {
+                await SendRequestCoreAsync(uri, payload, ct);
+                succeeded = true;
+                break;
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                firstError ??= ex;
+                DiagnosticLog?.Invoke($"Screen On attempt ({uri}) failed: {ex.Message}");
+            }
         }
-        catch
+
+        if (!succeeded)
         {
-            await SendRequestCoreAsync("ssap://com.webos.service.tv.power/turnOnScreen", new { standbyMode = "active" }, ct);
+            // Last-resort wake: any harmless remote button wakes LG Screen Off mode.
+            try
+            {
+                await SendButtonAsync("INFO", ct);
+                succeeded = true;
+            }
+            catch
+            {
+                throw new InvalidOperationException($"TV rejected Screen On ({firstError?.Message}).", firstError);
+            }
         }
 
         UpdateState(s => s with { IsScreenOff = false, PowerState = "Active" });
