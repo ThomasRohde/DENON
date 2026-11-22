@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-22
+
+### Added
+- **Built-In Context-Aware Help & Interactive Guide System (`F1` / `? Help`)**:
+  - Added a dedicated **Help & Guide** workspace (`Views/HelpGuideView.xaml`, `ViewModels/MainViewModel.Help.cs`, `Models/HelpGuideModels.cs`) accessible via the left navigation sidebar, a persistent **`? Help`** title-bar button, or pressing **`F1`** from any screen or plugin (with a **`← Back to [Page]`** button to snap straight back).
+  - **Live Setup Readiness Checklist**: automatically inspects your real Denon AVR connection (`LIVE PUSH`), Phone Remote / Audio Relay (`:18925`), Philips Hue Bridge, LG webOS Smart TV, Home Assistant Bridge, and Smart Scenes with live progress bar and 1-click **`Open →`** jump buttons.
+  - **11 Searchable, Category-Filtered Deep Guides**: covers Quick Start, Control Deck (31-Band RTA & Live Lyrics), YouTube Cinema & Acoustic Lip-Sync Calibration, Smart Scenes 2.0 & Automations, Couch Phone Remote & FLAC Jukebox, 40k Radio Explorer, Philips Hue 50 Hz DTLS Music Sync, LG webOS 2.0 & Magic Remote, Home Assistant Bridge, Complete Keyboard Shortcuts Reference Table, and Local Network Ports / Firewall Troubleshooting FAQ.
+  - Updated `Ctrl+1..9` section shortcuts so all 9 sections (including Plugins `Ctrl+6`, Settings `Ctrl+7`, Health `Ctrl+8`, and Help `Ctrl+9`) are directly reachable.
+
 ## [1.6.0] - 2026-11-21
 
 ### Changed
@@ -127,7 +136,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Zero-Lag Real-Time HEOS Push Events (`LIVE PUSH`) & Analog VU Meters**: Dedicated `register_for_change_events` push listener for `<50 ms` knob/remote sync and toggleable dual-channel illuminated VU dials.
 - **Automated GitHub Releases Workflow**: `.github/workflows/release.yml` builds self-contained single-file `win-x64` executables and SHA-256 checksums on version tags.
 
-[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/ThomasRohde/DENON/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/ThomasRohde/DENON/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/ThomasRohde/DENON/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/ThomasRohde/DENON/compare/v1.3.0...v1.4.0

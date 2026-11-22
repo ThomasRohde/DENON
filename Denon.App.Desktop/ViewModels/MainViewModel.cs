@@ -274,6 +274,7 @@ public sealed partial class MainViewModel : ObservableObject
         InitializePlugins(pluginHostService);
         InitializeAutomations(automationEngineService);
         InitializeStudioAndSync(lyricsService, calibrationService);
+        InitializeHelpGuide();
         _liveAudioAnalyzer.SetVuCaptureRequested(IsAnyAudioMeterVisible);
 
         LoadSettings(_settingsStore.Current);

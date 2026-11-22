@@ -183,6 +183,14 @@ public partial class MainWindow : Window
         var isTyping = Keyboard.FocusedElement is TextBox or PasswordBox;
         var ctrl = modifiers.HasFlag(ModifierKeys.Control);
 
+        // F1 anywhere opens context-aware Help & Guide for the current section or active plugin
+        if (actualKey == Key.F1 && modifiers == ModifierKeys.None)
+        {
+            _viewModel.OpenContextualHelp();
+            e.Handled = true;
+            return;
+        }
+
         if (ctrl && actualKey == Key.R)
         {
             if (_viewModel.RefreshCommand.CanExecute(null))
@@ -219,11 +227,19 @@ public partial class MainWindow : Window
                     e.Handled = true;
                     return;
                 case Key.D6:
-                    _viewModel.ActiveSection = "Settings";
+                    _viewModel.ActiveSection = "Plugins";
                     e.Handled = true;
                     return;
                 case Key.D7:
+                    _viewModel.ActiveSection = "Settings";
+                    e.Handled = true;
+                    return;
+                case Key.D8:
                     _viewModel.ActiveSection = "Diagnostics";
+                    e.Handled = true;
+                    return;
+                case Key.D9:
+                    _viewModel.OpenContextualHelp();
                     e.Handled = true;
                     return;
             }
