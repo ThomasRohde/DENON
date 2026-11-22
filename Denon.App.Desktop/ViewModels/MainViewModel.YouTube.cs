@@ -287,7 +287,7 @@ public sealed partial class MainViewModel
         try
         {
             await _relayServer.EnsureStartedAsync();
-            var port = _settingsStore.Current.Media.RelayPort;
+            var port = _relayServer.BoundPort > 0 ? _relayServer.BoundPort : _settingsStore.Current.Media.RelayPort;
             var psi = new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "netsh",

@@ -43,6 +43,7 @@ public sealed class LocalMediaJukeboxService : IDisposable
 
     private readonly LocalAudioRelayServer _relayServer;
     private readonly ReceiverController _receiverController;
+    private readonly ReceiverStateStore _stateStore;
     private readonly AppLogStore _logStore;
     private readonly object _sync = new();
     private readonly List<LocalAudioTrackItem> _tracks = [];
@@ -58,10 +59,12 @@ public sealed class LocalMediaJukeboxService : IDisposable
     public LocalMediaJukeboxService(
         LocalAudioRelayServer relayServer,
         ReceiverController receiverController,
+        ReceiverStateStore stateStore,
         AppLogStore logStore)
     {
         _relayServer = relayServer;
         _receiverController = receiverController;
+        _stateStore = stateStore;
         _logStore = logStore;
 
         _relayServer.LocalTrackStreamCompleted += OnLocalTrackCompleted;
@@ -92,9 +95,19 @@ public sealed class LocalMediaJukeboxService : IDisposable
         }
     }
 
-    public int AddPaths(IEnumerable<string> paths)
+    public int AddPaths(IEnumerable<string> paths) => AddPathsDetailed(paths).Added;
+
+    public (int Added, int Duplicates, int Skipped) AddPathsDetailed(IEnumerable<string> paths)
     {
         var discoveredFiles = new List<string>();
+        var skipped = 0;
+        var enumOpts = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = true,
+            AttributesToSkip = FileAttributes.System,
+        };
+
         foreach (var rawPath in paths)
         {
             if (string.IsNullOrWhiteSpace(rawPath))
@@ -102,38 +115,53 @@ public sealed class LocalMediaJukeboxService : IDisposable
                 continue;
             }
 
-            if (File.Exists(rawPath) && IsSupportedAudioFile(rawPath))
+            if (File.Exists(rawPath))
             {
-                discoveredFiles.Add(rawPath);
+                if (IsSupportedAudioFile(rawPath))
+                {
+                    discoveredFiles.Add(rawPath);
+                }
+                else
+                {
+                    skipped++;
+                }
             }
             else if (Directory.Exists(rawPath))
             {
                 try
                 {
-                    var files = Directory.EnumerateFiles(rawPath, "*.*", SearchOption.AllDirectories)
+                    var files = Directory.EnumerateFiles(rawPath, "*.*", enumOpts)
                         .Where(IsSupportedAudioFile)
                         .OrderBy(static f => f, StringComparer.OrdinalIgnoreCase);
                     discoveredFiles.AddRange(files);
                 }
                 catch (Exception ex)
                 {
+                    skipped++;
                     _logStore.Warning($"Could not scan folder '{rawPath}': {ex.Message}");
                 }
+            }
+            else
+            {
+                skipped++;
             }
         }
 
         if (discoveredFiles.Count == 0)
         {
-            return 0;
+            return (0, 0, skipped);
         }
 
         var added = 0;
+        var duplicates = 0;
         lock (_sync)
         {
+            var existingPaths = new HashSet<string>(_tracks.Select(static t => t.FilePath), StringComparer.OrdinalIgnoreCase);
             foreach (var file in discoveredFiles)
             {
-                if (_tracks.Any(t => string.Equals(t.FilePath, file, StringComparison.OrdinalIgnoreCase)))
+                if (!existingPaths.Add(file))
                 {
+                    duplicates++;
                     continue;
                 }
 
@@ -153,11 +181,11 @@ public sealed class LocalMediaJukeboxService : IDisposable
 
         if (added > 0)
         {
-            _logStore.Info($"Added {added} local audio track(s) to Hi-Res Jukebox.");
+            _logStore.Info($"Added {added} local audio track(s) to Hi-Res Jukebox{(duplicates > 0 ? $" ({duplicates} duplicate(s) skipped)" : string.Empty)}.");
             NotifyChanged();
         }
 
-        return added;
+        return (added, duplicates, skipped);
     }
 
     public async Task PlayTrackAsync(string trackId, bool useLowVolume, bool unmute, CancellationToken cancellationToken = default)
@@ -334,6 +362,9 @@ public sealed class LocalMediaJukeboxService : IDisposable
         CancelPendingAutoAdvance();
 
         LocalAudioTrackItem track;
+        int prevIndex;
+        bool prevActive;
+        string? prevToken;
         lock (_sync)
         {
             if (index < 0 || index >= _tracks.Count)
@@ -341,21 +372,43 @@ public sealed class LocalMediaJukeboxService : IDisposable
                 return;
             }
 
-            _currentIndex = index;
-            _isActive = true;
+            prevIndex = _currentIndex;
+            prevActive = _isActive;
+            prevToken = _activeRelayToken;
             track = _tracks[index];
         }
 
-        NotifyChanged();
-
-        var (relayUrl, token) = await _relayServer.RegisterLocalTrackAsync(track, cancellationToken);
-        lock (_sync)
+        try
         {
-            _activeRelayToken = token;
-        }
+            var (relayUrl, token) = await _relayServer.RegisterLocalTrackAsync(track, cancellationToken);
+            lock (_sync)
+            {
+                _activeRelayToken = token;
+            }
 
-        await _receiverController.PlayRelayStreamAsync(relayUrl, $"{track.Title} ({track.CodecBadge})", useLowVolume, unmute, cancellationToken);
-        NotifyChanged();
+            await _receiverController.PlayRelayStreamAsync(relayUrl, $"{track.Title} ({track.CodecBadge})", useLowVolume, unmute, cancellationToken);
+
+            lock (_sync)
+            {
+                var confirmedIdx = _tracks.FindIndex(t => string.Equals(t.TrackId, track.TrackId, StringComparison.Ordinal));
+                _currentIndex = confirmedIdx >= 0 ? confirmedIdx : Math.Clamp(index, 0, Math.Max(0, _tracks.Count - 1));
+                _isActive = _tracks.Count > 0;
+            }
+
+            NotifyChanged();
+        }
+        catch
+        {
+            lock (_sync)
+            {
+                _currentIndex = prevIndex;
+                _isActive = prevActive;
+                _activeRelayToken = prevToken;
+            }
+
+            NotifyChanged();
+            throw;
+        }
     }
 
     private void OnLocalTrackCompleted(string token, LocalAudioTrackItem track)
@@ -376,11 +429,71 @@ public sealed class LocalMediaJukeboxService : IDisposable
         {
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(2.5), cts.Token);
-                var advanced = await PlayNextAsync(cts.Token);
+                // Wait for HEOS to finish draining its prefetched audio buffer (watch playState == "stop" up to 45s)
+                var minGrace = DateTimeOffset.UtcNow.AddSeconds(2.5);
+                var deadline = DateTimeOffset.UtcNow.AddSeconds(45.0);
+                var sawPlaying = string.Equals(_stateStore.Snapshot.Status?.PlayState, "play", StringComparison.OrdinalIgnoreCase);
+
+                while (DateTimeOffset.UtcNow < deadline && !cts.Token.IsCancellationRequested)
+                {
+                    await Task.Delay(500, cts.Token);
+                    var state = _stateStore.Snapshot.Status?.PlayState;
+                    if (string.Equals(state, "play", StringComparison.OrdinalIgnoreCase))
+                    {
+                        sawPlaying = true;
+                    }
+                    else if (DateTimeOffset.UtcNow >= minGrace &&
+                             string.Equals(state, "stop", StringComparison.OrdinalIgnoreCase))
+                    {
+                        break;
+                    }
+                    else if (!sawPlaying && DateTimeOffset.UtcNow >= minGrace.AddSeconds(1.5))
+                    {
+                        break;
+                    }
+                }
+
+                // Discard superseded completions before advancing
+                lock (_sync)
+                {
+                    if (cts.IsCancellationRequested || !_isActive || !string.Equals(_activeRelayToken, token, StringComparison.Ordinal))
+                    {
+                        return;
+                    }
+                }
+
+                // IMPORTANT: Use a fresh CancellationToken so PlayAtIndexAsync's CancelPendingAutoAdvance()
+                // does not self-cancel the transition to the next local track!
+                var advanced = await PlayNextAsync(CancellationToken.None);
                 if (advanced)
                 {
                     _logStore.Info($"Local Jukebox auto-advanced after '{track.Title}'.");
+                }
+                else
+                {
+                    lock (_sync)
+                    {
+                        if (string.Equals(_activeRelayToken, token, StringComparison.Ordinal))
+                        {
+                            _isActive = false;
+                            _activeRelayToken = null;
+                        }
+                    }
+
+                    NotifyChanged();
+                    try
+                    {
+                        var playState = _stateStore.Snapshot.Status?.PlayState;
+                        if (!string.Equals(playState, "stop", StringComparison.OrdinalIgnoreCase))
+                        {
+                            await _receiverController.SetPlayStateAsync("stop", CancellationToken.None);
+                        }
+                    }
+                    catch
+                    {
+                    }
+
+                    _logStore.Info($"Local Jukebox finished after '{track.Title}'.");
                 }
             }
             catch (OperationCanceledException)

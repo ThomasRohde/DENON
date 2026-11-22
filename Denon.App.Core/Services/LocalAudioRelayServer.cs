@@ -49,6 +49,8 @@ public sealed class LocalAudioRelayServer : IDisposable
 
     public RelayStatusSnapshot CurrentStatus => _status;
 
+    public int BoundPort => _boundPort;
+
     public void AttachWebApiHandler(IRemoteWebApiHandler handler) => _webApiHandler = handler;
 
     public void AttachLivePcAudioHandler(Func<Stream, PcCastFormat, CancellationToken, Task> handler) =>
@@ -374,11 +376,13 @@ public sealed class LocalAudioRelayServer : IDisposable
                         return;
                     }
 
-                    var resp = await _webApiHandler.HandleAsync(request.Method, request.Path, request.Query, request.Body, serverToken);
+                    var resp = await _webApiHandler.HandleAsync(request.Method, request.Path, request.Query, request.Body, request.AuthToken, serverToken);
                     var statusText = resp.StatusCode switch
                     {
                         200 => "200 OK",
                         400 => "400 Bad Request",
+                        401 => "401 Unauthorized",
+                        403 => "403 Forbidden",
                         404 => "404 Not Found",
                         _ => "500 Internal Server Error",
                     };
@@ -524,7 +528,7 @@ public sealed class LocalAudioRelayServer : IDisposable
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = registered.FfmpegPath!,
-                    Arguments = "-hide_banner -loglevel error -i pipe:0 -vn -c:a libmp3lame -b:a 320k -ar 44100 -ac 2 -f mp3 pipe:1",
+                    Arguments = "-hide_banner -loglevel error -err_detect ignore_err -i pipe:0 -vn -c:a libmp3lame -b:a 320k -ar 44100 -ac 2 -f mp3 pipe:1",
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardInput = true,
@@ -559,6 +563,13 @@ public sealed class LocalAudioRelayServer : IDisposable
         var sourceReachedEof = false;
         var outputReachedEof = false;
         var playbackClockSignaled = false;
+        var streamStartTimestamp = Stopwatch.GetTimestamp();
+
+        // Allow an instant 6-second burst (240 KB @ 320 kbps) so HEOS starts playing immediately,
+        // then pace at ~1.03x real-time (41.2 KB/s) so HEOS never over-buffers 60+ seconds ahead
+        // and prematurely triggers track completion mid-song.
+        const long initialBurstBytes = 240_000;
+        const double targetBytesPerSecond = 41_200.0;
 
         try
         {
@@ -574,8 +585,12 @@ public sealed class LocalAudioRelayServer : IDisposable
                 catch (OperationCanceledException)
                 {
                 }
-                catch (IOException)
+                catch (Exception ex)
                 {
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        _logStore.Warning($"YouTube audio source interrupted for '{registered.Track.Title}': {ex.Message}");
+                    }
                 }
                 finally
                 {
@@ -606,6 +621,18 @@ public sealed class LocalAudioRelayServer : IDisposable
                     TrackPlaybackStarted?.Invoke(registered.Token, DateTimeOffset.UtcNow);
                 }
 
+                // Gentle real-time pacing after initial burst
+                if (totalBytes > initialBurstBytes)
+                {
+                    var elapsedSec = Stopwatch.GetElapsedTime(streamStartTimestamp).TotalSeconds;
+                    var targetElapsedSec = (totalBytes - initialBurstBytes) / targetBytesPerSecond;
+                    var aheadMs = (int)((targetElapsedSec - elapsedSec) * 1000.0);
+                    if (aheadMs > 25)
+                    {
+                        await Task.Delay(Math.Min(aheadMs, 500), cancellationToken);
+                    }
+                }
+
                 var nowTick = Environment.TickCount64;
                 if (nowTick - lastStatusTick >= 1000)
                 {
@@ -622,6 +649,12 @@ public sealed class LocalAudioRelayServer : IDisposable
             if (!string.IsNullOrWhiteSpace(stderr) && !cancellationToken.IsCancellationRequested)
             {
                 _logStore.Warning($"FFmpeg notice: {stderr.Trim()}");
+            }
+
+            var totalElapsedSec = Math.Round(Stopwatch.GetElapsedTime(streamStartTimestamp).TotalSeconds, 1);
+            if (!cancellationToken.IsCancellationRequested && totalBytes > 24_000)
+            {
+                _logStore.Info($"Finished streaming '{registered.Track.Title}' ({totalBytes / (1024.0 * 1024.0):0.2} MB in {totalElapsedSec:0.0}s).");
             }
 
             UpdateStatus(_status with { BytesStreamed = totalBytes });
@@ -668,11 +701,33 @@ public sealed class LocalAudioRelayServer : IDisposable
         long rangeEnd = totalSize > 0 ? totalSize - 1 : -1;
         var isPartial = false;
 
-        if (!string.IsNullOrWhiteSpace(rangeHeader) && totalSize > 0 && TryParseRangeHeader(rangeHeader, totalSize, out var s, out var e))
+        if (!string.IsNullOrWhiteSpace(rangeHeader) && totalSize > 0)
         {
+            if (!TryParseRangeHeader(rangeHeader, totalSize, out var s, out var e))
+            {
+                await WriteRangeNotSatisfiableAsync(networkStream, totalSize, cancellationToken);
+                return false;
+            }
+
             rangeStart = s;
             rangeEnd = e;
             isPartial = rangeStart > 0 || rangeEnd < totalSize - 1;
+        }
+
+        await using var youtubeStream = await _youtubeService.OpenAudioStreamAsync(streamInfo, cancellationToken);
+        if (rangeStart > 0)
+        {
+            if (youtubeStream.CanSeek)
+            {
+                youtubeStream.Seek(rangeStart, SeekOrigin.Begin);
+            }
+            else
+            {
+                // Upstream stream is not seekable: never advertise a nonzero byte offset we did not seek to.
+                rangeStart = 0;
+                rangeEnd = totalSize > 0 ? totalSize - 1 : -1;
+                isPartial = false;
+            }
         }
 
         var contentLength = totalSize > 0 ? (rangeEnd - rangeStart + 1) : (long?)null;
@@ -689,12 +744,6 @@ public sealed class LocalAudioRelayServer : IDisposable
         await networkStream.FlushAsync(cancellationToken);
 
         UpdateStatus(_status with { StreamState = "Streaming to Denon (Direct M4A)" });
-
-        await using var youtubeStream = await _youtubeService.OpenAudioStreamAsync(streamInfo, cancellationToken);
-        if (rangeStart > 0 && youtubeStream.CanSeek)
-        {
-            youtubeStream.Seek(rangeStart, SeekOrigin.Begin);
-        }
 
         var buffer = new byte[32768];
         var remaining = contentLength ?? long.MaxValue;
@@ -789,14 +838,25 @@ public sealed class LocalAudioRelayServer : IDisposable
         await stream.FlushAsync(cancellationToken);
     }
 
-    private static async Task<ParsedHttpRequest?> ReadHttpRequestAsync(NetworkStream stream, CancellationToken cancellationToken)
+    private static async Task WriteRangeNotSatisfiableAsync(
+        NetworkStream stream,
+        long totalSize,
+        CancellationToken cancellationToken)
+    {
+        var header = $"HTTP/1.1 416 Range Not Satisfiable\r\nContent-Range: bytes */{totalSize}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        await stream.WriteAsync(Encoding.ASCII.GetBytes(header), cancellationToken);
+        await stream.FlushAsync(cancellationToken);
+    }
+
+    internal static async Task<ParsedHttpRequest?> ReadHttpRequestAsync(Stream stream, CancellationToken cancellationToken)
     {
         var buffer = new byte[4096];
-        var builder = new StringBuilder();
+        var rawBytes = new List<byte>(4096);
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
 
-        while (builder.Length < 16384)
+        var headerEndIndex = -1;
+        while (rawBytes.Count < 16384)
         {
             var read = await stream.ReadAsync(buffer, timeoutCts.Token);
             if (read <= 0)
@@ -804,17 +864,25 @@ public sealed class LocalAudioRelayServer : IDisposable
                 break;
             }
 
-            builder.Append(Encoding.ASCII.GetString(buffer, 0, read));
-            if (builder.ToString().Contains("\r\n\r\n", StringComparison.Ordinal))
+            for (var i = 0; i < read; i++)
+            {
+                rawBytes.Add(buffer[i]);
+            }
+
+            headerEndIndex = FindHeaderDelimiter(rawBytes);
+            if (headerEndIndex >= 0)
             {
                 break;
             }
         }
 
-        var raw = builder.ToString();
-        var headerEnd = raw.IndexOf("\r\n\r\n", StringComparison.Ordinal);
-        var headerPart = headerEnd >= 0 ? raw[..headerEnd] : raw;
-        var initialBody = headerEnd >= 0 ? raw[(headerEnd + 4)..] : string.Empty;
+        if (rawBytes.Count == 0)
+        {
+            return null;
+        }
+
+        var headerByteLen = headerEndIndex >= 0 ? headerEndIndex : rawBytes.Count;
+        var headerPart = Encoding.ASCII.GetString(rawBytes.GetRange(0, headerByteLen).ToArray());
 
         var lines = headerPart.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
         if (lines.Length == 0)
@@ -829,6 +897,7 @@ public sealed class LocalAudioRelayServer : IDisposable
         }
 
         string? rangeHeader = null;
+        string? authToken = null;
         var contentLength = 0;
         for (var i = 1; i < lines.Length; i++)
         {
@@ -840,12 +909,31 @@ public sealed class LocalAudioRelayServer : IDisposable
             {
                 _ = int.TryParse(lines[i]["Content-Length:".Length..].Trim(), out contentLength);
             }
+            else if (lines[i].StartsWith("X-Denon-Token:", StringComparison.OrdinalIgnoreCase))
+            {
+                authToken = lines[i]["X-Denon-Token:".Length..].Trim();
+            }
+            else if (string.IsNullOrWhiteSpace(authToken) &&
+                     lines[i].StartsWith("Authorization:", StringComparison.OrdinalIgnoreCase))
+            {
+                var authVal = lines[i]["Authorization:".Length..].Trim();
+                if (authVal.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                {
+                    authToken = authVal["Bearer ".Length..].Trim();
+                }
+            }
         }
 
-        var body = initialBody;
+        // Preserve raw UTF-8 body bytes untouched across packet boundaries, then decode once as UTF-8.
+        var bodyStartIndex = headerEndIndex >= 0 ? headerEndIndex + 4 : rawBytes.Count;
+        var bodyBytes = new List<byte>(Math.Max(0, Math.Min(contentLength, 65536)));
+        for (var i = bodyStartIndex; i < rawBytes.Count; i++)
+        {
+            bodyBytes.Add(rawBytes[i]);
+        }
+
         if (contentLength > 0 && contentLength <= 65536)
         {
-            var bodyBytes = new List<byte>(Encoding.UTF8.GetBytes(initialBody));
             while (bodyBytes.Count < contentLength)
             {
                 var remaining = Math.Min(buffer.Length, contentLength - bodyBytes.Count);
@@ -860,9 +948,12 @@ public sealed class LocalAudioRelayServer : IDisposable
                     bodyBytes.Add(buffer[idx]);
                 }
             }
-
-            body = Encoding.UTF8.GetString(bodyBytes.ToArray());
         }
+
+        var bodyCount = contentLength > 0 ? Math.Min(bodyBytes.Count, contentLength) : bodyBytes.Count;
+        var body = bodyCount > 0
+            ? Encoding.UTF8.GetString(bodyBytes.GetRange(0, bodyCount).ToArray())
+            : string.Empty;
 
         var rawPath = parts[1];
         string? query = null;
@@ -873,7 +964,20 @@ public sealed class LocalAudioRelayServer : IDisposable
             rawPath = rawPath[..queryIndex];
         }
 
-        return new ParsedHttpRequest(parts[0], rawPath, query, rangeHeader, body);
+        return new ParsedHttpRequest(parts[0], rawPath, query, rangeHeader, body, authToken);
+    }
+
+    private static int FindHeaderDelimiter(List<byte> bytes)
+    {
+        for (var i = 0; i <= bytes.Count - 4; i++)
+        {
+            if (bytes[i] == '\r' && bytes[i + 1] == '\n' && bytes[i + 2] == '\r' && bytes[i + 3] == '\n')
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private async Task HandleLocalFileRequestAsync(
@@ -968,8 +1072,14 @@ public sealed class LocalAudioRelayServer : IDisposable
         long rangeEnd = totalSize > 0 ? totalSize - 1 : -1;
         var isPartial = false;
 
-        if (!string.IsNullOrWhiteSpace(rangeHeader) && totalSize > 0 && TryParseRangeHeader(rangeHeader, totalSize, out var s, out var e))
+        if (!string.IsNullOrWhiteSpace(rangeHeader) && totalSize > 0)
         {
+            if (!TryParseRangeHeader(rangeHeader, totalSize, out var s, out var e))
+            {
+                await WriteRangeNotSatisfiableAsync(networkStream, totalSize, cancellationToken);
+                return false;
+            }
+
             rangeStart = s;
             rangeEnd = e;
             isPartial = rangeStart > 0 || rangeEnd < totalSize - 1;
@@ -1023,7 +1133,7 @@ public sealed class LocalAudioRelayServer : IDisposable
         UpdateStatus(_status with { BytesStreamed = written });
 
         var reachedEnd = !isPartial || (totalSize > 0 && rangeEnd >= totalSize - 1);
-        return reachedEnd && remaining == 0 && written > 16_000;
+        return reachedEnd && remaining == 0 && written > 0;
     }
 
     private async Task<bool> StreamTranscodedLocalFileAsync(
@@ -1166,11 +1276,11 @@ public sealed class LocalAudioRelayServer : IDisposable
         return dot > 0 ? segment[..dot] : segment;
     }
 
-    private static bool TryParseRangeHeader(string header, long totalSize, out long start, out long end)
+    internal static bool TryParseRangeHeader(string header, long totalSize, out long start, out long end)
     {
         start = 0;
         end = totalSize - 1;
-        if (!header.StartsWith("bytes=", StringComparison.OrdinalIgnoreCase))
+        if (totalSize <= 0 || !header.StartsWith("bytes=", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -1184,6 +1294,19 @@ public sealed class LocalAudioRelayServer : IDisposable
 
         var startPart = rangeSpec[..dash].Trim();
         var endPart = rangeSpec[(dash + 1)..].Trim();
+
+        // Suffix-byte-range-spec: bytes=-N (last N bytes)
+        if (string.IsNullOrEmpty(startPart))
+        {
+            if (!long.TryParse(endPart, out var suffixLen) || suffixLen <= 0)
+            {
+                return false;
+            }
+
+            start = Math.Max(0, totalSize - suffixLen);
+            end = totalSize - 1;
+            return true;
+        }
 
         if (!long.TryParse(startPart, out start) || start < 0 || start >= totalSize)
         {
@@ -1243,5 +1366,5 @@ public sealed class LocalAudioRelayServer : IDisposable
 
     private sealed record RegisteredLocalTrack(string Token, LocalAudioTrackItem Track, bool UseDirectNative, string? FfmpegPath);
 
-    private sealed record ParsedHttpRequest(string Method, string Path, string? Query, string? RangeHeader, string Body);
+    internal sealed record ParsedHttpRequest(string Method, string Path, string? Query, string? RangeHeader, string Body, string? AuthToken = null);
 }

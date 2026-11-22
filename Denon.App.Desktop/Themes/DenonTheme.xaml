@@ -30,8 +30,8 @@
     <Color x:Key="AccentCrimsonBgColor">#351519</Color>
 
     <Color x:Key="TextPrimaryColor">#F1F5F9</Color>
-    <Color x:Key="TextSecondaryColor">#94A3B8</Color>
-    <Color x:Key="TextMutedColor">#64748B</Color>
+    <Color x:Key="TextSecondaryColor">#B0BFCE</Color>
+    <Color x:Key="TextMutedColor">#8E9FB3</Color>
 
     <SolidColorBrush x:Key="ChassisBgBrush" Color="{StaticResource ChassisBgColor}" />
     <SolidColorBrush x:Key="SidebarBgBrush" Color="{StaticResource SidebarBgColor}" />

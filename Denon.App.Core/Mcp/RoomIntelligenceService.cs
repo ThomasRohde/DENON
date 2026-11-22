@@ -109,18 +109,25 @@ public sealed class RoomIntelligenceService
         }
     }
 
-    public RoomStateSnapshot CaptureSnapshot(string reason)
+    public RoomStateSnapshot? CaptureSnapshot(string reason)
     {
-        var status = _stateStore.Snapshot.Status;
+        var live = _stateStore.Snapshot;
+        var status = live.Status;
+        if (!live.IsConnected || status is null)
+        {
+            _logStore.Warning($"[RoomBrain] Skipped Undo snapshot for '{reason}' because AVR state is not currently confirmed.");
+            return null;
+        }
+
         var snap = new RoomStateSnapshot(
             CapturedAt: DateTimeOffset.UtcNow,
             Reason: reason,
-            IsPoweredOn: status?.IsPoweredOn ?? false,
-            Volume: status?.Volume ?? 25,
-            IsMuted: status?.IsMuted ?? false,
-            InputSource: status?.InputSource ?? string.Empty,
-            SoundMode: status?.SoundMode ?? string.Empty,
-            Zone2On: status?.IsZone2On);
+            IsPoweredOn: status.IsPoweredOn,
+            Volume: status.Volume,
+            IsMuted: status.IsMuted,
+            InputSource: status.InputSource,
+            SoundMode: status.SoundMode,
+            Zone2On: status.IsZone2On);
 
         lock (_sync)
         {
@@ -140,26 +147,43 @@ public sealed class RoomIntelligenceService
         return snap;
     }
 
-    public async Task<(bool Success, string Message)> RestoreLastSnapshotAsync(CancellationToken ct = default)
+    public Task<(bool Success, string Message)> RestoreLastSnapshotAsync(CancellationToken ct = default) =>
+        RestoreLastSnapshotAsync(maxSafeVolume: null, ct);
+
+    public async Task<(bool Success, string Message)> RestoreLastSnapshotAsync(int? maxSafeVolume, CancellationToken ct = default)
     {
         RoomStateSnapshot? target;
         lock (_sync)
         {
-            target = _undoStack.Count > 0 ? _undoStack.Pop() : null;
+            // Peek first so a failed or timed-out restore remains retryable!
+            target = _undoStack.Count > 0 ? _undoStack.Peek() : null;
         }
-
-        UndoStackChanged?.Invoke();
 
         if (target is null)
         {
-            return (false, "No previous room state snapshot available to restore.");
+            return (false, "No confirmed previous AVR state snapshot available to restore.");
         }
+
+        var effectiveVolume = maxSafeVolume.HasValue
+            ? Math.Min(target.Volume, maxSafeVolume.Value)
+            : target.Volume;
+        var wasVolumeCapped = maxSafeVolume.HasValue && target.Volume > maxSafeVolume.Value;
 
         try
         {
             await _receiverController.SetPowerAsync(target.IsPoweredOn, ct);
             if (target.IsPoweredOn)
             {
+                // Establish safe mute/volume ordering BEFORE making an input audible:
+                // - If target is muted, mute first so nothing plays loudly.
+                // - Otherwise set target volume BEFORE switching input or releasing mute!
+                if (target.IsMuted)
+                {
+                    await _receiverController.SetMuteAsync(true, ct);
+                }
+
+                await _receiverController.SetVolumeAsync(effectiveVolume, ct);
+
                 if (!string.IsNullOrWhiteSpace(target.InputSource))
                 {
                     await _receiverController.SetInputSourceAsync(target.InputSource, ct);
@@ -170,8 +194,10 @@ public sealed class RoomIntelligenceService
                     await _receiverController.SetSoundModeAsync(target.SoundMode, ct);
                 }
 
-                await _receiverController.SetMuteAsync(target.IsMuted, ct);
-                await _receiverController.SetVolumeAsync(target.Volume, ct);
+                if (!target.IsMuted)
+                {
+                    await _receiverController.SetMuteAsync(false, ct);
+                }
             }
 
             if (target.Zone2On.HasValue)
@@ -179,13 +205,25 @@ public sealed class RoomIntelligenceService
                 await _receiverController.SetZone2PowerAsync(target.Zone2On.Value, ct);
             }
 
-            var msg = $"Restored room state from before '{target.Reason}' (Power: {(target.IsPoweredOn ? "ON" : "Standby")}, Vol: {target.Volume}, Input: {target.InputSource}).";
+            // Pop ONLY after all restore commands succeeded!
+            lock (_sync)
+            {
+                if (_undoStack.Count > 0 && ReferenceEquals(_undoStack.Peek(), target))
+                {
+                    _undoStack.Pop();
+                }
+            }
+
+            UndoStackChanged?.Invoke();
+
+            var capNote = wasVolumeCapped ? $" (capped from {target.Volume} by MaxSafeVolume {maxSafeVolume})" : string.Empty;
+            var msg = $"Restored AVR state from before '{target.Reason}' (Power: {(target.IsPoweredOn ? "ON" : "Standby")}, Vol: {effectiveVolume}{capNote}, Muted: {target.IsMuted}, Input: {target.InputSource}).";
             _logStore.Info($"[RoomBrain] {msg}");
             return (true, msg);
         }
         catch (Exception ex)
         {
-            return (false, $"Undo failed: {ex.Message}");
+            return (false, $"Undo failed (snapshot retained for retry): {ex.Message}");
         }
     }
 

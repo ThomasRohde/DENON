@@ -53,9 +53,9 @@ public partial class SpectrumAnalyzerControl : System.Windows.Controls.UserContr
         }
 
         SignalModeLabel.Text = isLiveSignal
-            ? "LIVE WASAPI FFT"
+            ? "PC LOOPBACK FFT"
             : isSimulatedPlaying
-                ? "AVR STREAM"
+                ? "SIMULATED (VOL)"
                 : "STANDBY";
 
         var dt = Math.Clamp(deltaSeconds, 0.001, 0.08);

@@ -184,6 +184,10 @@ public sealed partial class MainViewModel
         return (false, false);
     }
 
+    private int _lyricsRequestSeq;
+    private TimeSpan _nonYouTubePausedElapsed = TimeSpan.Zero;
+    private bool _wasLyricsClockPaused;
+
     private void NotifyTrackChangedForLyrics(string title, string detail)
     {
         var key = $"{title}||{detail}";
@@ -194,6 +198,8 @@ public sealed partial class MainViewModel
 
         _lastLyricsTrackKey = key;
         _nonYouTubeTrackStartedAt = DateTimeOffset.Now;
+        _nonYouTubePausedElapsed = TimeSpan.Zero;
+        _wasLyricsClockPaused = false;
         if (ShowLiveLyrics)
         {
             _ = RefreshLyricsForCurrentTrackAsync(force: false);
@@ -206,6 +212,7 @@ public sealed partial class MainViewModel
         var detail = NowPlayingDetail;
         if (string.IsNullOrWhiteSpace(title))
         {
+            Interlocked.Increment(ref _lyricsRequestSeq);
             CurrentLyricLine = string.Empty;
             NextLyricLine = string.Empty;
             return;
@@ -217,11 +224,19 @@ public sealed partial class MainViewModel
             return;
         }
 
+        var requestSeq = Interlocked.Increment(ref _lyricsRequestSeq);
         LyricsStatusBadge = "SEARCHING...";
         CurrentLyricLine = $"Looking up synced lyrics for \"{title}\"...";
         NextLyricLine = string.Empty;
 
         var doc = await _lyricsService.FetchLyricsAsync(title, detail);
+
+        // Discard stale responses if the user skipped to another track while this request was in flight!
+        if (requestSeq != Volatile.Read(ref _lyricsRequestSeq))
+        {
+            return;
+        }
+
         _currentLyricsDoc = doc;
 
         if (doc is null)
@@ -250,7 +265,26 @@ public sealed partial class MainViewModel
         }
         else
         {
-            posSeconds = Math.Max(0, (DateTimeOffset.Now - _nonYouTubeTrackStartedAt).TotalSeconds);
+            if (IsPaused)
+            {
+                if (!_wasLyricsClockPaused)
+                {
+                    _nonYouTubePausedElapsed += DateTimeOffset.Now - _nonYouTubeTrackStartedAt;
+                    _wasLyricsClockPaused = true;
+                }
+
+                posSeconds = Math.Max(0, _nonYouTubePausedElapsed.TotalSeconds);
+            }
+            else
+            {
+                if (_wasLyricsClockPaused)
+                {
+                    _nonYouTubeTrackStartedAt = DateTimeOffset.Now;
+                    _wasLyricsClockPaused = false;
+                }
+
+                posSeconds = Math.Max(0, (_nonYouTubePausedElapsed + (DateTimeOffset.Now - _nonYouTubeTrackStartedAt)).TotalSeconds);
+            }
         }
 
         var (cur, next) = LyricsService.GetDisplayLines(_currentLyricsDoc, posSeconds);

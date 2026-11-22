@@ -117,8 +117,17 @@
                                     <TextBox Text="{Binding BaseUrl, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource HaInput}" FontFamily="Cascadia Mono, Consolas" Tag="http://homeassistant.local:8123" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="LONG-LIVED ACCESS TOKEN" FontSize="10" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,4" />
-                                    <TextBox Text="{Binding AccessToken, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource HaInput}" FontFamily="Cascadia Mono, Consolas" Tag="eyJhbGciOiJIUzI1NiIsInR5cCI6..." />
+                                    <TextBlock Text="LONG-LIVED ACCESS TOKEN" FontSize="10" FontWeight="Bold" Foreground="#8E9FB3" Margin="0,0,0,4" />
+                                    <PasswordBox x:Name="TokenPasswordBox"
+                                                 PasswordChanged="TokenPasswordBox_PasswordChanged"
+                                                 Background="#0D111A"
+                                                 Foreground="#F1F5F9"
+                                                 BorderBrush="#252E42"
+                                                 BorderThickness="1"
+                                                 Padding="10,7"
+                                                 FontSize="12"
+                                                 FontFamily="Cascadia Mono, Consolas"
+                                                 ToolTip="Long-Lived Access Token (masked for privacy)" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="4">
                                     <TextBlock Text="WEBHOOK ID (OPTIONAL)" FontSize="10" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,4" />

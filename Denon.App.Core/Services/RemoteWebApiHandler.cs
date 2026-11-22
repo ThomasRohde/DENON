@@ -1,4 +1,6 @@
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Denon.App.Core.Models;
 using Denon.App.Core.Plugins;
@@ -7,7 +9,7 @@ namespace Denon.App.Core.Services;
 
 public interface IRemoteWebApiHandler
 {
-    Task<RemoteWebResponse> HandleAsync(string method, string path, string? query, string body, CancellationToken cancellationToken);
+    Task<RemoteWebResponse> HandleAsync(string method, string path, string? query, string body, string? authToken, CancellationToken cancellationToken);
 }
 
 public sealed record RemoteWebResponse(int StatusCode, string ContentType, string Body);
@@ -53,18 +55,51 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
         string path,
         string? query,
         string body,
+        string? authToken,
         CancellationToken cancellationToken)
     {
         try
         {
+            var remoteCfg = _settingsStore.Current.Remote;
+            if (!remoteCfg.Enabled)
+            {
+                if (method.Equals("GET", StringComparison.OrdinalIgnoreCase) &&
+                    (path == "/" || path.Equals("/index.html", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return new RemoteWebResponse(
+                        403,
+                        "text/html; charset=utf-8",
+                        "<!DOCTYPE html><html><body style='background:#0a0c10;color:#e2e8f0;font-family:sans-serif;padding:32px;text-align:center'><h2>Phone Remote Disabled</h2><p style='color:#94a3b8'>Enable Phone Remote in Denon Desktop → Cast &amp; Phone Remote to control this room.</p></body></html>");
+                }
+
+                return JsonError(403, "Phone Remote is currently disabled in Denon Desktop.");
+            }
+
             if (method.Equals("GET", StringComparison.OrdinalIgnoreCase) && (path == "/" || path.Equals("/index.html", StringComparison.OrdinalIgnoreCase)))
             {
                 return new RemoteWebResponse(200, "text/html; charset=utf-8", RemoteWebUiHtml.PageHtml);
             }
 
+            var effectiveToken = !string.IsNullOrWhiteSpace(authToken)
+                ? authToken.Trim()
+                : (ExtractQueryParam(query, "token") ?? ExtractQueryParam(query, "pair") ?? string.Empty).Trim();
+
+            var role = ResolveAccessRole(remoteCfg, effectiveToken);
+            if (role == "none")
+            {
+                return new RemoteWebResponse(
+                    401,
+                    "application/json; charset=utf-8",
+                    JsonSerializer.Serialize(new
+                    {
+                        error = "Pairing required. Scan the QR code in Denon Desktop or enter a valid pairing code.",
+                        pairingRequired = true,
+                    }, JsonOptions));
+            }
+
             if (method.Equals("GET", StringComparison.OrdinalIgnoreCase) && path.Equals("/api/status", StringComparison.OrdinalIgnoreCase))
             {
-                return JsonOk(BuildStatusPayload());
+                return JsonOk(BuildStatusPayload(role));
             }
 
             if (method.Equals("GET", StringComparison.OrdinalIgnoreCase) && path.Equals("/api/youtube/search", StringComparison.OrdinalIgnoreCase))
@@ -88,6 +123,12 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
                 return JsonError(404, "Endpoint not found.");
             }
 
+            var lowerPath = path.ToLowerInvariant();
+            if (role != "owner" && lowerPath != "/api/youtube/queue")
+            {
+                return JsonError(403, "Owner access required for this control. Guests can search and queue YouTube tracks.");
+            }
+
             using var doc = string.IsNullOrWhiteSpace(body)
                 ? JsonDocument.Parse("{}")
                 : JsonDocument.Parse(body);
@@ -96,11 +137,12 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
             _telemetry.MarkOrigin("avr", "phone_remote", "remote.api", new Dictionary<string, object?>
             {
                 ["path"] = path,
+                ["role"] = role,
             });
             _telemetry.MarkOrigin("tv", "phone_remote");
             _telemetry.MarkOrigin("lighting", "phone_remote");
 
-            switch (path.ToLowerInvariant())
+            switch (lowerPath)
             {
                 case "/api/power":
                     await _receiverController.TogglePowerAsync(cancellationToken);
@@ -268,7 +310,44 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
         }
     }
 
-    private object BuildStatusPayload()
+    private static string ResolveAccessRole(RemoteAccessSettings cfg, string candidateToken)
+    {
+        if (!cfg.RequirePairing)
+        {
+            return "owner";
+        }
+
+        if (string.IsNullOrWhiteSpace(candidateToken))
+        {
+            return "none";
+        }
+
+        if (SecureEquals(candidateToken, cfg.OwnerToken))
+        {
+            return "owner";
+        }
+
+        if (SecureEquals(candidateToken, cfg.GuestToken))
+        {
+            return "guest";
+        }
+
+        return "none";
+    }
+
+    private static bool SecureEquals(string a, string b)
+    {
+        if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b))
+        {
+            return false;
+        }
+
+        var ab = Encoding.UTF8.GetBytes(a);
+        var bb = Encoding.UTF8.GetBytes(b);
+        return ab.Length == bb.Length && CryptographicOperations.FixedTimeEquals(ab, bb);
+    }
+
+    private object BuildStatusPayload(string role)
     {
         var snapshot = _stateStore.Snapshot;
         var status = snapshot.Status;
@@ -276,48 +355,76 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
         var ytSnap = _youtubeQueueService.Snapshot;
         var localSnap = _localJukeboxService.Snapshot;
 
-        var isAwake = status is { IsPoweredOn: true, IsMainZoneOn: true };
-        var isPlaying = status is not null && string.Equals(status.PlayState, "play", StringComparison.OrdinalIgnoreCase);
+        var isAwake = snapshot.IsConnected && status is { IsPoweredOn: true, IsMainZoneOn: true };
+        var isPlaying = snapshot.IsConnected && status is not null && string.Equals(status.PlayState, "play", StringComparison.OrdinalIgnoreCase);
 
+        string connectionState;
         string title;
         string detail;
         string artwork = string.Empty;
 
-        if (!isAwake)
+        if (!snapshot.IsConnected && status is null)
         {
+            connectionState = string.IsNullOrWhiteSpace(snapshot.LastError) ? "connecting" : "receiver_unreachable";
+            title = connectionState == "connecting" ? "Connecting to Receiver..." : "Receiver Unreachable";
+            detail = !string.IsNullOrWhiteSpace(snapshot.LastError)
+                ? snapshot.LastError
+                : "Waiting for Denon Desktop to reach the receiver";
+        }
+        else if (!snapshot.IsConnected)
+        {
+            connectionState = "receiver_unreachable";
+            title = "Receiver Unreachable";
+            detail = !string.IsNullOrWhiteSpace(snapshot.LastError)
+                ? snapshot.LastError
+                : "Connection lost — showing last known state";
+        }
+        else if (!isAwake)
+        {
+            connectionState = "standby";
             title = "Receiver in Standby";
             detail = "Tap STANDBY or pick a Scene to wake";
         }
         else if (status is not null && !DenonCatalog.InputMatches(status.InputSource, "NET"))
         {
+            connectionState = "connected";
             title = DenonCatalog.GetFriendlyInputName(status.InputSource);
             detail = $"Sound Mode: {status.SoundMode}";
         }
         else if (ytSnap.IsActive && ytSnap.CurrentTrack is { } yt)
         {
+            connectionState = "connected";
             title = yt.Title;
             detail = $"{yt.Author} • YouTube • {yt.DurationDisplay}";
             artwork = yt.ThumbnailUrl;
         }
         else if (localSnap.IsActive && localSnap.CurrentTrack is { } loc)
         {
+            connectionState = "connected";
             title = loc.Title;
             detail = $"{loc.Artist} • Local {loc.CodecBadge}";
         }
         else if (status is not null)
         {
+            connectionState = "connected";
             title = string.IsNullOrWhiteSpace(status.NowPlaying.Song) ? "HEOS Stream" : status.NowPlaying.Song;
             detail = string.IsNullOrWhiteSpace(status.NowPlaying.Artist) ? "HEOS Network Audio" : status.NowPlaying.Artist;
             artwork = status.NowPlaying.ImageUrl;
         }
         else
         {
+            connectionState = "connecting";
             title = "Connecting...";
             detail = string.Empty;
         }
 
         return new
         {
+            role,
+            connectionState,
+            lastUpdatedUtc = (snapshot.LastSuccessfulRefresh ?? DateTimeOffset.UtcNow).ToString("O"),
+            lastError = snapshot.LastError,
+            isAvrControlAvailable = _receiverController.IsAvrProtocolAvailable,
             receiverName = status?.Player.Name ?? settings.PlayerName,
             isConnected = snapshot.IsConnected,
             isAwake,
@@ -343,7 +450,7 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
             {
                 alias = st.Alias,
                 displayName = st.DisplayName,
-                isPlaying = string.Equals(status?.ActiveStationAlias, st.Alias, StringComparison.OrdinalIgnoreCase),
+                isPlaying = isAwake && string.Equals(status?.ActiveStationAlias, st.Alias, StringComparison.OrdinalIgnoreCase),
             }),
             youtubeQueue = ytSnap.Queue.Select((t, idx) => new
             {
@@ -353,23 +460,25 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
                 durationDisplay = t.DurationDisplay,
                 isCurrent = ytSnap.IsActive && idx == ytSnap.CurrentIndex,
             }),
-            plugins = _pluginHost.GetPlugins().Select(static p => new
-            {
-                id = p.Id,
-                name = p.Name,
-                category = p.Category,
-                accentHex = p.AccentHex,
-                iconGlyph = p.IconGlyph,
-                isEnabled = p.IsEnabled,
-                health = p.Health.ToString(),
-                statusText = p.StatusText,
-                actions = p.Actions.Select(static a => new
+            plugins = role == "owner"
+                ? _pluginHost.GetPlugins().Select(static p => new
                 {
-                    actionId = a.ActionId,
-                    displayName = a.DisplayName,
-                    category = a.Category,
-                }),
-            }),
+                    id = p.Id,
+                    name = p.Name,
+                    category = p.Category,
+                    accentHex = p.AccentHex,
+                    iconGlyph = p.IconGlyph,
+                    isEnabled = p.IsEnabled,
+                    health = p.Health.ToString(),
+                    statusText = p.StatusText,
+                    actions = p.Actions.Select(static a => new
+                    {
+                        actionId = a.ActionId,
+                        displayName = a.DisplayName,
+                        category = a.Category,
+                    }),
+                }).ToArray()
+                : Array.Empty<object>(),
         };
     }
 

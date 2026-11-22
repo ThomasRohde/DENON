@@ -80,24 +80,31 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
         _viewModel.SyncFromConfig(_config);
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken = default)
+    public Task StartAsync(CancellationToken cancellationToken = default)
     {
         _isStarted = true;
         if (_config.DemoMode || IsConfigured)
         {
-            try
+            _context?.ReportStatus("Connecting to Home Assistant...", PluginHealthState.Idle);
+            _ = Task.Run(async () =>
             {
-                await FetchEntitiesAsync(cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _context?.ReportStatus($"HA unreachable: {ex.Message}", PluginHealthState.Warning);
-            }
+                try
+                {
+                    using var initCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    await FetchEntitiesAsync(initCts.Token);
+                }
+                catch (Exception ex)
+                {
+                    _context?.ReportStatus($"HA unreachable: {ex.Message}", PluginHealthState.Warning);
+                }
+            });
         }
         else
         {
             _context?.ReportStatus("Enter Home Assistant URL & Long-Lived Token (or Demo Mode)", PluginHealthState.Idle);
         }
+
+        return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken = default)

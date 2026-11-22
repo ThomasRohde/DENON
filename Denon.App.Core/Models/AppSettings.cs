@@ -14,6 +14,8 @@ public sealed class AppSettings
 
     public McpServerSettings Mcp { get; set; } = new();
 
+    public RemoteAccessSettings Remote { get; set; } = new();
+
     public TelemetrySettings Telemetry { get; set; } = new();
 
     public List<AutomationRule> Automations { get; set; } = AutomationRule.CreateDefaults();
@@ -27,6 +29,7 @@ public sealed class AppSettings
             Shortcuts = Shortcuts.Clone(),
             Plugins = Plugins.Clone(),
             Mcp = Mcp.Clone(),
+            Remote = Remote.Clone(),
             Telemetry = Telemetry.Clone(),
             Automations = Automations.Select(static a => a.Clone()).ToList(),
         };
@@ -187,4 +190,30 @@ public sealed class TelemetrySettings
             StandbyProbeIntervalSeconds = StandbyProbeIntervalSeconds,
             MaxTotalSizeMb = MaxTotalSizeMb,
         };
+}
+
+public sealed class RemoteAccessSettings
+{
+    public bool Enabled { get; set; } = true;
+
+    public bool RequirePairing { get; set; } = true;
+
+    public string OwnerToken { get; set; } = string.Empty;
+
+    public string GuestToken { get; set; } = string.Empty;
+
+    public RemoteAccessSettings Clone() =>
+        new()
+        {
+            Enabled = Enabled,
+            RequirePairing = RequirePairing,
+            OwnerToken = OwnerToken,
+            GuestToken = GuestToken,
+        };
+
+    public static string GeneratePairingToken(string prefix = "own")
+    {
+        var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(12);
+        return $"{prefix}_{Convert.ToHexString(bytes).ToLowerInvariant()}";
+    }
 }

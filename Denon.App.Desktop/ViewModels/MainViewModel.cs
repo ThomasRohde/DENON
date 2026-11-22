@@ -39,6 +39,7 @@ public sealed partial class MainViewModel : ObservableObject
     private CancellationTokenSource? _volumeDebounceCts;
     private bool _isDraggingVolume;
     private bool _suppressVolumeSend;
+    private bool _suppressNextSettingsReload;
 
     // Navigation
     private string _activeSection = "Control";
@@ -228,6 +229,7 @@ public sealed partial class MainViewModel : ObservableObject
             SettingsDisplayVolumeInDb = DisplayVolumeInDb;
             var updated = _settingsStore.Current.Clone();
             updated.Ui.DisplayVolumeInDb = DisplayVolumeInDb;
+            _suppressNextSettingsReload = true;
             _ = _settingsStore.SaveAsync(updated);
         });
 
@@ -305,7 +307,16 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         _stateStore.StateChanged += snapshot => _ = _dispatcher.InvokeAsync(() => ApplyStateSnapshot(snapshot));
-        _settingsStore.SettingsChanged += settings => _ = _dispatcher.InvokeAsync(() => LoadSettings(settings));
+        _settingsStore.SettingsChanged += settings => _ = _dispatcher.InvokeAsync(() =>
+        {
+            if (_suppressNextSettingsReload)
+            {
+                _suppressNextSettingsReload = false;
+                return;
+            }
+
+            LoadSettings(settings);
+        });
         _telemetryLog.StatsChanged += () => _ = _dispatcher.InvokeAsync(RefreshTelemetryStats);
         RefreshTelemetryStats();
         _logStore.EntryAdded += entry => _ = _dispatcher.InvokeAsync(() =>

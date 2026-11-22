@@ -123,7 +123,148 @@ public partial class YouTubeCinemaWindow : Window
                     background: #000 !important;
                     z-index: 2147483645 !important;
                 }
+                #denon-cinema-hud {
+                    position: fixed !important;
+                    top: 14px !important;
+                    right: 16px !important;
+                    z-index: 2147483647 !important;
+                    display: none;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 6px 8px;
+                    border-radius: 10px;
+                    background: rgba(13, 16, 23, 0.86);
+                    border: 1px solid rgba(56, 189, 248, 0.35);
+                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+                    backdrop-filter: blur(8px);
+                    opacity: 0;
+                    transition: opacity 0.22s ease;
+                    pointer-events: auto !important;
+                    font-family: "Segoe UI", system-ui, sans-serif;
+                }
+                #denon-cinema-hud.active {
+                    display: flex !important;
+                }
+                #denon-cinema-hud.visible {
+                    opacity: 1 !important;
+                }
+                #denon-cinema-hud button {
+                    appearance: none;
+                    border: 1px solid rgba(148, 163, 184, 0.28);
+                    background: rgba(30, 41, 59, 0.85);
+                    color: #e2e8f0;
+                    font-size: 12px;
+                    font-weight: 600;
+                    padding: 5px 10px;
+                    border-radius: 7px;
+                    cursor: pointer;
+                    line-height: 1.2;
+                }
+                #denon-cinema-hud button:hover {
+                    background: rgba(51, 65, 85, 0.95);
+                    border-color: rgba(56, 189, 248, 0.65);
+                    color: #ffffff;
+                }
+                #denon-cinema-hud button.denon-hud-close {
+                    background: rgba(127, 29, 29, 0.85);
+                    border-color: rgba(239, 68, 68, 0.55);
+                    color: #fecaca;
+                    padding: 5px 11px;
+                }
+                #denon-cinema-hud button.denon-hud-close:hover {
+                    background: #dc2626;
+                    border-color: #f87171;
+                    color: #ffffff;
+                }
             `;
+
+            const ensureFloatingHud = () => {
+                const targetParent = document.fullscreenElement || document.documentElement || document.body;
+                if (!targetParent) return null;
+                let hud = document.getElementById('denon-cinema-hud');
+                if (!hud) {
+                    hud = document.createElement('div');
+                    hud.id = 'denon-cinema-hud';
+
+                    const showBtn = document.createElement('button');
+                    showBtn.type = 'button';
+                    showBtn.textContent = 'Show Bars (H)';
+                    showBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        window.chrome?.webview?.postMessage('SHOW_BARS');
+                    });
+
+                    const fsBtn = document.createElement('button');
+                    fsBtn.type = 'button';
+                    fsBtn.textContent = 'Fullscreen (F11)';
+                    fsBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        window.chrome?.webview?.postMessage('F11');
+                    });
+
+                    const closeBtn = document.createElement('button');
+                    closeBtn.type = 'button';
+                    closeBtn.className = 'denon-hud-close';
+                    closeBtn.title = 'Close Cinema Window';
+                    closeBtn.textContent = '✕ Close';
+                    closeBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        window.chrome?.webview?.postMessage('CLOSE_WINDOW');
+                    });
+
+                    hud.appendChild(showBtn);
+                    hud.appendChild(fsBtn);
+                    hud.appendChild(closeBtn);
+
+                    hud.addEventListener('mouseenter', () => {
+                        window.__denonHudHovered = true;
+                        if (window.__denonHudTimer) clearTimeout(window.__denonHudTimer);
+                        hud.classList.add('visible');
+                    });
+                    hud.addEventListener('mouseleave', () => {
+                        window.__denonHudHovered = false;
+                        window.__denonFlashHud?.(1600);
+                    });
+                }
+
+                if (hud.parentElement !== targetParent) {
+                    targetParent.appendChild(hud);
+                }
+
+                if (window.__denonBarsHidden) {
+                    hud.classList.add('active');
+                }
+                return hud;
+            };
+
+            window.__denonFlashHud = (ms = 2400) => {
+                if (!window.__denonBarsHidden) return;
+                const hud = ensureFloatingHud();
+                if (!hud) return;
+                hud.classList.add('active', 'visible');
+                if (window.__denonHudTimer) clearTimeout(window.__denonHudTimer);
+                window.__denonHudTimer = setTimeout(() => {
+                    if (!window.__denonHudHovered) {
+                        hud.classList.remove('visible');
+                    }
+                }, ms);
+            };
+
+            window.__denonSetBarsHidden = (hidden) => {
+                window.__denonBarsHidden = !!hidden;
+                const hud = ensureFloatingHud();
+                if (!hud) return;
+                if (window.__denonBarsHidden) {
+                    hud.classList.add('active');
+                    window.__denonFlashHud(3500);
+                } else {
+                    if (window.__denonHudTimer) clearTimeout(window.__denonHudTimer);
+                    hud.classList.remove('active', 'visible');
+                }
+            };
 
             const injectStyle = () => {
                 const host = document.head || document.documentElement;
@@ -162,6 +303,7 @@ public partial class YouTubeCinemaWindow : Window
 
             injectStyle();
             dismissOverlays();
+            ensureFloatingHud();
 
             if (!window.__denonCinemaKeyHooked) {
                 window.__denonCinemaKeyHooked = true;
@@ -174,6 +316,17 @@ public partial class YouTubeCinemaWindow : Window
                         }
                     }
                 }, true);
+                window.addEventListener('mousemove', () => {
+                    if (window.__denonBarsHidden) {
+                        window.__denonFlashHud?.(2400);
+                    }
+                }, { passive: true });
+                document.addEventListener('fullscreenchange', () => {
+                    ensureFloatingHud();
+                    if (window.__denonBarsHidden && !document.fullscreenElement) {
+                        window.chrome?.webview?.postMessage('SHOW_BARS');
+                    }
+                });
             }
 
             if (!window.__denonCinemaObserverInstalled) {
@@ -186,6 +339,7 @@ public partial class YouTubeCinemaWindow : Window
                     const observer = new MutationObserver(() => {
                         injectStyle();
                         dismissOverlays();
+                        ensureFloatingHud();
                     });
                     observer.observe(document.documentElement, { childList: true, subtree: true });
                 };
@@ -383,6 +537,7 @@ public partial class YouTubeCinemaWindow : Window
         try
         {
             await VideoWebView.ExecuteScriptAsync(PureVideoModeScript);
+            await VideoWebView.ExecuteScriptAsync($"window.__denonSetBarsHidden?.({(_barsHidden ? "true" : "false")});");
         }
         catch
         {
@@ -627,6 +782,12 @@ public partial class YouTubeCinemaWindow : Window
             case "H":
                 SetBarsHidden(!_barsHidden);
                 break;
+            case "SHOW_BARS":
+                SetBarsHidden(false);
+                break;
+            case "CLOSE_WINDOW":
+                HideAndStopVideo();
+                break;
             case "ESCAPE":
                 if (_barsHidden)
                 {
@@ -698,7 +859,17 @@ public partial class YouTubeCinemaWindow : Window
         TitleBarBorder.Visibility = hidden ? Visibility.Collapsed : Visibility.Visible;
         TitleBarRow.Height = hidden ? new GridLength(0) : new GridLength(42);
         BottomSyncBar.Visibility = hidden ? Visibility.Collapsed : Visibility.Visible;
+        CinemaWindowChrome.CaptionHeight = (hidden || _isFullscreen) ? 0 : 42;
         HideBarsButton.Content = hidden ? "Show Bars (H)" : "Hide Bars (H)";
+
+        if (_isInitialized && VideoWebView.CoreWebView2 is not null)
+        {
+            _ = VideoWebView.ExecuteScriptAsync($"window.__denonSetBarsHidden?.({(hidden ? "true" : "false")});");
+            if (hidden)
+            {
+                VideoWebView.Focus();
+            }
+        }
     }
 
     private void ToggleFullscreen_Click(object sender, RoutedEventArgs e) => SetFullscreen(!_isFullscreen);

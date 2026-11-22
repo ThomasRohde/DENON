@@ -40,6 +40,9 @@ public static class ShortcutActionIds
     public const string AppVolumeUp = "app.volume_up";
     public const string AppVolumeDown = "app.volume_down";
     public const string AppRefresh = "app.refresh";
+
+    public const string ScenePrefix = "scene:";
+    public const string PluginPrefix = "plugin:";
 }
 
 public sealed class ShortcutSettings

@@ -344,10 +344,11 @@ public sealed class PluginHostService : IAsyncDisposable
         await BroadcastReceiverEventAsync(evt, cancellationToken, skipPluginIds: explicitlyHandledPlugins);
     }
 
-    public async Task ExecuteActionChainAsync(
+    public async Task<IReadOnlyList<(ScenePluginActionStep Step, PluginActionResult Result)>> ExecuteActionChainAsync(
         IEnumerable<ScenePluginActionStep> steps,
         CancellationToken cancellationToken = default)
     {
+        var outcomes = new List<(ScenePluginActionStep Step, PluginActionResult Result)>();
         foreach (var step in steps)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -362,9 +363,12 @@ public sealed class PluginHostService : IAsyncDisposable
 
             if (!string.IsNullOrWhiteSpace(step.PluginId) && !string.IsNullOrWhiteSpace(step.ActionId))
             {
-                await ExecuteActionAsync(step.PluginId, step.ActionId, step.Parameters, cancellationToken);
+                var res = await ExecuteActionAsync(step.PluginId, step.ActionId, step.Parameters, cancellationToken);
+                outcomes.Add((step, res));
             }
         }
+
+        return outcomes;
     }
 
     public async Task StopAllAsync(CancellationToken cancellationToken = default)

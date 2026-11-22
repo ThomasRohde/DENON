@@ -2729,24 +2729,31 @@
                                             </Border>
                                         </StackPanel>
 
-                                        <TextBlock Text="Scan from any phone on your Wi-Fi" FontSize="15" FontWeight="Bold" />
-                                        <TextBlock Text="Control volume, inputs, Smart Scenes, radio presets, and search/queue YouTube songs from the couch — zero app install."
+                                        <TextBlock Text="{Binding RemoteQrRoleCaption}" FontSize="14.5" FontWeight="Bold" />
+                                        <TextBlock Text="Scan to pair securely. Owner gets full room controls; Guest can search &amp; queue YouTube tracks only."
                                                    FontSize="11.5"
                                                    Foreground="{StaticResource TextSecondaryBrush}"
                                                    TextWrapping="Wrap"
                                                    Margin="0,4,0,8" />
 
-                                        <Border Background="#090D14" BorderBrush="#1F2C3D" BorderThickness="1" CornerRadius="7" Padding="9,6" Margin="0,0,0,10">
+                                        <Border Background="#090D14" BorderBrush="#1F2C3D" BorderThickness="1" CornerRadius="7" Padding="9,6" Margin="0,0,0,8">
                                             <TextBlock Text="{Binding RemoteWebUrl}"
-                                                       FontSize="12"
+                                                       FontSize="11.5"
                                                        FontWeight="Bold"
                                                        FontFamily="Cascadia Mono, Consolas"
                                                        Foreground="{StaticResource AccentCyanBrush}"
                                                        TextTrimming="CharacterEllipsis" />
                                         </Border>
 
+                                        <WrapPanel Margin="0,0,0,6">
+                                            <Button Content="Owner QR" Command="{Binding SetRemoteQrRoleCommand}" CommandParameter="owner" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="11" Margin="0,0,6,4" />
+                                            <Button Content="Guest QR" Command="{Binding SetRemoteQrRoleCommand}" CommandParameter="guest" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="11" Margin="0,0,6,4" />
+                                            <Button Content="{Binding PhoneRemoteToggleLabel}" Command="{Binding TogglePhoneRemoteEnabledCommand}" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="11" Margin="0,0,6,4" />
+                                            <Button Content="Revoke &amp; Rotate" Command="{Binding RotateRemoteTokensCommand}" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="11" Margin="0,0,0,4" />
+                                        </WrapPanel>
+
                                         <WrapPanel>
-                                            <Button Content="Copy URL" Command="{Binding CopyRemoteUrlCommand}" Style="{StaticResource PrimaryButton}" Padding="10,6" FontSize="11" Margin="0,0,6,0" />
+                                            <Button Content="Copy Paired URL" Command="{Binding CopyRemoteUrlCommand}" Style="{StaticResource PrimaryButton}" Padding="10,6" FontSize="11" Margin="0,0,6,0" />
                                             <Button Content="Open Browser" Command="{Binding OpenRemoteInBrowserCommand}" Style="{StaticResource SecondaryButton}" Padding="10,6" FontSize="11" Margin="0,0,6,0" />
                                             <Button Content="Allow Firewall" Command="{Binding AllowRelayFirewallCommand}" Style="{StaticResource SecondaryButton}" Padding="10,6" FontSize="11" />
                                         </WrapPanel>

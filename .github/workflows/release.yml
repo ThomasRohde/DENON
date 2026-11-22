@@ -21,6 +21,10 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Run automated tests
+        shell: pwsh
+        run: dotnet test .\DenonDesktop.slnx -c Release --verbosity normal
+
       - name: Publish single-file win-x64 executable
         shell: pwsh
         run: |
@@ -54,7 +58,13 @@ jobs:
           }
 
           $tag = "${{ github.ref_name }}"
-          $version = if ($tag -match '^v(\d+\.\d+\.\d+)') { $Matches[1] } else { '1.4.0' }
+          if ($tag -match '^v(\d+\.\d+\.\d+)') {
+            $version = $Matches[1]
+          } else {
+            [xml]$csproj = Get-Content .\Denon.App.Desktop\Denon.App.Desktop.csproj
+            $version = ($csproj.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1).Trim()
+            if (-not $version) { $version = '1.0.0' }
+          }
           $outDir = (Resolve-Path .\release-out).Path
           $srcExe = Join-Path $outDir 'Denon.App.Desktop-win-x64.exe'
 

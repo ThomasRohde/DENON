@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Denon.App.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Denon.App.Core\Denon.App.Core.csproj" />
     <ProjectReference Include="..\Denon.App.PluginSdk\Denon.App.PluginSdk.csproj" />
     <ProjectReference Include="..\Denon.Plugin.PhilipsHue\Denon.Plugin.PhilipsHue.csproj" />
@@ -11,7 +15,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
-    <Version>1.12.0</Version>
+    <Version>1.13.0</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>

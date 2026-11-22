@@ -181,6 +181,11 @@ public partial class MainWindow : Window
         }
 
         var isTyping = Keyboard.FocusedElement is TextBox or PasswordBox;
+        var isInteractiveControl = Keyboard.FocusedElement is System.Windows.Controls.Primitives.ButtonBase
+            or System.Windows.Controls.Primitives.Selector
+            or System.Windows.Controls.Slider
+            or System.Windows.Controls.ComboBox
+            or System.Windows.Controls.MenuItem;
         var ctrl = modifiers.HasFlag(ModifierKeys.Control);
 
         // F1 anywhere opens context-aware Help & Guide for the current section or active plugin
@@ -246,6 +251,12 @@ public partial class MainWindow : Window
         }
 
         if (isTyping && modifiers == ModifierKeys.None && actualKey is not (>= Key.F1 and <= Key.F24))
+        {
+            return;
+        }
+
+        // Let focused buttons, checkboxes, sliders and menus handle Space/Enter natively instead of hijacking Play/Pause!
+        if (isInteractiveControl && modifiers == ModifierKeys.None && actualKey is Key.Space or Key.Enter)
         {
             return;
         }

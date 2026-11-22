@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-11-22
+
+### Added
+- **Phone Remote Pairing, Roles & Access Controls**:
+  - Added switchable Phone Remote access (`Remote: ON / OFF` toggle — media fetches to Denon AVR stay online even when phone control is off), separate **Owner QR** (full room control) and **Guest QR** (Party Jukebox YouTube search & queue only), secure token pairing (`?pair=<token>` / `X-Denon-Token`), and instant **Revoke & Rotate** without interrupting active streams.
+- **Automated Test Suite (`Denon.App.Core.Tests`) & CI Test Gate**:
+  - Added xUnit project covering settings recovery/empty libraries/custom shortcuts/secret redaction, HTTP range & split-UTF-8 body parsing, PC Audio Cast 16/24/float/6-ch PCM conversion, Phone Remote pairing/roles/revocation, Radio Browser FLAC/256k+ union filtering, and Room Undo / telemetry origin attribution — wired into `.github/workflows/release.yml`.
+
+### Fixed
+- **Automatic Queue Transitions & Failed Track Starts**:
+  - Fixed self-cancelling delay token bug in `YouTubeQueueService` and `LocalMediaJukeboxService` auto-advance transitions (`PlayNextAsync` now uses an independent cancellation lifetime after the drain delay), added rollback of active index/history if relay registration or cast fails, added clean end-of-queue completion for local files, and allowed valid short local clips (`> 0` bytes) to complete naturally.
+- **YouTube Playback Cutting Off Early Mid-Song**:
+  - `LocalAudioRelayServer.StreamTranscodedMp3Async` bursts the first 6 seconds (240 KB) immediately for instant HEOS playback start and then paces streaming gently at ~1.03× real-time (`41.2 KB/s`) with `-err_detect ignore_err`, preventing Denon HEOS from over-buffering 60+ seconds ahead.
+  - `YouTubeQueueService.OnRelayTrackStreamCompleted` and `LocalMediaJukeboxService` wait for HEOS to naturally drain its internal audio buffer (`playState == "stop"` / remaining `track.Duration`) before advancing or stopping.
+- **Quiet Scene & Room Undo Safe Volume Ordering**:
+  - `ReceiverController.ApplySceneAsync`, `RoomIntelligenceService.RestoreLastSnapshotAsync`, and `DenonMcpHttpServer.ExecuteApplyAtmosphereAsync` now establish target volume **before** switching inputs or releasing mute so a muted receiver at high volume never briefly blasts when activating a quiet scene or undoing.
+  - `RoomIntelligenceService` now refuses to synthesize assumed Undo snapshots when disconnected, retains snapshots on failed restore for retry, and enforces `MaxSafeVolume` on MCP Undo.
+- **HEOS-Only Speaker Fallback**:
+  - `ReceiverController` now tracks AVR port 23 availability independently (`IsAvrProtocolAvailable`) and degrades gracefully to HEOS-only status, volume, mute, transport, and streaming when port 23 is unavailable (automatically restoring full AVR controls when port 23 recovers).
+- **PC Audio Cast Format Fidelity & Cleanup**:
+  - `PcAudioCastService` now accurately converts 16-bit, 24-bit, 32-bit int, 32-bit float, and multichannel WASAPI loopback audio to stereo 16-bit PCM WAV (and passes the exact `f32le`/`s24le`/`s32le`/`s16le` format to FFmpeg MP3), paces silence keepalive 1:1 to real time (100 ms per 100 ms idle), and cancels the silence producer before awaiting on disconnect.
+- **Settings Safety, Custom Shortcuts, Empty Libraries & Secret Redaction**:
+  - `AppSettingsStore` preserves corrupt `settings.json` files (`.corrupt-*`), keeps a last-good `.bak` backup, publishes in-memory state only after atomic disk replacement succeeds, preserves custom `scene:*` / `plugin:*` shortcuts, honors intentionally empty station/scene libraries, and redacts MCP/Remote tokens on JSON export (restoring local secrets on import).
+- **Phone Remote Web UI, Relay & Accessibility**:
+  - Replaced inline JSON click handlers in `RemoteWebUiHtml` with DOM event listeners so apostrophes/quotes/Unicode titles (`"Don't Stop"`, `"Björk"`) never break Play/Queue; preserved keyboard focus across 2.2s polls; serialized rapid volume taps without dropping steps; distinguished Connecting / Standby / Receiver Unreachable / Desktop Unreachable with Retry; enabled pinch-zoom and added ARIA labels/tablist semantics.
+  - Fixed `LocalAudioRelayServer` to decode UTF-8 HTTP request bodies once from raw bytes (preserving non-ASCII titles split across packets), implemented RFC suffix ranges (`bytes=-N`) + `416 Range Not Satisfiable`, prevented advertising nonzero `206` offsets on non-seekable streams, and pointed `Allow Firewall` at the actual bound port.
+- **Desktop UI, Cinema Viewer, Plugins, Telemetry & Packaging**:
+  - Added a translucent auto-hiding floating hover HUD (`Show Bars (H)` | `Fullscreen (F11)` | `✕ Close`) inside `YouTubeCinemaWindow` when bars are hidden, clearing `WindowChrome.CaptionHeight` so top-right clicks work cleanly.
+  - Prevented quick UI/remote preference toggles from wiping unsaved Settings/Stations/Scenes edits; prevented `Space`/`Enter` from hijacking focused buttons/checkboxes; raised muted/secondary text contrast to ≥ 4.5:1 WCAG AA; ran local folder drops off the UI thread with `IgnoreInaccessible` and added/duplicate/skipped reporting; updated spectrum analyzer labels (`PC LOOPBACK FFT` / `SIMULATED (VOL)`); guarded Lyrics fetches against stale out-of-order responses and paused playback.
+  - Made Hue & Home Assistant startup syncs non-blocking with 5s timeouts; retained Hue Entertainment stop identifiers before DTLS handshake so failed handshakes always release the bridge area; masked Home Assistant token with a `PasswordBox`; preserved distinct parameterized plugin steps and surfaced per-step failures in Automation; fixed Radio Browser `FLAC / 256k+` union filter; switched event telemetry files to daily granularity (`yyyy-MM-dd`) for exact day-based retention; passed `--minimized` in installer autostart and derived branch installer version from `Denon.App.Desktop.csproj`.
+
 ## [1.12.0] - 2026-11-22
 
 ### Added

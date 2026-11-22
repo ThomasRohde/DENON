@@ -35,12 +35,13 @@ public sealed class RadioBrowserService
         int limit = 30,
         CancellationToken cancellationToken = default)
     {
+        var fetchLimit = hiResOnly ? Math.Clamp(limit * 3, 30, 120) : Math.Clamp(limit, 5, 60);
         var queryParams = new List<string>
         {
             "hidebroken=true",
             "order=votes",
             "reverse=true",
-            $"limit={Math.Clamp(limit, 5, 60)}",
+            $"limit={fetchLimit}",
         };
 
         if (!string.IsNullOrWhiteSpace(nameQuery))
@@ -56,11 +57,6 @@ public sealed class RadioBrowserService
         if (!string.IsNullOrWhiteSpace(country))
         {
             queryParams.Add($"country={Uri.EscapeDataString(country.Trim())}");
-        }
-
-        if (hiResOnly)
-        {
-            queryParams.Add("bitrateMin=256");
         }
 
         var path = $"/json/stations/search?{string.Join('&', queryParams)}";
@@ -104,11 +100,7 @@ public sealed class RadioBrowserService
 
                 if (hiResOnly)
                 {
-                    results = results
-                        .OrderByDescending(static s => s.Codec.Equals("FLAC", StringComparison.OrdinalIgnoreCase))
-                        .ThenByDescending(static s => s.Bitrate)
-                        .ThenByDescending(static s => s.Votes)
-                        .ToList();
+                    results = FilterAndSortHiRes(results, limit);
                 }
 
                 return results;
@@ -122,6 +114,21 @@ public sealed class RadioBrowserService
         _logStore.Warning($"Radio Browser lookup failed across mirrors: {lastError?.Message}");
         throw new InvalidOperationException($"Radio Browser API unreachable: {lastError?.Message}", lastError);
     }
+
+    /// <summary>
+    /// Honors the exact "FLAC / 256k+" union: includes FLAC streams even when their reported bitrate is 0/unknown.
+    /// </summary>
+    internal static List<RadioBrowserStation> FilterAndSortHiRes(IEnumerable<RadioBrowserStation> stations, int limit) =>
+        stations
+            .Where(static s => IsHiResStation(s.Codec, s.Bitrate))
+            .OrderByDescending(static s => s.Codec.Equals("FLAC", StringComparison.OrdinalIgnoreCase))
+            .ThenByDescending(static s => s.Bitrate)
+            .ThenByDescending(static s => s.Votes)
+            .Take(Math.Clamp(limit, 5, 60))
+            .ToList();
+
+    internal static bool IsHiResStation(string? codec, int bitrate) =>
+        string.Equals(codec?.Trim(), "FLAC", StringComparison.OrdinalIgnoreCase) || bitrate >= 256;
 
     private sealed class RadioBrowserDto
     {

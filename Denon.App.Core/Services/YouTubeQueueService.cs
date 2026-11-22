@@ -429,6 +429,9 @@ public sealed class YouTubeQueueService : IDisposable
         CancelPendingAutoAdvance();
 
         YouTubeTrackItem track;
+        int prevIndex;
+        bool prevActive;
+        string? prevToken;
         lock (_sync)
         {
             if (index < 0 || index >= _queue.Count)
@@ -436,9 +439,48 @@ public sealed class YouTubeQueueService : IDisposable
                 return;
             }
 
-            _currentIndex = index;
-            _isActive = true;
+            prevIndex = _currentIndex;
+            prevActive = _isActive;
+            prevToken = _activeRelayToken;
             track = _queue[index];
+        }
+
+        string relayUrl;
+        string token;
+        try
+        {
+            relayUrl = await _relayServer.RegisterTrackAsync(track, cancellationToken);
+            token = ExtractTokenFromUrl(relayUrl) ?? string.Empty;
+
+            lock (_sync)
+            {
+                _activeRelayToken = token;
+                _clockAccumulated = TimeSpan.Zero;
+                _clockRunningSinceUtc = null;
+                _clockPaused = false;
+            }
+
+            await _receiverController.PlayRelayStreamAsync(relayUrl, track.Title, useLowVolume, unmute, cancellationToken);
+        }
+        catch
+        {
+            // Roll back pending state if relay registration or receiver cast failed so UI & history remain truthful.
+            lock (_sync)
+            {
+                _currentIndex = prevIndex;
+                _isActive = prevActive;
+                _activeRelayToken = prevToken;
+            }
+
+            NotifyChanged();
+            throw;
+        }
+
+        lock (_sync)
+        {
+            var confirmedIdx = _queue.FindIndex(t => string.Equals(t.EntryId, track.EntryId, StringComparison.Ordinal));
+            _currentIndex = confirmedIdx >= 0 ? confirmedIdx : Math.Clamp(index, 0, Math.Max(0, _queue.Count - 1));
+            _isActive = _queue.Count > 0;
 
             _history.RemoveAll(t => string.Equals(t.VideoId, track.VideoId, StringComparison.Ordinal));
             _history.Insert(0, track);
@@ -446,24 +488,7 @@ public sealed class YouTubeQueueService : IDisposable
             {
                 _history.RemoveAt(_history.Count - 1);
             }
-        }
 
-        NotifyChanged();
-
-        var relayUrl = await _relayServer.RegisterTrackAsync(track, cancellationToken);
-        var token = ExtractTokenFromUrl(relayUrl);
-        lock (_sync)
-        {
-            _activeRelayToken = token;
-            _clockAccumulated = TimeSpan.Zero;
-            _clockRunningSinceUtc = null;
-            _clockPaused = false;
-        }
-
-        await _receiverController.PlayRelayStreamAsync(relayUrl, track.Title, useLowVolume, unmute, cancellationToken);
-
-        lock (_sync)
-        {
             // Fallback start time if HEOS hasn't crossed the initial 16KB threshold yet
             if (string.Equals(_activeRelayToken, token, StringComparison.Ordinal) && _clockRunningSinceUtc is null)
             {
@@ -545,10 +570,47 @@ public sealed class YouTubeQueueService : IDisposable
         {
             try
             {
-                // Allow HEOS internal audio buffer (~2.5s) to finish playing the final audio frames
-                await Task.Delay(TimeSpan.FromSeconds(2.6), cts.Token);
+                // Wait for HEOS's internal audio buffer to finish draining before advancing or stopping.
+                // Never cut off a song early if HEOS buffered ahead of real-time!
+                var elapsedSec = GetEstimatedPlaybackPositionSeconds(heosBufferOffsetMs: 0);
+                var expectedDrainSec = track.Duration is { TotalSeconds: > 5 } dur
+                    ? Math.Clamp((dur.TotalSeconds - elapsedSec) + 3.5, 4.0, 90.0)
+                    : 6.0;
 
-                var advanced = await PlayNextAsync(cts.Token);
+                if (expectedDrainSec > 8.0)
+                {
+                    _logStore.Info($"Waiting up to {expectedDrainSec:0.0}s for Denon HEOS buffer to finish '{track.Title}'.");
+                }
+
+                var deadline = DateTimeOffset.UtcNow.AddSeconds(expectedDrainSec);
+                var minGraceEnd = DateTimeOffset.UtcNow.AddSeconds(2.5);
+                while (DateTimeOffset.UtcNow < deadline && !cts.Token.IsCancellationRequested)
+                {
+                    await Task.Delay(500, cts.Token);
+
+                    // Once past initial 2.5s grace, if HEOS itself transitions to 'stop' then its buffer is empty!
+                    if (DateTimeOffset.UtcNow >= minGraceEnd)
+                    {
+                        var playState = _stateStore.Snapshot.Status?.PlayState;
+                        if (string.Equals(playState, "stop", StringComparison.OrdinalIgnoreCase))
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                // Discard superseded completions before advancing
+                lock (_sync)
+                {
+                    if (cts.IsCancellationRequested || !_isActive || !string.Equals(_activeRelayToken, token, StringComparison.Ordinal))
+                    {
+                        return;
+                    }
+                }
+
+                // IMPORTANT: Use a fresh CancellationToken for the next track start so
+                // PlayAtIndexAsync's CancelPendingAutoAdvance() does NOT self-cancel the next playback!
+                var advanced = await PlayNextAsync(CancellationToken.None);
                 if (advanced)
                 {
                     _logStore.Info($"YouTube queue auto-advanced after '{track.Title}'.");
@@ -568,7 +630,11 @@ public sealed class YouTubeQueueService : IDisposable
                     NotifyChanged();
                     try
                     {
-                        await _receiverController.SetPlayStateAsync("stop", cts.Token);
+                        var playState = _stateStore.Snapshot.Status?.PlayState;
+                        if (!string.Equals(playState, "stop", StringComparison.OrdinalIgnoreCase))
+                        {
+                            await _receiverController.SetPlayStateAsync("stop", CancellationToken.None);
+                        }
                     }
                     catch
                     {

@@ -67,9 +67,15 @@ public sealed class HueEntertainmentStreamClient : IAsyncDisposable
             return false;
         }
 
+        // Retain stop identifiers IMMEDIATELY after Bridge activation so any DTLS handshake failure
+        // always sends the matching Stop request and never leaves the entertainment area locked active!
+        _activeBridgeIp = cleanHost;
+        _activeAppKey = config.ApplicationKey;
+        _activeAreaId = area.Id;
+
         try
         {
-            // 2. Connect UDP socket & perform DTLS 1.2 PSK handshake on port 2100
+            // 2. Connect UDP socket & perform DTLS 1.2 PSK handshake on port 2100 (bounded 10s timeout)
             var ip = IPAddress.Parse(cleanHost);
             var socket = new Socket(ip.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
             socket.Connect(new IPEndPoint(ip, HueEntertainmentUdpPort));
@@ -81,10 +87,10 @@ public sealed class HueEntertainmentStreamClient : IAsyncDisposable
                 pskSecret);
             var protocol = new DtlsClientProtocol();
 
-            _dtlsTransport = await Task.Run(() => protocol.Connect(dtlsClient, udpTransport), cancellationToken);
-            _activeBridgeIp = cleanHost;
-            _activeAppKey = config.ApplicationKey;
-            _activeAreaId = area.Id;
+            using var handshakeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            handshakeCts.CancelAfter(TimeSpan.FromSeconds(10));
+            _dtlsTransport = await Task.Run(() => protocol.Connect(dtlsClient, udpTransport), handshakeCts.Token)
+                .WaitAsync(handshakeCts.Token);
             _areaUuidAscii = Encoding.ASCII.GetBytes(area.Id.PadRight(36)[..36]);
             _channelCount = Math.Clamp(area.ChannelCount, 1, 20);
             _sequence = 0;

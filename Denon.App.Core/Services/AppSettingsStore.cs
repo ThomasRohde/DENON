@@ -6,6 +6,8 @@ namespace Denon.App.Core.Services;
 
 public sealed class AppSettingsStore
 {
+    public const string RedactedSecretPlaceholder = "REDACTED";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -14,26 +16,40 @@ public sealed class AppSettingsStore
 
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly AppLogStore _logStore;
+    private readonly string _settingsFilePath;
     private AppSettings _current = AppSettings.CreateDefault();
 
     public AppSettingsStore(AppLogStore logStore)
+        : this(logStore, AppDataPaths.SettingsFilePath)
+    {
+    }
+
+    public AppSettingsStore(AppLogStore logStore, string settingsFilePath)
     {
         _logStore = logStore;
-        AppDataPaths.EnsureCreated();
+        _settingsFilePath = settingsFilePath;
+        var dir = Path.GetDirectoryName(_settingsFilePath);
+        if (!string.IsNullOrWhiteSpace(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
     }
 
     public event Action<AppSettings>? SettingsChanged;
 
     public AppSettings Current => _current.Clone();
 
+    public string? LastLoadWarning { get; private set; }
+
     public async Task<AppSettings> InitializeAsync(CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            if (!File.Exists(AppDataPaths.SettingsFilePath))
+            LastLoadWarning = null;
+            if (!File.Exists(_settingsFilePath))
             {
-                _current = Normalize(AppSettings.CreateDefault());
+                _current = Normalize(AppSettings.CreateDefault(), seedDefaultsIfEmpty: true);
                 await SaveInternalAsync(_current, cancellationToken);
                 _logStore.Info("Created default settings file.");
             }
@@ -44,7 +60,7 @@ public sealed class AppSettingsStore
                 if (needsPersist)
                 {
                     await SaveInternalAsync(_current, cancellationToken);
-                    _logStore.Info("Persisted newly initialized settings (including MCP Bearer token) to disk.");
+                    _logStore.Info("Persisted newly initialized security tokens to settings file.");
                 }
             }
         }
@@ -58,12 +74,14 @@ public sealed class AppSettingsStore
 
     public async Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
-        var normalized = Normalize(settings);
+        var normalized = Normalize(settings, seedDefaultsIfEmpty: false);
         await _gate.WaitAsync(cancellationToken);
         try
         {
+            // Persist to disk FIRST; only publish in-memory state if replacement succeeds.
+            await SaveInternalAsync(normalized, cancellationToken);
             _current = normalized;
-            await SaveInternalAsync(_current, cancellationToken);
+            LastLoadWarning = null;
         }
         finally
         {
@@ -74,12 +92,38 @@ public sealed class AppSettingsStore
         SettingsChanged?.Invoke(_current.Clone());
     }
 
-    public string ExportJson() => JsonSerializer.Serialize(_current, JsonOptions);
+    public string ExportJson()
+    {
+        var sanitized = _current.Clone();
+        sanitized.Mcp.BearerToken = RedactedSecretPlaceholder;
+        sanitized.Remote.OwnerToken = RedactedSecretPlaceholder;
+        sanitized.Remote.GuestToken = RedactedSecretPlaceholder;
+        return JsonSerializer.Serialize(sanitized, JsonOptions);
+    }
 
     public async Task<AppSettings> ImportJsonAsync(string json, CancellationToken cancellationToken = default)
     {
         var parsed = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions)
             ?? throw new InvalidOperationException("Imported JSON did not contain valid settings.");
+
+        // Preserve existing local secrets if the imported export redacted them.
+        var existing = _current;
+        parsed.Mcp ??= new McpServerSettings();
+        if (IsRedactedOrEmpty(parsed.Mcp.BearerToken))
+        {
+            parsed.Mcp.BearerToken = existing.Mcp.BearerToken;
+        }
+
+        parsed.Remote ??= new RemoteAccessSettings();
+        if (IsRedactedOrEmpty(parsed.Remote.OwnerToken))
+        {
+            parsed.Remote.OwnerToken = existing.Remote.OwnerToken;
+        }
+
+        if (IsRedactedOrEmpty(parsed.Remote.GuestToken))
+        {
+            parsed.Remote.GuestToken = existing.Remote.GuestToken;
+        }
 
         await SaveAsync(parsed, cancellationToken);
         return _current.Clone();
@@ -89,49 +133,133 @@ public sealed class AppSettingsStore
     {
         try
         {
-            var rawJson = await File.ReadAllTextAsync(AppDataPaths.SettingsFilePath, cancellationToken);
+            var rawJson = await File.ReadAllTextAsync(_settingsFilePath, cancellationToken);
             var hasPersistedMcpToken = rawJson.Contains("\"bearerToken\"", StringComparison.OrdinalIgnoreCase);
+            var hasPersistedRemoteTokens = rawJson.Contains("\"ownerToken\"", StringComparison.OrdinalIgnoreCase) &&
+                                           rawJson.Contains("\"guestToken\"", StringComparison.OrdinalIgnoreCase);
             var settings = JsonSerializer.Deserialize<AppSettings>(rawJson, JsonOptions);
-            return (Normalize(settings ?? AppSettings.CreateDefault()), !hasPersistedMcpToken);
+            if (settings is null)
+            {
+                throw new JsonException("Settings file deserialized to null.");
+            }
+
+            var normalized = Normalize(settings, seedDefaultsIfEmpty: false);
+            return (normalized, !hasPersistedMcpToken || !hasPersistedRemoteTokens);
         }
         catch (Exception exception)
         {
-            _logStore.Warning($"Failed to parse settings. Falling back to defaults. {exception.Message}");
-            return (Normalize(AppSettings.CreateDefault()), true);
-        }
-    }
+            // Never overwrite a corrupt or transiently unreadable settings file with defaults!
+            TryBackupCorruptFile();
 
-    private static async Task SaveInternalAsync(AppSettings settings, CancellationToken cancellationToken)
-    {
-        var tempPath = AppDataPaths.SettingsFilePath + ".tmp";
-        try
-        {
-            await using (var stream = File.Create(tempPath))
+            var backupPath = _settingsFilePath + ".bak";
+            if (File.Exists(backupPath))
             {
-                await JsonSerializer.SerializeAsync(stream, settings, JsonOptions, cancellationToken);
+                try
+                {
+                    var backupJson = await File.ReadAllTextAsync(backupPath, cancellationToken);
+                    var recovered = JsonSerializer.Deserialize<AppSettings>(backupJson, JsonOptions);
+                    if (recovered is not null)
+                    {
+                        LastLoadWarning = $"Could not read settings.json ({exception.Message}). Recovered last-good backup.";
+                        _logStore.Warning(LastLoadWarning);
+                        return (Normalize(recovered, seedDefaultsIfEmpty: false), false);
+                    }
+                }
+                catch
+                {
+                    // Fall through to in-memory defaults without overwriting disk.
+                }
             }
 
-            File.Move(tempPath, AppDataPaths.SettingsFilePath, overwrite: true);
-        }
-        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
-        {
-            try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
-            await using var stream = File.Create(AppDataPaths.SettingsFilePath);
-            await JsonSerializer.SerializeAsync(stream, settings, JsonOptions, cancellationToken);
+            LastLoadWarning = $"Could not read settings.json ({exception.Message}). Running with in-memory defaults; original file preserved.";
+            _logStore.Warning(LastLoadWarning);
+            return (Normalize(AppSettings.CreateDefault(), seedDefaultsIfEmpty: true), false);
         }
     }
 
-    public static AppSettings Normalize(AppSettings settings)
+    private void TryBackupCorruptFile()
+    {
+        try
+        {
+            if (File.Exists(_settingsFilePath))
+            {
+                var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+                var corruptCopy = $"{_settingsFilePath}.corrupt-{stamp}";
+                if (!File.Exists(corruptCopy))
+                {
+                    File.Copy(_settingsFilePath, corruptCopy, overwrite: false);
+                }
+            }
+        }
+        catch
+        {
+            // Best-effort backup only.
+        }
+    }
+
+    private async Task SaveInternalAsync(AppSettings settings, CancellationToken cancellationToken)
+    {
+        var dir = Path.GetDirectoryName(_settingsFilePath);
+        if (!string.IsNullOrWhiteSpace(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+
+        var tempPath = $"{_settingsFilePath}.{Guid.NewGuid():N}.tmp";
+        var backupPath = _settingsFilePath + ".bak";
+
+        try
+        {
+            await using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, useAsync: true))
+            {
+                await JsonSerializer.SerializeAsync(stream, settings, JsonOptions, cancellationToken);
+                await stream.FlushAsync(cancellationToken);
+            }
+
+            // Retain a last-good backup before atomically replacing settings.json.
+            if (File.Exists(_settingsFilePath))
+            {
+                try
+                {
+                    File.Copy(_settingsFilePath, backupPath, overwrite: true);
+                }
+                catch
+                {
+                    // Do not fail save if backup copy is briefly locked.
+                }
+            }
+
+            File.Move(tempPath, _settingsFilePath, overwrite: true);
+        }
+        catch
+        {
+            try
+            {
+                if (File.Exists(tempPath))
+                {
+                    File.Delete(tempPath);
+                }
+            }
+            catch
+            {
+            }
+
+            throw;
+        }
+    }
+
+    public static AppSettings Normalize(AppSettings settings, bool seedDefaultsIfEmpty = false)
     {
         var normalized = settings.Clone();
+        normalized.Receiver ??= new ReceiverSettings();
         normalized.Receiver.Host = NormalizeHost(normalized.Receiver.Host);
         normalized.Receiver.Port = NormalizePort(normalized.Receiver.Port);
         normalized.Receiver.PlayerName = normalized.Receiver.PlayerName?.Trim() ?? string.Empty;
         normalized.Receiver.DefaultLowVolume = Math.Clamp(normalized.Receiver.DefaultLowVolume, 0, 98);
         normalized.Receiver.PollIntervalSeconds = Math.Clamp(normalized.Receiver.PollIntervalSeconds, 2, 60);
         normalized.Receiver.VolumePresets = NormalizeVolumePresets(normalized.Receiver.VolumePresets);
-        normalized.Receiver.Stations = NormalizeStations(normalized.Receiver.Stations);
-        normalized.Receiver.Scenes = NormalizeScenes(normalized.Receiver.Scenes);
+        normalized.Receiver.Stations = NormalizeStations(normalized.Receiver.Stations, seedDefaultsIfEmpty);
+        normalized.Receiver.Scenes = NormalizeScenes(normalized.Receiver.Scenes, seedDefaultsIfEmpty);
         normalized.Media ??= new MediaRelaySettings();
         normalized.Media.RelayPort = normalized.Media.RelayPort is >= 1024 and <= 65535
             ? normalized.Media.RelayPort
@@ -143,9 +271,20 @@ public sealed class AppSettingsStore
         normalized.Mcp ??= new McpServerSettings();
         normalized.Mcp.Port = normalized.Mcp.Port is >= 1024 and <= 65535 ? normalized.Mcp.Port : 18926;
         normalized.Mcp.MaxSafeVolume = Math.Clamp(normalized.Mcp.MaxSafeVolume, 20, 95);
-        if (string.IsNullOrWhiteSpace(normalized.Mcp.BearerToken))
+        if (IsRedactedOrEmpty(normalized.Mcp.BearerToken))
         {
             normalized.Mcp.BearerToken = McpServerSettings.GenerateSecureToken();
+        }
+
+        normalized.Remote ??= new RemoteAccessSettings();
+        if (IsRedactedOrEmpty(normalized.Remote.OwnerToken))
+        {
+            normalized.Remote.OwnerToken = RemoteAccessSettings.GeneratePairingToken("own");
+        }
+
+        if (IsRedactedOrEmpty(normalized.Remote.GuestToken))
+        {
+            normalized.Remote.GuestToken = RemoteAccessSettings.GeneratePairingToken("gst");
         }
 
         normalized.Telemetry ??= new TelemetrySettings();
@@ -159,15 +298,22 @@ public sealed class AppSettingsStore
         return normalized;
     }
 
+    private static bool IsRedactedOrEmpty(string? token) =>
+        string.IsNullOrWhiteSpace(token) ||
+        string.Equals(token.Trim(), RedactedSecretPlaceholder, StringComparison.OrdinalIgnoreCase);
+
     private static List<ShortcutBinding> NormalizeShortcuts(IEnumerable<ShortcutBinding>? existing)
     {
-        var byId = (existing ?? [])
+        var savedList = (existing ?? [])
             .Where(static b => !string.IsNullOrWhiteSpace(b.ActionId))
-            .GroupBy(static b => b.ActionId, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(static g => g.Key, static g => g.First(), StringComparer.OrdinalIgnoreCase);
+            .GroupBy(static b => b.ActionId.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(static g => g.First())
+            .ToList();
 
+        var byId = savedList.ToDictionary(static b => b.ActionId.Trim(), StringComparer.OrdinalIgnoreCase);
         var defaults = ShortcutSettings.CreateDefaults();
-        var result = new List<ShortcutBinding>(defaults.Count);
+        var defaultIds = new HashSet<string>(defaults.Select(static d => d.ActionId), StringComparer.OrdinalIgnoreCase);
+        var result = new List<ShortcutBinding>(defaults.Count + 4);
 
         foreach (var def in defaults)
         {
@@ -181,15 +327,37 @@ public sealed class AppSettingsStore
             }
         }
 
+        // Preserve validated dynamic custom scene & plugin shortcuts alongside built-in defaults!
+        foreach (var custom in savedList)
+        {
+            var id = custom.ActionId.Trim();
+            if (defaultIds.Contains(id))
+            {
+                continue;
+            }
+
+            if (id.StartsWith(ShortcutActionIds.ScenePrefix, StringComparison.OrdinalIgnoreCase) ||
+                id.StartsWith(ShortcutActionIds.PluginPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                var label = string.IsNullOrWhiteSpace(custom.Label) ? id : custom.Label.Trim();
+                result.Add(new ShortcutBinding(id, label, custom.IsGlobal, custom.Gesture?.Trim() ?? string.Empty));
+            }
+        }
+
         return result;
     }
 
-    private static List<ScenePreset> NormalizeScenes(IEnumerable<ScenePreset>? scenes)
+    private static List<ScenePreset> NormalizeScenes(IEnumerable<ScenePreset>? scenes, bool seedDefaultsIfEmpty)
     {
+        if (scenes is null)
+        {
+            return seedDefaultsIfEmpty ? ScenePreset.CreateDefaultScenes() : [];
+        }
+
         var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var normalized = new List<ScenePreset>();
 
-        foreach (var scene in scenes ?? [])
+        foreach (var scene in scenes)
         {
             if (string.IsNullOrWhiteSpace(scene.Name))
             {
@@ -230,7 +398,7 @@ public sealed class AppSettingsStore
             normalized.Add(clone);
         }
 
-        return normalized.Count == 0 ? ScenePreset.CreateDefaultScenes() : normalized;
+        return normalized.Count == 0 && seedDefaultsIfEmpty ? ScenePreset.CreateDefaultScenes() : normalized;
     }
 
     private static string NormalizeHost(string? value) =>
@@ -250,12 +418,17 @@ public sealed class AppSettingsStore
         return cleaned.Count == 0 ? [15, 28, 42, 55] : cleaned;
     }
 
-    private static List<StationPreset> NormalizeStations(IEnumerable<StationPreset>? stations)
+    private static List<StationPreset> NormalizeStations(IEnumerable<StationPreset>? stations, bool seedDefaultsIfEmpty)
     {
+        if (stations is null)
+        {
+            return seedDefaultsIfEmpty ? ReceiverSettings.CreateDefaultStations() : [];
+        }
+
         var seenAliases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var normalized = new List<StationPreset>();
 
-        foreach (var station in stations ?? [])
+        foreach (var station in stations)
         {
             var displayName = string.IsNullOrWhiteSpace(station.DisplayName) ? station.Alias : station.DisplayName;
             if (string.IsNullOrWhiteSpace(displayName) || string.IsNullOrWhiteSpace(station.Url))
@@ -269,7 +442,7 @@ public sealed class AppSettingsStore
             normalized.Add(new StationPreset(alias, displayName.Trim(), station.Url.Trim()));
         }
 
-        return normalized.Count == 0 ? ReceiverSettings.CreateDefaultStations() : normalized;
+        return normalized.Count == 0 && seedDefaultsIfEmpty ? ReceiverSettings.CreateDefaultStations() : normalized;
     }
 
     private static string EnsureUniqueAlias(string alias, ISet<string> seenAliases)

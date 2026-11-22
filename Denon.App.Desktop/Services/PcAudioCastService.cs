@@ -238,22 +238,26 @@ public sealed class PcAudioCastService : IDisposable
             capture.RecordingStopped += (_, _) => pcmChannel.Writer.TryComplete();
             capture.StartRecording();
 
-            // Silence keepalive loop so HEOS never drops the stream when Windows audio pauses
+            // Silence keepalive loop paced 1:1 to real audio time (100ms silence every 100ms idle)
+            // with its own linked CTS cancelled BEFORE awaiting on disconnect so WASAPI releases cleanly.
             var silenceFrameBytes = (sampleRate / 10) * waveFormat.BlockAlign; // 100ms of silence
             var silenceBuffer = new byte[Math.Max(waveFormat.BlockAlign * 4, silenceFrameBytes)];
+            using var silenceCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var silenceCt = silenceCts.Token;
             var silenceTask = Task.Run(async () =>
             {
                 try
                 {
-                    while (!ct.IsCancellationRequested)
+                    while (!silenceCt.IsCancellationRequested)
                     {
-                        await Task.Delay(50, ct);
-                        if (Environment.TickCount64 - lastAudioTick > 90)
+                        await Task.Delay(100, silenceCt);
+                        var idleMs = Environment.TickCount64 - Volatile.Read(ref lastAudioTick);
+                        if (idleMs > 90)
                         {
                             PublishMeter(0, 0, isLive: true);
                         }
 
-                        if (Environment.TickCount64 - lastAudioTick > 160)
+                        if (idleMs >= 150)
                         {
                             pcmChannel.Writer.TryWrite(silenceBuffer);
                         }
@@ -262,14 +266,14 @@ public sealed class PcAudioCastService : IDisposable
                 catch (OperationCanceledException)
                 {
                 }
-            }, ct);
+            }, silenceCt);
 
             try
             {
                 var ffmpegPath = _youtubeService.FindFfmpegPath();
                 if (format == PcCastFormat.Mp3_320k && !string.IsNullOrWhiteSpace(ffmpegPath))
                 {
-                    await PumpViaFfmpegMp3Async(pcmChannel.Reader, clientStream, ffmpegPath, sampleRate, channels, waveFormat.Encoding == WaveFormatEncoding.IeeeFloat, ct);
+                    await PumpViaFfmpegMp3Async(pcmChannel.Reader, clientStream, ffmpegPath, waveFormat, ct);
                 }
                 else
                 {
@@ -278,6 +282,7 @@ public sealed class PcAudioCastService : IDisposable
             }
             finally
             {
+                try { silenceCts.Cancel(); } catch { }
                 try { capture.StopRecording(); } catch { }
                 pcmChannel.Writer.TryComplete();
                 try { await silenceTask; } catch { }
@@ -290,12 +295,12 @@ public sealed class PcAudioCastService : IDisposable
         ChannelReader<byte[]> reader,
         Stream clientStream,
         string ffmpegPath,
-        int sampleRate,
-        int channels,
-        bool isFloat32,
+        WaveFormat sourceFormat,
         CancellationToken ct)
     {
-        var inputFmt = isFloat32 ? "f32le" : "s16le";
+        var inputFmt = ResolveFfmpegInputFormat(sourceFormat);
+        var sampleRate = sourceFormat.SampleRate;
+        var channels = Math.Max(1, sourceFormat.Channels);
         using var ffmpeg = new Process
         {
             StartInfo = new ProcessStartInfo
@@ -394,41 +399,113 @@ public sealed class PcAudioCastService : IDisposable
             await clientStream.FlushAsync(ct);
         }
 
-        var isFloat = sourceFormat.Encoding == WaveFormatEncoding.IeeeFloat;
-        var srcChannels = Math.Max(1, sourceFormat.Channels);
-
         await foreach (var chunk in reader.ReadAllAsync(ct))
         {
-            if (isFloat)
+            var outBytes = ConvertToStereo16Pcm(chunk, sourceFormat);
+            if (outBytes.Length > 0)
             {
-                var floatCount = chunk.Length / 4;
-                var frames = floatCount / srcChannels;
-                var outBytes = new byte[frames * 4];
-                var outIdx = 0;
-
-                for (var f = 0; f < frames; f++)
-                {
-                    var left = BitConverter.ToSingle(chunk, (f * srcChannels) * 4);
-                    var right = srcChannels > 1
-                        ? BitConverter.ToSingle(chunk, ((f * srcChannels) + 1) * 4)
-                        : left;
-
-                    var l16 = (short)Math.Clamp(left * 32767f, -32768f, 32767f);
-                    var r16 = (short)Math.Clamp(right * 32767f, -32768f, 32767f);
-
-                    outBytes[outIdx++] = (byte)(l16 & 0xFF);
-                    outBytes[outIdx++] = (byte)((l16 >> 8) & 0xFF);
-                    outBytes[outIdx++] = (byte)(r16 & 0xFF);
-                    outBytes[outIdx++] = (byte)((r16 >> 8) & 0xFF);
-                }
-
                 await clientStream.WriteAsync(outBytes, ct);
             }
-            else
-            {
-                await clientStream.WriteAsync(chunk, ct);
-            }
         }
+    }
+
+    internal static string ResolveFfmpegInputFormat(WaveFormat format)
+    {
+        if (format.Encoding == WaveFormatEncoding.IeeeFloat ||
+            (format is WaveFormatExtensible ext && ext.SubFormat == new Guid("00000003-0000-0010-8000-00aa00389b71")))
+        {
+            return format.BitsPerSample == 64 ? "f64le" : "f32le";
+        }
+
+        return format.BitsPerSample switch
+        {
+            24 => "s24le",
+            32 => "s32le",
+            _ => "s16le",
+        };
+    }
+
+    internal static byte[] ConvertToStereo16Pcm(byte[] chunk, WaveFormat sourceFormat)
+    {
+        var srcChannels = Math.Max(1, sourceFormat.Channels);
+        var bytesPerSample = Math.Max(1, sourceFormat.BitsPerSample / 8);
+        var frameSize = srcChannels * bytesPerSample;
+        if (frameSize <= 0 || chunk.Length < frameSize)
+        {
+            return [];
+        }
+
+        var isFloat = sourceFormat.Encoding == WaveFormatEncoding.IeeeFloat ||
+                      (sourceFormat is WaveFormatExtensible ext && ext.SubFormat == new Guid("00000003-0000-0010-8000-00aa00389b71"));
+
+        // Fast pass-through only when input is already 16-bit Stereo PCM!
+        if (!isFloat && sourceFormat.BitsPerSample == 16 && srcChannels == 2)
+        {
+            return chunk;
+        }
+
+        var frames = chunk.Length / frameSize;
+        var outBytes = new byte[frames * 4];
+        var outIdx = 0;
+
+        for (var f = 0; f < frames; f++)
+        {
+            var frameOffset = f * frameSize;
+            float left = ReadNormalizedSample(chunk, frameOffset, bytesPerSample, isFloat);
+            float right = srcChannels > 1
+                ? ReadNormalizedSample(chunk, frameOffset + bytesPerSample, bytesPerSample, isFloat)
+                : left;
+
+            // Downmix extra surround/center channels cleanly into L/R when >2 channels
+            if (srcChannels > 2)
+            {
+                var center = ReadNormalizedSample(chunk, frameOffset + (2 * bytesPerSample), bytesPerSample, isFloat);
+                left = Math.Clamp(left + (center * 0.707f), -1f, 1f);
+                right = Math.Clamp(right + (center * 0.707f), -1f, 1f);
+                for (var ch = 3; ch < srcChannels; ch++)
+                {
+                    var extra = ReadNormalizedSample(chunk, frameOffset + (ch * bytesPerSample), bytesPerSample, isFloat) * 0.5f;
+                    if (ch % 2 == 0) left = Math.Clamp(left + extra, -1f, 1f);
+                    else right = Math.Clamp(right + extra, -1f, 1f);
+                }
+            }
+
+            var l16 = (short)Math.Clamp(left * 32767f, -32768f, 32767f);
+            var r16 = (short)Math.Clamp(right * 32767f, -32768f, 32767f);
+
+            outBytes[outIdx++] = (byte)(l16 & 0xFF);
+            outBytes[outIdx++] = (byte)((l16 >> 8) & 0xFF);
+            outBytes[outIdx++] = (byte)(r16 & 0xFF);
+            outBytes[outIdx++] = (byte)((r16 >> 8) & 0xFF);
+        }
+
+        return outBytes;
+    }
+
+    private static float ReadNormalizedSample(byte[] buffer, int offset, int bytesPerSample, bool isFloat)
+    {
+        if (isFloat && bytesPerSample == 4)
+        {
+            return Math.Clamp(BitConverter.ToSingle(buffer, offset), -1f, 1f);
+        }
+
+        if (bytesPerSample == 2)
+        {
+            return BitConverter.ToInt16(buffer, offset) / 32768f;
+        }
+
+        if (bytesPerSample == 3)
+        {
+            int sample24 = buffer[offset] | (buffer[offset + 1] << 8) | ((sbyte)buffer[offset + 2] << 16);
+            return sample24 / 8388608f;
+        }
+
+        if (bytesPerSample == 4)
+        {
+            return BitConverter.ToInt32(buffer, offset) / 2147483648f;
+        }
+
+        return 0f;
     }
 
     private void PublishMeter(double left, double right, bool isLive)

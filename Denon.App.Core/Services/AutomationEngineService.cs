@@ -79,19 +79,41 @@ public sealed class AutomationEngineService : BackgroundService
 
             if (rule.PluginActions is { Count: > 0 })
             {
-                // Avoid re-running an identical plugin action if the target scene already executed it
+                // Deduplicate only IDENTICAL (pluginId, actionId, parameters) steps already run by targetScene
+                // so distinct parameterized calls to the same action (e.g. two different Hue rooms) are preserved!
+                static string BuildStepKey(ScenePluginActionStep step)
+                {
+                    var paramKey = step.Parameters is { Count: > 0 }
+                        ? string.Join("&", step.Parameters
+                            .OrderBy(static kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+                            .Select(static kv => $"{kv.Key.Trim().ToLowerInvariant()}={kv.Value?.Trim()}"))
+                        : string.Empty;
+                    return $"{step.PluginId}:{step.ActionId}:{paramKey}";
+                }
+
                 var sceneActionKeys = new HashSet<string>(
-                    (targetScene?.PluginActions ?? []).Select(static a => $"{a.PluginId}:{a.ActionId}"),
+                    (targetScene?.PluginActions ?? []).Select(BuildStepKey),
                     StringComparer.OrdinalIgnoreCase);
 
                 var extraSteps = rule.PluginActions
-                    .Where(a => !sceneActionKeys.Contains($"{a.PluginId}:{a.ActionId}"))
+                    .Where(a => !sceneActionKeys.Contains(BuildStepKey(a)))
                     .ToList();
 
                 if (extraSteps.Count > 0)
                 {
-                    await _pluginHost.ExecuteActionChainAsync(extraSteps, cancellationToken);
-                    executedParts.Add($"{extraSteps.Count} plugin step(s)");
+                    var outcomes = await _pluginHost.ExecuteActionChainAsync(extraSteps, cancellationToken);
+                    var okCount = outcomes.Count(static o => o.Result.Success);
+                    var failCount = outcomes.Count - okCount;
+                    if (failCount > 0)
+                    {
+                        success = false;
+                        var firstErr = outcomes.First(static o => !o.Result.Success).Result.Message;
+                        executedParts.Add($"{okCount}/{outcomes.Count} plugin step(s) ok ({failCount} failed: {firstErr})");
+                    }
+                    else
+                    {
+                        executedParts.Add($"{okCount} plugin step(s)");
+                    }
                 }
             }
 

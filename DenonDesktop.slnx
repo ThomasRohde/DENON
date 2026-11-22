@@ -5,4 +5,5 @@
   <Project Path="Denon.Plugin.SmartTv/Denon.Plugin.SmartTv.csproj" />
   <Project Path="Denon.Plugin.HomeAssistant/Denon.Plugin.HomeAssistant.csproj" />
   <Project Path="Denon.App.Desktop/Denon.App.Desktop.csproj" />
+  <Project Path="Denon.App.Core.Tests/Denon.App.Core.Tests.csproj" />
 </Solution>

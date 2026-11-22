@@ -193,14 +193,10 @@ public sealed class EventTelemetryLog : IAsyncDisposable
                 foreach (var file in Directory.EnumerateFiles(AppDataPaths.PluginEventsLogsDirectory, "*.jsonl"))
                 {
                     var name = Path.GetFileNameWithoutExtension(file);
-                    var dashIdx = name.LastIndexOf('-');
-                    if (dashIdx > 5)
+                    var slug = StripDateSuffix(name);
+                    if (!string.IsNullOrWhiteSpace(slug))
                     {
-                        var monthDash = name.LastIndexOf('-', dashIdx - 1);
-                        if (monthDash > 0)
-                        {
-                            streams.Add($"plugin:{name[..monthDash]}");
-                        }
+                        streams.Add($"plugin:{slug}");
                     }
                 }
             }
@@ -383,9 +379,9 @@ public sealed class EventTelemetryLog : IAsyncDisposable
                     break;
                 }
 
-                // Never delete the currently active month's file unless it alone exceeds the cap.
-                var currentMonthTag = DateTime.Now.ToString("yyyy-MM", CultureInfo.InvariantCulture);
-                if (fi.Name.Contains(currentMonthTag, StringComparison.OrdinalIgnoreCase) && remaining.Count > 1)
+                // Never delete today's active file unless it alone exceeds the cap.
+                var todayTag = DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                if (fi.Name.Contains(todayTag, StringComparison.OrdinalIgnoreCase) && remaining.Count > 1)
                 {
                     continue;
                 }
@@ -524,7 +520,8 @@ public sealed class EventTelemetryLog : IAsyncDisposable
 
     private static string ResolveMonthlyFilePath(string stream, DateTime localNow)
     {
-        var month = localNow.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+        // Daily files ensure RetentionDays is honored at exact day granularity.
+        var day = localNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         if (stream.StartsWith("plugin:", StringComparison.OrdinalIgnoreCase))
         {
             var pluginSlug = SlugNormalizer.Normalize(stream["plugin:".Length..]);
@@ -533,10 +530,10 @@ public sealed class EventTelemetryLog : IAsyncDisposable
                 pluginSlug = "plugin";
             }
 
-            return Path.Combine(AppDataPaths.PluginEventsLogsDirectory, $"{pluginSlug}-{month}.jsonl");
+            return Path.Combine(AppDataPaths.PluginEventsLogsDirectory, $"{pluginSlug}-{day}.jsonl");
         }
 
-        return Path.Combine(AppDataPaths.EventsLogsDirectory, $"{stream}-{month}.jsonl");
+        return Path.Combine(AppDataPaths.EventsLogsDirectory, $"{stream}-{day}.jsonl");
     }
 
     private static string NormalizeStreamName(string? stream)
@@ -586,18 +583,31 @@ public sealed class EventTelemetryLog : IAsyncDisposable
     private static string InferStreamKeyFromPath(string filePath)
     {
         var isPlugin = filePath.StartsWith(AppDataPaths.PluginEventsLogsDirectory, StringComparison.OrdinalIgnoreCase);
-        var name = Path.GetFileNameWithoutExtension(filePath);
-        var dashIdx = name.LastIndexOf('-');
-        if (dashIdx > 4)
+        var name = StripDateSuffix(Path.GetFileNameWithoutExtension(filePath));
+        return isPlugin ? $"plugin:{name}" : name;
+    }
+
+    private static string StripDateSuffix(string baseName)
+    {
+        // Matches -yyyy-MM-dd or legacy -yyyy-MM at end of filename
+        if (baseName.Length > 11 &&
+            baseName[^11] == '-' && baseName[^6] == '-' && baseName[^3] == '-' &&
+            int.TryParse(baseName[^10..^6], out _) &&
+            int.TryParse(baseName[^5..^3], out _) &&
+            int.TryParse(baseName[^2..], out _))
         {
-            var prevDash = name.LastIndexOf('-', dashIdx - 1);
-            if (prevDash > 0)
-            {
-                name = name[..prevDash];
-            }
+            return baseName[..^11];
         }
 
-        return isPlugin ? $"plugin:{name}" : name;
+        if (baseName.Length > 8 &&
+            baseName[^8] == '-' && baseName[^3] == '-' &&
+            int.TryParse(baseName[^7..^3], out _) &&
+            int.TryParse(baseName[^2..], out _))
+        {
+            return baseName[..^8];
+        }
+
+        return baseName;
     }
 
     private static List<string> ReadTailLines(string path, int maxLines)

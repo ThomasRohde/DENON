@@ -13,6 +13,7 @@ public sealed class ReceiverController
     private readonly EventTelemetryLog _telemetry;
     private readonly AppLogStore _logStore;
     private string? _lastPlayedStationAlias;
+    private bool _avrProtocolAvailable = true;
 
     public ReceiverController(
         HeosClient heosClient,
@@ -33,6 +34,12 @@ public sealed class ReceiverController
     public event Action? NonRelaySourceActivated;
 
     public event Action<ScenePreset>? SceneActivated;
+
+    /// <summary>
+    /// True when the Denon/Marantz AVR Telnet control interface (port 23) responded on the last check;
+    /// false for HEOS-only speakers (e.g. Denon Home) or when AVR port 23 is temporarily unavailable.
+    /// </summary>
+    public bool IsAvrProtocolAvailable => _avrProtocolAvailable;
 
     public IReadOnlyList<StationPreset> GetStations() => _settingsStore.Current.Receiver.Stations;
 
@@ -161,7 +168,7 @@ public sealed class ReceiverController
             $"Set volume to {level} ({DenonVolumeMath.FormatDecibels(level)})",
             async (settings, token) =>
             {
-                await _avrClient.SetVolumeAsync(settings, level, token);
+                await SetVolumeWithHeosFallbackAsync(settings, level, token);
                 return await GetMergedStatusAsync(settings, token);
             },
             markBusy: false,
@@ -176,7 +183,7 @@ public sealed class ReceiverController
             {
                 if (string.Equals(state, "play", StringComparison.OrdinalIgnoreCase))
                 {
-                    await _avrClient.EnsureMainZoneNetAsync(settings, token);
+                    await TryEnsureMainZoneNetAsync(settings, token);
                 }
 
                 await _heosClient.SetPlayStateAsync(settings, state, token);
@@ -218,7 +225,7 @@ public sealed class ReceiverController
             isMuted ? "Mute receiver" : "Unmute receiver",
             async (settings, token) =>
             {
-                await _avrClient.SetMuteAsync(settings, isMuted, token);
+                await SetMuteWithHeosFallbackAsync(settings, isMuted, token);
                 return await GetMergedStatusAsync(settings, token);
             },
             markBusy: true,
@@ -251,15 +258,15 @@ public sealed class ReceiverController
             async (settings, token) =>
             {
                 await TryStopHeosPlaybackAsync(settings, token);
-                await _avrClient.EnsureMainZoneNetAsync(settings, token);
+                await TryEnsureMainZoneNetAsync(settings, token);
                 if (volume is int level)
                 {
-                    await _avrClient.SetVolumeAsync(settings, level, token);
+                    await SetVolumeWithHeosFallbackAsync(settings, level, token);
                 }
 
                 if (unmute)
                 {
-                    await _avrClient.SetMuteAsync(settings, false, token);
+                    await SetMuteWithHeosFallbackAsync(settings, false, token);
                 }
 
                 await _heosClient.PlayUrlAsync(settings, preset.Url, volume: null, unmute: unmute, token);
@@ -285,15 +292,15 @@ public sealed class ReceiverController
             async (settings, token) =>
             {
                 await TryStopHeosPlaybackAsync(settings, token);
-                await _avrClient.EnsureMainZoneNetAsync(settings, token);
+                await TryEnsureMainZoneNetAsync(settings, token);
                 if (volume is int level)
                 {
-                    await _avrClient.SetVolumeAsync(settings, level, token);
+                    await SetVolumeWithHeosFallbackAsync(settings, level, token);
                 }
 
                 if (unmute)
                 {
-                    await _avrClient.SetMuteAsync(settings, false, token);
+                    await SetMuteWithHeosFallbackAsync(settings, false, token);
                 }
 
                 await _heosClient.PlayUrlAsync(settings, url, volume: null, unmute: unmute, token);
@@ -335,15 +342,15 @@ public sealed class ReceiverController
             async (settings, token) =>
             {
                 await TryStopHeosPlaybackAsync(settings, token);
-                await _avrClient.EnsureMainZoneNetAsync(settings, token);
+                await TryEnsureMainZoneNetAsync(settings, token);
                 if (volume is int level)
                 {
-                    await _avrClient.SetVolumeAsync(settings, level, token);
+                    await SetVolumeWithHeosFallbackAsync(settings, level, token);
                 }
 
                 if (unmute)
                 {
-                    await _avrClient.SetMuteAsync(settings, false, token);
+                    await SetMuteWithHeosFallbackAsync(settings, false, token);
                 }
 
                 await _heosClient.PlayFavoriteAsync(settings, favorite.PresetIndex, token);
@@ -435,15 +442,15 @@ public sealed class ReceiverController
             async (settings, token) =>
             {
                 await TryStopHeosPlaybackAsync(settings, token);
-                await _avrClient.EnsureMainZoneNetAsync(settings, token);
+                await TryEnsureMainZoneNetAsync(settings, token);
                 if (volume is int level)
                 {
-                    await _avrClient.SetVolumeAsync(settings, level, token);
+                    await SetVolumeWithHeosFallbackAsync(settings, level, token);
                 }
 
                 if (unmute)
                 {
-                    await _avrClient.SetMuteAsync(settings, false, token);
+                    await SetMuteWithHeosFallbackAsync(settings, false, token);
                 }
 
                 await _heosClient.PlayUrlAsync(settings, relayUrl, volume: null, unmute: unmute, token);
@@ -518,6 +525,26 @@ public sealed class ReceiverController
                     await Task.Delay(250, token);
                 }
 
+                // Read current level/mute BEFORE switching to a live input or releasing mute:
+                // for quiet scenes (lowering volume or starting muted), establish the safe target volume FIRST
+                // so a receiver muted at 75 never blasts at 75 before dropping to 25!
+                var preSceneAvr = await _avrClient.GetStatusAsync(settings, token);
+                var volumeAppliedEarly = false;
+                if (scene.TargetVolume is int earlyTargetVol &&
+                    (preSceneAvr.IsMuted || earlyTargetVol < preSceneAvr.Volume))
+                {
+                    if (scene.SmoothVolumeRamp && !preSceneAvr.IsMuted)
+                    {
+                        await _avrClient.RampVolumeAsync(settings, preSceneAvr.Volume, earlyTargetVol, token);
+                    }
+                    else
+                    {
+                        await _avrClient.SetVolumeAsync(settings, earlyTargetVol, token);
+                    }
+
+                    volumeAppliedEarly = true;
+                }
+
                 if (!string.IsNullOrWhiteSpace(scene.InputSource))
                 {
                     if (DenonCatalog.InputMatches(scene.InputSource, "NET"))
@@ -585,12 +612,8 @@ public sealed class ReceiverController
                     await TryRunSceneStepAsync(() => _avrClient.SetSleepTimerAsync(settings, sleepMins <= 0 ? null : sleepMins, token));
                 }
 
-                if (scene.Unmute)
-                {
-                    await _avrClient.SetMuteAsync(settings, false, token);
-                }
-
-                if (scene.TargetVolume is int targetVol)
+                // For upward volume moves (not muted), establish volume before releasing mute too.
+                if (!volumeAppliedEarly && scene.TargetVolume is int targetVol)
                 {
                     if (scene.SmoothVolumeRamp)
                     {
@@ -601,6 +624,12 @@ public sealed class ReceiverController
                     {
                         await _avrClient.SetVolumeAsync(settings, targetVol, token);
                     }
+                }
+
+                // Release mute ONLY AFTER target volume has succeeded!
+                if (scene.Unmute)
+                {
+                    await _avrClient.SetMuteAsync(settings, false, token);
                 }
 
                 if (!string.IsNullOrWhiteSpace(scene.StreamUrl))
@@ -742,7 +771,44 @@ public sealed class ReceiverController
     private async Task<ReceiverStatus> GetMergedStatusAsync(ReceiverSettings settings, CancellationToken cancellationToken)
     {
         var heosStatus = await _heosClient.GetStatusAsync(settings, cancellationToken);
-        var avrStatus = await _avrClient.GetStatusAsync(settings, cancellationToken);
+        AvrDeviceStatus? avrStatus = null;
+        try
+        {
+            avrStatus = await _avrClient.GetStatusAsync(settings, cancellationToken);
+            _avrProtocolAvailable = true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            if (_avrProtocolAvailable)
+            {
+                _logStore.Warning($"AVR port 23 control unavailable ({ex.Message}); operating in HEOS-only mode.");
+            }
+
+            _avrProtocolAvailable = false;
+        }
+
+        if (avrStatus is null)
+        {
+            var heosSyntheticAvr = new AvrDeviceStatus(
+                IsPoweredOn: true,
+                IsMainZoneOn: true,
+                Volume: heosStatus.Volume,
+                IsMuted: heosStatus.IsMuted,
+                InputSource: "NET",
+                SoundMode: "HEOS",
+                VolumeExact: heosStatus.Volume);
+            var heosAlias = DetectActiveStationAlias(settings, heosStatus, heosSyntheticAvr);
+
+            return heosStatus with
+            {
+                IsPoweredOn = true,
+                IsMainZoneOn = true,
+                InputSource = "NET",
+                SoundMode = "HEOS",
+                VolumeExact = heosStatus.Volume,
+                ActiveStationAlias = heosAlias,
+            };
+        }
 
         var activeAlias = DetectActiveStationAlias(settings, heosStatus, avrStatus);
 
@@ -761,6 +827,47 @@ public sealed class ReceiverController
             IsZone2On = avrStatus.IsZone2On,
             ActiveStationAlias = activeAlias,
         };
+    }
+
+    private async Task TryEnsureMainZoneNetAsync(ReceiverSettings settings, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _avrClient.EnsureMainZoneNetAsync(settings, cancellationToken);
+            _avrProtocolAvailable = true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _avrProtocolAvailable = false;
+        }
+    }
+
+    private async Task SetVolumeWithHeosFallbackAsync(ReceiverSettings settings, int level, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _avrClient.SetVolumeAsync(settings, level, cancellationToken);
+            _avrProtocolAvailable = true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _avrProtocolAvailable = false;
+            await _heosClient.SetVolumeAsync(settings, level, cancellationToken);
+        }
+    }
+
+    private async Task SetMuteWithHeosFallbackAsync(ReceiverSettings settings, bool isMuted, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _avrClient.SetMuteAsync(settings, isMuted, cancellationToken);
+            _avrProtocolAvailable = true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _avrProtocolAvailable = false;
+            await _heosClient.SetMuteAsync(settings, isMuted, cancellationToken);
+        }
     }
 
     private string? DetectActiveStationAlias(ReceiverSettings settings, ReceiverStatus heosStatus, AvrDeviceStatus avrStatus)

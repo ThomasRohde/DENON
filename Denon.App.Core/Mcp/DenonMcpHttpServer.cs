@@ -19,7 +19,7 @@ namespace Denon.App.Core.Mcp;
 public sealed partial class DenonMcpHttpServer : IAsyncDisposable
 {
     private const string ServerName = "denon-desktop-mcp";
-    private const string ServerVersion = "1.12.0";
+    private const string ServerVersion = "1.13.0";
     private const string DefaultProtocolVersion = "2025-11-25";
 
     private static readonly JsonSerializerOptions JsonOutOptions = new()
@@ -1500,7 +1500,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         {
             case "restore_previous_state":
             {
-                var (ok, msg) = await _intelligence.RestoreLastSnapshotAsync(ct);
+                var (ok, msg) = await _intelligence.RestoreLastSnapshotAsync(maxSafeVolume: cfg.MaxSafeVolume, ct);
                 return ok ? BuildToolText(msg) : BuildToolError(msg);
             }
 
@@ -1908,11 +1908,18 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
     private async Task<object> ExecuteApplyAtmosphereAsync(JsonElement args, McpServerSettings cfg, CancellationToken ct)
     {
         var reason = GetString(args, "reason", "AI Atmosphere");
-        _intelligence.CaptureSnapshot($"MCP Atmosphere: {reason}");
+        var captured = _intelligence.CaptureSnapshot($"MCP Atmosphere: {reason}");
 
         var stepsTaken = new List<string>();
         await _receiverController.SetPowerAsync(true, ct);
-        await _receiverController.SetMuteAsync(false, ct);
+
+        // Apply volume ceiling BEFORE unmuting or switching to a live input so quiet atmospheres never blast!
+        if (GetInt(args, "volume") is { } vol)
+        {
+            var clamped = ApplyVolumeCeiling(vol, cfg.MaxSafeVolume, out var capped);
+            await _receiverController.SetVolumeAsync(clamped, ct);
+            stepsTaken.Add($"Volume → {clamped} ({RoomIntelligenceService.FormatDb(clamped)}){(capped ? " [capped]" : string.Empty)}");
+        }
 
         if (GetString(args, "input_source") is { Length: > 0 } input)
         {
@@ -1926,12 +1933,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
             stepsTaken.Add($"Sound Mode → {mode.ToUpperInvariant()}");
         }
 
-        if (GetInt(args, "volume") is { } vol)
-        {
-            var clamped = ApplyVolumeCeiling(vol, cfg.MaxSafeVolume, out var capped);
-            await _receiverController.SetVolumeAsync(clamped, ct);
-            stepsTaken.Add($"Volume → {clamped} ({RoomIntelligenceService.FormatDb(clamped)}){(capped ? " [capped]" : string.Empty)}");
-        }
+        await _receiverController.SetMuteAsync(false, ct);
 
         if (GetString(args, "dynamic_volume") is { Length: > 0 } dv)
         {
@@ -1956,7 +1958,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         if (GetBool(args, "oled_screen_off") == true)
         {
             var res = await _pluginHost.ExecuteActionAsync("smart-tv", "tv.screen_off", null, ct);
-            stepsTaken.Add($"LG OLED Screen Off: {res.Message}");
+            stepsTaken.Add($"TV Screen Off: {res.Message}");
         }
 
         if (GetString(args, "tv_toast") is { Length: > 0 } toast)
@@ -1968,7 +1970,8 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         return BuildToolJson(new
         {
             applied = reason,
-            undoAvailable = true,
+            undoAvailable = captured is not null,
+            undoScope = captured is not null ? "Denon AVR power, volume, mute, input, sound mode, Zone 2" : "None (AVR state was unconfirmed)",
             steps = stepsTaken,
         });
     }

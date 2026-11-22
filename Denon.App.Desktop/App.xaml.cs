@@ -211,7 +211,8 @@ public partial class App : System.Windows.Application
 
             StartActivationSignalListener();
 
-            var startMinimized = settingsStore.Current.Ui.StartMinimizedToTray &&
+            var startMinimized = (settingsStore.Current.Ui.StartMinimizedToTray ||
+                                  e.Args.Contains("--minimized", StringComparer.OrdinalIgnoreCase)) &&
                                  !e.Args.Contains("--show", StringComparer.OrdinalIgnoreCase);
 
             if (startMinimized)

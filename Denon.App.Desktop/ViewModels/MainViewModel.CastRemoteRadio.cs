@@ -60,7 +60,10 @@ public sealed partial class MainViewModel
 
     // Couch Phone Remote & QR
     private string _remoteWebUrl = "Starting LAN server...";
+    private string _remotePairingUrl = string.Empty;
     private BitmapImage? _remoteQrImage;
+    private bool _isPhoneRemoteEnabled = true;
+    private bool _isGuestQrMode;
 
     // PC Audio Cast
     private AudioOutputDeviceOption? _selectedAudioDevice;
@@ -99,6 +102,9 @@ public sealed partial class MainViewModel
     // Commands
     public RelayCommand CopyRemoteUrlCommand { get; private set; } = null!;
     public RelayCommand OpenRemoteInBrowserCommand { get; private set; } = null!;
+    public AsyncRelayCommand TogglePhoneRemoteEnabledCommand { get; private set; } = null!;
+    public RelayCommand SetRemoteQrRoleCommand { get; private set; } = null!;
+    public AsyncRelayCommand RotateRemoteTokensCommand { get; private set; } = null!;
     public AsyncRelayCommand TogglePcCastCommand { get; private set; } = null!;
     public RelayCommand SetPcCastFormatCommand { get; private set; } = null!;
     public RelayCommand RefreshAudioDevicesCommand { get; private set; } = null!;
@@ -133,6 +139,13 @@ public sealed partial class MainViewModel
 
         CopyRemoteUrlCommand = new RelayCommand(_ => CopyRemoteUrl());
         OpenRemoteInBrowserCommand = new RelayCommand(_ => OpenRemoteInBrowser());
+        TogglePhoneRemoteEnabledCommand = new AsyncRelayCommand(_ => TogglePhoneRemoteEnabledAsync());
+        SetRemoteQrRoleCommand = new RelayCommand(param =>
+        {
+            IsGuestQrMode = string.Equals(param as string, "guest", StringComparison.OrdinalIgnoreCase);
+            UpdateRemoteQrFromRelay(_relayServer.CurrentStatus, forceRegenerate: true);
+        });
+        RotateRemoteTokensCommand = new AsyncRelayCommand(_ => RotateRemoteTokensAsync());
         TogglePcCastCommand = new AsyncRelayCommand(_ => TogglePcCastAsync(), CanControlReceiver);
         SetPcCastFormatCommand = new RelayCommand(param =>
         {
@@ -187,7 +200,8 @@ public sealed partial class MainViewModel
         IsLivePushConnected = _heosEventListener.IsPushConnected;
 
         _relayServer.StatusChanged += snap => _ = _dispatcher.InvokeAsync(() => UpdateRemoteQrFromRelay(snap));
-        UpdateRemoteQrFromRelay(_relayServer.CurrentStatus);
+        IsPhoneRemoteEnabled = _settingsStore.Current.Remote.Enabled;
+        UpdateRemoteQrFromRelay(_relayServer.CurrentStatus, forceRegenerate: true);
 
         RefreshAudioDevices();
         ApplyLocalJukeboxSnapshot(_localJukeboxService.Snapshot);
@@ -204,6 +218,36 @@ public sealed partial class MainViewModel
         get => _remoteQrImage;
         private set => SetProperty(ref _remoteQrImage, value);
     }
+
+    public bool IsPhoneRemoteEnabled
+    {
+        get => _isPhoneRemoteEnabled;
+        private set
+        {
+            if (SetProperty(ref _isPhoneRemoteEnabled, value))
+            {
+                OnPropertyChanged(nameof(PhoneRemoteToggleLabel));
+            }
+        }
+    }
+
+    public string PhoneRemoteToggleLabel => IsPhoneRemoteEnabled ? "Remote: ON" : "Remote: OFF";
+
+    public bool IsGuestQrMode
+    {
+        get => _isGuestQrMode;
+        private set
+        {
+            if (SetProperty(ref _isGuestQrMode, value))
+            {
+                OnPropertyChanged(nameof(RemoteQrRoleCaption));
+            }
+        }
+    }
+
+    public string RemoteQrRoleCaption => IsGuestQrMode
+        ? "Guest QR (YouTube Search & Queue Only)"
+        : "Owner QR (Full Room & Volume Control)";
 
     public AudioOutputDeviceOption? SelectedAudioDevice
     {
@@ -376,32 +420,102 @@ public sealed partial class MainViewModel
 
     public void HandleDroppedLocalPaths(string[] paths)
     {
-        var added = _localJukeboxService.AddPaths(paths);
-        LocalJukeboxStatusText = added > 0
-            ? $"Added {added} local audio file(s). Click any track or 'Play All' to stream to your Denon."
-            : "No supported audio files (.flac, .wav, .mp3, .m4a, .aac, .ogg, .opus) found in drop.";
+        if (paths is null || paths.Length == 0)
+        {
+            return;
+        }
+
+        LocalJukeboxStatusText = "Scanning audio files...";
+        _ = Task.Run(() => _localJukeboxService.AddPathsDetailed(paths))
+            .ContinueWith(t =>
+            {
+                _ = _dispatcher.InvokeAsync(() =>
+                {
+                    if (t.IsFaulted)
+                    {
+                        LocalJukeboxStatusText = $"Folder scan failed: {t.Exception?.GetBaseException().Message}";
+                        return;
+                    }
+
+                    var (added, duplicates, skipped) = t.Result;
+                    if (added > 0)
+                    {
+                        var extra = duplicates > 0 ? $" ({duplicates} duplicate(s) skipped)" : string.Empty;
+                        LocalJukeboxStatusText = $"Added {added} local audio file(s){extra}. Click any track or 'Play All' to stream to your Denon.";
+                    }
+                    else if (duplicates > 0)
+                    {
+                        LocalJukeboxStatusText = $"All {duplicates} audio file(s) are already in the Hi-Res Jukebox.";
+                    }
+                    else
+                    {
+                        LocalJukeboxStatusText = skipped > 0
+                            ? $"No supported audio files found ({skipped} item(s) skipped)."
+                            : "No supported audio files (.flac, .wav, .mp3, .m4a, .aac, .ogg, .opus) found.";
+                    }
+                });
+            }, TaskScheduler.Default);
     }
 
-    private void UpdateRemoteQrFromRelay(RelayStatusSnapshot snap)
+    private async Task TogglePhoneRemoteEnabledAsync()
+    {
+        var updated = _settingsStore.Current.Clone();
+        updated.Remote.Enabled = !updated.Remote.Enabled;
+        _suppressNextSettingsReload = true;
+        await _settingsStore.SaveAsync(updated);
+        IsPhoneRemoteEnabled = updated.Remote.Enabled;
+        UpdateRemoteQrFromRelay(_relayServer.CurrentStatus, forceRegenerate: true);
+        StatusMessage = updated.Remote.Enabled
+            ? "Phone Remote enabled (pairing required). Active receiver streams continue uninterrupted."
+            : "Phone Remote disabled. Denon receiver audio streams remain unaffected.";
+    }
+
+    private async Task RotateRemoteTokensAsync()
+    {
+        var updated = _settingsStore.Current.Clone();
+        updated.Remote.OwnerToken = RemoteAccessSettings.GeneratePairingToken("own");
+        updated.Remote.GuestToken = RemoteAccessSettings.GeneratePairingToken("gst");
+        _suppressNextSettingsReload = true;
+        await _settingsStore.SaveAsync(updated);
+        UpdateRemoteQrFromRelay(_relayServer.CurrentStatus, forceRegenerate: true);
+        StatusMessage = "Revoked previous phone pairings and generated fresh Owner & Guest QR codes.";
+    }
+
+    private void UpdateRemoteQrFromRelay(RelayStatusSnapshot snap, bool forceRegenerate = false)
     {
         if (!snap.IsRunning || string.IsNullOrWhiteSpace(snap.EndpointBaseUrl))
         {
             return;
         }
 
-        var url = snap.EndpointBaseUrl.TrimEnd('/') + "/";
-        if (string.Equals(RemoteWebUrl, url, StringComparison.OrdinalIgnoreCase) && RemoteQrImage is not null)
+        var remoteCfg = _settingsStore.Current.Remote;
+        IsPhoneRemoteEnabled = remoteCfg.Enabled;
+        var baseUrl = snap.EndpointBaseUrl.TrimEnd('/') + "/";
+        var token = IsGuestQrMode ? remoteCfg.GuestToken : remoteCfg.OwnerToken;
+        var pairingUrl = remoteCfg.RequirePairing && !string.IsNullOrWhiteSpace(token)
+            ? $"{baseUrl}?pair={Uri.EscapeDataString(token)}"
+            : baseUrl;
+
+        var displayUrl = remoteCfg.Enabled
+            ? (IsGuestQrMode ? $"{baseUrl} (Guest QR paired)" : $"{baseUrl} (Owner QR paired)")
+            : $"{baseUrl} (Phone Remote OFF)";
+
+        if (!forceRegenerate &&
+            string.Equals(_remotePairingUrl, pairingUrl, StringComparison.Ordinal) &&
+            string.Equals(RemoteWebUrl, displayUrl, StringComparison.Ordinal) &&
+            RemoteQrImage is not null)
         {
             return;
         }
 
-        RemoteWebUrl = url;
+        _remotePairingUrl = pairingUrl;
+        RemoteWebUrl = displayUrl;
         try
         {
             using var generator = new QRCodeGenerator();
-            using var data = generator.CreateQrCode(url, QRCodeGenerator.ECCLevel.M);
+            using var data = generator.CreateQrCode(pairingUrl, QRCodeGenerator.ECCLevel.M);
             var pngQr = new PngByteQRCode(data);
-            var bytes = pngQr.GetGraphic(8, [0, 212, 255], [10, 14, 22]);
+            var bytes = pngQr.GetGraphic(8, IsGuestQrMode ? [245, 158, 11] : [0, 212, 255], [10, 14, 22]);
 
             var bmp = new BitmapImage();
             using (var ms = new MemoryStream(bytes))
@@ -422,15 +536,16 @@ public sealed partial class MainViewModel
 
     private void CopyRemoteUrl()
     {
-        if (string.IsNullOrWhiteSpace(RemoteWebUrl) || !RemoteWebUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        var url = !string.IsNullOrWhiteSpace(_remotePairingUrl) ? _remotePairingUrl : RemoteWebUrl;
+        if (string.IsNullOrWhiteSpace(url) || !url.StartsWith("http", StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
         try
         {
-            System.Windows.Clipboard.SetText(RemoteWebUrl);
-            StatusMessage = $"Copied Phone Remote URL ({RemoteWebUrl}) to clipboard.";
+            System.Windows.Clipboard.SetText(url);
+            StatusMessage = $"Copied paired {(IsGuestQrMode ? "Guest" : "Owner")} Phone Remote URL to clipboard.";
         }
         catch
         {
@@ -439,14 +554,15 @@ public sealed partial class MainViewModel
 
     private void OpenRemoteInBrowser()
     {
-        if (string.IsNullOrWhiteSpace(RemoteWebUrl) || !RemoteWebUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        var url = !string.IsNullOrWhiteSpace(_remotePairingUrl) ? _remotePairingUrl : RemoteWebUrl;
+        if (string.IsNullOrWhiteSpace(url) || !url.StartsWith("http", StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
         try
         {
-            Process.Start(new ProcessStartInfo(RemoteWebUrl) { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         }
         catch
         {

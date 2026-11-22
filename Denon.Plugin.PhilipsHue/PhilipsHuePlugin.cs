@@ -74,25 +74,32 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
         _viewModel.SyncFromPluginConfig(_config);
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken = default)
+    public Task StartAsync(CancellationToken cancellationToken = default)
     {
         _isStarted = true;
         if (_config.DemoMode || IsConfigured)
         {
-            try
+            _context?.ReportStatus($"Connecting to {(_config.DemoMode ? "Demo Bridge" : _config.BridgeIp)}...", PluginHealthState.Idle);
+            _ = Task.Run(async () =>
             {
-                await RefreshBridgeStateAsync(cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _context?.Logger.Warning($"Initial Hue sync deferred: {ex.Message}");
-                _context?.ReportStatus($"Bridge unreachable ({_config.BridgeIp})", PluginHealthState.Warning);
-            }
+                try
+                {
+                    using var initCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    await RefreshBridgeStateAsync(initCts.Token);
+                }
+                catch (Exception ex)
+                {
+                    _context?.Logger.Warning($"Initial Hue sync deferred: {ex.Message}");
+                    _context?.ReportStatus($"Bridge unreachable ({_config.BridgeIp})", PluginHealthState.Warning);
+                }
+            });
         }
         else
         {
             _context?.ReportStatus("Ready to discover & pair Hue Bridge (or try Demo Mode)", PluginHealthState.Idle);
         }
+
+        return Task.CompletedTask;
     }
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
