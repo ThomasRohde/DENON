@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text;
@@ -73,9 +74,21 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
         "browser",
     ];
 
+    private static readonly HttpClient SnapshotHttpClient = new(new HttpClientHandler
+    {
+        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
+    })
+    {
+        Timeout = TimeSpan.FromSeconds(8),
+    };
+
+    private const int LogicalScreenWidth = 1920;
+    private const int LogicalScreenHeight = 1080;
+
     private readonly SemaphoreSlim _connectGate = new(1, 1);
     private readonly SemaphoreSlim _sendGate = new(1, 1);
     private readonly SemaphoreSlim _pointerGate = new(1, 1);
+    private readonly SemaphoreSlim _captureGate = new(1, 1);
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _pendingRequests = new();
     private readonly ConcurrentDictionary<string, Action<JsonElement>> _subscriptions = new();
     private readonly object _stateLock = new();
@@ -93,6 +106,10 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
     private string _transportLabel = "OFFLINE";
     private int _msgId;
     private bool _disposed;
+    private int _cursorPxX = LogicalScreenWidth / 2;
+    private int _cursorPxY = LogicalScreenHeight / 2;
+    private bool _cursorCalibrated;
+    private DateTimeOffset _lastCaptureUtc = DateTimeOffset.MinValue;
 
     private LgTvLiveState _state = new();
 
@@ -565,6 +582,79 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
     }
 
     /// <summary>
+    /// Returns the estimated Magic Remote cursor position normalized to 0..1000 x 0..1000.
+    /// </summary>
+    public (int X, int Y, bool Calibrated) GetNormalizedCursor()
+    {
+        lock (_stateLock)
+        {
+            var nx = (int)Math.Round(_cursorPxX * 1000.0 / LogicalScreenWidth);
+            var ny = (int)Math.Round(_cursorPxY * 1000.0 / LogicalScreenHeight);
+            return (Math.Clamp(nx, 0, 1000), Math.Clamp(ny, 0, 1000), _cursorCalibrated);
+        }
+    }
+
+    /// <summary>
+    /// Opens a URL directly in the LG webOS built-in Web Browser.
+    /// </summary>
+    public async Task<string> OpenBrowserUrlAsync(string url, CancellationToken ct = default)
+    {
+        var normalized = (url ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            throw new ArgumentException("URL is required.", nameof(url));
+        }
+
+        if (!normalized.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !normalized.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = "https://" + normalized;
+        }
+
+        if (_demoMode)
+        {
+            UpdateState(s => s with
+            {
+                IsScreenOff = false,
+                ForegroundAppId = "com.webos.app.browser",
+                ForegroundAppTitle = "Web Browser",
+                Apps = MarkActiveApp(s.Apps, "com.webos.app.browser"),
+            });
+            return normalized;
+        }
+
+        await EnsureConnectedAsync(allowInteractivePairing: string.IsNullOrWhiteSpace(_configuredClientKey), forcePairing: false, ct: ct);
+
+        try
+        {
+            await SendRequestCoreAsync("ssap://system.launcher/open", new { target = normalized }, ct, TimeSpan.FromSeconds(10));
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            DiagnosticLog?.Invoke($"system.launcher/open fallback ({ex.Message}); trying system.launcher/launch.");
+            await SendRequestCoreAsync(
+                "ssap://system.launcher/launch",
+                new { id = "com.webos.app.browser", target = normalized },
+                ct,
+                TimeSpan.FromSeconds(10));
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(800, CancellationToken.None);
+                await QueryForegroundAppOnceAsync(CancellationToken.None);
+            }
+            catch
+            {
+            }
+        });
+
+        return normalized;
+    }
+
+    /// <summary>
     /// Sends a Magic Remote button press over LG's secondary pointer input WebSocket
     /// (e.g., UP, DOWN, LEFT, RIGHT, ENTER, BACK, HOME, EXIT, MENU, QMENU, INFO, GUIDE, CHANNELUP, CHANNELDOWN).
     /// </summary>
@@ -585,26 +675,118 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
             return;
         }
 
+        await SendPointerFrameAsync($"type:button\nname:{cleanBtn}\n\n", ct);
+    }
+
+    /// <summary>
+    /// Moves the LG Magic Remote pointer by relative (dx, dy) deltas, chunking larger movements
+    /// into smooth small steps to minimize webOS pointer acceleration distortion.
+    /// </summary>
+    public async Task MovePointerRelativeAsync(int dx, int dy, bool drag = false, CancellationToken ct = default)
+    {
+        if (dx == 0 && dy == 0)
+        {
+            return;
+        }
+
+        if (_demoMode)
+        {
+            lock (_stateLock)
+            {
+                _cursorPxX = Math.Clamp(_cursorPxX + dx, 0, LogicalScreenWidth);
+                _cursorPxY = Math.Clamp(_cursorPxY + dy, 0, LogicalScreenHeight);
+            }
+            return;
+        }
+
         await EnsureConnectedAsync(allowInteractivePairing: false, forcePairing: false, ct: ct);
         await _pointerGate.WaitAsync(ct);
         try
         {
-            if (_pointerWs is null || _pointerWs.State != WebSocketState.Open)
+            await EnsurePointerSocketLockedAsync(ct);
+            await SendChunkedMoveLockedAsync(dx, dy, drag, maxStepPx: 50, delayMs: 12, ct);
+        }
+        finally
+        {
+            _pointerGate.Release();
+        }
+
+        lock (_stateLock)
+        {
+            _cursorPxX = Math.Clamp(_cursorPxX + dx, 0, LogicalScreenWidth);
+            _cursorPxY = Math.Clamp(_cursorPxY + dy, 0, LogicalScreenHeight);
+        }
+    }
+
+    /// <summary>
+    /// Moves the LG Magic Remote pointer to a normalized (0..1000, 0..1000) coordinate on the TV screen.
+    /// Homes the cursor to top-left (0, 0) on first use or when recalibrate=true, then steps smoothly.
+    /// </summary>
+    public async Task MovePointerToNormalizedAsync(int normX, int normY, bool recalibrate = false, CancellationToken ct = default)
+    {
+        var clampedX = Math.Clamp(normX, 0, 1000);
+        var clampedY = Math.Clamp(normY, 0, 1000);
+        var targetPxX = (int)Math.Round(clampedX * LogicalScreenWidth / 1000.0);
+        var targetPxY = (int)Math.Round(clampedY * LogicalScreenHeight / 1000.0);
+
+        if (_demoMode)
+        {
+            lock (_stateLock)
             {
-                await OpenPointerSocketCoreAsync(ct);
+                _cursorPxX = targetPxX;
+                _cursorPxY = targetPxY;
+                _cursorCalibrated = true;
+            }
+            return;
+        }
+
+        await EnsureConnectedAsync(allowInteractivePairing: false, forcePairing: false, ct: ct);
+        await _pointerGate.WaitAsync(ct);
+        try
+        {
+            await EnsurePointerSocketLockedAsync(ct);
+
+            bool needsHome;
+            int startX;
+            int startY;
+            lock (_stateLock)
+            {
+                needsHome = recalibrate || !_cursorCalibrated;
+                startX = _cursorPxX;
+                startY = _cursorPxY;
             }
 
-            var frame = $"type:button\nname:{cleanBtn}\n\n";
-            var bytes = Encoding.UTF8.GetBytes(frame);
-            try
+            if (needsHome)
             {
-                await _pointerWs!.SendAsync(bytes, WebSocketMessageType.Text, true, ct);
+                // Slam smoothly into the top-left corner (0, 0) to establish a known anchor point.
+                for (var i = 0; i < 14; i++)
+                {
+                    await SendPointerFrameLockedAsync("type:move\ndx:-180\ndy:-110\ndown:0\n\n", ct);
+                    await Task.Delay(10, ct);
+                }
+
+                startX = 0;
+                startY = 0;
+                lock (_stateLock)
+                {
+                    _cursorPxX = 0;
+                    _cursorPxY = 0;
+                    _cursorCalibrated = true;
+                }
             }
-            catch
+
+            var dx = targetPxX - startX;
+            var dy = targetPxY - startY;
+            if (dx != 0 || dy != 0)
             {
-                // Socket expired — reconnect once and retry.
-                await OpenPointerSocketCoreAsync(ct);
-                await _pointerWs!.SendAsync(bytes, WebSocketMessageType.Text, true, ct);
+                await SendChunkedMoveLockedAsync(dx, dy, drag: false, maxStepPx: 45, delayMs: 12, ct);
+            }
+
+            lock (_stateLock)
+            {
+                _cursorPxX = targetPxX;
+                _cursorPxY = targetPxY;
+                _cursorCalibrated = true;
             }
         }
         finally
@@ -613,7 +795,223 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
         }
     }
 
-    public async Task SendKeyboardTextAsync(string text, bool pressEnter = true, CancellationToken ct = default)
+    public async Task ClickPointerAsync(CancellationToken ct = default)
+    {
+        if (_demoMode)
+        {
+            return;
+        }
+
+        await SendPointerFrameAsync("type:click\n\n", ct);
+    }
+
+    public async Task ScrollPointerAsync(int dx, int dy, CancellationToken ct = default)
+    {
+        if (_demoMode)
+        {
+            return;
+        }
+
+        await SendPointerFrameAsync($"type:scroll\ndx:{dx}\ndy:{dy}\n\n", ct);
+    }
+
+    /// <summary>
+    /// Wakes the LG Magic Remote on-screen cursor with a tiny +/-2px micro-wiggle so it renders in screenshots.
+    /// </summary>
+    public async Task WakePointerCursorAsync(CancellationToken ct = default)
+    {
+        if (_demoMode)
+        {
+            return;
+        }
+
+        await EnsureConnectedAsync(allowInteractivePairing: false, forcePairing: false, ct: ct);
+        await _pointerGate.WaitAsync(ct);
+        try
+        {
+            await EnsurePointerSocketLockedAsync(ct);
+            await SendPointerFrameLockedAsync("type:move\ndx:2\ndy:0\ndown:0\n\n", ct);
+            await Task.Delay(35, ct);
+            await SendPointerFrameLockedAsync("type:move\ndx:-2\ndy:0\ndown:0\n\n", ct);
+        }
+        catch
+        {
+            // Non-fatal if pointer socket isn't ready yet.
+        }
+        finally
+        {
+            _pointerGate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Captures a live screenshot of the LG webOS TV screen via ssap://tv/executeOneShot,
+    /// downloads the returned imageUri over HTTPS/HTTP, and returns base64-encoded JPEG data.
+    /// </summary>
+    public async Task<LgTvScreenshotResult> CaptureScreenshotAsync(
+        int width = 960,
+        int height = 540,
+        bool showCursor = true,
+        CancellationToken ct = default)
+    {
+        var w = Math.Clamp(width, 320, 1920);
+        var h = Math.Clamp(height, 180, 1080);
+
+        if (_demoMode)
+        {
+            return new LgTvScreenshotResult(false, null, "image/jpeg", w, h, 0, null, "Screenshots are unavailable in Demo Mode.");
+        }
+
+        await EnsureConnectedAsync(allowInteractivePairing: false, forcePairing: false, ct: ct);
+
+        if (showCursor)
+        {
+            await WakePointerCursorAsync(ct);
+            await Task.Delay(120, ct);
+        }
+
+        await _captureGate.WaitAsync(ct);
+        try
+        {
+            var elapsed = DateTimeOffset.UtcNow - _lastCaptureUtc;
+            if (elapsed < TimeSpan.FromMilliseconds(850))
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(850) - elapsed, ct);
+            }
+
+            JsonElement resp = default;
+            Exception? lastEx = null;
+
+            var attempts = new (string Uri, object Payload)[]
+            {
+                ("ssap://tv/executeOneShot", new { path = "/tmp/denon_cap.jpg", method = "DISPLAY", format = "JPG", width = w, height = h }),
+                ("ssap://tv/executeOneShot", new { }),
+                ("ssap://com.webos.service.capture/executeOneShot", new { path = "/tmp/denon_cap.jpg", method = "DISPLAY", format = "JPG", width = w, height = h }),
+            };
+
+            string? imageUri = null;
+            foreach (var (uri, payload) in attempts)
+            {
+                try
+                {
+                    resp = await SendRequestCoreAsync(uri, payload, ct, TimeSpan.FromSeconds(8));
+                    if (resp.ValueKind == JsonValueKind.Object &&
+                        resp.TryGetProperty("imageUri", out var uriEl) &&
+                        uriEl.ValueKind == JsonValueKind.String &&
+                        !string.IsNullOrWhiteSpace(uriEl.GetString()))
+                    {
+                        imageUri = uriEl.GetString();
+                        break;
+                    }
+                }
+                catch (Exception ex) when (!ct.IsCancellationRequested)
+                {
+                    lastEx = ex;
+                }
+            }
+
+            _lastCaptureUtc = DateTimeOffset.UtcNow;
+
+            if (string.IsNullOrWhiteSpace(imageUri))
+            {
+                return new LgTvScreenshotResult(
+                    false,
+                    null,
+                    "image/jpeg",
+                    w,
+                    h,
+                    0,
+                    null,
+                    $"TV firmware did not return an imageUri for executeOneShot. {lastEx?.Message}".Trim());
+            }
+
+            var bytes = await SnapshotHttpClient.GetByteArrayAsync(imageUri, ct);
+            var mime = imageUri.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ? "image/png" : "image/jpeg";
+            return new LgTvScreenshotResult(
+                true,
+                Convert.ToBase64String(bytes),
+                mime,
+                w,
+                h,
+                bytes.Length,
+                imageUri,
+                null);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            return new LgTvScreenshotResult(false, null, "image/jpeg", w, h, 0, null, $"Screenshot capture failed: {ex.Message}");
+        }
+        finally
+        {
+            _captureGate.Release();
+        }
+    }
+
+    private async Task SendPointerFrameAsync(string frame, CancellationToken ct)
+    {
+        await EnsureConnectedAsync(allowInteractivePairing: false, forcePairing: false, ct: ct);
+        await _pointerGate.WaitAsync(ct);
+        try
+        {
+            await EnsurePointerSocketLockedAsync(ct);
+            await SendPointerFrameLockedAsync(frame, ct);
+        }
+        finally
+        {
+            _pointerGate.Release();
+        }
+    }
+
+    private async Task EnsurePointerSocketLockedAsync(CancellationToken ct)
+    {
+        if (_pointerWs is null || _pointerWs.State != WebSocketState.Open)
+        {
+            await OpenPointerSocketCoreAsync(ct);
+        }
+    }
+
+    private async Task SendPointerFrameLockedAsync(string frame, CancellationToken ct)
+    {
+        var bytes = Encoding.UTF8.GetBytes(frame);
+        try
+        {
+            await _pointerWs!.SendAsync(bytes, WebSocketMessageType.Text, true, ct);
+        }
+        catch
+        {
+            await OpenPointerSocketCoreAsync(ct);
+            await _pointerWs!.SendAsync(bytes, WebSocketMessageType.Text, true, ct);
+        }
+    }
+
+    private async Task SendChunkedMoveLockedAsync(int dx, int dy, bool drag, int maxStepPx, int delayMs, CancellationToken ct)
+    {
+        var steps = Math.Max(1, (int)Math.Ceiling(Math.Max(Math.Abs(dx), Math.Abs(dy)) / (double)Math.Max(10, maxStepPx)));
+        var downVal = drag ? 1 : 0;
+        var sentX = 0;
+        var sentY = 0;
+
+        for (var i = 1; i <= steps; i++)
+        {
+            var nextX = (int)Math.Round(dx * (i / (double)steps));
+            var nextY = (int)Math.Round(dy * (i / (double)steps));
+            var stepDx = nextX - sentX;
+            var stepDy = nextY - sentY;
+            sentX = nextX;
+            sentY = nextY;
+
+            if (stepDx != 0 || stepDy != 0)
+            {
+                await SendPointerFrameLockedAsync($"type:move\ndx:{stepDx}\ndy:{stepDy}\ndown:{downVal}\n\n", ct);
+                if (i < steps && delayMs > 0)
+                {
+                    await Task.Delay(delayMs, ct);
+                }
+            }
+        }
+    }
+
+    public async Task SendKeyboardTextAsync(string text, bool pressEnter = true, bool replace = false, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(text) || _demoMode)
         {
@@ -621,7 +1019,7 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
         }
 
         await EnsureConnectedAsync(allowInteractivePairing: false, forcePairing: false, ct: ct);
-        await SendRequestCoreAsync("ssap://com.webos.service.ime/insertText", new { text, replace = false }, ct);
+        await SendRequestCoreAsync("ssap://com.webos.service.ime/insertText", new { text, replace }, ct);
         if (pressEnter)
         {
             await Task.Delay(120, ct);
@@ -696,6 +1094,7 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
         _connectGate.Dispose();
         _sendGate.Dispose();
         _pointerGate.Dispose();
+        _captureGate.Dispose();
     }
 
     private async Task MonitorLoopAsync(CancellationToken ct)
@@ -1354,6 +1753,7 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
             "prime" or "amazon" => "amazon",
             "appletv" or "com.apple.appletv" => "apple",
             "livetv" or "com.webos.app.livetv" => "livetv",
+            "browser" or "web" or "webbrowser" or "com.webos.app.browser" => "browser",
             _ => lower,
         };
 
@@ -1378,6 +1778,7 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
             "prime" or "amazon" => "amazon",
             "appletv" => "com.apple.appletv",
             "livetv" => "com.webos.app.livetv",
+            "browser" or "web" or "webbrowser" => "com.webos.app.browser",
             _ => token,
         };
     }

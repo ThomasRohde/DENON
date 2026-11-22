@@ -1,10 +1,17 @@
 using System.Net.Http;
+using System.Text.Json;
 using Denon.App.PluginSdk;
 
 namespace Denon.Plugin.SmartTv;
 
 public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
 {
+    private static readonly JsonSerializerOptions ComputerJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = false,
+    };
+
     private readonly LgWebOsClient _client = new();
     private IPluginContext? _context;
     private SmartTvConfig _config = new();
@@ -21,7 +28,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
     public PluginManifest Manifest { get; } = new(
         Id: "smart-tv",
         Name: "Smart TV Control (LG webOS)",
-        Version: "2.0.0",
+        Version: "2.1.0",
         Author: "Denon Desktop",
         Description: "Full persistent LG webOS SSAP (wss://:3001) controller: live TV state subscriptions, auto-discovered apps & HDMI inputs, Magic Remote D-Pad & keyboard, OLED Screen Off, eARC Audio Output switching, YouTube deep-link casting, SSDP/ARP auto-discovery, Wake-on-LAN, and Denon AVR coordination.",
         Category: "Home Theater TV",
@@ -262,8 +269,27 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
                 {
                     var text = parameters is not null && parameters.TryGetValue("text", out var t) ? t : string.Empty;
                     var pressEnter = parameters is null || !parameters.TryGetValue("enter", out var e) || !e.Equals("false", StringComparison.OrdinalIgnoreCase);
-                    await _client.SendKeyboardTextAsync(text, pressEnter, cancellationToken);
+                    var replace = parameters is not null && parameters.TryGetValue("replace", out var r) && r.Equals("true", StringComparison.OrdinalIgnoreCase);
+                    await _client.SendKeyboardTextAsync(text, pressEnter, replace, cancellationToken);
                     return ReportAction($"Typed \"{text}\" on TV keyboard.");
+                }
+
+                case "tv.open_url":
+                {
+                    var url = parameters is not null && parameters.TryGetValue("url", out var u) ? u : string.Empty;
+                    if (string.IsNullOrWhiteSpace(url))
+                    {
+                        return PluginActionResult.Fail("Missing 'url' parameter.");
+                    }
+
+                    var opened = await _client.OpenBrowserUrlAsync(url, cancellationToken);
+                    return ReportAction($"Opened {opened} in LG webOS Web Browser.");
+                }
+
+                case "tv.computer":
+                {
+                    var payloadJson = parameters is not null && parameters.TryGetValue("payloadJson", out var pj) ? pj : "{}";
+                    return await ExecuteTvComputerAsync(payloadJson, cancellationToken);
                 }
 
                 case "tv.toast":
@@ -466,6 +492,320 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
 
         _viewModel?.ApplyLiveState(state);
         UpdateHealthStatus();
+    }
+
+    private async Task<PluginActionResult> ExecuteTvComputerAsync(string payloadJson, CancellationToken ct)
+    {
+        using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(payloadJson) ? "{}" : payloadJson);
+        var root = doc.RootElement;
+        var action = GetJsonString(root, "action", "screenshot").ToLowerInvariant();
+        var screenshotAfter = GetJsonBool(root, "screenshot_after") ?? false;
+        var showCursor = GetJsonBool(root, "show_cursor") ?? true;
+        var width = Math.Clamp(GetJsonInt(root, "width") ?? 960, 320, 1920);
+        var height = Math.Clamp(GetJsonInt(root, "height") ?? 540, 180, 1080);
+        var settleMs = Math.Clamp(GetJsonInt(root, "settle_ms") ?? 350, 0, 5000);
+
+        var executed = new List<string>();
+        LgTvScreenshotResult? shot = null;
+
+        if (action == "batch")
+        {
+            if (!root.TryGetProperty("steps", out var stepsEl) || stepsEl.ValueKind != JsonValueKind.Array)
+            {
+                return PluginActionResult.Fail("Action 'batch' requires a 'steps' array of sub-actions.");
+            }
+
+            var stepCount = 0;
+            foreach (var step in stepsEl.EnumerateArray())
+            {
+                if (++stepCount > 25)
+                {
+                    executed.Add("Stopped after max 25 batch steps.");
+                    break;
+                }
+
+                if (step.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                var subAction = GetJsonString(step, "action").ToLowerInvariant();
+                if (subAction == "screenshot")
+                {
+                    var sw = Math.Clamp(GetJsonInt(step, "width") ?? width, 320, 1920);
+                    var sh = Math.Clamp(GetJsonInt(step, "height") ?? height, 180, 1080);
+                    var sc = GetJsonBool(step, "show_cursor") ?? showCursor;
+                    shot = await _client.CaptureScreenshotAsync(sw, sh, sc, ct);
+                    executed.Add(shot.Success ? $"Captured screenshot ({shot.Width}x{shot.Height}, {shot.ByteLength} bytes)" : $"Screenshot failed: {shot.ErrorMessage}");
+                }
+                else
+                {
+                    var summary = await ExecuteSingleComputerStepAsync(subAction, step, ct);
+                    executed.Add(summary);
+                }
+            }
+        }
+        else if (action == "screenshot")
+        {
+            shot = await _client.CaptureScreenshotAsync(width, height, showCursor, ct);
+            executed.Add(shot.Success
+                ? $"Captured TV screenshot ({shot.Width}x{shot.Height}, {shot.ByteLength} bytes)."
+                : $"Screenshot failed: {shot.ErrorMessage}");
+        }
+        else if (action == "get_state")
+        {
+            executed.Add("Read live LG webOS TV state.");
+        }
+        else
+        {
+            var summary = await ExecuteSingleComputerStepAsync(action, root, ct);
+            executed.Add(summary);
+        }
+
+        if (screenshotAfter && shot is null)
+        {
+            if (settleMs > 0)
+            {
+                await Task.Delay(settleMs, ct);
+            }
+
+            shot = await _client.CaptureScreenshotAsync(width, height, showCursor, ct);
+            executed.Add(shot.Success
+                ? $"Captured post-action screenshot ({shot.Width}x{shot.Height}, {shot.ByteLength} bytes)."
+                : $"Post-action screenshot failed: {shot.ErrorMessage}");
+        }
+
+        var live = _client.CurrentState;
+        var (cx, cy, calibrated) = _client.GetNormalizedCursor();
+
+        var dataObj = new
+        {
+            action,
+            stepsExecuted = executed,
+            tv = new
+            {
+                connected = live.IsConnected,
+                model = live.ModelName,
+                webOsVersion = live.WebOsVersion,
+                powerState = live.PowerState,
+                isScreenOff = live.IsScreenOff,
+                foregroundAppId = live.ForegroundAppId,
+                foregroundAppTitle = live.ForegroundAppTitle,
+                nowShowing = live.NowShowingSummary,
+                soundOutput = live.SoundOutput,
+                soundOutputLabel = live.SoundOutputLabel,
+                pointerConnected = live.IsPointerConnected,
+            },
+            cursor = new
+            {
+                x = cx,
+                y = cy,
+                coordinateSpace = "0..1000 x 0..1000",
+                calibrated,
+            },
+            screenshot = shot is null
+                ? null
+                : new
+                {
+                    captured = shot.Success,
+                    mimeType = shot.MimeType,
+                    width = shot.Width,
+                    height = shot.Height,
+                    byteLength = shot.ByteLength,
+                    error = shot.ErrorMessage,
+                },
+            installedApps = live.Apps.Take(20).Select(a => new { id = a.Id, title = a.Title, active = a.IsActive }).ToArray(),
+            inputs = live.Inputs.Select(i => new { id = i.Id, appId = i.AppId, label = i.Label, connected = i.IsConnected, active = i.IsActive }).ToArray(),
+        };
+
+        var summaryText = string.Join(" → ", executed);
+        _context?.Logger.Info($"[TV Computer] {summaryText}");
+        _viewModel?.SetLastActivity(summaryText);
+
+        var dataJson = JsonSerializer.Serialize(dataObj, ComputerJsonOptions);
+        return PluginActionResult.OkWithData(
+            summaryText,
+            dataJson: dataJson,
+            imageBase64: shot?.Success == true ? shot.ImageBase64 : null,
+            imageMimeType: shot?.Success == true ? shot.MimeType : null);
+    }
+
+    private async Task<string> ExecuteSingleComputerStepAsync(string action, JsonElement el, CancellationToken ct)
+    {
+        switch (action)
+        {
+            case "open_url":
+            {
+                var url = GetJsonString(el, "url");
+                if (string.IsNullOrWhiteSpace(url))
+                {
+                    throw new ArgumentException("Action 'open_url' requires 'url'.");
+                }
+
+                var opened = await _client.OpenBrowserUrlAsync(url, ct);
+                return $"Opened browser URL {opened}";
+            }
+
+            case "launch_app":
+            {
+                var app = GetJsonString(el, "app");
+                if (string.IsNullOrWhiteSpace(app))
+                {
+                    app = GetJsonString(el, "app_id");
+                }
+
+                if (string.IsNullOrWhiteSpace(app))
+                {
+                    throw new ArgumentException("Action 'launch_app' requires 'app' (app name, alias, or webOS appId).");
+                }
+
+                var contentId = GetJsonString(el, "content_id");
+                var title = await _client.LaunchAppAsync(app, string.IsNullOrWhiteSpace(contentId) ? null : contentId, ct);
+                return string.IsNullOrWhiteSpace(contentId)
+                    ? $"Launched app '{title}'"
+                    : $"Launched '{title}' with content '{contentId}'";
+            }
+
+            case "close_app":
+                await _client.CloseCurrentAppAsync(ct);
+                return "Closed foreground app";
+
+            case "move":
+            {
+                var dx = GetJsonInt(el, "dx") ?? 0;
+                var dy = GetJsonInt(el, "dy") ?? 0;
+                var drag = GetJsonBool(el, "drag") ?? false;
+                await _client.MovePointerRelativeAsync(dx, dy, drag, ct);
+                return drag ? $"Dragged pointer by ({dx}, {dy})" : $"Moved pointer by ({dx}, {dy})";
+            }
+
+            case "move_to":
+            {
+                var x = GetJsonInt(el, "x") ?? throw new ArgumentException("Action 'move_to' requires integer 'x' (0..1000).");
+                var y = GetJsonInt(el, "y") ?? throw new ArgumentException("Action 'move_to' requires integer 'y' (0..1000).");
+                var recal = GetJsonBool(el, "recalibrate") ?? false;
+                await _client.MovePointerToNormalizedAsync(x, y, recal, ct);
+                return $"Moved pointer to ({Math.Clamp(x, 0, 1000)}, {Math.Clamp(y, 0, 1000)})";
+            }
+
+            case "click":
+            {
+                var x = GetJsonInt(el, "x");
+                var y = GetJsonInt(el, "y");
+                if (x.HasValue && y.HasValue)
+                {
+                    var recal = GetJsonBool(el, "recalibrate") ?? false;
+                    await _client.MovePointerToNormalizedAsync(x.Value, y.Value, recal, ct);
+                    await Task.Delay(70, ct);
+                    await _client.ClickPointerAsync(ct);
+                    return $"Clicked at ({Math.Clamp(x.Value, 0, 1000)}, {Math.Clamp(y.Value, 0, 1000)})";
+                }
+
+                await _client.ClickPointerAsync(ct);
+                return "Clicked at current pointer position";
+            }
+
+            case "scroll":
+            {
+                var dx = GetJsonInt(el, "dx") ?? 0;
+                var dy = GetJsonInt(el, "dy") ?? -3;
+                var repeat = Math.Clamp(GetJsonInt(el, "repeat") ?? 1, 1, 15);
+                for (var i = 0; i < repeat; i++)
+                {
+                    await _client.ScrollPointerAsync(dx, dy, ct);
+                    if (i + 1 < repeat)
+                    {
+                        await Task.Delay(90, ct);
+                    }
+                }
+
+                return repeat == 1 ? $"Scrolled ({dx}, {dy})" : $"Scrolled ({dx}, {dy}) x{repeat}";
+            }
+
+            case "button":
+            {
+                var btn = GetJsonString(el, "button");
+                if (string.IsNullOrWhiteSpace(btn))
+                {
+                    throw new ArgumentException("Action 'button' requires 'button' (e.g. HOME, BACK, ENTER, UP, DOWN, LEFT, RIGHT).");
+                }
+
+                var repeat = Math.Clamp(GetJsonInt(el, "repeat") ?? 1, 1, 15);
+                for (var i = 0; i < repeat; i++)
+                {
+                    await _client.SendButtonAsync(btn, ct);
+                    if (i + 1 < repeat)
+                    {
+                        await Task.Delay(130, ct);
+                    }
+                }
+
+                return repeat == 1 ? $"Pressed {btn.ToUpperInvariant()}" : $"Pressed {btn.ToUpperInvariant()} x{repeat}";
+            }
+
+            case "type":
+            {
+                var text = GetJsonString(el, "text");
+                if (string.IsNullOrEmpty(text))
+                {
+                    throw new ArgumentException("Action 'type' requires 'text'.");
+                }
+
+                var pressEnter = GetJsonBool(el, "press_enter") ?? true;
+                var replace = GetJsonBool(el, "replace") ?? false;
+                await _client.SendKeyboardTextAsync(text, pressEnter, replace, ct);
+                return pressEnter ? $"Typed \"{text}\" + Enter" : $"Typed \"{text}\"";
+            }
+
+            case "backspace":
+            {
+                var count = Math.Clamp(GetJsonInt(el, "count") ?? 1, 1, 50);
+                await _client.DeleteKeyboardCharactersAsync(count, ct);
+                return $"Deleted {count} character(s)";
+            }
+
+            case "wait":
+            {
+                var ms = Math.Clamp(GetJsonInt(el, "ms") ?? 1000, 50, 10000);
+                await Task.Delay(ms, ct);
+                return $"Waited {ms}ms";
+            }
+
+            default:
+                throw new ArgumentException($"Unknown tv_computer action '{action}'. Use screenshot, get_state, open_url, launch_app, close_app, move, move_to, click, scroll, button, type, backspace, wait, or batch.");
+        }
+    }
+
+    private static string GetJsonString(JsonElement el, string name, string fallback = "")
+    {
+        if (el.ValueKind == JsonValueKind.Object && el.TryGetProperty(name, out var prop) && prop.ValueKind != JsonValueKind.Null)
+        {
+            return prop.ValueKind == JsonValueKind.String ? (prop.GetString() ?? fallback) : prop.ToString();
+        }
+
+        return fallback;
+    }
+
+    private static int? GetJsonInt(JsonElement el, string name)
+    {
+        if (el.ValueKind == JsonValueKind.Object && el.TryGetProperty(name, out var prop))
+        {
+            if (prop.ValueKind == JsonValueKind.Number && prop.TryGetInt32(out var i)) return i;
+            if (prop.ValueKind == JsonValueKind.String && int.TryParse(prop.GetString(), out var i2)) return i2;
+        }
+
+        return null;
+    }
+
+    private static bool? GetJsonBool(JsonElement el, string name)
+    {
+        if (el.ValueKind == JsonValueKind.Object && el.TryGetProperty(name, out var prop))
+        {
+            if (prop.ValueKind is JsonValueKind.True or JsonValueKind.False) return prop.GetBoolean();
+            if (prop.ValueKind == JsonValueKind.String && bool.TryParse(prop.GetString(), out var b)) return b;
+        }
+
+        return null;
     }
 
     private PluginActionResult ReportAction(string message)

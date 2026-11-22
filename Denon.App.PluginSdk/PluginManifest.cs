@@ -41,9 +41,19 @@ public sealed record PluginActionDescriptor(
 
 public sealed record PluginActionResult(
     bool Success,
-    string Message)
+    string Message,
+    string? DataJson = null,
+    string? ImageBase64 = null,
+    string? ImageMimeType = null)
 {
     public static PluginActionResult Ok(string message) => new(true, message);
+
+    public static PluginActionResult OkWithData(
+        string message,
+        string? dataJson = null,
+        string? imageBase64 = null,
+        string? imageMimeType = null) =>
+        new(true, message, dataJson, imageBase64, imageMimeType);
 
     public static PluginActionResult Fail(string message) => new(false, message);
 }

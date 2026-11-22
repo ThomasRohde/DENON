@@ -265,6 +265,181 @@
                 </StackPanel>
             </Border>
 
+            <!-- ======================== CARD 2: LIVE TV SCREEN PREVIEW & VIRTUAL TRACKPAD ======================== -->
+            <Border Style="{StaticResource TvCard}" Margin="0,0,0,14">
+                <StackPanel>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="LIVE TV SCREEN &amp; VIRTUAL TRACKPAD" FontSize="10.5" FontWeight="Bold" Foreground="#64748B" VerticalAlignment="Center" />
+                                <Border Background="#0E1726" BorderBrush="#243248" BorderThickness="1" CornerRadius="5" Padding="7,1.5" Margin="8,0,0,0">
+                                    <TextBlock Text="{Binding PreviewStatusText}" FontSize="10" Foreground="#38BDF8" />
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <WrapPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <CheckBox Content="Auto-Refresh"
+                                      IsChecked="{Binding AutoRefreshPreview, Mode=TwoWay}"
+                                      Foreground="#CBD5E1"
+                                      FontSize="11.5"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,10,0"
+                                      ToolTip="Automatically refresh the live TV preview every 2 seconds while this tab is open" />
+                            <Button Content="Center Cursor"
+                                    Command="{Binding RecalibrateCursorCommand}"
+                                    Style="{StaticResource TvChipBtn}"
+                                    Margin="0,0,6,0"
+                                    ToolTip="Recalibrate LG Magic Remote pointer to the center of the TV screen" />
+                            <Button Content="Snap Now"
+                                    Command="{Binding CapturePreviewCommand}"
+                                    Style="{StaticResource TvPrimaryBtn}"
+                                    Padding="12,5.5"
+                                    FontSize="11.5" />
+                        </WrapPanel>
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.38*" />
+                            <ColumnDefinition Width="14" />
+                            <ColumnDefinition Width="0.62*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Left: Clickable 16:9 Live TV Preview + Browser URL Bar -->
+                        <StackPanel Grid.Column="0">
+                            <Border x:Name="PreviewSurface"
+                                    Background="#080B11"
+                                    BorderBrush="#243044"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    ClipToBounds="True"
+                                    Height="236"
+                                    Cursor="Cross"
+                                    MouseLeftButtonDown="PreviewSurface_MouseLeftButtonDown"
+                                    MouseRightButtonDown="PreviewSurface_MouseRightButtonDown"
+                                    MouseWheel="PreviewSurface_MouseWheel"
+                                    ToolTip="Left-click anywhere to click that spot on your TV • Right-click = Back • Mouse wheel = Scroll">
+                                <Grid>
+                                    <Image x:Name="PreviewImageControl"
+                                           Source="{Binding PreviewImage}"
+                                           Stretch="Uniform"
+                                           RenderOptions.BitmapScalingMode="HighQuality"
+                                           Visibility="{Binding HasPreviewImage, Converter={StaticResource TvBoolToVis}}" />
+
+                                    <!-- Click visual feedback marker -->
+                                    <Canvas x:Name="ClickOverlayCanvas" IsHitTestVisible="False">
+                                        <Ellipse x:Name="ClickMarker"
+                                                 Width="18"
+                                                 Height="18"
+                                                 Stroke="#38BDF8"
+                                                 StrokeThickness="2"
+                                                 Fill="#4438BDF8"
+                                                 Visibility="Collapsed" />
+                                    </Canvas>
+
+                                    <!-- Placeholder before first capture -->
+                                    <StackPanel VerticalAlignment="Center"
+                                                HorizontalAlignment="Center"
+                                                Margin="24"
+                                                Visibility="{Binding ShowPreviewPlaceholder, Converter={StaticResource TvBoolToVis}}">
+                                        <TextBlock Text="Live LG webOS Screen Preview"
+                                                   FontSize="13.5"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#94A3B8"
+                                                   HorizontalAlignment="Center"
+                                                   Margin="0,0,0,5" />
+                                        <TextBlock Text="Click Snap Now or enable Auto-Refresh to view your TV screen here. Left-click directly on the image to point &amp; click on the TV."
+                                                   FontSize="11.5"
+                                                   Foreground="#64748B"
+                                                   TextAlignment="Center"
+                                                   TextWrapping="Wrap"
+                                                   MaxWidth="380" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Direct LG webOS Web Browser Launcher -->
+                            <Grid Margin="0,9,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="6" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding BrowserUrlText, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource TvInput}"
+                                         Tag="Open URL in LG webOS Browser (e.g. news.ycombinator.com) &amp; press Enter..."
+                                         ToolTip="Launches LG webOS built-in Web Browser straight to this URL and refreshes the preview">
+                                    <TextBox.InputBindings>
+                                        <KeyBinding Key="Return" Command="{Binding OpenBrowserUrlCommand}" />
+                                    </TextBox.InputBindings>
+                                </TextBox>
+                                <Button Grid.Column="2"
+                                        Content="Open in TV Browser"
+                                        Command="{Binding OpenBrowserUrlCommand}"
+                                        Style="{StaticResource TvBtn}"
+                                        Padding="11,5.5" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Right: Precision Virtual Trackpad -->
+                        <Grid Grid.Column="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="9" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <Border x:Name="TrackpadSurface"
+                                    Grid.Row="0"
+                                    Background="#0B0F18"
+                                    BorderBrush="#27344A"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Cursor="Hand"
+                                    MinHeight="200"
+                                    MouseLeftButtonDown="Trackpad_MouseLeftButtonDown"
+                                    MouseMove="Trackpad_MouseMove"
+                                    MouseLeftButtonUp="Trackpad_MouseLeftButtonUp"
+                                    MouseRightButtonDown="Trackpad_MouseRightButtonDown"
+                                    MouseWheel="Trackpad_MouseWheel"
+                                    ToolTip="Drag to steer Magic Remote pointer • Tap to click • Right-click = Back • Wheel = Scroll">
+                                <Grid>
+                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="14" IsHitTestVisible="False">
+                                        <TextBlock Text="VIRTUAL TRACKPAD"
+                                                   FontSize="11"
+                                                   FontWeight="Bold"
+                                                   Foreground="#38BDF8"
+                                                   HorizontalAlignment="Center"
+                                                   Margin="0,0,0,6" />
+                                        <TextBlock x:Name="TrackpadHintText"
+                                                   Text="Hold &amp; drag to move pointer&#x0a;Click to select • Right-click Back&#x0a;Scroll wheel to scroll page"
+                                                   FontSize="11"
+                                                   Foreground="#64748B"
+                                                   TextAlignment="Center"
+                                                   LineHeight="17" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <UniformGrid Grid.Row="2" Columns="5">
+                                <Button Content="Click" Command="{Binding PointerClickCommand}" Style="{StaticResource TvPrimaryBtn}" Padding="4,5.5" FontSize="11" Margin="0,0,4,0" />
+                                <Button Content="Back" Command="{Binding SendButtonCommand}" CommandParameter="BACK" Style="{StaticResource TvChipBtn}" Padding="4,5.5" FontSize="11" Margin="0,0,4,0" />
+                                <Button Content="Home" Command="{Binding SendButtonCommand}" CommandParameter="HOME" Style="{StaticResource TvChipBtn}" Padding="4,5.5" FontSize="11" Margin="0,0,4,0" />
+                                <Button Content="▲" Command="{Binding PointerScrollCommand}" CommandParameter="up" Style="{StaticResource TvChipBtn}" Padding="4,5.5" FontSize="11" Margin="0,0,4,0" ToolTip="Scroll Up" />
+                                <Button Content="▼" Command="{Binding PointerScrollCommand}" CommandParameter="down" Style="{StaticResource TvChipBtn}" Padding="4,5.5" FontSize="11" ToolTip="Scroll Down" />
+                            </UniformGrid>
+                        </Grid>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
             <!-- ======================== ROW 2: POWER/AUDIO/HDMI + MAGIC REMOTE ======================== -->
             <Grid Margin="0,0,0,14">
                 <Grid.ColumnDefinitions>

@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-11-22
+
+### Added
+- **Live TV Screen Preview & Interactive Virtual Trackpad (Smart TV Plugin UI)**:
+  - Added a full-width **Live TV Screen & Virtual Trackpad** card inside the LG webOS Smart TV dashboard with **Snap Now**, **Auto-Refresh (`2s`)** (automatically paused when navigated away), **Click-to-Click** directly on the live TV preview image (with cyan target feedback), **Open in TV Browser** URL launcher, **Center Cursor** recalibration, and a laptop-style **Virtual Trackpad** supporting drag-to-move, tap-to-click, right-click Back, and mouse-wheel scrolling.
+- **Unified LG webOS TV Computer-Use MCP Tool (`tv_computer`)**:
+  - Added live TV screen capture (`ssap://tv/executeOneShot`) returning native MCP `image` content blocks (`image/jpeg`) alongside structured TV state (`foregroundApp`, `inputs`, `installedApps`, estimated cursor position), with cursor-wake micro-wiggle so the pink Magic Remote pointer is visible in screenshots.
+  - Added Magic Remote pointer control (`move` with drag support, corner-homed chunked `move_to` & `click` on a `0..1000` normalized grid, `scroll`), LG webOS Web Browser launcher (`open_url` via `ssap://system.launcher/open`), `launch_app` (with YouTube `content_id`), `close_app`, `button` (with `repeat`), `type` (with `replace`/`press_enter`), `backspace`, `wait`, and single-round-trip `batch` + `screenshot_after: true`.
+  - Extended `PluginActionResult` in `Denon.App.PluginSdk` with optional `DataJson`, `ImageBase64`, and `ImageMimeType` for multimodal plugin-to-MCP responses.
+
+### Changed
+- **Consolidated LG TV MCP Controls into `tv_computer`**: Replaced separate `tv_remote_button`, `tv_type_text`, and `tv_cast_youtube` tools with the single unified `tv_computer` tool (while keeping `screenshot` / `get_state` strictly read-only in `Observer` permission tier).
+
 ## [1.9.0] - 2026-11-22
 
 ### Added
@@ -167,7 +180,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Zero-Lag Real-Time HEOS Push Events (`LIVE PUSH`) & Analog VU Meters**: Dedicated `register_for_change_events` push listener for `<50 ms` knob/remote sync and toggleable dual-channel illuminated VU dials.
 - **Automated GitHub Releases Workflow**: `.github/workflows/release.yml` builds self-contained single-file `win-x64` executables and SHA-256 checksums on version tags.
 
-[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.9.0...HEAD
+[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.10.0...HEAD
+[1.10.0]: https://github.com/ThomasRohde/DENON/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/ThomasRohde/DENON/compare/v1.8.1...v1.9.0
 [1.8.1]: https://github.com/ThomasRohde/DENON/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/ThomasRohde/DENON/compare/v1.7.0...v1.8.0

@@ -1,9 +1,11 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace Denon.Plugin.SmartTv;
 
@@ -36,7 +38,15 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     private readonly SmartTvPlugin _plugin;
     private IReadOnlyList<LgTvAppInfo> _allApps = DefaultOfflineApps;
     private CancellationTokenSource? _volumeDebounceCts;
+    private CancellationTokenSource? _previewLoopCts;
     private bool _suppressVolumeSend;
+    private bool _isViewVisible;
+    private bool _isCapturingPreview;
+
+    private ImageSource? _previewImage;
+    private bool _autoRefreshPreview;
+    private string _previewStatusText = "Ready — click Snap Now or enable Auto-Refresh";
+    private string _browserUrlText = string.Empty;
 
     private string _tvName = "Living Room OLED TV";
     private string _tvIp = string.Empty;
@@ -98,6 +108,11 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
         BackspaceKeyboardCommand = new AsyncRelayCommand(_ => BackspaceKeyboardAsync());
         CastYouTubeCommand = new AsyncRelayCommand(_ => CastYouTubeAsync());
         SendCustomToastCommand = new AsyncRelayCommand(_ => SendCustomToastAsync());
+        CapturePreviewCommand = new AsyncRelayCommand(_ => CapturePreviewAsync(showCursor: true));
+        OpenBrowserUrlCommand = new AsyncRelayCommand(_ => OpenBrowserUrlAsync());
+        RecalibrateCursorCommand = new AsyncRelayCommand(_ => RecalibrateCursorAsync());
+        PointerClickCommand = new AsyncRelayCommand(_ => ClickPointerAsync());
+        PointerScrollCommand = new AsyncRelayCommand(p => ScrollPointerAsync(0, p?.ToString() == "up" ? 3 : -3));
 
         foreach (var inp in DefaultOfflineInputs) Inputs.Add(inp);
         RebuildFilteredApps();
@@ -128,6 +143,11 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     public ICommand BackspaceKeyboardCommand { get; }
     public ICommand CastYouTubeCommand { get; }
     public ICommand SendCustomToastCommand { get; }
+    public ICommand CapturePreviewCommand { get; }
+    public ICommand OpenBrowserUrlCommand { get; }
+    public ICommand RecalibrateCursorCommand { get; }
+    public ICommand PointerClickCommand { get; }
+    public ICommand PointerScrollCommand { get; }
 
     public string TvName { get => _tvName; set => Set(ref _tvName, value); }
     public string TvIp { get => _tvIp; set => Set(ref _tvIp, value); }
@@ -261,7 +281,49 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     public string KeyboardText { get => _keyboardText; set => Set(ref _keyboardText, value); }
     public string YouTubeUrlOrId { get => _youtubeUrlOrId; set => Set(ref _youtubeUrlOrId, value); }
     public string ToastText { get => _toastText; set => Set(ref _toastText, value); }
+    public string BrowserUrlText { get => _browserUrlText; set => Set(ref _browserUrlText, value); }
     public string StatusMessage { get => _statusMessage; private set => Set(ref _statusMessage, value); }
+
+    public ImageSource? PreviewImage
+    {
+        get => _previewImage;
+        private set
+        {
+            if (Set(ref _previewImage, value))
+            {
+                Raise(nameof(HasPreviewImage));
+                Raise(nameof(ShowPreviewPlaceholder));
+            }
+        }
+    }
+
+    public bool HasPreviewImage => _previewImage is not null;
+
+    public bool ShowPreviewPlaceholder => _previewImage is null;
+
+    public string PreviewStatusText
+    {
+        get => _previewStatusText;
+        private set => Set(ref _previewStatusText, value);
+    }
+
+    public bool AutoRefreshPreview
+    {
+        get => _autoRefreshPreview;
+        set
+        {
+            if (Set(ref _autoRefreshPreview, value))
+            {
+                UpdatePreviewLoop();
+            }
+        }
+    }
+
+    public void SetViewVisible(bool isVisible)
+    {
+        _isViewVisible = isVisible;
+        UpdatePreviewLoop();
+    }
 
     public void SyncFromConfig(SmartTvConfig cfg)
     {
@@ -749,6 +811,195 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
         {
             StatusMessage = $"⚠ Toast failed: {ex.Message}";
         }
+    }
+
+    public async Task CapturePreviewAsync(bool showCursor = true, bool quiet = false)
+    {
+        if (_isCapturingPreview)
+        {
+            return;
+        }
+
+        _isCapturingPreview = true;
+        try
+        {
+            if (!quiet)
+            {
+                PreviewStatusText = "Capturing TV screen...";
+            }
+
+            var shot = await _plugin.Client.CaptureScreenshotAsync(width: 960, height: 540, showCursor: showCursor);
+            if (!shot.Success || string.IsNullOrWhiteSpace(shot.ImageBase64))
+            {
+                PreviewStatusText = shot.ErrorMessage ?? "Preview unavailable";
+                if (!quiet)
+                {
+                    StatusMessage = $"⚠ {PreviewStatusText}";
+                }
+                return;
+            }
+
+            var bytes = Convert.FromBase64String(shot.ImageBase64);
+            var bmp = DecodeFrozenBitmap(bytes);
+            var kb = Math.Max(1, shot.ByteLength / 1024);
+            RunOnUi(() =>
+            {
+                PreviewImage = bmp;
+                PreviewStatusText = $"Live • {DateTime.Now:HH:mm:ss} • {shot.Width}×{shot.Height} ({kb} KB)";
+            });
+        }
+        catch (Exception ex)
+        {
+            PreviewStatusText = $"Preview failed: {ex.Message}";
+        }
+        finally
+        {
+            _isCapturingPreview = false;
+        }
+    }
+
+    public async Task ClickPreviewAtNormalizedAsync(int normX, int normY)
+    {
+        try
+        {
+            PreviewStatusText = $"Clicking ({normX}, {normY})...";
+            await _plugin.Client.MovePointerToNormalizedAsync(normX, normY, recalibrate: false);
+            await Task.Delay(70);
+            await _plugin.Client.ClickPointerAsync();
+            StatusMessage = $"✓ Clicked TV screen at ({normX}, {normY}).";
+
+            if (!AutoRefreshPreview)
+            {
+                await Task.Delay(450);
+                await CapturePreviewAsync(showCursor: true, quiet: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ Preview click failed: {ex.Message}";
+        }
+    }
+
+    public async Task MovePointerRelativeAsync(int dx, int dy)
+    {
+        try
+        {
+            await _plugin.Client.MovePointerRelativeAsync(dx, dy, drag: false);
+        }
+        catch
+        {
+            // Ignore transient pointer move failures during rapid gestures.
+        }
+    }
+
+    public async Task ClickPointerAsync()
+    {
+        try
+        {
+            await _plugin.Client.ClickPointerAsync();
+            StatusMessage = "✓ Sent Magic Remote click.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ Pointer click failed: {ex.Message}";
+        }
+    }
+
+    public async Task ScrollPointerAsync(int dx, int dy)
+    {
+        try
+        {
+            await _plugin.Client.ScrollPointerAsync(dx, dy);
+            StatusMessage = dy > 0 ? "✓ Scrolled TV up." : "✓ Scrolled TV down.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ Pointer scroll failed: {ex.Message}";
+        }
+    }
+
+    private async Task RecalibrateCursorAsync()
+    {
+        try
+        {
+            await _plugin.Client.MovePointerToNormalizedAsync(500, 500, recalibrate: true);
+            StatusMessage = "✓ Recalibrated Magic Remote cursor to center (500, 500).";
+            await CapturePreviewAsync(showCursor: true, quiet: true);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ Cursor recalibration failed: {ex.Message}";
+        }
+    }
+
+    private async Task OpenBrowserUrlAsync()
+    {
+        var raw = (BrowserUrlText ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            raw = "https://www.google.com";
+        }
+
+        try
+        {
+            var opened = await _plugin.Client.OpenBrowserUrlAsync(raw);
+            StatusMessage = $"✓ Opened {opened} in LG webOS Browser.";
+            if (!AutoRefreshPreview)
+            {
+                await Task.Delay(2200);
+                await CapturePreviewAsync(showCursor: true, quiet: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ Open URL failed: {ex.Message}";
+        }
+    }
+
+    private void UpdatePreviewLoop()
+    {
+        _previewLoopCts?.Cancel();
+        _previewLoopCts?.Dispose();
+        _previewLoopCts = null;
+
+        if (!_autoRefreshPreview || !_isViewVisible)
+        {
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        _previewLoopCts = cts;
+        _ = Task.Run(async () =>
+        {
+            while (!cts.IsCancellationRequested)
+            {
+                if (_plugin.Client.IsConnected && !DemoMode)
+                {
+                    await CapturePreviewAsync(showCursor: false, quiet: true);
+                }
+
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(2), cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+            }
+        }, cts.Token);
+    }
+
+    private static BitmapImage DecodeFrozenBitmap(byte[] bytes)
+    {
+        using var ms = new MemoryStream(bytes);
+        var bmp = new BitmapImage();
+        bmp.BeginInit();
+        bmp.CacheOption = BitmapCacheOption.OnLoad;
+        bmp.StreamSource = ms;
+        bmp.EndInit();
+        bmp.Freeze();
+        return bmp;
     }
 
     private static void RunOnUi(Action action)

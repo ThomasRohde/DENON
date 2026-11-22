@@ -54,6 +54,16 @@ public sealed record LgTvDiscoveredDevice(
     string ModelName,
     string Udn);
 
+public sealed record LgTvScreenshotResult(
+    bool Success,
+    string? ImageBase64,
+    string MimeType,
+    int Width,
+    int Height,
+    int ByteLength,
+    string? ImageUri = null,
+    string? ErrorMessage = null);
+
 public sealed record LgTvLiveState
 {
     public bool IsConnected { get; init; }

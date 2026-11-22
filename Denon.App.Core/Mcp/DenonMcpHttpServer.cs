@@ -19,7 +19,7 @@ namespace Denon.App.Core.Mcp;
 public sealed partial class DenonMcpHttpServer : IAsyncDisposable
 {
     private const string ServerName = "denon-desktop-mcp";
-    private const string ServerVersion = "1.9.0";
+    private const string ServerVersion = "1.10.0";
     private const string DefaultProtocolVersion = "2025-11-25";
 
     private static readonly JsonSerializerOptions JsonOutOptions = new()
@@ -670,7 +670,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                 version = ServerVersion,
             },
             instructions =
-                "Denon Desktop Living-Room Intelligence MCP Server. Read denon://room/state and denon://memory/habits first to understand the user's Denon AVR, Philips Hue lights, LG webOS Smart TV, Home Assistant entities, active Room Doctor insights, and preferred listening volumes. Use apply_atmosphere for cohesive multi-device moods (it automatically captures an Undo snapshot and enforces MaxSafeVolume).",
+                "Denon Desktop Living-Room Intelligence MCP Server. Read denon://room/state and denon://memory/habits first to understand the user's Denon AVR, Philips Hue lights, LG webOS Smart TV, Home Assistant entities, active Room Doctor insights, and preferred listening volumes. Use apply_atmosphere for cohesive multi-device moods (it automatically captures an Undo snapshot and enforces MaxSafeVolume). Use tv_computer to visually see (screenshot) and operate the LG webOS TV OS, Web Browser, Magic Remote pointer, and apps in a single unified tool.",
         };
     }
 
@@ -1143,23 +1143,18 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                     ("room", "string", "Optional Hue room/zone name or 'all' (defaults to active target room)", false)),
                 title: "Set Philips Hue Color & Warmth",
                 idempotent: true),
-            Tool("tv_cast_youtube",
-                "Launch the YouTube app on the LG webOS Smart TV and directly cast/play a specific YouTube video URL or 11-character video ID.",
-                ObjSchema(
-                    ("video_url_or_id", "string", "YouTube watch URL, youtu.be link, or 11-character video ID", true)),
-                title: "Cast YouTube Video to LG TV",
-                openWorld: true),
-            Tool("tv_remote_button",
-                "Send a Magic Remote button press to the LG webOS Smart TV over the persistent pointer socket.",
-                ObjSchema(
-                    ("button", "string", "Button name: UP, DOWN, LEFT, RIGHT, ENTER, BACK, HOME, MENU, EXIT, PLAY, PAUSE, VOLUMEUP, VOLUMEDOWN, MUTE, RED, GREEN, YELLOW, BLUE", true)),
-                title: "Press LG TV Remote Button"),
-            Tool("tv_type_text",
-                "Type text directly into an active search box or keyboard field on the LG webOS Smart TV.",
-                ObjSchema(
-                    ("text", "string", "Text to type on the TV", true),
-                    ("press_enter", "boolean", "Whether to submit/press Enter after typing (default true)", false)),
-                title: "Type Text on LG TV"),
+            Tool("tv_computer",
+                "Unified LG webOS TV Computer-Use tool: see the TV screen via live screenshots (returns MCP image), open URLs in the LG Web Browser, launch/close apps (including casting YouTube videos via content_id), move/drag/click/scroll the Magic Remote pointer (relative dx/dy OR normalized 0..1000 x/y), press remote buttons, type text, or chain multiple steps in one batch with screenshot_after=true.",
+                BuildTvComputerSchema(),
+                title: "LG webOS TV Computer Use",
+                openWorld: true,
+                outputSchema: OutputObjSchema(
+                    ("action", "string"),
+                    ("stepsExecuted", "array"),
+                    ("tv", "object"),
+                    ("cursor", "object"),
+                    ("installedApps", "array"),
+                    ("inputs", "array"))),
 
             // Generative Smart Scene & Automation Architect
             Tool("list_scenes_and_rules",
@@ -1421,6 +1416,8 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                     tracks = res.Tracks.Select(t => new { id = t.VideoId, title = t.Title, author = t.Author, duration = t.Duration?.ToString(@"m\:ss") ?? "LIVE", url = t.WatchUrl }),
                 });
             }
+            case "tv_computer":
+                return await ExecuteTvComputerToolAsync(args, cfg, ct);
         }
 
         // Everything below mutates live devices or settings -> block in Observer mode!
@@ -1622,35 +1619,6 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                 return res.Success ? BuildToolText(res.Message) : BuildToolError(res.Message);
             }
 
-            case "tv_cast_youtube":
-            {
-                var video = RequireString(args, "video_url_or_id");
-                var res = await _pluginHost.ExecuteActionAsync("smart-tv", "tv.youtube", new Dictionary<string, string> { ["contentId"] = video }, ct);
-                _intelligence.RecordPluginActionUsed("smart-tv", "tv.youtube");
-                return res.Success ? BuildToolText(res.Message) : BuildToolError(res.Message);
-            }
-
-            case "tv_remote_button":
-            {
-                var button = RequireString(args, "button").ToUpperInvariant();
-                var res = await _pluginHost.ExecuteActionAsync("smart-tv", "tv.button", new Dictionary<string, string> { ["button"] = button }, ct);
-                _intelligence.RecordPluginActionUsed("smart-tv", "tv.button");
-                return res.Success ? BuildToolText(res.Message) : BuildToolError(res.Message);
-            }
-
-            case "tv_type_text":
-            {
-                var text = RequireString(args, "text");
-                var pressEnter = GetBool(args, "press_enter") ?? true;
-                var res = await _pluginHost.ExecuteActionAsync("smart-tv", "tv.type_text", new Dictionary<string, string>
-                {
-                    ["text"] = text,
-                    ["enter"] = pressEnter ? "true" : "false",
-                }, ct);
-                _intelligence.RecordPluginActionUsed("smart-tv", "tv.type_text");
-                return res.Success ? BuildToolText(res.Message) : BuildToolError(res.Message);
-            }
-
             case "activate_smart_scene":
             {
                 var target = RequireString(args, "scene_id_or_name");
@@ -1705,6 +1673,154 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
 
         throw new McpInvalidParamsException($"Unknown MCP tool '{toolName}'.");
     }
+
+    private async Task<object> ExecuteTvComputerToolAsync(JsonElement args, McpServerSettings cfg, CancellationToken ct)
+    {
+        var action = GetString(args, "action", "screenshot").Trim().ToLowerInvariant();
+        var isReadOnlyAction = action is "screenshot" or "get_state";
+        if (!isReadOnlyAction && cfg.PermissionTier == McpPermissionTier.Observer)
+        {
+            throw new UnauthorizedAccessException($"MCP Permission Tier is 'Observer' (read-only). Change to SafeControl or FullOrchestration in Denon Desktop Settings to run tv_computer action '{action}'.");
+        }
+
+        string payloadJson;
+        if (args.ValueKind == JsonValueKind.Object)
+        {
+            if (isReadOnlyAction && cfg.PermissionTier == McpPermissionTier.Observer)
+            {
+                // Keep Observer mode strictly read-only (no cursor wiggle input).
+                payloadJson = JsonSerializer.Serialize(new
+                {
+                    action,
+                    show_cursor = false,
+                    width = GetInt(args, "width") ?? 960,
+                    height = GetInt(args, "height") ?? 540,
+                }, JsonOutOptions);
+            }
+            else
+            {
+                payloadJson = args.GetRawText();
+            }
+        }
+        else
+        {
+            payloadJson = "{\"action\":\"screenshot\"}";
+        }
+
+        var res = await _pluginHost.ExecuteActionAsync(
+            "smart-tv",
+            "tv.computer",
+            new Dictionary<string, string> { ["payloadJson"] = payloadJson },
+            ct);
+
+        if (!res.Success)
+        {
+            return BuildToolError(res.Message);
+        }
+
+        if (!isReadOnlyAction)
+        {
+            _intelligence.RecordPluginActionUsed("smart-tv", $"tv.computer:{action}");
+        }
+
+        JsonElement structured = default;
+        var hasStructured = false;
+        var textPayload = res.Message;
+
+        if (!string.IsNullOrWhiteSpace(res.DataJson))
+        {
+            try
+            {
+                using var parsedDoc = JsonDocument.Parse(res.DataJson);
+                structured = parsedDoc.RootElement.Clone();
+                hasStructured = structured.ValueKind == JsonValueKind.Object;
+                textPayload = JsonSerializer.Serialize(structured, JsonPrettyOptions);
+            }
+            catch
+            {
+                textPayload = res.DataJson;
+            }
+        }
+
+        var contentBlocks = new List<object>();
+        if (!string.IsNullOrWhiteSpace(res.ImageBase64))
+        {
+            contentBlocks.Add(new
+            {
+                type = "image",
+                data = res.ImageBase64,
+                mimeType = string.IsNullOrWhiteSpace(res.ImageMimeType) ? "image/jpeg" : res.ImageMimeType,
+            });
+        }
+
+        contentBlocks.Add(new
+        {
+            type = "text",
+            text = textPayload,
+        });
+
+        if (hasStructured)
+        {
+            return new
+            {
+                content = contentBlocks,
+                structuredContent = structured,
+                isError = false,
+            };
+        }
+
+        return new
+        {
+            content = contentBlocks,
+            isError = false,
+        };
+    }
+
+    private static object BuildTvComputerSchema() => new
+    {
+        type = "object",
+        properties = new Dictionary<string, object>
+        {
+            ["action"] = new
+            {
+                type = "string",
+                @enum = new[]
+                {
+                    "screenshot", "get_state", "open_url", "launch_app", "close_app",
+                    "move", "move_to", "click", "scroll", "button", "type", "backspace", "wait", "batch",
+                },
+                description = "Operation to perform on the LG webOS TV. Use 'screenshot' to see the screen, 'open_url' for the Web Browser, 'move_to'/'click'/'move'/'scroll' for the Magic Remote pointer, 'button' for D-pad/Home/Back, 'type'/'backspace' for keyboard input, or 'batch' to chain multiple steps in one round-trip.",
+            },
+            ["url"] = new { type = "string", description = "URL to open in the LG webOS Web Browser (for action='open_url')." },
+            ["app"] = new { type = "string", description = "App name, alias, or webOS appId (e.g. 'youtube', 'browser', 'plex', 'netflix', 'livetv', 'com.webos.app.hdmi1') for action='launch_app'." },
+            ["content_id"] = new { type = "string", description = "Optional deep-link content ID (e.g. YouTube URL or 11-char video ID) for action='launch_app'." },
+            ["x"] = new { type = "integer", description = "Normalized horizontal screen coordinate 0..1000 (0=left, 1000=right) for 'move_to' or 'click'." },
+            ["y"] = new { type = "integer", description = "Normalized vertical screen coordinate 0..1000 (0=top, 1000=bottom) for 'move_to' or 'click'." },
+            ["dx"] = new { type = "integer", description = "Relative horizontal pixel delta (for 'move') or horizontal scroll ticks (for 'scroll')." },
+            ["dy"] = new { type = "integer", description = "Relative vertical pixel delta (for 'move') or vertical scroll ticks (for 'scroll', negative scrolls down)." },
+            ["drag"] = new { type = "boolean", description = "Hold click down while moving (for action='move')." },
+            ["recalibrate"] = new { type = "boolean", description = "Force re-homing the Magic Remote cursor to top-left (0,0) before moving to (x,y)." },
+            ["button"] = new { type = "string", description = "Magic Remote button for action='button': HOME, BACK, ENTER, UP, DOWN, LEFT, RIGHT, EXIT, MENU, QMENU, INFO, GUIDE, PLAY, PAUSE, RED, GREEN, YELLOW, BLUE." },
+            ["repeat"] = new { type = "integer", description = "Number of times to repeat a 'button' or 'scroll' action (1-15)." },
+            ["text"] = new { type = "string", description = "Text to insert into an active TV search/keyboard field (for action='type')." },
+            ["press_enter"] = new { type = "boolean", description = "Submit/press Enter after typing (default true, for action='type')." },
+            ["replace"] = new { type = "boolean", description = "Replace existing field text instead of appending (default false, for action='type')." },
+            ["count"] = new { type = "integer", description = "Characters to delete (1-50, for action='backspace')." },
+            ["ms"] = new { type = "integer", description = "Milliseconds to wait (50-10000, for action='wait')." },
+            ["steps"] = new
+            {
+                type = "array",
+                description = "Ordered list of sub-action objects (up to 25) to execute sequentially when action='batch'. Each object uses the same fields (action, url, x, y, dx, dy, button, text, ms, etc.).",
+                items = new { type = "object" },
+            },
+            ["screenshot_after"] = new { type = "boolean", description = "If true, automatically waits settle_ms and captures a fresh screenshot after executing the action or batch." },
+            ["settle_ms"] = new { type = "integer", description = "Milliseconds to wait before capturing screenshot_after (default 350, max 5000)." },
+            ["show_cursor"] = new { type = "boolean", description = "If true (default), gently wakes the pink LG Magic Remote cursor before snapping a screenshot so its position is visible." },
+            ["width"] = new { type = "integer", description = "Screenshot width in pixels (320-1920, default 960)." },
+            ["height"] = new { type = "integer", description = "Screenshot height in pixels (180-1080, default 540)." },
+        },
+        required = new[] { "action" },
+    };
 
     private async Task<object> ExecuteApplyAtmosphereAsync(JsonElement args, McpServerSettings cfg, CancellationToken ct)
     {
