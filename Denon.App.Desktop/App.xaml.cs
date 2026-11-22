@@ -301,6 +301,12 @@ public partial class App : System.Windows.Application
         }, token);
     }
 
+    protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+    {
+        _isExiting = true;
+        base.OnSessionEnding(e);
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         _activationListenerCts?.Cancel();
@@ -308,11 +314,23 @@ public partial class App : System.Windows.Application
         _activationSignal?.Dispose();
         _trayIconController?.Dispose();
 
-        if (_host is not null)
+        var remainingHost = _host;
+        _host = null;
+        if (remainingHost is not null)
         {
             try
             {
-                _host.Dispose();
+                Task.Run(async () =>
+                {
+                    if (remainingHost is IAsyncDisposable asyncHost)
+                    {
+                        await asyncHost.DisposeAsync();
+                    }
+                    else
+                    {
+                        remainingHost.Dispose();
+                    }
+                }).Wait(TimeSpan.FromSeconds(2));
             }
             catch
             {
@@ -377,14 +395,18 @@ public partial class App : System.Windows.Application
 
         try
         {
+            _activationListenerCts?.Cancel();
             _trayIconController?.Dispose();
             _trayIconController = null;
 
-            if (_host is not null)
+            var hostToStop = _host;
+            _host = null;
+
+            if (hostToStop is not null)
             {
                 try
                 {
-                    _host.Services.GetService<YouTubeCinemaWindow>()?.HideAndStopVideo();
+                    hostToStop.Services.GetService<YouTubeCinemaWindow>()?.ForceCloseForExit();
                 }
                 catch
                 {
@@ -392,25 +414,69 @@ public partial class App : System.Windows.Application
 
                 try
                 {
-                    var pluginHost = _host.Services.GetService<PluginHostService>();
-                    if (pluginHost is not null)
-                    {
-                        await pluginHost.StopAllAsync();
-                    }
+                    hostToStop.Services.GetRequiredService<AppLogStore>().Info("Application shutting down.");
                 }
                 catch
                 {
                 }
 
-                _host.Services.GetRequiredService<AppLogStore>().Info("Application shutting down.");
-                await _host.StopAsync(TimeSpan.FromSeconds(5));
-                _host.Dispose();
-                _host = null;
+                // Run async stop + IAsyncDisposable host disposal OFF the WPF Dispatcher thread with a
+                // bounded timeout so IAsyncDisposable singletons (MCP server, telemetry log, plugins)
+                // can never deadlock against DispatcherSynchronizationContext!
+                try
+                {
+                    await Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var pluginHost = hostToStop.Services.GetService<PluginHostService>();
+                            if (pluginHost is not null)
+                            {
+                                await pluginHost.StopAllAsync().WaitAsync(TimeSpan.FromSeconds(2));
+                            }
+                        }
+                        catch
+                        {
+                        }
+
+                        try
+                        {
+                            await hostToStop.StopAsync(TimeSpan.FromSeconds(3));
+                        }
+                        catch
+                        {
+                        }
+
+                        try
+                        {
+                            if (hostToStop is IAsyncDisposable asyncHost)
+                            {
+                                await asyncHost.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3));
+                            }
+                            else
+                            {
+                                hostToStop.Dispose();
+                            }
+                        }
+                        catch
+                        {
+                        }
+                    }).WaitAsync(TimeSpan.FromSeconds(5));
+                }
+                catch
+                {
+                }
             }
         }
         finally
         {
-            Shutdown();
+            Shutdown(0);
+            // Safety net: if a WebView2 / COM thread lingers past WPF Shutdown, terminate cleanly after 1.5s.
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(1500);
+                Environment.Exit(0);
+            });
         }
     }
 }

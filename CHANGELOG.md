@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.13.1] - 2026-11-22
+
+### Fixed
+- **Clean Process Exit (No Lingering Background Process on Shutdown / Upgrade)**:
+  - Fixed a WPF UI-thread async-over-sync deadlock in `App.ExitApplicationAsync` where synchronous `_host.Dispose()` blocked while disposing `IAsyncDisposable` singletons (`DenonMcpHttpServer`, `PluginHostService`, `EventTelemetryLog`), leaving a hidden `Denon.App.Desktop` process running after clicking Exit and triggering Inno Setup's "application still using files" prompt.
+  - Host shutdown & async disposal now run off the WPF Dispatcher thread with bounded timeouts, `YouTubeCinemaWindow` force-closes cleanly on exit instead of cancelling `OnClosing`, and Windows session/Restart Manager shutdown exits cleanly without hiding to tray.
+
 ## [1.13.0] - 2026-11-22
 
 ### Added

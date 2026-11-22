@@ -390,6 +390,7 @@ public partial class YouTubeCinemaWindow : Window
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
     private bool _isInitialized;
+    private bool _allowClose;
     private bool _keepVideoMuted = true;
     private bool _isFullscreen;
     private bool _barsHidden;
@@ -902,9 +903,22 @@ public partial class YouTubeCinemaWindow : Window
 
     protected override void OnClosing(CancelEventArgs e)
     {
+        if (_allowClose)
+        {
+            base.OnClosing(e);
+            return;
+        }
+
         // Hide instead of permanently destroying so Cinema Companion reopens instantaneously
         e.Cancel = true;
         HideAndStopVideo();
+    }
+
+    public void ForceCloseForExit()
+    {
+        _allowClose = true;
+        HideAndStopVideo();
+        try { Close(); } catch { }
     }
 
     public void HideAndStopVideo()
