@@ -385,31 +385,21 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
             title = "Receiver in Standby";
             detail = "Tap STANDBY or pick a Scene to wake";
         }
-        else if (status is not null && !DenonCatalog.InputMatches(status.InputSource, "NET"))
-        {
-            connectionState = "connected";
-            title = DenonCatalog.GetFriendlyInputName(status.InputSource);
-            detail = $"Sound Mode: {status.SoundMode}";
-        }
-        else if (ytSnap.IsActive && ytSnap.CurrentTrack is { } yt)
-        {
-            connectionState = "connected";
-            title = yt.Title;
-            detail = $"{yt.Author} • YouTube • {yt.DurationDisplay}";
-            artwork = yt.ThumbnailUrl;
-        }
-        else if (localSnap.IsActive && localSnap.CurrentTrack is { } loc)
-        {
-            connectionState = "connected";
-            title = loc.Title;
-            detail = $"{loc.Artist} • Local {loc.CodecBadge}";
-        }
         else if (status is not null)
         {
             connectionState = "connected";
-            title = string.IsNullOrWhiteSpace(status.NowPlaying.Song) ? "HEOS Stream" : status.NowPlaying.Song;
-            detail = string.IsNullOrWhiteSpace(status.NowPlaying.Artist) ? "HEOS Network Audio" : status.NowPlaying.Artist;
-            artwork = status.NowPlaying.ImageUrl;
+            var activeStationName = !string.IsNullOrWhiteSpace(status.ActiveStationAlias)
+                ? settings.Stations.FirstOrDefault(s => string.Equals(s.Alias, status.ActiveStationAlias, StringComparison.OrdinalIgnoreCase))?.DisplayName
+                : null;
+            var resolved = NowPlayingResolver.Resolve(
+                status,
+                activeStationName: activeStationName,
+                plugins: _pluginHost.GetPlugins(),
+                activeLocalTrack: localSnap.IsActive ? localSnap.CurrentTrack : null,
+                activeYouTubeTrack: ytSnap.IsActive ? ytSnap.CurrentTrack : null);
+            title = resolved.Title;
+            detail = resolved.Detail;
+            artwork = resolved.ImageUrl;
         }
         else
         {

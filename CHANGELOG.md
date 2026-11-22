@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-11-22
+
+### Changed
+- **Custom Denon Obsidian & Cyan Windows Installer**:
+  - Pre-selected **I accept the agreement** by default on the license step for faster installs and upgrades.
+  - Branded the Inno Setup wizard with custom Hi-DPI Denon Desktop sidebar artwork (`wizard-sidebar.bmp`), glowing top-right badge (`wizard-small.bmp`), Windows 11 dark title bar (`DWMWA_USE_IMMERSIVE_DARK_MODE`), Obsidian `#0A0C10` / `#13161E` surfaces, Denon Cyan `#00D4FF` headings & accent line, and high-contrast custom radio labels.
+- **CI Pull Request Test Gate**:
+  - Extended `.github/workflows/release.yml` to run automated `dotnet test` verification on `pull_request` events targeting `master` (skipping installer packaging & release uploads on PRs).
+
+### Fixed
+- **Live External Remote, Smart TV & Phone App Now-Playing Sync**:
+  - Added unified `NowPlayingResolver` across Desktop UI, Phone Remote, and MCP `get_room_state`: when the AVR is on `TV Audio`, Denon Desktop now displays the live LG webOS TV app, Live TV channel, or labeled HDMI input (e.g. `DVD Player (HDMI 1)`, `Netflix`, `Live TV (Ch 1 • DR1)`) and updates immediately when switching with the physical TV remote, showing `Live TV` / `Active` instead of misleading HEOS `Stop` or stale `Url Stream`.
+  - Parsed HEOS `"station"` metadata and service names (`Spotify`, `TuneIn`, `Tidal`, `Deezer`, `Amazon Music`, `AirPlay`, etc.) in `HeosClient`, recognized AirPlay/Tidal/Deezer/Amazon/TuneIn/USB inputs, and surfaced live track/artist/artwork metadata for Bluetooth phone streams.
+  - Auto-deactivated stale YouTube Cast, Local Hi-Res Jukebox, and radio preset highlights whenever a physical remote switches inputs/standby or a phone app (Spotify Connect, AirPlay, HEOS, TuneIn) takes over playback, and added coalesced 250ms HEOS push refreshes plus a 15-second LG webOS foreground/channel/input sync guard against dropped TV subscriptions.
+  - Preserved confirmed AVR power/input/soundMode across brief port 23 collisions (up to 2 polls) so external Denon phone apps cannot transiently overwrite `TV` with synthetic `NET / HEOS`.
+- **Local Relay Range Probes & Stream Isolation**:
+  - `LocalAudioRelayServer` no longer invalidates local track URLs or fires `LocalTrackStreamCompleted` on metadata suffix reads (`Range: bytes=-1`); completion now fires only when a full-track transfer reaches EOF, and tokens stay registered for the active session until explicitly unregistered.
+  - Clearing an inactive `YouTubeQueueService` or `LocalMediaJukeboxService` now cancels only its own tracked relay token (`CancelStream(token)`) instead of interrupting unrelated active PC Audio Cast or local streams.
+- **Pause-Aware & Mute-Preserving Queue Advancement**:
+  - `YouTubeQueueService` and `LocalMediaJukeboxService` now suspend their end-of-track buffer drain timers while HEOS is paused (`playState == "pause"`) and preserve the receiver's current mute state across automatic next-track transitions.
+- **Atomic Settings Updates, Safe Backup Recovery & Multi-Receiver Discovery**:
+  - Added atomic `AppSettingsStore.UpdateAsync(...)` merges inside the persistence gate and switched quick toggles, Remote token rotation, calibration saves, and discovery updates to it so concurrent saves never clobber independent fields; validated the existing primary file before rotating to `.bak` so saving after backup recovery never overwrites a good `.bak` with corrupt JSON; surfaced startup recovery warnings with the exact settings path.
+  - `ReceiverPollingService` now auto-selects only when a single receiver is discovered on the LAN; when multiple receivers are found, it lists them clearly so the user chooses the right room in Settings.
+- **Room-Scoped Undo & HEOS-Only Timeout Fallback**:
+  - `RoomIntelligenceService` now scopes `CanUndo`, `LastSnapshot`, and `RestoreLastSnapshotAsync` strictly to the currently connected receiver's identity so Room A's snapshot can never be applied to Room B, and refuses to capture synthetic HEOS-only status (`IsAvrConfirmed == false`).
+  - `ReceiverController` now distinguishes `DenonAvrClient`'s internal 3-second connect/command timeout from explicit caller cancellation (`!cancellationToken.IsCancellationRequested`) so HEOS-only speakers seamlessly enter HEOS fallback instead of failing.
+- **Phone Remote, Desktop UI, PC Cast & Windows Startup Polish**:
+  - Phone Remote (`RemoteWebUiHtml`) now retains optimistic volume steps across spaced taps until a fresh poll confirms, hides the header Power button when locked/disabled, displays a dedicated `Remote Disabled` recovery card with Retry on `403`, and auto-focuses the pairing input on `401`.
+  - Split the Scene Editor toggle into separate **Power on AVR** and **Auto-unmute AVR** switches, enabled text wrapping on the Phone Remote QR caption, lowered `MainWindow.MinHeight` to `580` for compact displays, and relabeled the PC Cast WAV button honestly to **PCM 16-bit WAV**.
+  - `PcAudioCastService` now supports 64-bit IEEE float WASAPI loopback streams in `ConvertToStereo16Pcm`, and `WindowsStartupService.SetEnabled` preserves the installer's `--minimized` autostart argument when saving general Settings.
+  - Isolated `AppLogStore`, `EventTelemetryLog`, and `RoomIntelligenceService` file paths in `Denon.App.Core.Tests` so running `dotnet test` never reads or modifies `%LocalAppData%\DenonDesktop`, and expanded the suite to cover all follow-up review findings.
+
 ## [1.13.1] - 2026-11-22
 
 ### Fixed

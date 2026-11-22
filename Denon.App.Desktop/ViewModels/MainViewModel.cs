@@ -227,10 +227,9 @@ public sealed partial class MainViewModel : ObservableObject
         {
             DisplayVolumeInDb = !DisplayVolumeInDb;
             SettingsDisplayVolumeInDb = DisplayVolumeInDb;
-            var updated = _settingsStore.Current.Clone();
-            updated.Ui.DisplayVolumeInDb = DisplayVolumeInDb;
+            var newVal = DisplayVolumeInDb;
             _suppressNextSettingsReload = true;
-            _ = _settingsStore.SaveAsync(updated);
+            _ = _settingsStore.UpdateAsync(s => s.Ui.DisplayVolumeInDb = newVal);
         });
 
         SelectInputCommand = new AsyncRelayCommand(SelectInputAsync, CanControlReceiver);
@@ -300,6 +299,12 @@ public sealed partial class MainViewModel : ObservableObject
         _liveAudioAnalyzer.SetVuCaptureRequested(IsAnyAudioMeterVisible);
 
         LoadSettings(_settingsStore.Current);
+        if (!string.IsNullOrWhiteSpace(_settingsStore.LastLoadWarning))
+        {
+            LastError = _settingsStore.LastLoadWarning;
+            StatusMessage = $"{_settingsStore.LastLoadWarning} ({_settingsStore.SettingsFilePath})";
+        }
+
         ApplyStateSnapshot(_stateStore.Snapshot);
         foreach (var entry in _logStore.Snapshot())
         {
@@ -1143,7 +1148,6 @@ public sealed partial class MainViewModel : ObservableObject
             var wasPaused = IsPaused;
             IsPlaying = string.Equals(status.PlayState, "play", StringComparison.OrdinalIgnoreCase);
             IsPaused = string.Equals(status.PlayState, "pause", StringComparison.OrdinalIgnoreCase);
-            PlayState = ToTitleCase(status.PlayState);
 
             if (wasPaused != IsPaused && _youtubeQueueService is { IsYouTubePlaybackActive: true } && _cinemaWindow is { IsVisible: true })
             {
@@ -1159,47 +1163,30 @@ public sealed partial class MainViewModel : ObservableObject
                 preset.IsCurrentlyPlaying = activeStation is not null && ReferenceEquals(preset, activeStation);
             }
 
-            if (!status.IsPoweredOn || !status.IsMainZoneOn)
-            {
-                NowPlayingTitle = "Receiver in Standby";
-                NowPlayingDetail = "Press Power or select any station to wake the receiver.";
-                NowPlayingImageUrl = string.Empty;
-            }
-            else if (!DenonCatalog.InputMatches(status.InputSource, "NET"))
-            {
-                NowPlayingTitle = InputSourceDisplay;
-                NowPlayingDetail = $"External Input • Sound Mode: {SoundMode}";
-                NowPlayingImageUrl = string.Empty;
-            }
-            else if (_pcAudioCastService is not null && _pcAudioCastService.IsCasting)
-            {
-                NowPlayingTitle = "Windows PC Audio (Live Cast)";
-                NowPlayingDetail = $"{SelectedAudioDevice?.FriendlyName ?? "System Output"} • {(SelectedPcCastFormat == PcCastFormat.Wav_Lossless ? "Lossless WAV" : "MP3 320 kbps")}";
-                NowPlayingImageUrl = string.Empty;
-            }
-            else if (_localJukeboxService is not null &&
-                     _localJukeboxService.IsLocalPlaybackActive &&
-                     _localJukeboxService.Snapshot.CurrentTrack is { } activeLocalTrack)
-            {
-                NowPlayingTitle = activeLocalTrack.Title;
-                NowPlayingDetail = $"{activeLocalTrack.Artist} • Local {activeLocalTrack.CodecBadge} ({activeLocalTrack.SizeDisplay})";
-                NowPlayingImageUrl = string.Empty;
-            }
-            else if (_youtubeQueueService is not null &&
-                     _youtubeQueueService.IsYouTubePlaybackActive &&
-                     _youtubeQueueService.Snapshot.CurrentTrack is { } activeYouTubeTrack)
-            {
-                NowPlayingTitle = activeYouTubeTrack.Title;
-                NowPlayingDetail = $"{activeYouTubeTrack.Author} • YouTube Music • {activeYouTubeTrack.DurationDisplay}";
-                NowPlayingImageUrl = activeYouTubeTrack.ThumbnailUrl;
-            }
-            else
-            {
-                var fallbackTitle = activeStation?.DisplayName ?? "HEOS Stream";
-                NowPlayingTitle = FirstNonEmpty(status.NowPlaying.Song, fallbackTitle);
-                NowPlayingDetail = BuildNowPlayingDetail(status.NowPlaying, activeStation);
-                NowPlayingImageUrl = status.NowPlaying.ImageUrl;
-            }
+            var isPcCasting = _pcAudioCastService is not null && _pcAudioCastService.IsCasting;
+            var pcCastDetail = isPcCasting
+                ? $"{SelectedAudioDevice?.FriendlyName ?? "System Output"} • {(SelectedPcCastFormat == PcCastFormat.Wav_Lossless ? "PCM 16-bit WAV" : "MP3 320 kbps")}"
+                : null;
+            var activeLocalTrack = _localJukeboxService is { IsLocalPlaybackActive: true }
+                ? _localJukeboxService.Snapshot.CurrentTrack
+                : null;
+            var activeYouTubeTrack = _youtubeQueueService is { IsYouTubePlaybackActive: true }
+                ? _youtubeQueueService.Snapshot.CurrentTrack
+                : null;
+
+            var resolved = NowPlayingResolver.Resolve(
+                status,
+                activeStationName: activeStation?.DisplayName,
+                plugins: _pluginHost?.GetPlugins(),
+                isPcCasting: isPcCasting,
+                pcCastDetail: pcCastDetail,
+                activeLocalTrack: activeLocalTrack,
+                activeYouTubeTrack: activeYouTubeTrack);
+
+            PlayState = resolved.PlayStateLabel;
+            NowPlayingTitle = resolved.Title;
+            NowPlayingDetail = resolved.Detail;
+            NowPlayingImageUrl = resolved.ImageUrl;
 
             MaxVolume = status.MaxVolume > 0 ? status.MaxVolume : 98;
             LiveVolume = status.Volume;
@@ -1850,9 +1837,16 @@ public sealed partial class MainViewModel : ObservableObject
             settings.Telemetry.RetentionDays = ParseInt(SettingsTelemetryRetentionDays, 90);
             settings.Telemetry.MediaDwellSeconds = ParseInt(SettingsTelemetryMediaDwellSeconds, 15);
 
-            _startupService.SetEnabled(SettingsLaunchAtWindowsStartup);
+            _startupService.SetEnabled(SettingsLaunchAtWindowsStartup, SettingsStartMinimizedToTray ? true : null);
             _receiverController.ResetConnections();
-            await _settingsStore.SaveAsync(settings);
+            await _settingsStore.UpdateAsync(s =>
+            {
+                s.Receiver = settings.Receiver;
+                s.Ui = settings.Ui;
+                s.Media = settings.Media;
+                s.Shortcuts = settings.Shortcuts;
+                s.Telemetry = settings.Telemetry;
+            });
             RefreshTelemetryStats();
             StatusMessage = "Settings saved. Syncing with receiver...";
             await _receiverController.RefreshAsync();

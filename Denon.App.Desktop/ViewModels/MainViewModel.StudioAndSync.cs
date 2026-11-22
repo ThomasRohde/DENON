@@ -313,9 +313,15 @@ public sealed partial class MainViewModel
             if (result.Success)
             {
                 SettingsCinemaSyncOffsetMs = result.MeasuredOffsetMs.ToString();
-                var updated = _settingsStore.Current.Clone();
-                updated.Media.CinemaSyncOffsetMs = result.MeasuredOffsetMs;
-                await _settingsStore.SaveAsync(updated);
+                _suppressNextSettingsReload = true;
+                try
+                {
+                    await _settingsStore.UpdateAsync(s => s.Media.CinemaSyncOffsetMs = result.MeasuredOffsetMs);
+                }
+                finally
+                {
+                    _suppressNextSettingsReload = false;
+                }
             }
         }
         catch (Exception ex)

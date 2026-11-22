@@ -459,10 +459,9 @@ public sealed partial class MainViewModel
 
     private async Task TogglePhoneRemoteEnabledAsync()
     {
-        var updated = _settingsStore.Current.Clone();
-        updated.Remote.Enabled = !updated.Remote.Enabled;
+        var nextEnabled = !_settingsStore.Current.Remote.Enabled;
         _suppressNextSettingsReload = true;
-        await _settingsStore.SaveAsync(updated);
+        var updated = await _settingsStore.UpdateAsync(s => s.Remote.Enabled = nextEnabled);
         IsPhoneRemoteEnabled = updated.Remote.Enabled;
         UpdateRemoteQrFromRelay(_relayServer.CurrentStatus, forceRegenerate: true);
         StatusMessage = updated.Remote.Enabled
@@ -472,13 +471,14 @@ public sealed partial class MainViewModel
 
     private async Task RotateRemoteTokensAsync()
     {
-        var updated = _settingsStore.Current.Clone();
-        updated.Remote.OwnerToken = RemoteAccessSettings.GeneratePairingToken("own");
-        updated.Remote.GuestToken = RemoteAccessSettings.GeneratePairingToken("gst");
         _suppressNextSettingsReload = true;
-        await _settingsStore.SaveAsync(updated);
+        await _settingsStore.UpdateAsync(s =>
+        {
+            s.Remote.OwnerToken = RemoteAccessSettings.GeneratePairingToken("own");
+            s.Remote.GuestToken = RemoteAccessSettings.GeneratePairingToken("gst");
+        });
         UpdateRemoteQrFromRelay(_relayServer.CurrentStatus, forceRegenerate: true);
-        StatusMessage = "Revoked previous phone pairings and generated fresh Owner & Guest QR codes.";
+        StatusMessage = "Revoked all previous Owner & Guest phone pairings and generated fresh QR codes.";
     }
 
     private void UpdateRemoteQrFromRelay(RelayStatusSnapshot snap, bool forceRegenerate = false)

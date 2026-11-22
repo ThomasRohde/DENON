@@ -19,6 +19,8 @@ public sealed class HeosEventListenerService : BackgroundService
 
     private volatile bool _isPushConnected;
     private CancellationTokenSource? _reconnectTriggerCts;
+    private CancellationTokenSource? _coalescedRefreshCts;
+    private readonly object _refreshSync = new();
 
     public HeosEventListenerService(
         AppSettingsStore settingsStore,
@@ -156,6 +158,8 @@ public sealed class HeosEventListenerService : BackgroundService
 
             if (command.Equals("event/player_volume_changed", StringComparison.OrdinalIgnoreCase))
             {
+                var wasStandby = _stateStore.Snapshot.Status is { IsPoweredOn: false } or { IsMainZoneOn: false };
+
                 int? level = parameters.TryGetValue("level", out var lvl) && double.TryParse(lvl, System.Globalization.CultureInfo.InvariantCulture, out var parsedLvl)
                     ? Math.Clamp((int)Math.Round(parsedLvl), 0, 98)
                     : null;
@@ -168,6 +172,12 @@ public sealed class HeosEventListenerService : BackgroundService
                 {
                     _stateStore.PatchLiveTelemetry(volume: level, isMuted: muted);
                 }
+
+                // If receiver was in standby and volume changed from a remote/phone app, pull full AVR state immediately
+                if (wasStandby)
+                {
+                    ScheduleCoalescedRefresh(cancellationToken);
+                }
             }
             else if (command.Equals("event/player_state_changed", StringComparison.OrdinalIgnoreCase))
             {
@@ -175,26 +185,47 @@ public sealed class HeosEventListenerService : BackgroundService
                 {
                     _stateStore.PatchLiveTelemetry(playState: state.Trim());
                 }
+
+                // External phone apps (Spotify Connect, AirPlay, HEOS app, TuneIn) often fire state_changed
+                // as they take over playback — trigger a fast coalesced refresh so input & metadata update immediately.
+                ScheduleCoalescedRefresh(cancellationToken);
             }
-            else if (command.Equals("event/player_now_playing_changed", StringComparison.OrdinalIgnoreCase))
+            else if (command.Equals("event/player_now_playing_changed", StringComparison.OrdinalIgnoreCase) ||
+                     command.Equals("event/player_queue_changed", StringComparison.OrdinalIgnoreCase) ||
+                     command.Equals("event/sources_changed", StringComparison.OrdinalIgnoreCase))
             {
-                // Trigger a fast metadata refresh so album art & song title update immediately
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await _receiverController.RefreshAsync(cancellationToken);
-                    }
-                    catch
-                    {
-                    }
-                }, cancellationToken);
+                ScheduleCoalescedRefresh(cancellationToken);
             }
         }
         catch
         {
             // Ignore malformed push frames
         }
+    }
+
+    private void ScheduleCoalescedRefresh(CancellationToken loopToken)
+    {
+        CancellationTokenSource cts;
+        lock (_refreshSync)
+        {
+            _coalescedRefreshCts?.Cancel();
+            _coalescedRefreshCts?.Dispose();
+            cts = CancellationTokenSource.CreateLinkedTokenSource(loopToken);
+            _coalescedRefreshCts = cts;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(250, cts.Token);
+                await _receiverController.RefreshAsync(cts.Token);
+            }
+            catch
+            {
+                // Superseded by newer event or disconnected
+            }
+        }, CancellationToken.None);
     }
 
     private void TriggerReconnect()
@@ -215,6 +246,13 @@ public sealed class HeosEventListenerService : BackgroundService
 
     public override void Dispose()
     {
+        lock (_refreshSync)
+        {
+            _coalescedRefreshCts?.Cancel();
+            _coalescedRefreshCts?.Dispose();
+            _coalescedRefreshCts = null;
+        }
+
         _reconnectTriggerCts?.Dispose();
         base.Dispose();
     }

@@ -58,7 +58,9 @@ public sealed record RoomStateSnapshot(
     bool IsMuted,
     string InputSource,
     string SoundMode,
-    bool? Zone2On);
+    bool? Zone2On,
+    string ReceiverId = "",
+    string ReceiverName = "");
 
 public sealed record RoomInsight(
     string Id,

@@ -436,8 +436,8 @@ public sealed class EventTelemetryMonitorService : BackgroundService
                 return null;
             }
 
-            // 1. Desktop YouTube Music / Video playback
-            if (ytSnapshot.CurrentTrack is { } ytTrack)
+            // 1. Desktop YouTube Music / Video playback (only when HEOS is not playing a distinct external phone stream)
+            if (ytSnapshot.CurrentTrack is { } ytTrack && !status.NowPlaying.HasRealMetadata)
             {
                 var origin = _telemetry.ResolveOrigin("avr", fallback: "desktop_ui");
                 return new MediaCandidate(
@@ -462,7 +462,10 @@ public sealed class EventTelemetryMonitorService : BackgroundService
             if (!string.IsNullOrWhiteSpace(status.ActiveStationAlias))
             {
                 var song = CleanText(status.NowPlaying.Song);
-                var title = !string.IsNullOrWhiteSpace(song) ? song : status.ActiveStationAlias;
+                var stationLabel = CleanText(status.NowPlaying.Station);
+                var title = !string.IsNullOrWhiteSpace(song) && !string.Equals(song, "Url Stream", StringComparison.OrdinalIgnoreCase)
+                    ? song
+                    : (!string.IsNullOrWhiteSpace(stationLabel) ? stationLabel : status.ActiveStationAlias);
                 var origin = _telemetry.ResolveOrigin("avr");
                 return new MediaCandidate(
                     Key: $"radio:{status.ActiveStationAlias.ToLowerInvariant()}",
@@ -484,18 +487,22 @@ public sealed class EventTelemetryMonitorService : BackgroundService
 
             // 3. External HEOS / Phone Cast (Spotify Connect, AirPlay, TuneIn, HEOS Phone App, USB, DLNA)
             var npSong = CleanText(status.NowPlaying.Song);
+            var npStation = CleanText(status.NowPlaying.Station);
             var npArtist = CleanText(status.NowPlaying.Artist);
             var npAlbum = CleanText(status.NowPlaying.Album);
             var npType = CleanText(status.NowPlaying.Type);
 
-            if (string.IsNullOrWhiteSpace(npSong) && string.IsNullOrWhiteSpace(npArtist) && string.IsNullOrWhiteSpace(npAlbum))
+            if (status.NowPlaying.IsPlaceholderUrlStream ||
+                (string.IsNullOrWhiteSpace(npSong) && string.IsNullOrWhiteSpace(npStation) && string.IsNullOrWhiteSpace(npArtist) && string.IsNullOrWhiteSpace(npAlbum)))
             {
                 return null;
             }
 
             var kind = InferExternalHeosKind(status.NowPlaying);
             var originExternal = _telemetry.ResolveOrigin("avr");
-            var displayTitle = !string.IsNullOrWhiteSpace(npSong) ? npSong : (npAlbum ?? npArtist ?? "HEOS Stream");
+            var displayTitle = !string.IsNullOrWhiteSpace(npSong)
+                ? npSong
+                : (!string.IsNullOrWhiteSpace(npStation) ? npStation : (npAlbum ?? npArtist ?? "HEOS Stream"));
             var key = $"heos:{kind}:{displayTitle.ToLowerInvariant()}:{(npArtist ?? string.Empty).ToLowerInvariant()}";
 
             return new MediaCandidate(
@@ -504,13 +511,14 @@ public sealed class EventTelemetryMonitorService : BackgroundService
                 Title: displayTitle,
                 Artist: npArtist,
                 Album: npAlbum,
-                Source: kind,
+                Source: DenonCatalog.GetHeosSourceName(status.NowPlaying.SourceId) ?? kind,
                 Origin: originExternal,
                 StartedUtc: nowUtc,
                 InitialVolume: vol,
                 ExtraData: new Dictionary<string, object?>
                 {
                     ["mediaType"] = npType,
+                    ["station"] = npStation,
                     ["sourceId"] = status.NowPlaying.SourceId,
                     ["input"] = "NET",
                     ["soundMode"] = status.SoundMode,

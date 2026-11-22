@@ -36,14 +36,21 @@ public sealed class ReceiverPollingService : BackgroundService
                 {
                     _logStore.Info("No receiver IP configured — scanning local network for Denon / Marantz HEOS receivers...");
                     var discovered = await _discoveryService.DiscoverAsync(TimeSpan.FromSeconds(3.5), stoppingToken);
-                    if (discovered.Count > 0)
+                    if (discovered.Count == 1)
                     {
-                        var first = discovered[0];
-                        currentSettings.Receiver.Host = first.IpAddress;
-                        currentSettings.Receiver.Port = first.Port;
-                        currentSettings.Receiver.PlayerName = first.Name;
-                        await _settingsStore.SaveAsync(currentSettings, stoppingToken);
-                        _logStore.Info($"Auto-detected receiver: {first.Name} ({first.Model}) at {first.IpAddress}.");
+                        var sole = discovered[0];
+                        await _settingsStore.UpdateAsync(s =>
+                        {
+                            s.Receiver.Host = sole.IpAddress;
+                            s.Receiver.Port = sole.Port;
+                            s.Receiver.PlayerName = sole.Name;
+                        }, stoppingToken);
+                        _logStore.Info($"Auto-detected receiver: {sole.Name} ({sole.Model}) at {sole.IpAddress}.");
+                    }
+                    else if (discovered.Count > 1)
+                    {
+                        var names = string.Join(", ", discovered.Select(static d => $"{d.Name} ({d.IpAddress})"));
+                        throw new InvalidOperationException($"Multiple rooms found ({names}). Open Settings → Scan LAN to choose which room to control.");
                     }
                     else
                     {

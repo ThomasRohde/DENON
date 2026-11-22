@@ -489,6 +489,11 @@ public sealed class PcAudioCastService : IDisposable
             return Math.Clamp(BitConverter.ToSingle(buffer, offset), -1f, 1f);
         }
 
+        if (isFloat && bytesPerSample == 8)
+        {
+            return (float)Math.Clamp(BitConverter.ToDouble(buffer, offset), -1.0, 1.0);
+        }
+
         if (bytesPerSample == 2)
         {
             return BitConverter.ToInt16(buffer, offset) / 32768f;

@@ -257,6 +257,31 @@ public sealed class LocalAudioRelayServer : IDisposable
         }
     }
 
+    public void CancelStream(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return;
+        }
+
+        if (_activeStreamTokens.TryRemove(token, out var cts))
+        {
+            try { cts.Cancel(); } catch { }
+            cts.Dispose();
+        }
+    }
+
+    public void UnregisterLocalTrack(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return;
+        }
+
+        CancelStream(token);
+        _localTracks.TryRemove(token, out _);
+    }
+
     public void CancelAllActiveStreams()
     {
         foreach (var pair in _activeStreamTokens.ToArray())
@@ -1043,8 +1068,8 @@ public sealed class LocalAudioRelayServer : IDisposable
 
             if (completedNaturally && !streamCts.IsCancellationRequested)
             {
-                // Remove finished token immediately so HEOS firmware cannot auto-reconnect and replay it
-                _localTracks.TryRemove(registered.Token, out _);
+                // Keep the track registration valid for the active session so follow-up range reads,
+                // seeks, or reconnects on the same URL continue working until the queue advances or stops.
                 UpdateStatus(_status with { StreamState = "Local Track Completed" });
                 LocalTrackStreamCompleted?.Invoke(registered.Token, registered.Track);
             }
@@ -1132,8 +1157,10 @@ public sealed class LocalAudioRelayServer : IDisposable
         await networkStream.FlushAsync(cancellationToken);
         UpdateStatus(_status with { BytesStreamed = written });
 
-        var reachedEnd = !isPartial || (totalSize > 0 && rangeEnd >= totalSize - 1);
-        return reachedEnd && remaining == 0 && written > 0;
+        // Only treat a full-stream read from byte 0 through EOF (not a small metadata/ID3 suffix probe
+        // like bytes=-1 or bytes=-128) as natural track playback transfer completion.
+        var isFullTrackTransfer = (!isPartial || rangeStart == 0) && totalSize > 0 && rangeEnd >= totalSize - 1;
+        return isFullTrackTransfer && remaining == 0 && written > 0;
     }
 
     private async Task<bool> StreamTranscodedLocalFileAsync(

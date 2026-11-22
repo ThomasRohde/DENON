@@ -72,6 +72,8 @@ public sealed class AppSettingsStore
         return _current.Clone();
     }
 
+    public string SettingsFilePath => _settingsFilePath;
+
     public async Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
         var normalized = Normalize(settings, seedDefaultsIfEmpty: false);
@@ -90,6 +92,35 @@ public sealed class AppSettingsStore
 
         _logStore.Info("Settings saved.");
         SettingsChanged?.Invoke(_current.Clone());
+    }
+
+    /// <summary>
+    /// Atomically applies a targeted field-level mutation to the latest persisted settings inside
+    /// the store lock so concurrent/independent writers (discovery, volume unit, remote toggles,
+    /// calibration, settings editor) never clobber each other's changes.
+    /// </summary>
+    public async Task<AppSettings> UpdateAsync(Action<AppSettings> mutator, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(mutator);
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var draft = _current.Clone();
+            mutator(draft);
+            var normalized = Normalize(draft, seedDefaultsIfEmpty: false);
+            await SaveInternalAsync(normalized, cancellationToken);
+            _current = normalized;
+            LastLoadWarning = null;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+
+        _logStore.Info("Settings updated.");
+        var snapshot = _current.Clone();
+        SettingsChanged?.Invoke(snapshot);
+        return snapshot;
     }
 
     public string ExportJson()
@@ -216,8 +247,9 @@ public sealed class AppSettingsStore
                 await stream.FlushAsync(cancellationToken);
             }
 
-            // Retain a last-good backup before atomically replacing settings.json.
-            if (File.Exists(_settingsFilePath))
+            // Retain a last-good backup ONLY when the existing primary parses cleanly as valid settings,
+            // so saving after recovery from a corrupt primary NEVER overwrites the valid .bak file!
+            if (File.Exists(_settingsFilePath) && await IsValidSettingsFileAsync(_settingsFilePath, cancellationToken))
             {
                 try
                 {
@@ -230,6 +262,12 @@ public sealed class AppSettingsStore
             }
 
             File.Move(tempPath, _settingsFilePath, overwrite: true);
+
+            // If no valid backup exists yet, seed .bak from the newly written valid primary.
+            if (!File.Exists(backupPath))
+            {
+                try { File.Copy(_settingsFilePath, backupPath, overwrite: true); } catch { }
+            }
         }
         catch
         {
@@ -245,6 +283,20 @@ public sealed class AppSettingsStore
             }
 
             throw;
+        }
+    }
+
+    private static async Task<bool> IsValidSettingsFileAsync(string path, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var raw = await File.ReadAllTextAsync(path, cancellationToken);
+            var parsed = JsonSerializer.Deserialize<AppSettings>(raw, JsonOptions);
+            return parsed is not null;
+        }
+        catch
+        {
+            return false;
         }
     }
 

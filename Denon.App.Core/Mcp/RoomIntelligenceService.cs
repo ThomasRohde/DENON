@@ -30,12 +30,14 @@ public sealed class RoomIntelligenceService
     private readonly YouTubeQueueService _queueService;
     private readonly HeosEventListenerService _heosEvents;
     private readonly AppLogStore _logStore;
+    private readonly string _habitsFilePath;
 
     private readonly object _sync = new();
     private readonly Stack<RoomStateSnapshot> _undoStack = new();
     private readonly HashSet<string> _dismissedInsightIds = new(StringComparer.OrdinalIgnoreCase);
 
     private RoomHabitsMemory _habits = new();
+    private string _lastActiveReceiverId = string.Empty;
     private DateTimeOffset _lastHabitSampleAt = DateTimeOffset.MinValue;
     private DateTimeOffset _lastHabitSaveAt = DateTimeOffset.MinValue;
     private AcousticStatus? _cachedAcoustics;
@@ -51,7 +53,8 @@ public sealed class RoomIntelligenceService
         PluginHostService pluginHost,
         YouTubeQueueService queueService,
         HeosEventListenerService heosEvents,
-        AppLogStore logStore)
+        AppLogStore logStore,
+        string? habitsFilePath = null)
     {
         _stateStore = stateStore;
         _receiverController = receiverController;
@@ -60,6 +63,7 @@ public sealed class RoomIntelligenceService
         _queueService = queueService;
         _heosEvents = heosEvents;
         _logStore = logStore;
+        _habitsFilePath = string.IsNullOrWhiteSpace(habitsFilePath) ? AppDataPaths.RoomHabitsFilePath : habitsFilePath;
 
         LoadHabitsFromDisk();
 
@@ -87,24 +91,27 @@ public sealed class RoomIntelligenceService
         }
     }
 
-    public bool CanUndo
-    {
-        get
-        {
-            lock (_sync)
-            {
-                return _undoStack.Count > 0;
-            }
-        }
-    }
+    public bool CanUndo => LastSnapshot is not null;
 
     public RoomStateSnapshot? LastSnapshot
     {
         get
         {
+            var activeId = GetCurrentReceiverIdentity().Id;
             lock (_sync)
             {
-                return _undoStack.Count > 0 ? _undoStack.Peek() : null;
+                if (_undoStack.Count == 0)
+                {
+                    return null;
+                }
+
+                if (string.IsNullOrWhiteSpace(activeId))
+                {
+                    return _undoStack.Peek();
+                }
+
+                return _undoStack.FirstOrDefault(s =>
+                    string.Equals(s.ReceiverId, activeId, StringComparison.OrdinalIgnoreCase));
             }
         }
     }
@@ -113,12 +120,13 @@ public sealed class RoomIntelligenceService
     {
         var live = _stateStore.Snapshot;
         var status = live.Status;
-        if (!live.IsConnected || status is null)
+        if (!live.IsConnected || status is null || !status.IsAvrConfirmed)
         {
-            _logStore.Warning($"[RoomBrain] Skipped Undo snapshot for '{reason}' because AVR state is not currently confirmed.");
+            _logStore.Warning($"[RoomBrain] Skipped Undo snapshot for '{reason}' because confirmed AVR state is unavailable.");
             return null;
         }
 
+        var (receiverId, receiverName) = GetCurrentReceiverIdentity();
         var snap = new RoomStateSnapshot(
             CapturedAt: DateTimeOffset.UtcNow,
             Reason: reason,
@@ -127,7 +135,9 @@ public sealed class RoomIntelligenceService
             IsMuted: status.IsMuted,
             InputSource: status.InputSource,
             SoundMode: status.SoundMode,
-            Zone2On: status.IsZone2On);
+            Zone2On: status.IsZone2On,
+            ReceiverId: receiverId,
+            ReceiverName: receiverName);
 
         lock (_sync)
         {
@@ -152,16 +162,24 @@ public sealed class RoomIntelligenceService
 
     public async Task<(bool Success, string Message)> RestoreLastSnapshotAsync(int? maxSafeVolume, CancellationToken ct = default)
     {
+        var (activeId, activeName) = GetCurrentReceiverIdentity();
+        if (string.IsNullOrWhiteSpace(activeId))
+        {
+            return (false, "Cannot restore Undo snapshot: no confirmed receiver is currently connected.");
+        }
+
         RoomStateSnapshot? target;
         lock (_sync)
         {
-            // Peek first so a failed or timed-out restore remains retryable!
-            target = _undoStack.Count > 0 ? _undoStack.Peek() : null;
+            // Scope Undo strictly to the currently selected/connected receiver so Room A's state
+            // can NEVER be pushed onto Room B!
+            target = _undoStack.FirstOrDefault(s =>
+                string.Equals(s.ReceiverId, activeId, StringComparison.OrdinalIgnoreCase));
         }
 
         if (target is null)
         {
-            return (false, "No confirmed previous AVR state snapshot available to restore.");
+            return (false, $"No Undo snapshot available for '{activeName}'.");
         }
 
         var effectiveVolume = maxSafeVolume.HasValue
@@ -171,12 +189,15 @@ public sealed class RoomIntelligenceService
 
         try
         {
+            if (!string.Equals(GetCurrentReceiverIdentity().Id, target.ReceiverId, StringComparison.OrdinalIgnoreCase))
+            {
+                return (false, $"Undo aborted: active receiver changed away from '{target.ReceiverName}'.");
+            }
+
             await _receiverController.SetPowerAsync(target.IsPoweredOn, ct);
             if (target.IsPoweredOn)
             {
                 // Establish safe mute/volume ordering BEFORE making an input audible:
-                // - If target is muted, mute first so nothing plays loudly.
-                // - Otherwise set target volume BEFORE switching input or releasing mute!
                 if (target.IsMuted)
                 {
                     await _receiverController.SetMuteAsync(true, ct);
@@ -205,26 +226,49 @@ public sealed class RoomIntelligenceService
                 await _receiverController.SetZone2PowerAsync(target.Zone2On.Value, ct);
             }
 
-            // Pop ONLY after all restore commands succeeded!
+            // Remove ONLY the restored snapshot after all restore commands succeeded!
             lock (_sync)
             {
-                if (_undoStack.Count > 0 && ReferenceEquals(_undoStack.Peek(), target))
+                var remaining = _undoStack.Where(s => !ReferenceEquals(s, target)).Reverse().ToList();
+                _undoStack.Clear();
+                foreach (var item in remaining)
                 {
-                    _undoStack.Pop();
+                    _undoStack.Push(item);
                 }
             }
 
             UndoStackChanged?.Invoke();
 
             var capNote = wasVolumeCapped ? $" (capped from {target.Volume} by MaxSafeVolume {maxSafeVolume})" : string.Empty;
-            var msg = $"Restored AVR state from before '{target.Reason}' (Power: {(target.IsPoweredOn ? "ON" : "Standby")}, Vol: {effectiveVolume}{capNote}, Muted: {target.IsMuted}, Input: {target.InputSource}).";
+            var msg = $"Restored '{target.ReceiverName}' from before '{target.Reason}' (Power: {(target.IsPoweredOn ? "ON" : "Standby")}, Vol: {effectiveVolume}{capNote}, Muted: {target.IsMuted}, Input: {target.InputSource}).";
             _logStore.Info($"[RoomBrain] {msg}");
             return (true, msg);
         }
         catch (Exception ex)
         {
-            return (false, $"Undo failed (snapshot retained for retry): {ex.Message}");
+            return (false, $"Undo failed for '{target.ReceiverName}' (snapshot retained for retry): {ex.Message}");
         }
+    }
+
+    private (string Id, string Name) GetCurrentReceiverIdentity()
+    {
+        var live = _stateStore.Snapshot;
+        if (!live.IsConnected || live.Status is null)
+        {
+            return (string.Empty, string.Empty);
+        }
+
+        var player = live.Status.Player;
+        var host = !string.IsNullOrWhiteSpace(player.IpAddress)
+            ? player.IpAddress.Trim()
+            : _settingsStore.Current.Receiver.Host.Trim();
+        var id = !string.IsNullOrWhiteSpace(player.Serial)
+            ? $"{player.Serial.Trim()}|{host}"
+            : $"{player.PlayerId}|{player.Model.Trim()}|{host}";
+        var name = !string.IsNullOrWhiteSpace(player.Name)
+            ? player.Name.Trim()
+            : (!string.IsNullOrWhiteSpace(player.Model) ? player.Model.Trim() : host);
+        return (id, name);
     }
 
     public void DismissInsight(string insightId)
@@ -636,6 +680,16 @@ public sealed class RoomIntelligenceService
             acoustics = _cachedAcoustics;
         }
 
+        var resolvedNowPlaying = st is null
+            ? null
+            : NowPlayingResolver.Resolve(
+                st,
+                activeStationName: !string.IsNullOrWhiteSpace(st.ActiveStationAlias)
+                    ? settings.Receiver.Stations.FirstOrDefault(s => string.Equals(s.Alias, st.ActiveStationAlias, StringComparison.OrdinalIgnoreCase))?.DisplayName
+                    : null,
+                plugins: plugins,
+                activeYouTubeTrack: _queueService.IsYouTubePlaybackActive ? _queueService.Snapshot.CurrentTrack : null);
+
         return new
         {
             timestamp = DateTimeOffset.Now.ToString("O"),
@@ -658,12 +712,16 @@ public sealed class RoomIntelligenceService
                 soundMode = st?.SoundMode ?? string.Empty,
                 ecoMode = st?.EcoMode ?? string.Empty,
                 sleepTimerMinutes = st?.SleepTimerMinutes,
-                playState = st?.PlayState ?? "unknown",
+                playState = resolvedNowPlaying?.PlayStateLabel ?? st?.PlayState ?? "unknown",
                 nowPlaying = st is null ? null : new
                 {
-                    song = st.NowPlaying.Song,
-                    artist = st.NowPlaying.Artist,
-                    album = st.NowPlaying.Album,
+                    title = resolvedNowPlaying?.Title ?? st.NowPlaying.Song,
+                    detail = resolvedNowPlaying?.Detail ?? string.Empty,
+                    song = st.NowPlaying.IsPlaceholderUrlStream && !DenonCatalog.InputMatches(st.InputSource, "NET") ? string.Empty : st.NowPlaying.Song,
+                    station = st.NowPlaying.Station,
+                    artist = st.NowPlaying.IsPlaceholderUrlStream && !DenonCatalog.InputMatches(st.InputSource, "NET") ? string.Empty : st.NowPlaying.Artist,
+                    album = st.NowPlaying.IsPlaceholderUrlStream && !DenonCatalog.InputMatches(st.InputSource, "NET") ? string.Empty : st.NowPlaying.Album,
+                    service = DenonCatalog.GetHeosSourceName(st.NowPlaying.SourceId),
                     type = st.NowPlaying.Type,
                 },
                 acoustics = acoustics is null ? null : new
@@ -847,6 +905,13 @@ public sealed class RoomIntelligenceService
 
     private void OnReceiverStateChanged(ReceiverStateSnapshot snap)
     {
+        var currentReceiverId = GetCurrentReceiverIdentity().Id;
+        if (!string.Equals(_lastActiveReceiverId, currentReceiverId, StringComparison.OrdinalIgnoreCase))
+        {
+            _lastActiveReceiverId = currentReceiverId;
+            UndoStackChanged?.Invoke();
+        }
+
         if (snap.IsConnected && snap.Status is { IsPoweredOn: true } st)
         {
             var now = DateTimeOffset.UtcNow;
@@ -933,12 +998,12 @@ public sealed class RoomIntelligenceService
     {
         try
         {
-            if (!File.Exists(AppDataPaths.RoomHabitsFilePath))
+            if (!File.Exists(_habitsFilePath))
             {
                 return;
             }
 
-            var json = File.ReadAllText(AppDataPaths.RoomHabitsFilePath);
+            var json = File.ReadAllText(_habitsFilePath);
             var loaded = JsonSerializer.Deserialize<RoomHabitsMemory>(json, JsonOptions);
             if (loaded is not null)
             {
@@ -970,8 +1035,13 @@ public sealed class RoomIntelligenceService
                     json = JsonSerializer.Serialize(_habits, JsonOptions);
                 }
 
-                AppDataPaths.EnsureCreated();
-                File.WriteAllText(AppDataPaths.RoomHabitsFilePath, json);
+                var dir = Path.GetDirectoryName(_habitsFilePath);
+                if (!string.IsNullOrWhiteSpace(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+
+                File.WriteAllText(_habitsFilePath, json);
             }
             catch
             {

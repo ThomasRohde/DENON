@@ -20,12 +20,23 @@ public sealed class AppLogStore
     private const int MaxRotatedFiles = 4;
     private readonly ConcurrentQueue<AppLogEntry> _entries = new();
     private readonly object _fileLock = new();
+    private readonly string _logFilePath;
 
     public event Action<AppLogEntry>? EntryAdded;
 
     public AppLogStore()
+        : this(AppDataPaths.LogFilePath)
     {
-        AppDataPaths.EnsureCreated();
+    }
+
+    public AppLogStore(string logFilePath)
+    {
+        _logFilePath = logFilePath;
+        var dir = Path.GetDirectoryName(_logFilePath);
+        if (!string.IsNullOrWhiteSpace(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
     }
 
     public IReadOnlyList<AppLogEntry> Snapshot() => _entries.ToArray();
@@ -62,7 +73,7 @@ public sealed class AppLogStore
             {
                 RotateIfNeededLocked();
                 File.AppendAllText(
-                    AppDataPaths.LogFilePath,
+                    _logFilePath,
                     FormatEntry(entry) + Environment.NewLine,
                     Encoding.UTF8);
             }
@@ -73,9 +84,9 @@ public sealed class AppLogStore
         }
     }
 
-    private static void RotateIfNeededLocked()
+    private void RotateIfNeededLocked()
     {
-        var path = AppDataPaths.LogFilePath;
+        var path = _logFilePath;
         if (!File.Exists(path))
         {
             return;

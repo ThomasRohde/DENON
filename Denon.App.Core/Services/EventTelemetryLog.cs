@@ -66,6 +66,8 @@ public sealed class EventTelemetryLog : IAsyncDisposable
 
     private readonly AppSettingsStore _settingsStore;
     private readonly AppLogStore _logStore;
+    private readonly string _eventsDir;
+    private readonly string _pluginEventsDir;
     private readonly Channel<TelemetryEventEnvelope> _channel;
     private readonly ConcurrentDictionary<string, OriginWatermark> _originWatermarks = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _ioGate = new(1, 1);
@@ -76,11 +78,19 @@ public sealed class EventTelemetryLog : IAsyncDisposable
     private bool _disposed;
 
     public EventTelemetryLog(AppSettingsStore settingsStore, AppLogStore logStore)
+        : this(settingsStore, logStore, AppDataPaths.EventsLogsDirectory)
+    {
+    }
+
+    public EventTelemetryLog(AppSettingsStore settingsStore, AppLogStore logStore, string eventsDirectory)
     {
         _settingsStore = settingsStore;
         _logStore = logStore;
+        _eventsDir = eventsDirectory;
+        _pluginEventsDir = Path.Combine(eventsDirectory, "plugins");
 
-        AppDataPaths.EnsureCreated();
+        Directory.CreateDirectory(_eventsDir);
+        Directory.CreateDirectory(_pluginEventsDir);
         _channel = Channel.CreateBounded<TelemetryEventEnvelope>(new BoundedChannelOptions(2048)
         {
             SingleReader = true,
@@ -188,9 +198,9 @@ public sealed class EventTelemetryLog : IAsyncDisposable
         var streams = new HashSet<string>(CoreStreams, StringComparer.OrdinalIgnoreCase);
         try
         {
-            if (Directory.Exists(AppDataPaths.PluginEventsLogsDirectory))
+            if (Directory.Exists(_pluginEventsDir))
             {
-                foreach (var file in Directory.EnumerateFiles(AppDataPaths.PluginEventsLogsDirectory, "*.jsonl"))
+                foreach (var file in Directory.EnumerateFiles(_pluginEventsDir, "*.jsonl"))
                 {
                     var name = Path.GetFileNameWithoutExtension(file);
                     var slug = StripDateSuffix(name);
@@ -218,9 +228,9 @@ public sealed class EventTelemetryLog : IAsyncDisposable
 
         try
         {
-            if (Directory.Exists(AppDataPaths.EventsLogsDirectory))
+            if (Directory.Exists(_eventsDir))
             {
-                foreach (var file in Directory.EnumerateFiles(AppDataPaths.EventsLogsDirectory, "*.jsonl", SearchOption.AllDirectories))
+                foreach (var file in Directory.EnumerateFiles(_eventsDir, "*.jsonl", SearchOption.AllDirectories))
                 {
                     var fi = new FileInfo(file);
                     totalFiles++;
@@ -251,7 +261,7 @@ public sealed class EventTelemetryLog : IAsyncDisposable
 
         return new TelemetryStatsSnapshot(
             Enabled: cfg.Enabled,
-            EventsDirectory: AppDataPaths.EventsLogsDirectory,
+            EventsDirectory: _eventsDir,
             TotalFiles: totalFiles,
             TotalBytes: totalBytes,
             EventsRecordedThisSession: EventsRecordedThisSession,
@@ -347,13 +357,13 @@ public sealed class EventTelemetryLog : IAsyncDisposable
 
         try
         {
-            if (!Directory.Exists(AppDataPaths.EventsLogsDirectory))
+            if (!Directory.Exists(_eventsDir))
             {
                 return;
             }
 
             var files = Directory
-                .EnumerateFiles(AppDataPaths.EventsLogsDirectory, "*.jsonl", SearchOption.AllDirectories)
+                .EnumerateFiles(_eventsDir, "*.jsonl", SearchOption.AllDirectories)
                 .Select(static p => new FileInfo(p))
                 .OrderBy(static fi => fi.LastWriteTimeUtc)
                 .ToList();
@@ -408,9 +418,9 @@ public sealed class EventTelemetryLog : IAsyncDisposable
         await _ioGate.WaitAsync(ct);
         try
         {
-            if (Directory.Exists(AppDataPaths.EventsLogsDirectory))
+            if (Directory.Exists(_eventsDir))
             {
-                foreach (var file in Directory.EnumerateFiles(AppDataPaths.EventsLogsDirectory, "*.jsonl", SearchOption.AllDirectories))
+                foreach (var file in Directory.EnumerateFiles(_eventsDir, "*.jsonl", SearchOption.AllDirectories))
                 {
                     try { File.Delete(file); } catch { }
                 }
@@ -486,7 +496,8 @@ public sealed class EventTelemetryLog : IAsyncDisposable
         await _ioGate.WaitAsync(ct);
         try
         {
-            AppDataPaths.EnsureCreated();
+            Directory.CreateDirectory(_eventsDir);
+            Directory.CreateDirectory(_pluginEventsDir);
             var byPath = new Dictionary<string, StringBuilder>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var item in batch)
@@ -518,7 +529,7 @@ public sealed class EventTelemetryLog : IAsyncDisposable
         }
     }
 
-    private static string ResolveMonthlyFilePath(string stream, DateTime localNow)
+    private string ResolveMonthlyFilePath(string stream, DateTime localNow)
     {
         // Daily files ensure RetentionDays is honored at exact day granularity.
         var day = localNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
@@ -530,10 +541,10 @@ public sealed class EventTelemetryLog : IAsyncDisposable
                 pluginSlug = "plugin";
             }
 
-            return Path.Combine(AppDataPaths.PluginEventsLogsDirectory, $"{pluginSlug}-{day}.jsonl");
+            return Path.Combine(_pluginEventsDir, $"{pluginSlug}-{day}.jsonl");
         }
 
-        return Path.Combine(AppDataPaths.EventsLogsDirectory, $"{stream}-{day}.jsonl");
+        return Path.Combine(_eventsDir, $"{stream}-{day}.jsonl");
     }
 
     private static string NormalizeStreamName(string? stream)
@@ -554,35 +565,35 @@ public sealed class EventTelemetryLog : IAsyncDisposable
         return string.IsNullOrWhiteSpace(normalized) ? StreamControl : $"plugin:{normalized}";
     }
 
-    private static IEnumerable<string> GetCandidateFiles(string? stream)
+    private IEnumerable<string> GetCandidateFiles(string? stream)
     {
-        if (!Directory.Exists(AppDataPaths.EventsLogsDirectory))
+        if (!Directory.Exists(_eventsDir))
         {
             return [];
         }
 
         if (stream is null)
         {
-            return Directory.EnumerateFiles(AppDataPaths.EventsLogsDirectory, "*.jsonl", SearchOption.AllDirectories);
+            return Directory.EnumerateFiles(_eventsDir, "*.jsonl", SearchOption.AllDirectories);
         }
 
         if (stream.StartsWith("plugin:", StringComparison.OrdinalIgnoreCase))
         {
-            if (!Directory.Exists(AppDataPaths.PluginEventsLogsDirectory))
+            if (!Directory.Exists(_pluginEventsDir))
             {
                 return [];
             }
 
             var slug = SlugNormalizer.Normalize(stream["plugin:".Length..]);
-            return Directory.EnumerateFiles(AppDataPaths.PluginEventsLogsDirectory, $"{slug}-*.jsonl", SearchOption.TopDirectoryOnly);
+            return Directory.EnumerateFiles(_pluginEventsDir, $"{slug}-*.jsonl", SearchOption.TopDirectoryOnly);
         }
 
-        return Directory.EnumerateFiles(AppDataPaths.EventsLogsDirectory, $"{stream}-*.jsonl", SearchOption.TopDirectoryOnly);
+        return Directory.EnumerateFiles(_eventsDir, $"{stream}-*.jsonl", SearchOption.TopDirectoryOnly);
     }
 
-    private static string InferStreamKeyFromPath(string filePath)
+    private string InferStreamKeyFromPath(string filePath)
     {
-        var isPlugin = filePath.StartsWith(AppDataPaths.PluginEventsLogsDirectory, StringComparison.OrdinalIgnoreCase);
+        var isPlugin = filePath.StartsWith(_pluginEventsDir, StringComparison.OrdinalIgnoreCase);
         var name = StripDateSuffix(Path.GetFileNameWithoutExtension(filePath));
         return isPlugin ? $"plugin:{name}" : name;
     }

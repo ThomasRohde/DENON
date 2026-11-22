@@ -4,6 +4,9 @@ on:
   push:
     tags:
       - 'v*'
+  pull_request:
+    branches:
+      - master
   workflow_dispatch:
 
 permissions:
@@ -26,6 +29,7 @@ jobs:
         run: dotnet test .\DenonDesktop.slnx -c Release --verbosity normal
 
       - name: Publish single-file win-x64 executable
+        if: github.event_name != 'pull_request'
         shell: pwsh
         run: |
           dotnet publish .\Denon.App.Desktop\Denon.App.Desktop.csproj `
@@ -43,6 +47,7 @@ jobs:
           Remove-Item .\release-out\*.xml -Force -ErrorAction SilentlyContinue
 
       - name: Build Unsigned Windows Installer (Inno Setup)
+        if: github.event_name != 'pull_request'
         shell: pwsh
         run: |
           $iscc = Get-Command iscc -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
@@ -81,6 +86,7 @@ jobs:
           ) | Set-Content -Path (Join-Path $outDir 'SHA256SUMS.txt') -Encoding ascii
 
       - name: Upload build artifacts
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: Denon.App.Desktop-win-x64

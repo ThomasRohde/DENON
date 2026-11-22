@@ -21,7 +21,7 @@ public sealed class WindowsStartupService
         }
     }
 
-    public void SetEnabled(bool enabled)
+    public void SetEnabled(bool enabled, bool? startMinimized = null)
     {
         try
         {
@@ -38,7 +38,10 @@ public sealed class WindowsStartupService
                 var exePath = Environment.ProcessPath;
                 if (!string.IsNullOrWhiteSpace(exePath))
                 {
-                    key.SetValue(ValueName, $"\"{exePath}\"");
+                    var existing = key.GetValue(ValueName) as string ?? string.Empty;
+                    var keepMinimized = startMinimized ?? existing.Contains("--minimized", StringComparison.OrdinalIgnoreCase);
+                    var value = keepMinimized ? $"\"{exePath}\" --minimized" : $"\"{exePath}\"";
+                    key.SetValue(ValueName, value);
                 }
             }
             else

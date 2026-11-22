@@ -55,6 +55,7 @@ public sealed class LocalMediaJukeboxService : IDisposable
     private YouTubeRepeatMode _repeatMode = YouTubeRepeatMode.Off;
     private string? _activeRelayToken;
     private CancellationTokenSource? _autoAdvanceCts;
+    private DateTimeOffset _sessionStartedUtc = DateTimeOffset.MinValue;
 
     public LocalMediaJukeboxService(
         LocalAudioRelayServer relayServer,
@@ -69,6 +70,7 @@ public sealed class LocalMediaJukeboxService : IDisposable
 
         _relayServer.LocalTrackStreamCompleted += OnLocalTrackCompleted;
         _receiverController.NonRelaySourceActivated += OnExternalSourceActivated;
+        _stateStore.StateChanged += OnReceiverStateChanged;
     }
 
     public event Action<LocalJukeboxSnapshot>? JukeboxChanged;
@@ -216,7 +218,10 @@ public sealed class LocalMediaJukeboxService : IDisposable
         }
     }
 
-    public async Task<bool> PlayNextAsync(CancellationToken cancellationToken = default)
+    public Task<bool> PlayNextAsync(CancellationToken cancellationToken = default) =>
+        PlayNextCoreAsync(unmute: true, cancellationToken);
+
+    private async Task<bool> PlayNextCoreAsync(bool unmute, CancellationToken cancellationToken)
     {
         int nextIndex;
         lock (_sync)
@@ -252,7 +257,7 @@ public sealed class LocalMediaJukeboxService : IDisposable
             }
         }
 
-        await PlayAtIndexAsync(nextIndex, useLowVolume: false, unmute: true, cancellationToken);
+        await PlayAtIndexAsync(nextIndex, useLowVolume: false, unmute: unmute, cancellationToken);
         return true;
     }
 
@@ -306,12 +311,19 @@ public sealed class LocalMediaJukeboxService : IDisposable
     public void Clear()
     {
         CancelPendingAutoAdvance();
+        string? activeToken;
         lock (_sync)
         {
+            activeToken = _isActive ? _activeRelayToken : null;
             _tracks.Clear();
             _currentIndex = -1;
             _isActive = false;
             _activeRelayToken = null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(activeToken))
+        {
+            _relayServer.UnregisterLocalTrack(activeToken);
         }
 
         NotifyChanged();
@@ -320,10 +332,17 @@ public sealed class LocalMediaJukeboxService : IDisposable
     public void StopSession()
     {
         CancelPendingAutoAdvance();
+        string? activeToken;
         lock (_sync)
         {
+            activeToken = _isActive ? _activeRelayToken : null;
             _isActive = false;
             _activeRelayToken = null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(activeToken))
+        {
+            _relayServer.UnregisterLocalTrack(activeToken);
         }
 
         NotifyChanged();
@@ -393,6 +412,7 @@ public sealed class LocalMediaJukeboxService : IDisposable
                 var confirmedIdx = _tracks.FindIndex(t => string.Equals(t.TrackId, track.TrackId, StringComparison.Ordinal));
                 _currentIndex = confirmedIdx >= 0 ? confirmedIdx : Math.Clamp(index, 0, Math.Max(0, _tracks.Count - 1));
                 _isActive = _tracks.Count > 0;
+                _sessionStartedUtc = DateTimeOffset.UtcNow;
             }
 
             NotifyChanged();
@@ -429,25 +449,32 @@ public sealed class LocalMediaJukeboxService : IDisposable
         {
             try
             {
-                // Wait for HEOS to finish draining its prefetched audio buffer (watch playState == "stop" up to 45s)
-                var minGrace = DateTimeOffset.UtcNow.AddSeconds(2.5);
-                var deadline = DateTimeOffset.UtcNow.AddSeconds(45.0);
+                // Wait for HEOS to finish draining its prefetched audio buffer; suspend the timer
+                // whenever HEOS is paused so pausing a buffered file never advances prematurely!
+                var playedWaitSec = 0.0;
+                const double maxDrainSec = 45.0;
                 var sawPlaying = string.Equals(_stateStore.Snapshot.Status?.PlayState, "play", StringComparison.OrdinalIgnoreCase);
 
-                while (DateTimeOffset.UtcNow < deadline && !cts.Token.IsCancellationRequested)
+                while (playedWaitSec < maxDrainSec && !cts.Token.IsCancellationRequested)
                 {
                     await Task.Delay(500, cts.Token);
                     var state = _stateStore.Snapshot.Status?.PlayState;
+                    if (string.Equals(state, "pause", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    playedWaitSec += 0.5;
                     if (string.Equals(state, "play", StringComparison.OrdinalIgnoreCase))
                     {
                         sawPlaying = true;
                     }
-                    else if (DateTimeOffset.UtcNow >= minGrace &&
+                    else if (playedWaitSec >= 2.5 &&
                              string.Equals(state, "stop", StringComparison.OrdinalIgnoreCase))
                     {
                         break;
                     }
-                    else if (!sawPlaying && DateTimeOffset.UtcNow >= minGrace.AddSeconds(1.5))
+                    else if (!sawPlaying && playedWaitSec >= 4.0)
                     {
                         break;
                     }
@@ -462,9 +489,10 @@ public sealed class LocalMediaJukeboxService : IDisposable
                     }
                 }
 
-                // IMPORTANT: Use a fresh CancellationToken so PlayAtIndexAsync's CancelPendingAutoAdvance()
-                // does not self-cancel the transition to the next local track!
-                var advanced = await PlayNextAsync(CancellationToken.None);
+                // Unregister finished track now that HEOS finished draining it, then preserve mute on auto-advance!
+                _relayServer.UnregisterLocalTrack(token);
+                var keepMuted = _stateStore.Snapshot.Status?.IsMuted == true;
+                var advanced = await PlayNextCoreAsync(unmute: !keepMuted, CancellationToken.None);
                 if (advanced)
                 {
                     _logStore.Info($"Local Jukebox auto-advanced after '{track.Title}'.");
@@ -553,6 +581,55 @@ public sealed class LocalMediaJukeboxService : IDisposable
         return (string.IsNullOrWhiteSpace(parentFolder) ? "Local Audio" : parentFolder, name);
     }
 
+    private void OnReceiverStateChanged(ReceiverStateSnapshot snapshot)
+    {
+        if (!snapshot.IsConnected || snapshot.Status is not { } status)
+        {
+            return;
+        }
+
+        string? externalTakeoverReason = null;
+        lock (_sync)
+        {
+            if (!_isActive || (DateTimeOffset.UtcNow - _sessionStartedUtc) < TimeSpan.FromSeconds(5))
+            {
+                return;
+            }
+
+            var currentTrack = _currentIndex >= 0 && _currentIndex < _tracks.Count ? _tracks[_currentIndex] : null;
+            if (status.IsAvrConfirmed && (!status.IsPoweredOn || !status.IsMainZoneOn))
+            {
+                externalTakeoverReason = "receiver entered standby";
+            }
+            else if (status.IsAvrConfirmed &&
+                     !string.IsNullOrWhiteSpace(status.InputSource) &&
+                     !DenonCatalog.InputMatches(status.InputSource, "NET"))
+            {
+                externalTakeoverReason = $"input switched externally to {DenonCatalog.GetFriendlyInputName(status.InputSource)}";
+            }
+            else if (string.Equals(status.PlayState, "play", StringComparison.OrdinalIgnoreCase) &&
+                     status.NowPlaying.SourceId is int sid && sid != 1029 && sid != 0)
+            {
+                externalTakeoverReason = $"external streaming service started ({DenonCatalog.GetHeosSourceName(sid) ?? $"sid {sid}"})";
+            }
+            else if (string.Equals(status.PlayState, "play", StringComparison.OrdinalIgnoreCase) &&
+                     status.NowPlaying.HasRealMetadata &&
+                     currentTrack is not null &&
+                     !string.IsNullOrWhiteSpace(status.NowPlaying.Song) &&
+                     !status.NowPlaying.Song.Contains(currentTrack.Title, StringComparison.OrdinalIgnoreCase) &&
+                     !currentTrack.Title.Contains(status.NowPlaying.Song, StringComparison.OrdinalIgnoreCase))
+            {
+                externalTakeoverReason = $"external HEOS track started ({status.NowPlaying.Song})";
+            }
+        }
+
+        if (externalTakeoverReason is not null)
+        {
+            _logStore.Info($"Deactivating Local Hi-Res Jukebox session because {externalTakeoverReason}.");
+            StopSession();
+        }
+    }
+
     private void NotifyChanged() => JukeboxChanged?.Invoke(Snapshot);
 
     public void Dispose()
@@ -560,5 +637,6 @@ public sealed class LocalMediaJukeboxService : IDisposable
         CancelPendingAutoAdvance();
         _relayServer.LocalTrackStreamCompleted -= OnLocalTrackCompleted;
         _receiverController.NonRelaySourceActivated -= OnExternalSourceActivated;
+        _stateStore.StateChanged -= OnReceiverStateChanged;
     }
 }

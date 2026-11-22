@@ -62,6 +62,7 @@ public sealed class YouTubeQueueService : IDisposable
     private DateTimeOffset? _clockRunningSinceUtc;
     private TimeSpan _clockAccumulated = TimeSpan.Zero;
     private bool _clockPaused;
+    private DateTimeOffset _sessionStartedUtc = DateTimeOffset.MinValue;
 
     public YouTubeQueueService(
         LocalAudioRelayServer relayServer,
@@ -226,7 +227,13 @@ public sealed class YouTubeQueueService : IDisposable
         }
     }
 
-    public async Task<bool> PlayNextAsync(CancellationToken cancellationToken = default)
+    public Task<bool> PlayNextAsync(CancellationToken cancellationToken = default) =>
+        PlayNextCoreAsync(overrideUnmute: null, cancellationToken);
+
+    private Task<bool> PlayNextAutoAsync(bool unmute, CancellationToken cancellationToken) =>
+        PlayNextCoreAsync(overrideUnmute: unmute, cancellationToken);
+
+    private async Task<bool> PlayNextCoreAsync(bool? overrideUnmute, CancellationToken cancellationToken)
     {
         int nextIndex;
         bool lowVol;
@@ -240,7 +247,7 @@ public sealed class YouTubeQueueService : IDisposable
             }
 
             lowVol = false; // Don't force safety low volume on track skip
-            unmute = _lastUnmute;
+            unmute = overrideUnmute ?? _lastUnmute;
 
             if (_repeatMode == YouTubeRepeatMode.One && _currentIndex >= 0 && _currentIndex < _queue.Count)
             {
@@ -370,28 +377,42 @@ public sealed class YouTubeQueueService : IDisposable
     public void ClearQueue()
     {
         CancelPendingAutoAdvance();
+        string? activeToken;
         lock (_sync)
         {
+            activeToken = _isActive ? _activeRelayToken : null;
             _queue.Clear();
             _currentIndex = -1;
             _isActive = false;
             _activeRelayToken = null;
         }
 
-        _relayServer.CancelAllActiveStreams();
+        // Cancel ONLY YouTube's own active stream token so clearing an inactive queue never
+        // interrupts an active Local Jukebox or PC Audio Cast session!
+        if (!string.IsNullOrWhiteSpace(activeToken))
+        {
+            _relayServer.CancelStream(activeToken);
+        }
+
         NotifyChanged();
     }
 
     public void StopSession()
     {
         CancelPendingAutoAdvance();
+        string? activeToken;
         lock (_sync)
         {
+            activeToken = _isActive ? _activeRelayToken : null;
             _isActive = false;
             _activeRelayToken = null;
         }
 
-        _relayServer.CancelAllActiveStreams();
+        if (!string.IsNullOrWhiteSpace(activeToken))
+        {
+            _relayServer.CancelStream(activeToken);
+        }
+
         NotifyChanged();
     }
 
@@ -481,6 +502,7 @@ public sealed class YouTubeQueueService : IDisposable
             var confirmedIdx = _queue.FindIndex(t => string.Equals(t.EntryId, track.EntryId, StringComparison.Ordinal));
             _currentIndex = confirmedIdx >= 0 ? confirmedIdx : Math.Clamp(index, 0, Math.Max(0, _queue.Count - 1));
             _isActive = _queue.Count > 0;
+            _sessionStartedUtc = DateTimeOffset.UtcNow;
 
             _history.RemoveAll(t => string.Equals(t.VideoId, track.VideoId, StringComparison.Ordinal));
             _history.Insert(0, track);
@@ -518,11 +540,13 @@ public sealed class YouTubeQueueService : IDisposable
 
     private void OnReceiverStateChanged(ReceiverStateSnapshot snapshot)
     {
-        var playState = snapshot.Status?.PlayState;
-        if (string.IsNullOrWhiteSpace(playState))
+        if (!snapshot.IsConnected || snapshot.Status is not { } status)
         {
             return;
         }
+
+        string? externalTakeoverReason = null;
+        var playState = status.PlayState;
 
         lock (_sync)
         {
@@ -531,24 +555,53 @@ public sealed class YouTubeQueueService : IDisposable
                 return;
             }
 
-            var isPausedNow = string.Equals(playState, "pause", StringComparison.OrdinalIgnoreCase);
-            var isPlayingNow = string.Equals(playState, "play", StringComparison.OrdinalIgnoreCase);
-
-            if (isPausedNow && !_clockPaused)
+            var pastStartupGrace = (DateTimeOffset.UtcNow - _sessionStartedUtc) >= TimeSpan.FromSeconds(5);
+            if (pastStartupGrace)
             {
-                if (_clockRunningSinceUtc is { } started)
+                if (status.IsAvrConfirmed && (!status.IsPoweredOn || !status.IsMainZoneOn))
                 {
-                    _clockAccumulated += DateTimeOffset.UtcNow - started;
+                    externalTakeoverReason = "receiver entered standby";
                 }
+                else if (status.IsAvrConfirmed &&
+                         !string.IsNullOrWhiteSpace(status.InputSource) &&
+                         !DenonCatalog.InputMatches(status.InputSource, "NET"))
+                {
+                    externalTakeoverReason = $"input switched externally to {DenonCatalog.GetFriendlyInputName(status.InputSource)}";
+                }
+                else if (string.Equals(playState, "play", StringComparison.OrdinalIgnoreCase) &&
+                         status.NowPlaying.HasRealMetadata)
+                {
+                    externalTakeoverReason = $"external HEOS stream started ({status.NowPlaying.Song})";
+                }
+            }
 
-                _clockRunningSinceUtc = null;
-                _clockPaused = true;
-            }
-            else if (isPlayingNow && _clockPaused)
+            if (externalTakeoverReason is null && !string.IsNullOrWhiteSpace(playState))
             {
-                _clockRunningSinceUtc = DateTimeOffset.UtcNow;
-                _clockPaused = false;
+                var isPausedNow = string.Equals(playState, "pause", StringComparison.OrdinalIgnoreCase);
+                var isPlayingNow = string.Equals(playState, "play", StringComparison.OrdinalIgnoreCase);
+
+                if (isPausedNow && !_clockPaused)
+                {
+                    if (_clockRunningSinceUtc is { } started)
+                    {
+                        _clockAccumulated += DateTimeOffset.UtcNow - started;
+                    }
+
+                    _clockRunningSinceUtc = null;
+                    _clockPaused = true;
+                }
+                else if (isPlayingNow && _clockPaused)
+                {
+                    _clockRunningSinceUtc = DateTimeOffset.UtcNow;
+                    _clockPaused = false;
+                }
             }
+        }
+
+        if (externalTakeoverReason is not null)
+        {
+            _logStore.Info($"Deactivating YouTube cast session because {externalTakeoverReason}.");
+            StopSession();
         }
     }
 
@@ -571,7 +624,8 @@ public sealed class YouTubeQueueService : IDisposable
             try
             {
                 // Wait for HEOS's internal audio buffer to finish draining before advancing or stopping.
-                // Never cut off a song early if HEOS buffered ahead of real-time!
+                // Suspend the drain timer whenever HEOS is paused so pausing a buffered track never
+                // prematurely skips to the next track!
                 var elapsedSec = GetEstimatedPlaybackPositionSeconds(heosBufferOffsetMs: 0);
                 var expectedDrainSec = track.Duration is { TotalSeconds: > 5 } dur
                     ? Math.Clamp((dur.TotalSeconds - elapsedSec) + 3.5, 4.0, 90.0)
@@ -582,20 +636,24 @@ public sealed class YouTubeQueueService : IDisposable
                     _logStore.Info($"Waiting up to {expectedDrainSec:0.0}s for Denon HEOS buffer to finish '{track.Title}'.");
                 }
 
-                var deadline = DateTimeOffset.UtcNow.AddSeconds(expectedDrainSec);
-                var minGraceEnd = DateTimeOffset.UtcNow.AddSeconds(2.5);
-                while (DateTimeOffset.UtcNow < deadline && !cts.Token.IsCancellationRequested)
+                var playedWaitSec = 0.0;
+                while (playedWaitSec < expectedDrainSec && !cts.Token.IsCancellationRequested)
                 {
                     await Task.Delay(500, cts.Token);
 
-                    // Once past initial 2.5s grace, if HEOS itself transitions to 'stop' then its buffer is empty!
-                    if (DateTimeOffset.UtcNow >= minGraceEnd)
+                    var playState = _stateStore.Snapshot.Status?.PlayState;
+                    if (string.Equals(playState, "pause", StringComparison.OrdinalIgnoreCase))
                     {
-                        var playState = _stateStore.Snapshot.Status?.PlayState;
-                        if (string.Equals(playState, "stop", StringComparison.OrdinalIgnoreCase))
-                        {
-                            break;
-                        }
+                        continue;
+                    }
+
+                    playedWaitSec += 0.5;
+
+                    // Once past initial 2.5s active grace, if HEOS itself transitions to 'stop' then its buffer is empty!
+                    if (playedWaitSec >= 2.5 &&
+                        string.Equals(playState, "stop", StringComparison.OrdinalIgnoreCase))
+                    {
+                        break;
                     }
                 }
 
@@ -608,9 +666,9 @@ public sealed class YouTubeQueueService : IDisposable
                     }
                 }
 
-                // IMPORTANT: Use a fresh CancellationToken for the next track start so
-                // PlayAtIndexAsync's CancelPendingAutoAdvance() does NOT self-cancel the next playback!
-                var advanced = await PlayNextAsync(CancellationToken.None);
+                // Preserve user's current mute state across automatic queue transitions!
+                var keepMuted = _stateStore.Snapshot.Status?.IsMuted == true;
+                var advanced = await PlayNextAutoAsync(unmute: !keepMuted, CancellationToken.None);
                 if (advanced)
                 {
                     _logStore.Info($"YouTube queue auto-advanced after '{track.Title}'.");
@@ -656,10 +714,12 @@ public sealed class YouTubeQueueService : IDisposable
     private void OnNonRelaySourceActivated()
     {
         var wasActive = false;
+        string? activeToken = null;
         lock (_sync)
         {
             if (_isActive)
             {
+                activeToken = _activeRelayToken;
                 _isActive = false;
                 _activeRelayToken = null;
                 wasActive = true;
@@ -669,7 +729,11 @@ public sealed class YouTubeQueueService : IDisposable
         if (wasActive)
         {
             CancelPendingAutoAdvance();
-            _relayServer.CancelAllActiveStreams();
+            if (!string.IsNullOrWhiteSpace(activeToken))
+            {
+                _relayServer.CancelStream(activeToken);
+            }
+
             NotifyChanged();
         }
     }

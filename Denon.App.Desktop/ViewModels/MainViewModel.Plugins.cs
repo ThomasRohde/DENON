@@ -328,6 +328,13 @@ public sealed partial class MainViewModel
         {
             RefreshSelectedPluginPresentation();
         }
+
+        // Re-evaluate Now Playing immediately whenever Smart TV or other live plugins update
+        // (e.g., switching LG TV apps, channels, or HDMI inputs with the physical TV remote).
+        if (_stateStore is not null && _stateStore.Snapshot.Status is not null)
+        {
+            ApplyStateSnapshot(_stateStore.Snapshot);
+        }
     }
 
     private void RefreshSelectedPluginPresentation()

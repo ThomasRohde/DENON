@@ -1282,17 +1282,34 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
     private async Task MonitorLoopAsync(CancellationToken ct)
     {
         var backoffSeconds = 3;
+        var lastPeriodicSyncUtc = DateTimeOffset.UtcNow;
+
         while (!ct.IsCancellationRequested && !_disposed)
         {
             try
             {
                 if (!_demoMode &&
                     !string.IsNullOrWhiteSpace(_configuredIp) &&
-                    !string.IsNullOrWhiteSpace(_configuredClientKey) &&
-                    (_ws is null || _ws.State != WebSocketState.Open))
+                    !string.IsNullOrWhiteSpace(_configuredClientKey))
                 {
-                    await EnsureConnectedAsync(allowInteractivePairing: false, forcePairing: false, ct: ct);
-                    backoffSeconds = 3;
+                    if (_ws is null || _ws.State != WebSocketState.Open)
+                    {
+                        await EnsureConnectedAsync(allowInteractivePairing: false, forcePairing: false, ct: ct);
+                        backoffSeconds = 3;
+                        lastPeriodicSyncUtc = DateTimeOffset.UtcNow;
+                    }
+                    else if ((DateTimeOffset.UtcNow - lastPeriodicSyncUtc) >= TimeSpan.FromSeconds(15))
+                    {
+                        // Guard against silent SSAP subscription drops on webOS 23/24 when operating via physical LG remote.
+                        lastPeriodicSyncUtc = DateTimeOffset.UtcNow;
+                        await TryQueryAsync("ssap://com.webos.applicationManager/getForegroundAppInfo", HandleForegroundUpdate, ct);
+                        await TryQueryAsync("ssap://com.webos.service.tvpower/power/getPowerState", HandlePowerStateUpdate, ct);
+                        await TryQueryAsync("ssap://audio/getSoundOutput", HandleSoundOutputUpdate, ct);
+                        if (CurrentState.ForegroundAppId.Contains("livetv", StringComparison.OrdinalIgnoreCase))
+                        {
+                            await TryQueryAsync("ssap://tv/getCurrentChannel", HandleCurrentChannelUpdate, ct);
+                        }
+                    }
                 }
             }
             catch (OperationCanceledException)
@@ -1693,10 +1710,11 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
 
         UpdateState(s =>
         {
-            var title =
-                s.Inputs.FirstOrDefault(i => i.AppId.Equals(appId, StringComparison.OrdinalIgnoreCase))?.Label ??
-                s.Apps.FirstOrDefault(a => a.Id.Equals(appId, StringComparison.OrdinalIgnoreCase))?.Title ??
-                FormatFriendlyAppId(appId);
+            var matchedInput = s.Inputs.FirstOrDefault(i => i.AppId.Equals(appId, StringComparison.OrdinalIgnoreCase));
+            var title = matchedInput is not null
+                ? FormatInputDisplayTitle(matchedInput)
+                : (s.Apps.FirstOrDefault(a => a.Id.Equals(appId, StringComparison.OrdinalIgnoreCase))?.Title ??
+                   FormatFriendlyAppId(appId));
 
             return s with
             {
@@ -1824,11 +1842,36 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
 
         if (inputs.Count > 0)
         {
-            UpdateState(s => s with
+            UpdateState(s =>
             {
-                Inputs = MarkActiveInput(inputs, s.ForegroundAppId),
+                var marked = MarkActiveInput(inputs, s.ForegroundAppId);
+                var activeInput = marked.FirstOrDefault(i => i.AppId.Equals(s.ForegroundAppId, StringComparison.OrdinalIgnoreCase));
+                return s with
+                {
+                    Inputs = marked,
+                    ForegroundAppTitle = activeInput is not null ? FormatInputDisplayTitle(activeInput) : s.ForegroundAppTitle,
+                };
             });
         }
+    }
+
+    private static string FormatInputDisplayTitle(LgTvInputInfo input)
+    {
+        var portName = input.Id.Replace('_', ' ').Trim();
+        var label = input.Label?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            return string.IsNullOrWhiteSpace(portName) ? FormatFriendlyAppId(input.AppId) : portName;
+        }
+
+        if (string.IsNullOrWhiteSpace(portName) ||
+            label.Contains(portName, StringComparison.OrdinalIgnoreCase) ||
+            portName.Contains(label, StringComparison.OrdinalIgnoreCase))
+        {
+            return label;
+        }
+
+        return $"{label} ({portName})";
     }
 
     private void HandleLaunchPoints(JsonElement payload)

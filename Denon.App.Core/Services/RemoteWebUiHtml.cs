@@ -73,9 +73,10 @@ public static class RemoteWebUiHtml
   .toast { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); background: #0e2430; border: 1px solid var(--cyan); color: var(--text); padding: 8px 14px; border-radius: 99px; font-size: 12px; font-weight: 600; opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 99; }
   .toast.show { opacity: 1; }
   .owner-only.hidden { display: none !important; }
-  #pairGate { display: none; }
-  #pairGate.show { display: block; }
+  #pairGate, #disabledGate { display: none; }
+  #pairGate.show, #disabledGate.show { display: block; }
   #appShell.locked { display: none; }
+  .header-locked { display: none !important; }
 </style>
 </head>
 <body>
@@ -83,10 +84,19 @@ public static class RemoteWebUiHtml
 
 <div class="header">
   <div class="brand"><div class="logo" aria-hidden="true">D</div><span id="rxName">DENON REMOTE</span></div>
-  <div style="display:flex;gap:6px;align-items:center">
+  <div id="headerControls" style="display:flex;gap:6px;align-items:center">
     <span id="roleBadge" class="pill guest" style="display:none">GUEST</span>
     <button id="powerBtn" class="pill owner-only" type="button" aria-label="Toggle Receiver Power" onclick="post('/api/power')">STANDBY</button>
   </div>
+</div>
+
+<!-- DISABLED GATE -->
+<div id="disabledGate" class="card" role="alert">
+  <div class="label"><span>Phone Remote Disabled</span><span>Desktop Setting</span></div>
+  <p id="disabledMsg" style="font-size:13px;color:var(--sub);margin:0 0 12px;line-height:1.45">
+    Phone Remote is currently disabled in Denon Desktop. Enable it under Cast &amp; Phone Remote to resume control.
+  </p>
+  <button class="btn primary" type="button" onclick="refreshStatus()">Retry</button>
 </div>
 
 <!-- PAIRING GATE -->
@@ -203,6 +213,8 @@ const TOKEN_KEY = 'denon_remote_token_v1';
 let state = null;
 let dragging = false;
 let pendingVol = null;
+let acknowledgedVol = null;
+let acknowledgedVolAt = 0;
 let volCommitTimer = null;
 let volInFlight = false;
 let lastSuccessTime = null;
@@ -235,14 +247,27 @@ function authHeaders(extra) {
 }
 
 function showPairGate(msg) {
+  document.getElementById('disabledGate').classList.remove('show');
   document.getElementById('pairGate').classList.add('show');
   document.getElementById('appShell').classList.add('locked');
+  document.getElementById('headerControls').classList.add('header-locked');
   document.getElementById('pairError').textContent = msg || '';
+  setTimeout(() => document.getElementById('pairInput')?.focus(), 50);
 }
 
-function hidePairGate() {
+function showDisabledGate(msg) {
   document.getElementById('pairGate').classList.remove('show');
+  document.getElementById('disabledGate').classList.add('show');
+  document.getElementById('appShell').classList.add('locked');
+  document.getElementById('headerControls').classList.add('header-locked');
+  document.getElementById('disabledMsg').textContent = msg || 'Phone Remote is currently disabled in Denon Desktop.';
+}
+
+function hideGates() {
+  document.getElementById('pairGate').classList.remove('show');
+  document.getElementById('disabledGate').classList.remove('show');
   document.getElementById('appShell').classList.remove('locked');
+  document.getElementById('headerControls').classList.remove('header-locked');
 }
 
 function submitPairToken() {
@@ -298,7 +323,10 @@ function commitSlide(v) {
 
 function stepVol(delta) {
   const maxV = state?.maxVolume || 98;
-  const base = pendingVol !== null ? pendingVol : (state ? state.volume : Number(document.getElementById('volSlider').value));
+  const freshAck = acknowledgedVol !== null && (Date.now() - acknowledgedVolAt) < 2800;
+  const base = pendingVol !== null
+    ? pendingVol
+    : (freshAck ? acknowledgedVol : (state ? state.volume : Number(document.getElementById('volSlider').value)));
   pendingVol = Math.max(0, Math.min(maxV, base + delta));
   applyVolumeDisplay(pendingVol, maxV);
   scheduleVolumeFlush(120);
@@ -314,7 +342,11 @@ async function flushPendingVolume() {
   const target = pendingVol;
   volInFlight = true;
   try {
-    await post('/api/volume', { level: target });
+    const ok = await post('/api/volume', { level: target });
+    if (ok) {
+      acknowledgedVol = target;
+      acknowledgedVolAt = Date.now();
+    }
   } finally {
     volInFlight = false;
     if (pendingVol !== null && pendingVol !== target) {
@@ -338,11 +370,13 @@ async function post(url, body) {
       body: body ? JSON.stringify(body) : '{}'
     });
     const j = await r.json().catch(() => ({}));
-    if (r.status === 401) { showPairGate(j.error || 'Pairing required'); return; }
-    if (!r.ok) { toast(j.error || 'Command failed'); return; }
+    if (r.status === 401) { showPairGate(j.error || 'Pairing required'); return false; }
+    if (r.status === 403 && /disabled/i.test(j.error || '')) { showDisabledGate(j.error); return false; }
+    if (!r.ok) { toast(j.error || 'Command failed'); return false; }
     if (j.message) toast(j.message);
     setTimeout(refreshStatus, 250);
-  } catch (e) { toast('Desktop unreachable'); }
+    return true;
+  } catch (e) { toast('Desktop unreachable'); return false; }
 }
 
 async function searchYt() {
@@ -451,14 +485,14 @@ async function refreshStatus() {
     }
     if (r.status === 403) {
       const j = await r.json().catch(() => ({}));
-      updateBanner('err', j.error || 'Phone Remote disabled on Desktop');
+      showDisabledGate(j.error || 'Phone Remote disabled on Desktop');
       return;
     }
     if (!r.ok) {
       updateBanner('err', `Desktop returned HTTP ${r.status}`);
       return;
     }
-    hidePairGate();
+    hideGates();
     state = await r.json();
     lastSuccessTime = new Date();
     applyRoleUi(state.role || 'owner');
@@ -490,7 +524,12 @@ async function refreshStatus() {
     else { art.style.display = 'none'; }
 
     if (!dragging && pendingVol === null) {
-      applyVolumeDisplay(state.volume || 0, state.maxVolume || 98);
+      const freshAck = acknowledgedVol !== null && (Date.now() - acknowledgedVolAt) < 2800;
+      if (freshAck && state.volume === acknowledgedVol) {
+        acknowledgedVol = null;
+      }
+      const displayVol = (freshAck && acknowledgedVol !== null) ? acknowledgedVol : (state.volume || 0);
+      applyVolumeDisplay(displayVol, state.maxVolume || 98);
     }
 
     const mbtn = document.getElementById('muteBtn');

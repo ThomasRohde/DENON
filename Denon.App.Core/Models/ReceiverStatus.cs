@@ -21,7 +21,20 @@ public sealed record NowPlayingMedia(
     string AlbumId,
     string MediaId,
     int? QueueId,
-    int? SourceId);
+    int? SourceId,
+    string Station = "")
+{
+    public bool IsPlaceholderUrlStream =>
+        string.Equals(Song?.Trim(), "Url Stream", StringComparison.OrdinalIgnoreCase) &&
+        (string.IsNullOrWhiteSpace(Artist) || string.Equals(Artist.Trim(), "Url Stream", StringComparison.OrdinalIgnoreCase)) &&
+        string.IsNullOrWhiteSpace(Station);
+
+    public bool HasRealMetadata =>
+        !IsPlaceholderUrlStream &&
+        (!string.IsNullOrWhiteSpace(Song) ||
+         !string.IsNullOrWhiteSpace(Station) ||
+         !string.IsNullOrWhiteSpace(Artist));
+}
 
 public sealed record ReceiverStatus(
     ReceiverPlayerInfo Player,
@@ -39,7 +52,8 @@ public sealed record ReceiverStatus(
     bool IsZone2On = false,
     int MaxVolume = 98,
     double VolumeExact = 0,
-    string? ActiveStationAlias = null);
+    string? ActiveStationAlias = null,
+    bool IsAvrConfirmed = true);
 
 public sealed record AvrDeviceStatus(
     bool IsPoweredOn,
@@ -143,13 +157,38 @@ public static class DenonCatalog
         var normalizedCurrent = currentInput.Trim().ToUpperInvariant();
         var normalizedCode = optionCode.Trim().ToUpperInvariant();
 
-        if (normalizedCode == "NET" && normalizedCurrent is "NET" or "HEOS" or "IRADIO" or "ONLINE MUSIC" or "SERVER" or "PANDORA" or "SPOTIFY")
+        if (normalizedCode == "NET" && normalizedCurrent is
+            "NET" or "HEOS" or "IRADIO" or "ONLINE MUSIC" or "SERVER" or "PANDORA" or "SPOTIFY" or
+            "AIRPLAY" or "TIDAL" or "DEEZER" or "AMAZON" or "TUNEIN" or "SOUNDCLOUD" or "NAPSTER" or
+            "RHAPSODY" or "SIRIUSXM" or "FAVORITES" or "NET/USB" or "USB/IPOD" or "USB")
         {
             return true;
         }
 
         return string.Equals(normalizedCurrent, normalizedCode, StringComparison.OrdinalIgnoreCase);
     }
+
+    public static string? GetHeosSourceName(int? sourceId) => sourceId switch
+    {
+        1 => "Pandora",
+        2 => "Rhapsody",
+        3 => "TuneIn",
+        4 => "Spotify",
+        5 => "Deezer",
+        6 => "Napster",
+        7 => "iHeartRadio",
+        8 => "SiriusXM",
+        9 => "SoundCloud",
+        10 => "Tidal",
+        13 => "Amazon Music",
+        1024 => "Local Music",
+        1025 => "HEOS Playlists",
+        1026 => "HEOS History",
+        1027 => "HEOS Aux",
+        1028 => "HEOS Favorites",
+        1029 => "Network Stream",
+        _ => null,
+    };
 }
 
 public static class DenonVolumeMath

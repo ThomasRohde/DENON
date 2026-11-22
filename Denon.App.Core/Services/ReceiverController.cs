@@ -14,6 +14,8 @@ public sealed class ReceiverController
     private readonly AppLogStore _logStore;
     private string? _lastPlayedStationAlias;
     private bool _avrProtocolAvailable = true;
+    private bool _hasConfirmedAvrOnce;
+    private int _consecutiveAvrFailures;
 
     public ReceiverController(
         HeosClient heosClient,
@@ -776,9 +778,14 @@ public sealed class ReceiverController
         {
             avrStatus = await _avrClient.GetStatusAsync(settings, cancellationToken);
             _avrProtocolAvailable = true;
+            _hasConfirmedAvrOnce = true;
+            _consecutiveAvrFailures = 0;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
         {
+            _consecutiveAvrFailures++;
+            // Distinguish internal AVR socket timeout (3s) from caller cancellation so silently
+            // dropped port 23 cleanly degrades to HEOS-only mode while caller cancel exits immediately.
             if (_avrProtocolAvailable)
             {
                 _logStore.Warning($"AVR port 23 control unavailable ({ex.Message}); operating in HEOS-only mode.");
@@ -789,6 +796,31 @@ public sealed class ReceiverController
 
         if (avrStatus is null)
         {
+            // If this is a known AVR experiencing a brief port 23 collision (e.g., phone AVR app briefly connected),
+            // preserve the last confirmed AVR power/input/soundMode for up to 2 polls instead of falsely overwriting
+            // TV/HDMI with synthetic "NET / HEOS"!
+            if (_hasConfirmedAvrOnce &&
+                _consecutiveAvrFailures <= 2 &&
+                _stateStore.Snapshot.Status is { IsAvrConfirmed: true } prevConfirmed)
+            {
+                return heosStatus with
+                {
+                    Volume = heosStatus.Volume,
+                    VolumeExact = heosStatus.Volume,
+                    MaxVolume = prevConfirmed.MaxVolume,
+                    IsMuted = heosStatus.IsMuted,
+                    IsPoweredOn = prevConfirmed.IsPoweredOn,
+                    IsMainZoneOn = prevConfirmed.IsMainZoneOn,
+                    InputSource = prevConfirmed.InputSource,
+                    SoundMode = prevConfirmed.SoundMode,
+                    EcoMode = prevConfirmed.EcoMode,
+                    SleepTimerMinutes = prevConfirmed.SleepTimerMinutes,
+                    IsZone2On = prevConfirmed.IsZone2On,
+                    ActiveStationAlias = prevConfirmed.ActiveStationAlias,
+                    IsAvrConfirmed = false,
+                };
+            }
+
             var heosSyntheticAvr = new AvrDeviceStatus(
                 IsPoweredOn: true,
                 IsMainZoneOn: true,
@@ -807,6 +839,7 @@ public sealed class ReceiverController
                 SoundMode = "HEOS",
                 VolumeExact = heosStatus.Volume,
                 ActiveStationAlias = heosAlias,
+                IsAvrConfirmed = false,
             };
         }
 
@@ -826,6 +859,7 @@ public sealed class ReceiverController
             SleepTimerMinutes = avrStatus.SleepTimerMinutes,
             IsZone2On = avrStatus.IsZone2On,
             ActiveStationAlias = activeAlias,
+            IsAvrConfirmed = true,
         };
     }
 
@@ -836,7 +870,7 @@ public sealed class ReceiverController
             await _avrClient.EnsureMainZoneNetAsync(settings, cancellationToken);
             _avrProtocolAvailable = true;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
             _avrProtocolAvailable = false;
         }
@@ -849,7 +883,7 @@ public sealed class ReceiverController
             await _avrClient.SetVolumeAsync(settings, level, cancellationToken);
             _avrProtocolAvailable = true;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
             _avrProtocolAvailable = false;
             await _heosClient.SetVolumeAsync(settings, level, cancellationToken);
@@ -863,7 +897,7 @@ public sealed class ReceiverController
             await _avrClient.SetMuteAsync(settings, isMuted, cancellationToken);
             _avrProtocolAvailable = true;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
             _avrProtocolAvailable = false;
             await _heosClient.SetMuteAsync(settings, isMuted, cancellationToken);
@@ -874,6 +908,7 @@ public sealed class ReceiverController
     {
         if (!avrStatus.IsPoweredOn || !avrStatus.IsMainZoneOn || !DenonCatalog.InputMatches(avrStatus.InputSource, "NET"))
         {
+            _lastPlayedStationAlias = null;
             return null;
         }
 
@@ -884,14 +919,25 @@ public sealed class ReceiverController
 
         var song = heosStatus.NowPlaying.Song;
         var artist = heosStatus.NowPlaying.Artist;
+        var stationName = heosStatus.NowPlaying.Station;
 
         foreach (var station in settings.Stations)
         {
             if ((!string.IsNullOrWhiteSpace(song) && song.Contains(station.DisplayName, StringComparison.OrdinalIgnoreCase)) ||
-                (!string.IsNullOrWhiteSpace(artist) && artist.Contains(station.DisplayName, StringComparison.OrdinalIgnoreCase)))
+                (!string.IsNullOrWhiteSpace(artist) && artist.Contains(station.DisplayName, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrWhiteSpace(stationName) && stationName.Contains(station.DisplayName, StringComparison.OrdinalIgnoreCase)))
             {
                 return station.Alias;
             }
+        }
+
+        // If an external streaming service (Spotify, Tidal, TuneIn, Deezer, Amazon, AirPlay, etc.)
+        // is playing via phone/HEOS app, clear the stale Denon Desktop preset highlight!
+        var sid = heosStatus.NowPlaying.SourceId;
+        if (sid is int sourceId && sourceId != 1029 && sourceId != 0)
+        {
+            _lastPlayedStationAlias = null;
+            return null;
         }
 
         return _lastPlayedStationAlias;

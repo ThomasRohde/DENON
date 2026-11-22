@@ -255,7 +255,8 @@ public sealed class HeosClient : IDisposable
                 nowPlaying.AlbumId ?? string.Empty,
                 nowPlaying.MediaId ?? string.Empty,
                 nowPlaying.QueueId,
-                nowPlaying.SourceId),
+                nowPlaying.SourceId,
+                nowPlaying.Station ?? string.Empty),
             DateTimeOffset.Now,
             VolumeExact: volume);
     }
@@ -592,6 +593,8 @@ public sealed class HeosClient : IDisposable
         public string? Type { get; set; }
 
         public string? Song { get; set; }
+
+        public string? Station { get; set; }
 
         public string? Album { get; set; }
 
