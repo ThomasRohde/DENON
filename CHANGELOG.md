@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-22
+
+### Added
+- **Streamable HTTP MCP Server (`POST /mcp` + SSE, 2025-11-25 Spec) & Always-On Living-Room Brain**:
+  - Added `DenonMcpHttpServer` hosted natively on `http://127.0.0.1:18926/mcp` (localhost-only default, optional LAN bind, auto-generated `ddn_...` Bearer token, 3 Permission Tiers: `Observer` / `SafeControl` / `FullOrchestration`, and a hard `MaxSafeVolume` ceiling enforced on every volume mutation).
+  - Exposes **4 Live MCP Resources** (`denon://room/state`, `denon://diagnostics/health`, `denon://catalog/capabilities`, `denon://memory/habits`), **4 Expert Prompts** (`design_atmosphere`, `diagnose_home_theater`, `acoustic_advisor`, `architect_automation`), **22 Core Intelligence/AVR/Acoustic/Media/Scene/Rule Tools** (including semantic `apply_atmosphere`, `diagnose_room`, `fix_room_issue`, `restore_previous_state`, `create_or_update_scene`, and `create_automation_rule`), plus **zero-config auto-bridging** of every enabled `IDenonPlugin` action (Philips Hue, LG webOS TV, Home Assistant, and drop-in `.dll` plugins).
+  - Added `RoomIntelligenceService` (**Self-Healing Room Doctor** detecting cross-device mismatches like AVR muted while playing, late-night loud volume, LG TV video playing while Denon isn't on TV eARC, and OLED burn-in protection during audio-only playback, with 1-click Auto-Fix + **Room State Snapshot Undo** + 100% local **Habits Memory** in `room-habits.json`).
+  - Added the **MCP & Room Brain** studio dashboard (`Views/McpIntelligenceView.xaml`), a live **`MCP :18926`** status pill in the Title Bar, a zero-clutter **Room Brain Insight Strip** on Control Deck (only shown when actionable), 1-click **Copy MCP Config JSON**, a live MCP Activity Feed, and Guide #12 in the built-in Help & Guide system.
+
 ## [1.7.0] - 2026-11-22
 
 ### Added
@@ -136,7 +145,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Zero-Lag Real-Time HEOS Push Events (`LIVE PUSH`) & Analog VU Meters**: Dedicated `register_for_change_events` push listener for `<50 ms` knob/remote sync and toggleable dual-channel illuminated VU dials.
 - **Automated GitHub Releases Workflow**: `.github/workflows/release.yml` builds self-contained single-file `win-x64` executables and SHA-256 checksums on version tags.
 
-[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/ThomasRohde/DENON/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/ThomasRohde/DENON/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/ThomasRohde/DENON/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/ThomasRohde/DENON/compare/v1.4.0...v1.5.0

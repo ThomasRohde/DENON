@@ -13,6 +13,8 @@ public static class AppDataPaths
 
     public static string SettingsFilePath { get; } = Path.Combine(RootDirectory, "settings.json");
 
+    public static string RoomHabitsFilePath { get; } = Path.Combine(RootDirectory, "room-habits.json");
+
     public static string LogFilePath { get; } = Path.Combine(LogsDirectory, "app.log");
 
     public static string GetPluginDataDirectory(string pluginId)

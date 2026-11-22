@@ -82,6 +82,7 @@ public sealed partial class MainViewModel
         "CastRemote" => "← Back to Cast & Remote",
         "Stations" => "← Back to Stations & Streams",
         "Plugins" => SelectedPlugin is not null ? $"← Back to {SelectedPlugin.ShortName}" : "← Back to Plugins",
+        "Mcp" => "← Back to MCP & Room Brain",
         "Settings" => "← Back to Settings",
         "Diagnostics" => "← Back to Health & Support",
         _ => "← Back",
@@ -377,6 +378,7 @@ public sealed partial class MainViewModel
         HelpPortsReference.Add(new("TCP 23", "Denon / Marantz AVR Telnet", "Hardware power, master volume, HDMI inputs, sound modes, Audyssey, ECO, Zone 2 & dimmer"));
         HelpPortsReference.Add(new("TCP 1255", "HEOS CLI & LIVE PUSH", "Zero-lag (<50 ms) real-time playback, volume, album art, favorites & queue events"));
         HelpPortsReference.Add(new("TCP 18925", "LAN Audio Relay & Phone Remote", "Streams YouTube, PC Audio Cast & local FLACs to HEOS + hosts the QR Couch Phone Remote web UI"));
+        HelpPortsReference.Add(new("TCP 18926", "Streamable HTTP MCP Server", "Spec-compliant 2025-11-25 MCP server (POST /mcp + SSE) with Bearer auth, Room Graph resources & auto-bridged plugin tools"));
         HelpPortsReference.Add(new("UDP 1900", "SSDP Auto-Discovery", "Zero-config LAN discovery for Denon/Marantz AVRs, Philips Hue Bridges & LG webOS TVs"));
         HelpPortsReference.Add(new("HTTPS 443 / HTTP 80", "Philips Hue Bridge API", "Room/light controls, native Hue scenes & Entertainment Area discovery on local LAN"));
         HelpPortsReference.Add(new("UDP 2100", "Hue Entertainment API v2 (DTLS)", "True 50 Hz zero-lag binary RGB streaming for FFT Music Sync"));
@@ -672,6 +674,37 @@ public sealed partial class MainViewModel
             ],
             contextSection: "Plugins",
             contextPluginId: "home-assistant"));
+
+        _allHelpTopics.Add(new HelpGuideTopic(
+            id: "mcp-room-brain",
+            badge: "MCP",
+            accentHex: "#10B981",
+            category: "Plugins",
+            title: "Streamable HTTP MCP Server & Living-Room Brain",
+            subtitle: "Connect AI agents via 2025-11-25 Streamable HTTP (/mcp), Self-Healing Room Doctor, Snapshot Undo & Habits Memory.",
+            overview: "Denon Desktop hosts a native Streamable HTTP Model Context Protocol (MCP) server (POST /mcp + SSE) paired with an always-on local Living-Room Intelligence Engine. External AI agents (Antigravity, Claude Desktop, Cursor, VS Code, n8n) gain full situational awareness of your Denon AVR, Philips Hue, LG webOS TV, Home Assistant, and local listening habits — with hard safety guardrails and 1-click Undo.",
+            steps:
+            [
+                new("01", "Copy Client Config JSON in One Click", "Open MCP & Room Brain (from the left sidebar or the green MCP :18926 badge in the title bar) and click Copy MCP Config JSON. Paste it directly into Antigravity, Claude Desktop, Cursor, or VS Code."),
+                new("02", "Configure Safety Guardrails", "Choose a Permission Tier — Observer (Read-Only), Safe Control (no power-off or config edits), or Full Orchestration — and set your Hard Max Safe Volume Ceiling (default 65 / -15.0 dB) so no AI can ever accidentally blast your speakers."),
+                new("03", "Use the Self-Healing Room Doctor & 1-Click Undo", "Denon Desktop continuously monitors cross-device health (AVR muted while playing, late-night loud volume, LG TV video playing while Denon isn't on TV eARC, OLED screen left on during audio-only music). Fix any detected issue in 1 click or roll back any AI/atmosphere change via Restore Previous State."),
+                new("04", "Auto-Bridged Plugin Tools & Local Habits Memory", "Every enabled plugin action (Philips Hue, LG webOS TV, Home Assistant, and external drop-in DLLs) is automatically exposed as an MCP tool alongside composite tools like apply_atmosphere, create_or_update_scene, and create_automation_rule. Your preferred volumes by time of day are learned 100% locally in room-habits.json (denon://memory/habits)."),
+            ],
+            proTips:
+            [
+                "By default the MCP server binds strictly to 127.0.0.1 (localhost only) with an auto-generated Bearer token — toggle Allow LAN Connections only if you want agents on another machine to connect.",
+                "Watch every incoming MCP tool call and resource read in real time inside the Live MCP Activity Feed.",
+            ],
+            troubleshooting:
+            [
+                new("MCP client receives 401 Unauthorized?", "Verify the Authorization: Bearer <token> header matches your token in MCP & Room Brain (use Copy MCP Config JSON to avoid typos), or temporarily disable Require Bearer Auth for trusted localhost testing."),
+                new("Can't connect from another PC on the LAN?", "Turn on 'Allow LAN connections' in MCP & Room Brain and click Save & Apply (note: Windows requires a URLACL or running elevated once to bind '+' on non-localhost interfaces)."),
+            ],
+            quickJumps:
+            [
+                new("Open MCP & Room Brain →", "Mcp"),
+            ],
+            contextSection: "Mcp"));
 
         _allHelpTopics.Add(new HelpGuideTopic(
             id: "shortcuts-hotkeys",

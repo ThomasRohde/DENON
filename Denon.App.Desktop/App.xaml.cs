@@ -3,6 +3,7 @@ using System.Threading;
 using System.Windows;
 using Denon.App.Core.Heos;
 using Denon.App.Core.Infrastructure;
+using Denon.App.Core.Mcp;
 using Denon.App.Core.Plugins;
 using Denon.App.Core.Services;
 using Denon.App.Desktop.Services;
@@ -96,6 +97,8 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<IDenonPlugin, SmartTvPlugin>();
             builder.Services.AddSingleton<IDenonPlugin, HomeAssistantPlugin>();
             builder.Services.AddSingleton<PluginHostService>();
+            builder.Services.AddSingleton<RoomIntelligenceService>();
+            builder.Services.AddSingleton<DenonMcpHttpServer>();
             builder.Services.AddSingleton<LyricsService>();
             builder.Services.AddSingleton<AcousticSyncCalibrationService>();
             builder.Services.AddSingleton<LiveAudioAnalyzerService>();
@@ -135,6 +138,16 @@ public partial class App : System.Windows.Application
                     catch (Exception ex)
                     {
                         _host.Services.GetRequiredService<AppLogStore>().Warning($"Local audio relay startup deferred: {ex.Message}");
+                    }
+
+                    try
+                    {
+                        var mcpServer = _host.Services.GetRequiredService<DenonMcpHttpServer>();
+                        await mcpServer.ApplySettingsAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _host.Services.GetRequiredService<AppLogStore>().Warning($"MCP HTTP server startup deferred: {ex.Message}");
                     }
                 });
 

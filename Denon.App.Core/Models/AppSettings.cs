@@ -12,6 +12,8 @@ public sealed class AppSettings
 
     public PluginSettings Plugins { get; set; } = new();
 
+    public McpServerSettings Mcp { get; set; } = new();
+
     public List<AutomationRule> Automations { get; set; } = AutomationRule.CreateDefaults();
 
     public AppSettings Clone() =>
@@ -22,6 +24,7 @@ public sealed class AppSettings
             Media = Media.Clone(),
             Shortcuts = Shortcuts.Clone(),
             Plugins = Plugins.Clone(),
+            Mcp = Mcp.Clone(),
             Automations = Automations.Select(static a => a.Clone()).ToList(),
         };
 

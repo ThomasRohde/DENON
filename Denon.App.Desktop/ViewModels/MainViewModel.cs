@@ -7,6 +7,7 @@ using System.Text;
 using System.Windows.Data;
 using System.Windows.Media;
 using Denon.App.Core.Infrastructure;
+using Denon.App.Core.Mcp;
 using Denon.App.Core.Models;
 using Denon.App.Core.Plugins;
 using Denon.App.Core.Services;
@@ -137,7 +138,9 @@ public sealed partial class MainViewModel : ObservableObject
         LiveAudioAnalyzerService liveAudioAnalyzerService,
         AlbumArtPaletteService albumArtPaletteService,
         LyricsService lyricsService,
-        AcousticSyncCalibrationService calibrationService)
+        AcousticSyncCalibrationService calibrationService,
+        RoomIntelligenceService roomIntelligenceService,
+        DenonMcpHttpServer mcpServer)
     {
         _receiverController = receiverController;
         _settingsStore = settingsStore;
@@ -274,6 +277,7 @@ public sealed partial class MainViewModel : ObservableObject
         InitializePlugins(pluginHostService);
         InitializeAutomations(automationEngineService);
         InitializeStudioAndSync(lyricsService, calibrationService);
+        InitializeMcpAndIntelligence(roomIntelligenceService, mcpServer);
         InitializeHelpGuide();
         _liveAudioAnalyzer.SetVuCaptureRequested(IsAnyAudioMeterVisible);
 
