@@ -24,6 +24,8 @@ public sealed class SmartTvConfig
 
     public bool ScreenOffOnMusicScene { get; set; }
 
+    public bool AutoRefreshPreview { get; set; }
+
     public string MovieNightInputAppId { get; set; } = "com.webos.app.hdmi1";
 
     public string LastModelName { get; set; } = string.Empty;

@@ -73,6 +73,7 @@ public partial class SmartTvDashboardView : UserControl
 
     private void Trackpad_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        ViewModel?.NotifyUserInteraction();
         _isDraggingTrackpad = true;
         _lastTrackpadPos = e.GetPosition(TrackpadSurface);
         _dragDistanceAccum = 0;

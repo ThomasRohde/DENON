@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-11-22
+
+### Added
+- **Direct LG webOS System Settings API (`get_settings` & `set_settings` in `tv_computer`)**:
+  - Added `GetSystemSettingsAsync` and `SetSystemSettingsAsync` in `LgWebOsClient` (`ssap://settings/getSystemSettings` / `setSystemSettings` with `com.webos.settingsservice` fallback) for fast 100 ms reads/writes of `picture`, `sound`, `option`, or `all` (picture + sound) settings — with clear fallback guidance to on-screen Settings navigation on firmwares that restrict direct writes.
+  - Read-only `get_settings` works in all MCP permission tiers (including `Observer`).
+- **Smart TV Live Preview & Virtual Trackpad Polish**:
+  - Added a quick **`TV Settings`** shortcut right in the Live TV Screen header bar (automatically snaps a fresh preview after launch when `Auto-Refresh` is off).
+  - Added adaptive **Active-Gesture Fast Refresh (`1 s` while actively steering the Virtual Trackpad or clicking the preview, relaxing to `2.5 s` when idle)** and persisted your `Auto-Refresh` preference in `config.json`.
+  - Added an inline **Quick Type** input bar directly beneath the Virtual Trackpad so you can click a TV search box and type without scrolling.
+- **Smarter Living-Room Room Doctor 2.0 Checks**:
+  - Added lazy background Telnet acoustic caching in `RoomIntelligenceService` (also surfaced live in `get_room_state`) powering three new zero-clutter 1-click Auto-Fix insights:
+    - **Evening Cinema Display Glow (`avr.dim_panel`)**: detects Denon front panel left on `BRI` during evening movie/surround sound modes and dims it to `DAR` in 1 click.
+    - **Daytime Music Night-Compression (`avr.dynvol_off`)**: detects `Dynamic Volume: HEV` left active during daytime music listening and turns it off for full dynamics.
+    - **Evening Movie Lights (`hue.movie_dim`)**: detects Philips Hue lights still bright while Netflix/Disney+/Plex/Apple TV/Prime Video/SkyShowtime is playing in the evening and offers 1-click Movie Night dimming.
+
 ## [1.10.1] - 2026-11-22
 
 ### Changed
@@ -186,7 +202,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Zero-Lag Real-Time HEOS Push Events (`LIVE PUSH`) & Analog VU Meters**: Dedicated `register_for_change_events` push listener for `<50 ms` knob/remote sync and toggleable dual-channel illuminated VU dials.
 - **Automated GitHub Releases Workflow**: `.github/workflows/release.yml` builds self-contained single-file `win-x64` executables and SHA-256 checksums on version tags.
 
-[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.10.1...HEAD
+[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.11.0...HEAD
+[1.11.0]: https://github.com/ThomasRohde/DENON/compare/v1.10.1...v1.11.0
 [1.10.1]: https://github.com/ThomasRohde/DENON/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/ThomasRohde/DENON/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/ThomasRohde/DENON/compare/v1.8.1...v1.9.0

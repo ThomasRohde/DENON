@@ -290,7 +290,13 @@
                                       FontSize="11.5"
                                       VerticalAlignment="Center"
                                       Margin="0,0,10,0"
-                                      ToolTip="Automatically refresh the live TV preview every 2 seconds while this tab is open" />
+                                      ToolTip="Automatically refresh the live TV preview (1s while actively using the trackpad, 2.5s idle; pauses when tab is hidden)" />
+                            <Button Content="TV Settings"
+                                    Command="{Binding LaunchAppCommand}"
+                                    CommandParameter="settings"
+                                    Style="{StaticResource TvChipBtn}"
+                                    Margin="0,0,6,0"
+                                    ToolTip="Open LG webOS TV Settings directly" />
                             <Button Content="Center Cursor"
                                     Command="{Binding RecalibrateCursorCommand}"
                                     Style="{StaticResource TvChipBtn}"
@@ -388,11 +394,13 @@
                             </Grid>
                         </StackPanel>
 
-                        <!-- Right: Precision Virtual Trackpad -->
+                        <!-- Right: Precision Virtual Trackpad + Quick Type -->
                         <Grid Grid.Column="2">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="*" />
-                                <RowDefinition Height="9" />
+                                <RowDefinition Height="8" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="8" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
@@ -403,7 +411,7 @@
                                     BorderThickness="1"
                                     CornerRadius="12"
                                     Cursor="Hand"
-                                    MinHeight="200"
+                                    MinHeight="168"
                                     MouseLeftButtonDown="Trackpad_MouseLeftButtonDown"
                                     MouseMove="Trackpad_MouseMove"
                                     MouseLeftButtonUp="Trackpad_MouseLeftButtonUp"
@@ -435,6 +443,31 @@
                                 <Button Content="▲" Command="{Binding PointerScrollCommand}" CommandParameter="up" Style="{StaticResource TvChipBtn}" Padding="4,5.5" FontSize="11" Margin="0,0,4,0" ToolTip="Scroll Up" />
                                 <Button Content="▼" Command="{Binding PointerScrollCommand}" CommandParameter="down" Style="{StaticResource TvChipBtn}" Padding="4,5.5" FontSize="11" ToolTip="Scroll Down" />
                             </UniformGrid>
+
+                            <!-- Inline Quick Type to TV -->
+                            <Grid Grid.Row="4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="5" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding KeyboardText, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource TvInput}"
+                                         Padding="8,5"
+                                         FontSize="11.5"
+                                         Tag="Quick type to TV &amp; Enter...">
+                                    <TextBox.InputBindings>
+                                        <KeyBinding Key="Return" Command="{Binding SendKeyboardCommand}" />
+                                    </TextBox.InputBindings>
+                                </TextBox>
+                                <Button Grid.Column="2"
+                                        Content="Send ↵"
+                                        Command="{Binding SendKeyboardCommand}"
+                                        Style="{StaticResource TvBtn}"
+                                        Padding="9,5"
+                                        FontSize="11" />
+                            </Grid>
                         </Grid>
                     </Grid>
                 </StackPanel>

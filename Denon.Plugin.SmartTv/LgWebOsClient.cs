@@ -1039,6 +1039,129 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
         await SendRequestCoreAsync("ssap://com.webos.service.ime/deleteCharacters", new { count = Math.Clamp(count, 1, 50) }, ct);
     }
 
+    public static IReadOnlyList<string> GetDefaultSettingKeysForCategory(string category) =>
+        (category ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "picture" =>
+            [
+                "pictureMode",
+                "backlight",
+                "brightness",
+                "contrast",
+                "color",
+                "sharpness",
+                "colorTemperature",
+                "energySaving",
+                "dynamicContrast",
+                "truMotionMode",
+                "eyeComfortMode",
+                "filmmakerModeAutoStart",
+            ],
+            "sound" =>
+            [
+                "soundOutput",
+                "soundMode",
+                "eArcSupport",
+                "digitalSoundOut",
+                "avSyncBypass",
+                "autoVolume",
+            ],
+            "option" =>
+            [
+                "country",
+                "audioGuidance",
+                "standbyLight",
+            ],
+            _ => [],
+        };
+
+    /// <summary>
+    /// Reads LG webOS system settings directly over SSAP (ssap://settings/getSystemSettings),
+    /// returning the raw JSON payload (typically containing a 'settings' object).
+    /// </summary>
+    public async Task<JsonElement> GetSystemSettingsAsync(
+        string category,
+        IReadOnlyList<string>? keys = null,
+        CancellationToken ct = default)
+    {
+        var cleanCat = string.IsNullOrWhiteSpace(category) ? "picture" : category.Trim().ToLowerInvariant();
+        var cleanKeys = keys is { Count: > 0 } ? keys : GetDefaultSettingKeysForCategory(cleanCat);
+
+        if (_demoMode)
+        {
+            var demoJson = cleanCat == "sound"
+                ? "{\"returnValue\":true,\"category\":\"sound\",\"settings\":{\"soundOutput\":\"external_arc\",\"soundMode\":\"aiSoundPlus\",\"eArcSupport\":\"on\",\"digitalSoundOut\":\"passThrough\"}}"
+                : "{\"returnValue\":true,\"category\":\"picture\",\"settings\":{\"pictureMode\":\"expert1\",\"backlight\":80,\"contrast\":85,\"brightness\":50,\"sharpness\":10,\"energySaving\":\"off\",\"filmmakerModeAutoStart\":\"on\"}}";
+            using var doc = JsonDocument.Parse(demoJson);
+            return doc.RootElement.Clone();
+        }
+
+        await EnsureConnectedAsync(allowInteractivePairing: false, forcePairing: false, ct: ct);
+        var payload = cleanKeys.Count > 0
+            ? (object)new { category = cleanCat, keys = cleanKeys }
+            : new { category = cleanCat };
+
+        try
+        {
+            var res = await SendRequestCoreAsync("ssap://settings/getSystemSettings", payload, ct, TimeSpan.FromSeconds(8));
+            return res.ValueKind == JsonValueKind.Undefined ? default : res.Clone();
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            DiagnosticLog?.Invoke($"settings/getSystemSettings fallback ({ex.Message}); trying com.webos.settingsservice.");
+            var res = await SendRequestCoreAsync("ssap://com.webos.settingsservice/getSystemSettings", payload, ct, TimeSpan.FromSeconds(8));
+            return res.ValueKind == JsonValueKind.Undefined ? default : res.Clone();
+        }
+    }
+
+    /// <summary>
+    /// Writes LG webOS system settings directly over SSAP (ssap://settings/setSystemSettings).
+    /// Note: Some newer webOS firmwares restrict direct writes for specific categories; callers
+    /// can fall back to tv_computer UI navigation (launch_app 'settings' + D-pad).
+    /// </summary>
+    public async Task<JsonElement> SetSystemSettingsAsync(
+        string category,
+        IReadOnlyDictionary<string, object?> settings,
+        CancellationToken ct = default)
+    {
+        if (settings is null || settings.Count == 0)
+        {
+            throw new ArgumentException("At least one setting key/value pair is required.", nameof(settings));
+        }
+
+        var cleanCat = string.IsNullOrWhiteSpace(category) ? "picture" : category.Trim().ToLowerInvariant();
+        if (_demoMode)
+        {
+            var demoJson = JsonSerializer.Serialize(new { returnValue = true, category = cleanCat, settings });
+            using var doc = JsonDocument.Parse(demoJson);
+            return doc.RootElement.Clone();
+        }
+
+        await EnsureConnectedAsync(allowInteractivePairing: false, forcePairing: false, ct: ct);
+        var payload = new { category = cleanCat, settings };
+
+        try
+        {
+            var res = await SendRequestCoreAsync("ssap://settings/setSystemSettings", payload, ct, TimeSpan.FromSeconds(8));
+            return res.ValueKind == JsonValueKind.Undefined ? default : res.Clone();
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                DiagnosticLog?.Invoke($"settings/setSystemSettings fallback ({ex.Message}); trying com.webos.settingsservice.");
+                var res = await SendRequestCoreAsync("ssap://com.webos.settingsservice/setSystemSettings", payload, ct, TimeSpan.FromSeconds(8));
+                return res.ValueKind == JsonValueKind.Undefined ? default : res.Clone();
+            }
+            catch (Exception ex2)
+            {
+                throw new InvalidOperationException(
+                    $"Direct SSAP setSystemSettings for category '{cleanCat}' was rejected by TV firmware ({ex2.Message}). Use tv_computer with action='launch_app', app='settings' and D-pad buttons to adjust this setting via the on-screen menu instead.",
+                    ex2);
+            }
+        }
+    }
+
     public async Task SendWakeOnLanAsync(string macAddress, CancellationToken ct = default)
     {
         var hex = new string(macAddress.Where(Uri.IsHexDigit).ToArray());

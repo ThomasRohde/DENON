@@ -28,7 +28,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
     public PluginManifest Manifest { get; } = new(
         Id: "smart-tv",
         Name: "Smart TV Control (LG webOS)",
-        Version: "2.1.0",
+        Version: "2.2.0",
         Author: "Denon Desktop",
         Description: "Full persistent LG webOS SSAP (wss://:3001) controller: live TV state subscriptions, auto-discovered apps & HDMI inputs, Magic Remote D-Pad & keyboard, OLED Screen Off, eARC Audio Output switching, YouTube deep-link casting, SSDP/ARP auto-discovery, Wake-on-LAN, and Denon AVR coordination.",
         Category: "Home Theater TV",
@@ -507,6 +507,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
 
         var executed = new List<string>();
         LgTvScreenshotResult? shot = null;
+        object? systemSettingsResult = null;
 
         if (action == "batch")
         {
@@ -538,6 +539,16 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
                     shot = await _client.CaptureScreenshotAsync(sw, sh, sc, ct);
                     executed.Add(shot.Success ? $"Captured screenshot ({shot.Width}x{shot.Height}, {shot.ByteLength} bytes)" : $"Screenshot failed: {shot.ErrorMessage}");
                 }
+                else if (subAction == "get_settings")
+                {
+                    (systemSettingsResult, var msg) = await ExecuteGetSystemSettingsAsync(step, ct);
+                    executed.Add(msg);
+                }
+                else if (subAction == "set_settings")
+                {
+                    (systemSettingsResult, var msg) = await ExecuteSetSystemSettingsAsync(step, ct);
+                    executed.Add(msg);
+                }
                 else
                 {
                     var summary = await ExecuteSingleComputerStepAsync(subAction, step, ct);
@@ -555,6 +566,16 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
         else if (action == "get_state")
         {
             executed.Add("Read live LG webOS TV state.");
+        }
+        else if (action == "get_settings")
+        {
+            (systemSettingsResult, var msg) = await ExecuteGetSystemSettingsAsync(root, ct);
+            executed.Add(msg);
+        }
+        else if (action == "set_settings")
+        {
+            (systemSettingsResult, var msg) = await ExecuteSetSystemSettingsAsync(root, ct);
+            executed.Add(msg);
         }
         else
         {
@@ -614,6 +635,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
                     byteLength = shot.ByteLength,
                     error = shot.ErrorMessage,
                 },
+            systemSettings = systemSettingsResult,
             installedApps = live.Apps.Take(20).Select(a => new { id = a.Id, title = a.Title, active = a.IsActive }).ToArray(),
             inputs = live.Inputs.Select(i => new { id = i.Id, appId = i.AppId, label = i.Label, connected = i.IsConnected, active = i.IsActive }).ToArray(),
         };
@@ -772,9 +794,129 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
             }
 
             default:
-                throw new ArgumentException($"Unknown tv_computer action '{action}'. Use screenshot, get_state, open_url, launch_app, close_app, move, move_to, click, scroll, button, type, backspace, wait, or batch.");
+                throw new ArgumentException($"Unknown tv_computer action '{action}'. Use screenshot, get_state, get_settings, set_settings, open_url, launch_app, close_app, move, move_to, click, scroll, button, type, backspace, wait, or batch.");
         }
     }
+
+    private async Task<(object Data, string Summary)> ExecuteGetSystemSettingsAsync(JsonElement el, CancellationToken ct)
+    {
+        var category = GetJsonString(el, "category", "picture").Trim().ToLowerInvariant();
+        var keys = new List<string>();
+        if (el.ValueKind == JsonValueKind.Object && el.TryGetProperty("keys", out var keysEl) && keysEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in keysEl.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(item.GetString()))
+                {
+                    keys.Add(item.GetString()!.Trim());
+                }
+            }
+        }
+
+        if (category == "all")
+        {
+            var results = new Dictionary<string, object?>();
+            var errors = new Dictionary<string, string>();
+            foreach (var cat in new[] { "picture", "sound" })
+            {
+                try
+                {
+                    var res = await _client.GetSystemSettingsAsync(cat, null, ct);
+                    results[cat] = ExtractSettingsBody(res);
+                }
+                catch (Exception ex) when (!ct.IsCancellationRequested)
+                {
+                    errors[cat] = ex.Message;
+                }
+            }
+
+            var data = new
+            {
+                category = "all",
+                categories = results,
+                errors = errors.Count > 0 ? errors : null,
+            };
+            var msg = errors.Count == 0
+                ? "Read LG webOS picture & sound system settings."
+                : $"Read LG webOS settings ({results.Count} category ok, {errors.Count} restricted).";
+            return (data, msg);
+        }
+
+        try
+        {
+            var raw = await _client.GetSystemSettingsAsync(category, keys.Count > 0 ? keys : null, ct);
+            var data = new
+            {
+                category,
+                supported = true,
+                settings = ExtractSettingsBody(raw),
+            };
+            return (data, $"Read LG webOS '{category}' system settings.");
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            var data = new
+            {
+                category,
+                supported = false,
+                error = ex.Message,
+                fallbackHint = "Use action='launch_app', app='settings' + D-pad navigation with screenshot_after=true to inspect this setting visually.",
+            };
+            return (data, $"Direct SSAP get_settings('{category}') was restricted by TV firmware; use on-screen Settings fallback.");
+        }
+    }
+
+    private async Task<(object Data, string Summary)> ExecuteSetSystemSettingsAsync(JsonElement el, CancellationToken ct)
+    {
+        var category = GetJsonString(el, "category", "picture").Trim().ToLowerInvariant();
+        if (el.ValueKind != JsonValueKind.Object ||
+            !el.TryGetProperty("settings", out var settingsEl) ||
+            settingsEl.ValueKind != JsonValueKind.Object)
+        {
+            throw new ArgumentException("Action 'set_settings' requires a 'settings' JSON object (e.g. {\"backlight\": 70, \"pictureMode\": \"expert2\"}).");
+        }
+
+        var map = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var prop in settingsEl.EnumerateObject())
+        {
+            map[prop.Name] = ConvertJsonValue(prop.Value);
+        }
+
+        if (map.Count == 0)
+        {
+            throw new ArgumentException("Action 'set_settings' requires at least one key/value entry inside 'settings'.");
+        }
+
+        var raw = await _client.SetSystemSettingsAsync(category, map, ct);
+        var data = new
+        {
+            category,
+            applied = true,
+            requested = map,
+            response = raw.ValueKind == JsonValueKind.Undefined ? (object?)null : raw,
+        };
+        return (data, $"Updated LG webOS '{category}' settings ({string.Join(", ", map.Keys)}).");
+    }
+
+    private static object? ExtractSettingsBody(JsonElement raw)
+    {
+        if (raw.ValueKind == JsonValueKind.Object && raw.TryGetProperty("settings", out var sEl))
+        {
+            return sEl.Clone();
+        }
+
+        return raw.ValueKind == JsonValueKind.Undefined ? null : raw.Clone();
+    }
+
+    private static object? ConvertJsonValue(JsonElement el) => el.ValueKind switch
+    {
+        JsonValueKind.String => el.GetString(),
+        JsonValueKind.Number => el.TryGetInt32(out var i) ? i : (el.TryGetInt64(out var l) ? l : el.GetDouble()),
+        JsonValueKind.True => true,
+        JsonValueKind.False => false,
+        JsonValueKind.Null => null,
+        _ => el.Clone(),
+    };
 
     private static string GetJsonString(JsonElement el, string name, string fallback = "")
     {

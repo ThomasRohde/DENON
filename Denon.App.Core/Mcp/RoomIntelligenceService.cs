@@ -38,6 +38,10 @@ public sealed class RoomIntelligenceService
     private RoomHabitsMemory _habits = new();
     private DateTimeOffset _lastHabitSampleAt = DateTimeOffset.MinValue;
     private DateTimeOffset _lastHabitSaveAt = DateTimeOffset.MinValue;
+    private AcousticStatus? _cachedAcoustics;
+    private DateTimeOffset _lastAcousticsRefreshUtc = DateTimeOffset.MinValue;
+    private int _acousticsRefreshInFlight;
+    private DateTimeOffset _lastHueMovieDimAt = DateTimeOffset.MinValue;
     private IReadOnlyList<RoomInsight> _currentInsights = [];
 
     public RoomIntelligenceService(
@@ -205,6 +209,17 @@ public sealed class RoomIntelligenceService
         RecomputeInsights();
     }
 
+    public void UpdateCachedAcoustics(AcousticStatus acoustics)
+    {
+        lock (_sync)
+        {
+            _cachedAcoustics = acoustics;
+            _lastAcousticsRefreshUtc = DateTimeOffset.UtcNow;
+        }
+
+        RecomputeInsights();
+    }
+
     public IReadOnlyList<RoomInsight> DiagnoseRoom()
     {
         var list = new List<RoomInsight>();
@@ -263,14 +278,71 @@ public sealed class RoomIntelligenceService
                     Id: "late-night-loud",
                     Severity: "Suggestion",
                     Category: "Acoustics",
-                    Title: $"Late-night volume is high ({FormatDb(status.Volume)})",
-                    Explanation: "It's late — enabling Dynamic Volume (Heavy) and lowering to -46 dB keeps dialogue crisp without disturbing others.",
+                    Title: $"Late-night volume is high ({status.Volume}.0)",
+                    Explanation: "It's late — enabling Dynamic Volume (Heavy) and lowering to 34.0 keeps dialogue crisp without disturbing others.",
                     FixLabel: "Late-Night Mode",
                     FixActionKey: "avr.late_night_comfort"));
             }
 
-            // 4. Cross-device LG TV ↔ Denon AVR intelligence
+            // 3b. Acoustic intelligence (using lazily cached Telnet acoustics)
+            AcousticStatus? acoustics;
+            DateTimeOffset lastHueDim;
+            lock (_sync)
+            {
+                acoustics = _cachedAcoustics;
+                lastHueDim = _lastHueMovieDimAt;
+            }
+
+            var isEveningOrNight = nowHour >= 19.0 || nowHour < 6.0;
+            var isDaytime = nowHour >= 7.0 && nowHour < 21.5;
+
+            if (status.IsPoweredOn && acoustics is not null)
+            {
+                var isCinemaMode =
+                    status.SoundMode.Contains("MOVIE", StringComparison.OrdinalIgnoreCase) ||
+                    status.SoundMode.Contains("DOLBY", StringComparison.OrdinalIgnoreCase) ||
+                    status.SoundMode.Contains("NEURAL", StringComparison.OrdinalIgnoreCase) ||
+                    status.SoundMode.Contains("ATMOS", StringComparison.OrdinalIgnoreCase) ||
+                    status.SoundMode.Contains("DTS", StringComparison.OrdinalIgnoreCase);
+
+                if (isEveningOrNight && isCinemaMode &&
+                    acoustics.Dimmer.Equals("BRI", StringComparison.OrdinalIgnoreCase))
+                {
+                    list.Add(new RoomInsight(
+                        Id: "avr-bright-dimmer-cinema",
+                        Severity: "Info",
+                        Category: "Acoustics",
+                        Title: "Denon front panel is at full brightness during evening viewing",
+                        Explanation: $"Sound mode is {status.SoundMode} with front display set to Bright. Dimming it to Dark reduces glare beneath your TV.",
+                        FixLabel: "Dim Front Panel",
+                        FixActionKey: "avr.dim_panel"));
+                }
+
+                var isMusicListening =
+                    status.InputSource.Equals("NET", StringComparison.OrdinalIgnoreCase) ||
+                    status.InputSource.Equals("CD", StringComparison.OrdinalIgnoreCase) ||
+                    status.InputSource.Equals("BT", StringComparison.OrdinalIgnoreCase) ||
+                    status.InputSource.Equals("PHONO", StringComparison.OrdinalIgnoreCase) ||
+                    status.SoundMode.Contains("STEREO", StringComparison.OrdinalIgnoreCase) ||
+                    status.SoundMode.Contains("DIRECT", StringComparison.OrdinalIgnoreCase);
+
+                if (isDaytime && isMusicListening &&
+                    acoustics.DynamicVolume.Equals("HEV", StringComparison.OrdinalIgnoreCase))
+                {
+                    list.Add(new RoomInsight(
+                        Id: "avr-heavy-dynvol-music",
+                        Severity: "Suggestion",
+                        Category: "Acoustics",
+                        Title: "Heavy Night Compression (Dynamic Volume HEV) is active for music",
+                        Explanation: "Dynamic Volume Heavy compresses musical dynamics for late-night listening. Turning it off restores full punch and range.",
+                        FixLabel: "Dynamic Vol Off",
+                        FixActionKey: "avr.dynvol_off"));
+                }
+            }
+
+            // 4. Cross-device LG TV ↔ Denon AVR ↔ Philips Hue intelligence
             var tvPlugin = plugins.FirstOrDefault(p => p.Id.Equals("smart-tv", StringComparison.OrdinalIgnoreCase) && p.IsEnabled);
+            var huePlugin = plugins.FirstOrDefault(p => p.Id.Equals("philips-hue", StringComparison.OrdinalIgnoreCase) && p.IsEnabled);
             if (tvPlugin is not null && tvPlugin.Health == PluginHealthState.Connected)
             {
                 var tvStatus = tvPlugin.StatusText ?? string.Empty;
@@ -317,6 +389,37 @@ public sealed class RoomIntelligenceService
                         Explanation: $"TV status is '{tvStatus}', while Denon input is '{status.InputSource}'. Route TV eARC straight to Denon!",
                         FixLabel: "Route TV → eARC",
                         FixActionKey: "room.route_tv_earc"));
+                }
+
+                // 4c. Evening movie app active while Philips Hue lights are still on
+                var tvWatchingMovieApp =
+                    tvIsLiveApp &&
+                    (tvStatus.Contains("Netflix", StringComparison.OrdinalIgnoreCase) ||
+                     tvStatus.Contains("Disney", StringComparison.OrdinalIgnoreCase) ||
+                     tvStatus.Contains("Plex", StringComparison.OrdinalIgnoreCase) ||
+                     tvStatus.Contains("Apple TV", StringComparison.OrdinalIgnoreCase) ||
+                     tvStatus.Contains("Prime Video", StringComparison.OrdinalIgnoreCase) ||
+                     tvStatus.Contains("SkyShowtime", StringComparison.OrdinalIgnoreCase));
+
+                if (isEveningOrNight && tvWatchingMovieApp &&
+                    huePlugin is not null && huePlugin.Health == PluginHealthState.Connected &&
+                    (DateTimeOffset.UtcNow - lastHueDim) > TimeSpan.FromMinutes(15))
+                {
+                    var hueStatus = huePlugin.StatusText ?? string.Empty;
+                    var hasLightsOn = hueStatus.Contains("lights on", StringComparison.OrdinalIgnoreCase) &&
+                                      !hueStatus.Contains(" 0/", StringComparison.OrdinalIgnoreCase) &&
+                                      !hueStatus.StartsWith("0/", StringComparison.OrdinalIgnoreCase);
+                    if (hasLightsOn)
+                    {
+                        list.Add(new RoomInsight(
+                            Id: "hue-bright-movie-evening",
+                            Severity: "Suggestion",
+                            Category: "Atmosphere",
+                            Title: "Philips Hue lights are on during evening movie viewing",
+                            Explanation: $"TV is showing '{tvStatus}' while Hue reports '{hueStatus}'. Dim the room to Movie Night ambiance in one click.",
+                            FixLabel: "Dim for Movie",
+                            FixActionKey: "hue.movie_dim"));
+                    }
                 }
             }
         }
@@ -393,6 +496,45 @@ public sealed class RoomIntelligenceService
                 RecomputeInsights();
                 return (true, "Ran Fix Silent Audio (powered ON, unmuted, set audible volume).");
 
+            case "avr.dim_panel":
+                await _receiverController.SetDimmerAsync("DAR", ct);
+                lock (_sync)
+                {
+                    if (_cachedAcoustics is not null)
+                    {
+                        _cachedAcoustics = _cachedAcoustics with { Dimmer = "DAR" };
+                    }
+                }
+                RecomputeInsights();
+                return (true, "Dimmed Denon front panel display to Dark.");
+
+            case "avr.dynvol_off":
+                await _receiverController.SetDynamicVolumeAsync("OFF", ct);
+                lock (_sync)
+                {
+                    if (_cachedAcoustics is not null)
+                    {
+                        _cachedAcoustics = _cachedAcoustics with { DynamicVolume = "OFF" };
+                    }
+                }
+                RecomputeInsights();
+                return (true, "Turned Audyssey Dynamic Volume OFF for full musical dynamics.");
+
+            case "hue.movie_dim":
+            {
+                var res = await _pluginHost.ExecuteActionAsync("philips-hue", "hue.movie_dim", null, ct);
+                if (res.Success)
+                {
+                    lock (_sync)
+                    {
+                        _lastHueMovieDimAt = DateTimeOffset.UtcNow;
+                    }
+                    RecordPluginActionUsed("philips-hue", "hue.movie_dim");
+                }
+                RecomputeInsights();
+                return (res.Success, res.Message);
+            }
+
             default:
                 return (false, $"No automatic fix handler for '{fixActionKey}'.");
         }
@@ -434,6 +576,11 @@ public sealed class RoomIntelligenceService
         var plugins = _pluginHost.GetPlugins();
         var insights = DiagnoseRoom();
         var queue = _queueService.Snapshot.Queue;
+        AcousticStatus? acoustics;
+        lock (_sync)
+        {
+            acoustics = _cachedAcoustics;
+        }
 
         return new
         {
@@ -464,6 +611,16 @@ public sealed class RoomIntelligenceService
                     artist = st.NowPlaying.Artist,
                     album = st.NowPlaying.Album,
                     type = st.NowPlaying.Type,
+                },
+                acoustics = acoustics is null ? null : new
+                {
+                    multEq = acoustics.MultEq,
+                    dynamicEq = acoustics.DynamicEq,
+                    dynamicVolume = acoustics.DynamicVolume,
+                    restorer = acoustics.Restorer,
+                    dimmer = acoustics.Dimmer,
+                    subwooferTrimDb = acoustics.SubwooferTrimDb,
+                    dialogTrimDb = acoustics.DialogTrimDb,
                 },
                 lastError = snap.LastError,
             },
@@ -643,6 +800,31 @@ public sealed class RoomIntelligenceService
             {
                 _lastHabitSampleAt = now;
                 RecordLiveObservation(st);
+            }
+
+            if ((now - _lastAcousticsRefreshUtc) >= TimeSpan.FromSeconds(90) &&
+                Interlocked.CompareExchange(ref _acousticsRefreshInFlight, 1, 0) == 0)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+                        var acoustics = await _receiverController.GetAcousticStatusAsync(cts.Token);
+                        UpdateCachedAcoustics(acoustics);
+                    }
+                    catch
+                    {
+                        lock (_sync)
+                        {
+                            _lastAcousticsRefreshUtc = DateTimeOffset.UtcNow;
+                        }
+                    }
+                    finally
+                    {
+                        Interlocked.Exchange(ref _acousticsRefreshInFlight, 0);
+                    }
+                });
             }
         }
 

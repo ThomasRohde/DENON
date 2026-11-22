@@ -42,6 +42,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     private bool _suppressVolumeSend;
     private bool _isViewVisible;
     private bool _isCapturingPreview;
+    private DateTimeOffset _lastUserInteractionUtc = DateTimeOffset.MinValue;
 
     private ImageSource? _previewImage;
     private bool _autoRefreshPreview;
@@ -315,8 +316,14 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
             if (Set(ref _autoRefreshPreview, value))
             {
                 UpdatePreviewLoop();
+                TriggerAutoSave();
             }
         }
+    }
+
+    public void NotifyUserInteraction()
+    {
+        _lastUserInteractionUtc = DateTimeOffset.UtcNow;
     }
 
     public void SetViewVisible(bool isVisible)
@@ -342,6 +349,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
                 SwitchToArcOnDenon = cfg.SwitchToArcOnDenonPowerOn;
                 MuteSpeakersOnDenon = cfg.MuteTvSpeakersOnDenonPowerOn;
                 ScreenOffOnMusicScene = cfg.ScreenOffOnMusicScene;
+                AutoRefreshPreview = cfg.AutoRefreshPreview;
 
                 var isConfigured = cfg.DemoMode || (!string.IsNullOrWhiteSpace(cfg.TvIp) && !string.IsNullOrWhiteSpace(cfg.ClientKey));
                 IsSetupExpanded = !isConfigured;
@@ -625,6 +633,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
             SwitchToArcOnDenonPowerOn = SwitchToArcOnDenon,
             MuteTvSpeakersOnDenonPowerOn = MuteSpeakersOnDenon,
             ScreenOffOnMusicScene = ScreenOffOnMusicScene,
+            AutoRefreshPreview = AutoRefreshPreview,
             MovieNightInputAppId = _plugin.Config.MovieNightInputAppId,
             LastModelName = _plugin.Config.LastModelName,
             LastWebOsVersion = _plugin.Config.LastWebOsVersion,
@@ -664,10 +673,19 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 
     private async Task LaunchAppAsync(string appId)
     {
+        NotifyUserInteraction();
         try
         {
             var title = await _plugin.Client.LaunchAppAsync(appId);
-            StatusMessage = $"✓ Launched {title} ({appId}) on TV.";
+            StatusMessage = $"✓ Launched {title} on TV.";
+
+            if (!AutoRefreshPreview && HasPreviewImage &&
+                (appId.Equals("settings", StringComparison.OrdinalIgnoreCase) ||
+                 appId.Equals("com.palm.app.settings", StringComparison.OrdinalIgnoreCase)))
+            {
+                await Task.Delay(3200);
+                await CapturePreviewAsync(showCursor: false, quiet: true);
+            }
         }
         catch (Exception ex)
         {
@@ -842,10 +860,12 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
             var bytes = Convert.FromBase64String(shot.ImageBase64);
             var bmp = DecodeFrozenBitmap(bytes);
             var kb = Math.Max(1, shot.ByteLength / 1024);
+            var isFast = AutoRefreshPreview && (DateTimeOffset.UtcNow - _lastUserInteractionUtc) < TimeSpan.FromSeconds(6);
+            var liveTag = isFast ? "Live 1s" : "Live";
             RunOnUi(() =>
             {
                 PreviewImage = bmp;
-                PreviewStatusText = $"Live • {DateTime.Now:HH:mm:ss} • {shot.Width}×{shot.Height} ({kb} KB)";
+                PreviewStatusText = $"{liveTag} • {DateTime.Now:HH:mm:ss} • {shot.Width}×{shot.Height} ({kb} KB)";
             });
         }
         catch (Exception ex)
@@ -860,6 +880,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 
     public async Task ClickPreviewAtNormalizedAsync(int normX, int normY)
     {
+        NotifyUserInteraction();
         try
         {
             PreviewStatusText = $"Clicking ({normX}, {normY})...";
@@ -882,6 +903,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 
     public async Task MovePointerRelativeAsync(int dx, int dy)
     {
+        NotifyUserInteraction();
         try
         {
             await _plugin.Client.MovePointerRelativeAsync(dx, dy, drag: false);
@@ -894,6 +916,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 
     public async Task ClickPointerAsync()
     {
+        NotifyUserInteraction();
         try
         {
             await _plugin.Client.ClickPointerAsync();
@@ -907,6 +930,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 
     public async Task ScrollPointerAsync(int dx, int dy)
     {
+        NotifyUserInteraction();
         try
         {
             await _plugin.Client.ScrollPointerAsync(dx, dy);
@@ -920,6 +944,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 
     private async Task RecalibrateCursorAsync()
     {
+        NotifyUserInteraction();
         try
         {
             await _plugin.Client.MovePointerToNormalizedAsync(500, 500, recalibrate: true);
@@ -934,6 +959,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 
     private async Task OpenBrowserUrlAsync()
     {
+        NotifyUserInteraction();
         var raw = (BrowserUrlText ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(raw))
         {
@@ -978,9 +1004,11 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
                     await CapturePreviewAsync(showCursor: false, quiet: true);
                 }
 
+                var isActiveGesture = (DateTimeOffset.UtcNow - _lastUserInteractionUtc) < TimeSpan.FromSeconds(6);
+                var delay = isActiveGesture ? TimeSpan.FromSeconds(1.0) : TimeSpan.FromSeconds(2.5);
                 try
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(2), cts.Token);
+                    await Task.Delay(delay, cts.Token);
                 }
                 catch (OperationCanceledException)
                 {

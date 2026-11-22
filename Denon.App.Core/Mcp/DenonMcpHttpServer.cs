@@ -19,7 +19,7 @@ namespace Denon.App.Core.Mcp;
 public sealed partial class DenonMcpHttpServer : IAsyncDisposable
 {
     private const string ServerName = "denon-desktop-mcp";
-    private const string ServerVersion = "1.10.1";
+    private const string ServerVersion = "1.11.0";
     private const string DefaultProtocolVersion = "2025-11-25";
 
     private static readonly JsonSerializerOptions JsonOutOptions = new()
@@ -948,7 +948,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                     ("count", "integer"),
                     ("insights", "array"))),
             Tool("fix_room_issue",
-                "Execute a Room Doctor auto-fix key (e.g. 'avr.unmute', 'avr.safe_volume', 'avr.late_night_comfort', 'room.route_tv_earc', 'tv.screen_off', 'avr.fix_silent', 'avr.refresh').",
+                "Execute a Room Doctor auto-fix key (e.g. 'avr.unmute', 'avr.safe_volume', 'avr.late_night_comfort', 'avr.dim_panel', 'avr.dynvol_off', 'hue.movie_dim', 'room.route_tv_earc', 'tv.screen_off', 'avr.fix_silent', 'avr.refresh').",
                 ObjSchema(("fix_action_key", "string", "The fixActionKey returned by diagnose_room", true)),
                 title: "Auto-Fix Room Issue",
                 idempotent: true),
@@ -1144,7 +1144,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                 title: "Set Philips Hue Color & Warmth",
                 idempotent: true),
             Tool("tv_computer",
-                "Unified LG webOS TV Computer-Use tool: see the TV screen via live screenshots (returns MCP image), open URLs in the LG Web Browser, launch/close apps (including casting YouTube videos via content_id), move/drag/click/scroll the Magic Remote pointer (relative dx/dy OR normalized 0..1000 x/y), press remote buttons, type text, or chain multiple steps in one batch with screenshot_after=true.",
+                "Unified LG webOS TV Computer-Use tool: see the TV screen via live screenshots (returns MCP image), read/write direct webOS system settings ('get_settings' / 'set_settings' for picture/sound), open URLs in the LG Web Browser, launch/close apps (including 'settings' and casting YouTube videos via content_id), move/drag/click/scroll the Magic Remote pointer (relative dx/dy OR normalized 0..1000 x/y), press remote buttons, type text, or chain multiple steps in one batch with screenshot_after=true.",
                 BuildTvComputerSchema(),
                 title: "LG webOS TV Computer Use",
                 openWorld: true,
@@ -1266,6 +1266,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
             case "avr_get_acoustics":
             {
                 var acoustics = await _receiverController.GetAcousticStatusAsync(ct);
+                _intelligence.UpdateCachedAcoustics(acoustics);
                 return BuildToolJson(new
                 {
                     multEq = acoustics.MultEq,
@@ -1677,7 +1678,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
     private async Task<object> ExecuteTvComputerToolAsync(JsonElement args, McpServerSettings cfg, CancellationToken ct)
     {
         var action = GetString(args, "action", "screenshot").Trim().ToLowerInvariant();
-        var isReadOnlyAction = action is "screenshot" or "get_state";
+        var isReadOnlyAction = action is "screenshot" or "get_state" or "get_settings";
         if (!isReadOnlyAction && cfg.PermissionTier == McpPermissionTier.Observer)
         {
             throw new UnauthorizedAccessException($"MCP Permission Tier is 'Observer' (read-only). Change to SafeControl or FullOrchestration in Denon Desktop Settings to run tv_computer action '{action}'.");
@@ -1686,7 +1687,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         string payloadJson;
         if (args.ValueKind == JsonValueKind.Object)
         {
-            if (isReadOnlyAction && cfg.PermissionTier == McpPermissionTier.Observer)
+            if (action == "screenshot" && cfg.PermissionTier == McpPermissionTier.Observer)
             {
                 // Keep Observer mode strictly read-only (no cursor wiggle input).
                 payloadJson = JsonSerializer.Serialize(new
@@ -1786,11 +1787,19 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                 type = "string",
                 @enum = new[]
                 {
-                    "screenshot", "get_state", "open_url", "launch_app", "close_app",
+                    "screenshot", "get_state", "get_settings", "set_settings", "open_url", "launch_app", "close_app",
                     "move", "move_to", "click", "scroll", "button", "type", "backspace", "wait", "batch",
                 },
-                description = "Operation to perform on the LG webOS TV. Use 'screenshot' to see the screen, 'open_url' for the Web Browser, 'move_to'/'click'/'move'/'scroll' for the Magic Remote pointer, 'button' for D-pad/Home/Back, 'type'/'backspace' for keyboard input, or 'batch' to chain multiple steps in one round-trip.",
+                description = "Operation to perform on the LG webOS TV. Use 'screenshot' to see the screen, 'get_settings'/'set_settings' to read or update picture/sound system settings directly over SSAP, 'open_url' for the Web Browser, 'move_to'/'click'/'move'/'scroll' for the Magic Remote pointer, 'button' for D-pad/Home/Back, 'type'/'backspace' for keyboard input, or 'batch' to chain multiple steps in one round-trip.",
             },
+            ["category"] = new { type = "string", description = "System settings category for 'get_settings' / 'set_settings': 'picture', 'sound', 'option', or 'all' (for get_settings)." },
+            ["keys"] = new
+            {
+                type = "array",
+                description = "Optional list of specific setting keys to query for action='get_settings' (defaults to key picture/sound properties when omitted).",
+                items = new { type = "string" },
+            },
+            ["settings"] = new { type = "object", description = "Key-value map of settings to apply for action='set_settings' (e.g. {\"backlight\": 70, \"pictureMode\": \"expert2\"})." },
             ["url"] = new { type = "string", description = "URL to open in the LG webOS Web Browser (for action='open_url')." },
             ["app"] = new { type = "string", description = "App name, alias, or webOS appId (e.g. 'settings', 'youtube', 'browser', 'plex', 'netflix', 'livetv', 'com.webos.app.hdmi1') for action='launch_app'. Use 'settings' to open LG webOS Settings directly." },
             ["content_id"] = new { type = "string", description = "Optional deep-link content ID (e.g. YouTube URL or 11-char video ID) for action='launch_app'." },
