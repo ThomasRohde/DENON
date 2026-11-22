@@ -19,7 +19,7 @@ namespace Denon.App.Core.Mcp;
 public sealed partial class DenonMcpHttpServer : IAsyncDisposable
 {
     private const string ServerName = "denon-desktop-mcp";
-    private const string ServerVersion = "1.8.0";
+    private const string ServerVersion = "1.8.1";
     private const string DefaultProtocolVersion = "2025-11-25";
 
     private static readonly JsonSerializerOptions JsonOutOptions = new()

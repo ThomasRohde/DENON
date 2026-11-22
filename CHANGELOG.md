@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-11-22
+
+### Fixed
+- **Persist Auto-Generated MCP Bearer Token on First Boot**: `AppSettingsStore` now immediately writes newly initialized MCP settings (including the generated `BearerToken`) to `settings.json` when upgrading from older versions so the token never rotates across restarts.
+
 ## [1.8.0] - 2026-11-22
 
 ### Added
@@ -145,7 +150,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Zero-Lag Real-Time HEOS Push Events (`LIVE PUSH`) & Analog VU Meters**: Dedicated `register_for_change_events` push listener for `<50 ms` knob/remote sync and toggleable dual-channel illuminated VU dials.
 - **Automated GitHub Releases Workflow**: `.github/workflows/release.yml` builds self-contained single-file `win-x64` executables and SHA-256 checksums on version tags.
 
-[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/ThomasRohde/DENON/compare/v1.8.1...HEAD
+[1.8.1]: https://github.com/ThomasRohde/DENON/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/ThomasRohde/DENON/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/ThomasRohde/DENON/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/ThomasRohde/DENON/compare/v1.5.0...v1.6.0

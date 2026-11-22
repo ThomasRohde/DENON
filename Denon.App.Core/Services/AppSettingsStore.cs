@@ -39,7 +39,13 @@ public sealed class AppSettingsStore
             }
             else
             {
-                _current = await LoadFromDiskAsync(cancellationToken);
+                var (loaded, needsPersist) = await LoadFromDiskAsync(cancellationToken);
+                _current = loaded;
+                if (needsPersist)
+                {
+                    await SaveInternalAsync(_current, cancellationToken);
+                    _logStore.Info("Persisted newly initialized settings (including MCP Bearer token) to disk.");
+                }
             }
         }
         finally
@@ -79,18 +85,19 @@ public sealed class AppSettingsStore
         return _current.Clone();
     }
 
-    private async Task<AppSettings> LoadFromDiskAsync(CancellationToken cancellationToken)
+    private async Task<(AppSettings Settings, bool NeedsPersist)> LoadFromDiskAsync(CancellationToken cancellationToken)
     {
         try
         {
-            await using var stream = File.OpenRead(AppDataPaths.SettingsFilePath);
-            var settings = await JsonSerializer.DeserializeAsync<AppSettings>(stream, JsonOptions, cancellationToken);
-            return Normalize(settings ?? AppSettings.CreateDefault());
+            var rawJson = await File.ReadAllTextAsync(AppDataPaths.SettingsFilePath, cancellationToken);
+            var hasPersistedMcpToken = rawJson.Contains("\"bearerToken\"", StringComparison.OrdinalIgnoreCase);
+            var settings = JsonSerializer.Deserialize<AppSettings>(rawJson, JsonOptions);
+            return (Normalize(settings ?? AppSettings.CreateDefault()), !hasPersistedMcpToken);
         }
         catch (Exception exception)
         {
             _logStore.Warning($"Failed to parse settings. Falling back to defaults. {exception.Message}");
-            return Normalize(AppSettings.CreateDefault());
+            return (Normalize(AppSettings.CreateDefault()), true);
         }
     }
 
@@ -133,6 +140,14 @@ public sealed class AppSettingsStore
         normalized.Media.CinemaSyncOffsetMs = Math.Clamp(normalized.Media.CinemaSyncOffsetMs, 0, 8000);
         normalized.Shortcuts ??= new ShortcutSettings();
         normalized.Shortcuts.Bindings = NormalizeShortcuts(normalized.Shortcuts.Bindings);
+        normalized.Mcp ??= new McpServerSettings();
+        normalized.Mcp.Port = normalized.Mcp.Port is >= 1024 and <= 65535 ? normalized.Mcp.Port : 18926;
+        normalized.Mcp.MaxSafeVolume = Math.Clamp(normalized.Mcp.MaxSafeVolume, 20, 95);
+        if (string.IsNullOrWhiteSpace(normalized.Mcp.BearerToken))
+        {
+            normalized.Mcp.BearerToken = McpServerSettings.GenerateSecureToken();
+        }
+
         return normalized;
     }
 
