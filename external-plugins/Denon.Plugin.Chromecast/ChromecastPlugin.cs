@@ -98,7 +98,7 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
-        _watchLog?.EndAll(DateTimeOffset.UtcNow, "plugin_stopped");
+        _watchLog?.EndAll(DateTimeOffset.UtcNow, StopReason());
         _lifetime?.Cancel();
         foreach (var timer in _idleTimers.Values)
         {
@@ -152,6 +152,23 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
         "then the device with an active app, then the only device.");
 
     private static readonly PluginActionParameter[] DeviceOnly = [DeviceParam];
+
+    /// <summary>"app_shutdown" when Denon Desktop exits (SDK 1.17+), else "plugin_stopped". Works on 1.16 hosts too.</summary>
+    private string StopReason()
+    {
+        try
+        {
+            return _context is not null && ReadAppShuttingDown(_context) ? "app_shutdown" : "plugin_stopped";
+        }
+        catch (MissingMethodException)
+        {
+            return "plugin_stopped"; // Host SDK 1.16: no IsAppShuttingDown.
+        }
+    }
+
+    // Separate, non-inlined method: on a 1.16 host the JIT fails here (MissingMethodException), not in StopAsync.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static bool ReadAppShuttingDown(IPluginContext context) => context.IsAppShuttingDown;
 
     public IReadOnlyList<PluginActionDescriptor> GetActions() =>
     [

@@ -57,6 +57,15 @@ public interface IPluginContext
     IPluginReceiverControl? ReceiverControl => null;
 
     /// <summary>
+    /// SDK 1.17: true while the host app is exiting (user exit, Windows logoff/shutdown, installer upgrade), so
+    /// <see cref="IDenonPlugin.StopAsync"/> can tell an app exit from the plugin being stopped or disabled
+    /// (for example to end sessions with <c>reason: "app_shutdown"</c>). False on hosts older than 1.17.
+    /// A plugin built against 1.17 that must also run on 1.16 should call this inside a try/catch
+    /// (<see cref="MissingMethodException"/>), in a separate non-inlined method.
+    /// </summary>
+    bool IsAppShuttingDown => false;
+
+    /// <summary>
     /// Creates an HttpClient suitable for communicating with external or local LAN hardware bridges.
     /// When <paramref name="allowLocalSelfSignedTls"/> is true, self-signed TLS certificates on RFC1918
     /// private LAN addresses (such as Philips Hue Bridges) are permitted.

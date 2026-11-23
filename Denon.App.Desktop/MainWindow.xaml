@@ -4255,7 +4255,7 @@
                                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                                         <TextBlock Text="Plugins &amp; Extensions" FontSize="15.5" FontWeight="Bold" VerticalAlignment="Center" />
                                         <Border Background="#1B2334" BorderBrush="#2D3B56" BorderThickness="1" CornerRadius="6" Padding="7,1.5" Margin="9,0,0,0" VerticalAlignment="Center">
-                                            <TextBlock Text="SDK v1.15" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
+                                            <TextBlock Text="{Binding PluginSdkBadgeText}" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
                                         </Border>
                                         <TextBlock Text="{Binding PluginsStatusText}"
                                                    FontSize="11"

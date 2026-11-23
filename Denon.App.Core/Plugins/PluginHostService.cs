@@ -563,7 +563,8 @@ public sealed class PluginHostService : IAsyncDisposable
                 entry.StatusText = statusText;
                 entry.Health = entry.IsEnabled ? health : PluginHealthState.Disabled;
                 NotifyPluginsChanged();
-            });
+            },
+            () => IsStoppingAll);
 
         lock (_syncRoot)
         {
@@ -845,7 +846,10 @@ public sealed class PluginHostService : IAsyncDisposable
             // IDenonPlugin / WPF types match across the boundary.
             if (string.Equals(assemblyName.Name, "Denon.App.PluginSdk", StringComparison.OrdinalIgnoreCase))
             {
-                return null;
+                // Return the host's SDK explicitly (not null → default binder). A custom context only checks the
+                // simple name, so a plugin built against a newer SDK still binds to this host's SDK; members the
+                // host lacks fail later with MissingMethodException, which a plugin can handle.
+                return typeof(IDenonPlugin).Assembly;
             }
 
             var assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);
@@ -1054,9 +1058,12 @@ public sealed class PluginHostService : IAsyncDisposable
         IPluginReceiverBridge receiver,
         IPluginReceiverControl? receiverControl,
         IPluginEventLogger events,
-        Action<string, PluginHealthState> reportStatus) : IPluginContext
+        Action<string, PluginHealthState> reportStatus,
+        Func<bool> isAppShuttingDown) : IPluginContext
     {
         public string PluginId { get; } = pluginId;
+
+        public bool IsAppShuttingDown => isAppShuttingDown();
 
         public IPluginLogger Logger { get; } = logger;
 

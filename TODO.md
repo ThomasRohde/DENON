@@ -20,8 +20,8 @@ Phase 1 is done in 1.15.1 (source router, DENON/SIM/MUTED/PC/IDLE badge, PC Cast
 
 ## Habit telemetry
 
-- [ ] Cast sessions end with `plugin_stopped` at app exit (the plugin cannot tell app exit from a plugin stop).
-      Option: add a stop reason to the SDK (`IDenonPlugin.StopAsync` context or `IPluginContext.IsAppShuttingDown`).
+- [ ] Verify live: a cast session ends with `reason: "app_shutdown"` when the app exits during a cast (SDK 1.17
+      `IsAppShuttingDown`; not checked live because no cast was playing).
 - [ ] Events written before 1.15.0 have no `coveredSec` / `exclusiveSec`. Readers must fall back to `durationSec`.
 - [ ] **Hero "now playing" during a cast** shows the TV input ("DVD Player (HDMI 1)") instead of the cast app/title
       (for example "Netflix"). When the TV is on the Chromecast's HDMI input, show the cast state from the plugin.
