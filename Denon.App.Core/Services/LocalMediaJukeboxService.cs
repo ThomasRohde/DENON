@@ -670,7 +670,8 @@ public sealed class LocalMediaJukeboxService : IDisposable
                 externalTakeoverReason = $"input switched externally to {DenonCatalog.GetFriendlyInputName(status.InputSource)}";
             }
             else if (string.Equals(status.PlayState, "play", StringComparison.OrdinalIgnoreCase) &&
-                     status.NowPlaying.SourceId is int sid && sid != 1029 && sid != 0)
+                     status.NowPlaying.IsNamedServiceSource &&
+                     status.NowPlaying.SourceId is int sid)
             {
                 externalTakeoverReason = $"external streaming service started ({DenonCatalog.GetHeosSourceName(sid) ?? $"sid {sid}"})";
             }

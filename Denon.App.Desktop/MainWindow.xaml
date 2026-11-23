@@ -809,14 +809,14 @@
                                                       Height="20"
                                                       Margin="3,0,0,0"
                                                       Stretch="Uniform"
-                                                      Visibility="{Binding IsPlaying, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
+                                                      Visibility="{Binding IsTransportPlaying, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
                                                 <!-- Pause Icon -->
                                                 <Path Data="M14,19H18V5H14M6,19H10V5H6V19Z"
                                                       Fill="#04151C"
                                                       Width="18"
                                                       Height="18"
                                                       Stretch="Uniform"
-                                                      Visibility="{Binding IsPlaying, Converter={StaticResource BoolToVis}}" />
+                                                      Visibility="{Binding IsTransportPlaying, Converter={StaticResource BoolToVis}}" />
                                             </Grid>
                                         </Button>
 

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- **Cast artwork and cast play/pause in the now-playing hero**: While the hero shows a Chromecast program (TV Audio, TV on HDMI), it shows the program artwork (read from the Chromecast plugin's read-only `now-playing` action, fetched again when the program changes), and the play/pause button and the Space hotkey send play or pause to the Chromecast instead of HEOS. The icon follows the cast state (also in the tray flyout). Stop, previous and next are unchanged. Verified live with DR TV.
+
+### Fixed
+- **The jukebox stopped its own session after 10 seconds** for native FLAC/WAV files: HEOS reports the app's relayed file as source 1024 "Local Music" with "Url Stream" placeholder metadata, and the jukebox took that for another service. The hero then dropped the track, auto-advance stopped, and the synced meters fell back to SIM. A source now counts as another service only with real metadata (`NowPlayingMedia.IsNamedServiceSource`); a real DLNA/Local Music track from the HEOS app still takes over.
+
 ## [1.18.0] - 2026-11-23
 
 ### Added

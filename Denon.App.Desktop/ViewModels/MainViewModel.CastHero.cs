@@ -1,0 +1,113 @@
+using Denon.App.Core.Services;
+
+namespace Denon.App.Desktop.ViewModels;
+
+/// <summary>
+/// Now-playing hero while it shows a Chromecast program (TV Audio + TV on HDMI): cast artwork and a
+/// play/pause button that controls the Chromecast instead of HEOS.
+/// </summary>
+public sealed partial class MainViewModel
+{
+    private const string ChromecastPluginId = "chromecast";
+
+    private CastNowPlaying? _heroCast;
+    private string? _castArtKey;
+    private string _castArtUrl = string.Empty;
+    private DateTimeOffset _castArtFetchedUtc = DateTimeOffset.MinValue;
+    private bool _isTransportPlaying;
+
+    /// <summary>Play/pause icon state: the cast's state while the hero shows a cast, else the HEOS state.</summary>
+    public bool IsTransportPlaying
+    {
+        get => _isTransportPlaying;
+        private set => SetProperty(ref _isTransportPlaying, value);
+    }
+
+    /// <summary>
+    /// Remembers the cast the hero shows, sets the transport state, and adds the cast artwork when it is known.
+    /// Starts an artwork lookup when the program changes.
+    /// </summary>
+    private ResolvedNowPlaying ApplyHeroCast(ResolvedNowPlaying resolved)
+    {
+        _heroCast = resolved.Cast;
+        IsTransportPlaying = resolved.Cast?.IsPlaying ?? IsPlaying;
+
+        if (resolved.Cast is not { } cast)
+        {
+            return resolved;
+        }
+
+        var key = $"{cast.DeviceName}|{cast.App}|{cast.Title}";
+        var isNewProgram = !string.Equals(key, _castArtKey, StringComparison.Ordinal);
+        if (isNewProgram)
+        {
+            _castArtKey = key;
+            _castArtUrl = string.Empty;
+        }
+
+        // Fetch on a new program; retry a missing artwork at most every 15 s (it can arrive after the title).
+        if (isNewProgram || (_castArtUrl.Length == 0 && DateTimeOffset.UtcNow - _castArtFetchedUtc > TimeSpan.FromSeconds(15)))
+        {
+            _castArtFetchedUtc = DateTimeOffset.UtcNow;
+            _ = FetchCastArtworkAsync(key, cast.DeviceName);
+        }
+
+        return _castArtUrl.Length > 0 ? resolved with { ImageUrl = _castArtUrl } : resolved;
+    }
+
+    private async Task FetchCastArtworkAsync(string key, string deviceName)
+    {
+        try
+        {
+            var result = await _pluginHost.ExecuteActionAsync(
+                ChromecastPluginId,
+                "now-playing",
+                new Dictionary<string, string> { ["device"] = deviceName, ["includeImage"] = "false" });
+
+            var url = result.Success ? NowPlayingResolver.TryReadCastImageUrl(result.DataJson) : null;
+            if (url is null)
+            {
+                return;
+            }
+
+            await _dispatcher.InvokeAsync(() =>
+            {
+                if (!string.Equals(_castArtKey, key, StringComparison.Ordinal))
+                {
+                    return; // The program changed while we waited.
+                }
+
+                _castArtUrl = url;
+                if (_heroCast is not null)
+                {
+                    NowPlayingImageUrl = url;
+                }
+            });
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logStore.Warning($"Could not read the cast artwork: {ex.Message}");
+        }
+    }
+
+    /// <summary>Play/pause for the Chromecast the hero shows (explicit play or pause, from the known state).</summary>
+    private async Task PlayPauseCastAsync(CastNowPlaying cast)
+    {
+        var action = cast.IsPlaying ? "pause" : "play";
+        try
+        {
+            var result = await _pluginHost.ExecuteActionAsync(
+                ChromecastPluginId,
+                action,
+                new Dictionary<string, string> { ["device"] = cast.DeviceName });
+
+            StatusMessage = result.Success
+                ? $"{(cast.IsPlaying ? "Paused" : "Resumed")} {cast.Title ?? cast.App} on {cast.DeviceName}."
+                : $"Could not {action} {cast.DeviceName}: {result.Message}";
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            StatusMessage = $"Could not {action} {cast.DeviceName}: {ex.Message}";
+        }
+    }
+}

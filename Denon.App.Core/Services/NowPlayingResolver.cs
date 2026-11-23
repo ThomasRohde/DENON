@@ -9,7 +9,8 @@ public sealed record ResolvedNowPlaying(
     string Detail,
     string ImageUrl,
     string PlayStateLabel,
-    bool IsExternalLiveInput);
+    bool IsExternalLiveInput,
+    CastNowPlaying? Cast = null);
 
 public sealed record SmartTvNowShowing(
     string ModelName,
@@ -80,7 +81,8 @@ public static class NowPlayingResolver
                         Detail: string.Join(" • ", castDetail),
                         ImageUrl: string.Empty,
                         PlayStateLabel: cast.IsPlaying ? "Casting" : "Paused",
-                        IsExternalLiveInput: true);
+                        IsExternalLiveInput: true,
+                        Cast: cast);
                 }
 
                 if (tvInfo is not null)
@@ -135,8 +137,7 @@ public static class NowPlayingResolver
         var externalHeosPlaying =
             string.Equals(status.PlayState, "play", StringComparison.OrdinalIgnoreCase) &&
             status.NowPlaying.HasRealMetadata;
-        var isExternalNamedService =
-            status.NowPlaying.SourceId is int sid && sid != 1029 && sid != 0;
+        var isExternalNamedService = status.NowPlaying.IsNamedServiceSource;
 
         if (isPcCasting && !externalHeosPlaying)
         {
@@ -290,6 +291,36 @@ public static class NowPlayingResolver
 
         var title = parts.Length > 3 ? string.Join(" • ", parts.Skip(3)) : null;
         return new CastNowPlaying(parts[1], parts[2], string.IsNullOrWhiteSpace(title) ? null : title, parts[0] == "CASTING");
+    }
+
+    /// <summary>
+    /// The artwork URL from the Chromecast plugin's <c>now-playing</c> action data (<c>"imageUrl"</c>).
+    /// Only absolute http(s) URLs; null otherwise.
+    /// </summary>
+    public static string? TryReadCastImageUrl(string? nowPlayingDataJson)
+    {
+        if (string.IsNullOrWhiteSpace(nowPlayingDataJson))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(nowPlayingDataJson);
+            if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object &&
+                doc.RootElement.TryGetProperty("imageUrl", out var image) &&
+                image.ValueKind == System.Text.Json.JsonValueKind.String &&
+                Uri.TryCreate(image.GetString(), UriKind.Absolute, out var uri) &&
+                uri.Scheme is "http" or "https")
+            {
+                return uri.AbsoluteUri;
+            }
+        }
+        catch (System.Text.Json.JsonException)
+        {
+        }
+
+        return null;
     }
 
     private static string BuildMetadataDetail(

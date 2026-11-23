@@ -1178,14 +1178,14 @@ public sealed partial class MainViewModel : ObservableObject
                 ? _youtubeQueueService.Snapshot.CurrentTrack
                 : null;
 
-            var resolved = NowPlayingResolver.Resolve(
+            var resolved = ApplyHeroCast(NowPlayingResolver.Resolve(
                 status,
                 activeStationName: activeStation?.DisplayName,
                 plugins: _pluginHost?.GetPlugins(),
                 isPcCasting: isPcCasting,
                 pcCastDetail: pcCastDetail,
                 activeLocalTrack: activeLocalTrack,
-                activeYouTubeTrack: activeYouTubeTrack);
+                activeYouTubeTrack: activeYouTubeTrack));
 
             PlayState = resolved.PlayStateLabel;
             NowPlayingTitle = resolved.Title;
@@ -1365,7 +1365,9 @@ public sealed partial class MainViewModel : ObservableObject
         ExecuteReceiverActionAsync(() => _receiverController.SetZone2PowerAsync(!IsZone2On), IsZone2On ? "Zone 2 turned off." : "Zone 2 turned on.");
 
     private Task PlayPauseAsync() =>
-        SetPlayStateAsync(IsPlaying ? "pause" : "play");
+        _heroCast is { } cast
+            ? PlayPauseCastAsync(cast) // The hero shows a cast: control the Chromecast, not HEOS.
+            : SetPlayStateAsync(IsPlaying ? "pause" : "play");
 
     private async Task SetPlayStateAsync(string state)
     {

@@ -6,11 +6,15 @@ left open, and remove them (with a CHANGELOG entry) when they are done.
 ## VU meters & RTA (follow the Denon)
 
 Phase 1 is done in 1.15.1 (source router, DENON/SIM/MUTED/PC/IDLE badge, PC Cast meters synced to the HEOS delay).
-Phase 2 is done (unreleased): YouTube / YouTube Music and jukebox tracks are decoded by a separate FFmpeg process
-(`AppStreamMeterService`) and shown at the playback position. Verified live with YouTube Music on 2026-11-23.
+Phase 2 is done in 1.18.0: YouTube / YouTube Music and jukebox tracks are decoded by a separate FFmpeg process
+(`AppStreamMeterService`) and shown at the playback position. Verified live with YouTube Music and a jukebox FLAC
+(metronome test track) on 2026-11-23.
 
-- [ ] Verify live: phase 2 with a **local jukebox** file (only YouTube was checked), and a seek inside a jukebox
-      track (a range read does not restart the clock, so the meters may drift after a seek).
+- [ ] **Tune the Cinema Offset** (Settings): with the metronome FLAC the meters move very slightly before the beeps.
+      The offset is 250 ms (Auto-Calibrate with a WAV chirp, 2026-11-22); FLAC/YouTube likely buffer a bit longer in
+      HEOS. Try 300–400 ms by ear. The same value times lyrics and the Cinema video. If one value cannot fit all,
+      add a separate meter trim.
+- [ ] A seek inside a jukebox track is not tested (the app has no seek bar; a range read does not restart the clock).
 - [ ] **Phase 3: opt-in "ROOM" mode (PC microphone)** for TV/ARC, HDMI and Chromecast audio that the app cannot tap.
       Needs AGC, a noise gate, a clear "mic on" badge and a setting (off by default).
 - [ ] **Philips Hue Music Sync** still reacts to the live PC output (`PluginHostService.PublishAudioFrame`).
@@ -21,9 +25,6 @@ Phase 2 is done (unreleased): YouTube / YouTube Music and jukebox tracks are dec
 ## Habit telemetry
 
 - [ ] Events written before 1.15.0 have no `coveredSec` / `exclusiveSec`. Readers must fall back to `durationSec`.
-- [ ] The now-playing hero during a cast has no cast artwork yet, and its transport button shows ▶ while the cast
-      plays (the buttons follow HEOS, not the cast). Decide if the hero should show cast artwork and cast play/pause.
-      (Hero text and the `app_shutdown` end reason were checked live on 2026-11-23 with a Netflix cast.)
 
 ## MCP: plugin tools
 

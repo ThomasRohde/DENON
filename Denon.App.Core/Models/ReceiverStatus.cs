@@ -29,6 +29,14 @@ public sealed record NowPlayingMedia(
         (string.IsNullOrWhiteSpace(Artist) || string.Equals(Artist.Trim(), "Url Stream", StringComparison.OrdinalIgnoreCase)) &&
         string.IsNullOrWhiteSpace(Station);
 
+    /// <summary>
+    /// A named HEOS service (Spotify, TuneIn, Local Music/DLNA…) plays, not a URL stream from this app.
+    /// HEOS reports some app relay streams (for example a local FLAC) as sid 1024 "Local Music" with the
+    /// "Url Stream" placeholder metadata, so a placeholder never counts as another service.
+    /// </summary>
+    public bool IsNamedServiceSource =>
+        SourceId is int sid && sid != 1029 && sid != 0 && !IsPlaceholderUrlStream;
+
     public bool HasRealMetadata =>
         !IsPlaceholderUrlStream &&
         (!string.IsNullOrWhiteSpace(Song) ||
