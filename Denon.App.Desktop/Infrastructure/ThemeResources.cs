@@ -21,6 +21,11 @@ public static class ThemeResources
     public static Color Color(string token) =>
         Application.Current?.TryFindResource(token + "Color") is Color color ? color : Colors.Transparent;
 
+    /// <summary>A font token from <c>Themes/Typography.xaml</c> (<c>DisplayFont</c>, <c>UiFont</c>, <c>MonoFont</c>);
+    /// the system UI font without an application.</summary>
+    public static System.Windows.Media.FontFamily Font(string key) =>
+        Application.Current?.TryFindResource(key) as System.Windows.Media.FontFamily ?? System.Windows.SystemFonts.MessageFontFamily;
+
     /// <summary>The token color as a WinForms color (tray menu).</summary>
     public static System.Drawing.Color DrawingColor(string token)
     {

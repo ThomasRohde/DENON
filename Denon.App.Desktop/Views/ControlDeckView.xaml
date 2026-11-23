@@ -17,7 +17,7 @@
                 Background="{StaticResource CardElevatedBrush}"
                 BorderBrush="{StaticResource AccentAmberBrush}"
                 BorderThickness="1"
-                CornerRadius="11"
+                CornerRadius="{StaticResource Radius04}"
                 Padding="12,8"
                 Margin="0,0,0,10"
                 Visibility="{Binding ShowControlDeckInsights, Converter={StaticResource BoolToVis}}">
@@ -27,12 +27,12 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <Border Grid.Column="0" Background="{StaticResource AccentAmberSubtleBgBrush}" BorderBrush="{StaticResource AccentAmberBrush}" BorderThickness="1" CornerRadius="6" Padding="7,2" Margin="0,0,10,0" VerticalAlignment="Center">
-                    <TextBlock Text="ROOM BRAIN" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentAmberTextBrush}" />
+                <Border Grid.Column="0" Background="{StaticResource AccentAmberSubtleBgBrush}" BorderBrush="{StaticResource AccentAmberBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="7,2" Margin="0,0,10,0" VerticalAlignment="Center">
+                    <TextBlock Text="ROOM BRAIN" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentAmberTextBrush}" />
                 </Border>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding Explanation}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Title}" FontSize="{StaticResource FontSize06}" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Explanation}" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
                     <Button Content="{Binding FixLabel}"
@@ -40,13 +40,13 @@
                             CommandParameter="{Binding}"
                             Style="{StaticResource PrimaryButton}"
                             Padding="10,4.5"
-                            FontSize="11"
+                            FontSize="{StaticResource FontSize04}"
                             Margin="0,0,6,0" />
                     <Button Content="Undo"
                             Command="{Binding DataContext.RestorePreviousRoomStateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                             Style="{StaticResource SecondaryButton}"
                             Padding="9,4.5"
-                            FontSize="11"
+                            FontSize="{StaticResource FontSize04}"
                             Margin="0,0,6,0"
                             Visibility="{Binding DataContext.CanUndoRoomState, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}" />
                     <Button Content="✕"
@@ -54,7 +54,7 @@
                             CommandParameter="{Binding}"
                             Style="{StaticResource SecondaryButton}"
                             Padding="7,4.5"
-                            FontSize="10.5"
+                            FontSize="{StaticResource FontSize03}"
                             ToolTip="Dismiss insight" />
                 </StackPanel>
             </Grid>
@@ -74,7 +74,7 @@
                     <Border Grid.Column="0"
                             Width="88"
                             Height="88"
-                            CornerRadius="14"
+                            CornerRadius="{StaticResource Radius06}"
                             Background="{StaticResource SidebarBgBrush}"
                             BorderBrush="{StaticResource Ink12Brush}"
                             BorderThickness="1"
@@ -125,28 +125,28 @@
                                 <Border x:Name="Eq5" Style="{StaticResource EqBarStyle}" Height="6" />
                             </StackPanel>
 
-                            <Border Background="{StaticResource AccentCyanSubtleBgDeepBrush}" CornerRadius="5" Padding="7,2.5" Margin="0,0,6,0">
-                                <TextBlock Text="{Binding InputSourceDisplay}" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrush}" />
+                            <Border Background="{StaticResource AccentCyanSubtleBgDeepBrush}" CornerRadius="{StaticResource Radius02}" Padding="7,2.5" Margin="0,0,6,0">
+                                <TextBlock Text="{Binding InputSourceDisplay}" FontSize="{StaticResource FontSize03}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrush}" />
                             </Border>
-                            <Border Background="{StaticResource ControlBgBrush}" CornerRadius="5" Padding="7,2.5" Margin="0,0,6,0">
-                                <TextBlock Text="{Binding PlayState}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" />
+                            <Border Background="{StaticResource ControlBgBrush}" CornerRadius="{StaticResource Radius02}" Padding="7,2.5" Margin="0,0,6,0">
+                                <TextBlock Text="{Binding PlayState}" FontSize="{StaticResource FontSize03}" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" />
                             </Border>
-                            <Border Background="{StaticResource ControlBgBrush}" CornerRadius="5" Padding="7,2.5" Margin="0,0,6,0">
-                                <TextBlock Text="{Binding SoundMode}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource AccentAmberBrush}" />
+                            <Border Background="{StaticResource ControlBgBrush}" CornerRadius="{StaticResource Radius02}" Padding="7,2.5" Margin="0,0,6,0">
+                                <TextBlock Text="{Binding SoundMode}" FontSize="{StaticResource FontSize03}" FontWeight="SemiBold" Foreground="{StaticResource AccentAmberBrush}" />
                             </Border>
-                            <Border Background="{StaticResource ControlBgBrush}" CornerRadius="5" Padding="7,2.5" Margin="0,0,6,0"
+                            <Border Background="{StaticResource ControlBgBrush}" CornerRadius="{StaticResource Radius02}" Padding="7,2.5" Margin="0,0,6,0"
                                     Visibility="{Binding HasSleepTimer, Converter={StaticResource BoolToVis}}">
-                                <TextBlock Text="{Binding SleepTimerDisplay}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource AccentVioletBrush}" />
+                                <TextBlock Text="{Binding SleepTimerDisplay}" FontSize="{StaticResource FontSize03}" FontWeight="SemiBold" Foreground="{StaticResource AccentVioletBrush}" />
                             </Border>
-                            <Border Background="{StaticResource AccentCrimsonBgBrush}" BorderBrush="{StaticResource AccentCrimsonBrush}" BorderThickness="1" CornerRadius="5" Padding="7,2" Margin="0,0,6,0"
+                            <Border Background="{StaticResource AccentCrimsonBgBrush}" BorderBrush="{StaticResource AccentCrimsonBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="7,2" Margin="0,0,6,0"
                                     Visibility="{Binding IsYouTubeActive, Converter={StaticResource BoolToVis}}">
-                                <TextBlock Text="YOUTUBE CAST" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentCrimsonTextBrush}" />
+                                <TextBlock Text="YOUTUBE CAST" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentCrimsonTextBrush}" />
                             </Border>
                             <Button Content="Watch Video"
                                     Command="{Binding OpenCinemaForCurrentTrackCommand}"
                                     Style="{StaticResource SecondaryButton}"
                                     Padding="8,2.5"
-                                    FontSize="10.5"
+                                    FontSize="{StaticResource FontSize03}"
                                     Margin="0,0,6,0"
                                     ToolTip="Open synchronized YouTube Cinema Companion window"
                                     Visibility="{Binding IsYouTubeActive, Converter={StaticResource BoolToVis}}" />
@@ -154,32 +154,32 @@
                                     Command="{Binding CycleMeterDisplayModeCommand}"
                                     Style="{StaticResource SecondaryButton}"
                                     Padding="8,2.5"
-                                    FontSize="10"
+                                    FontSize="{StaticResource FontSize02}"
                                     Margin="0,0,5,0"
                                     ToolTip="Cycle studio meter mode: Analog VU → 31-Band RTA Spectrum → Both" />
                             <Button Content="{Binding LyricsToggleLabel}"
                                     Command="{Binding ToggleLiveLyricsCommand}"
                                     Style="{StaticResource SecondaryButton}"
                                     Padding="8,2.5"
-                                    FontSize="10"
+                                    FontSize="{StaticResource FontSize02}"
                                     Margin="0,0,5,0"
                                     ToolTip="Show synced live lyrics (LRCLIB) for the currently playing track" />
                             <Button Content="{Binding VuToggleLabel}"
                                     Command="{Binding ToggleVuMetersCommand}"
                                     Style="{StaticResource SecondaryButton}"
                                     Padding="8,2.5"
-                                    FontSize="10"
+                                    FontSize="{StaticResource FontSize02}"
                                     ToolTip="Show or hide audio meters" />
                         </StackPanel>
 
                         <TextBlock Text="{Binding NowPlayingTitle}"
-                                   FontSize="24"
+                                   FontSize="{StaticResource FontSize13}"
                                    FontWeight="Bold"
                                    Foreground="{StaticResource TextPrimaryBrush}"
                                    TextTrimming="CharacterEllipsis"
                                    Margin="0,8,0,0" />
                         <TextBlock Text="{Binding NowPlayingDetail}"
-                                   FontSize="13"
+                                   FontSize="{StaticResource FontSize08}"
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    TextTrimming="CharacterEllipsis"
                                    Margin="0,4,0,0" />
@@ -259,22 +259,22 @@
                 <Border Background="{StaticResource SidebarBgBrush}"
                         BorderBrush="{StaticResource Ink11Brush}"
                         BorderThickness="1"
-                        CornerRadius="10"
+                        CornerRadius="{StaticResource Radius04}"
                         Padding="12,8"
                         Margin="0,10,0,0"
                         Visibility="{Binding ShowLiveLyrics, Converter={StaticResource BoolToVis}}">
                     <DockPanel>
-                        <Border DockPanel.Dock="Right" Background="{StaticResource Ink08Brush}" BorderBrush="{StaticResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="6" Padding="7,2" VerticalAlignment="Center" Margin="10,0,0,0">
-                            <TextBlock Text="{Binding LyricsStatusBadge}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
+                        <Border DockPanel.Dock="Right" Background="{StaticResource Ink08Brush}" BorderBrush="{StaticResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="7,2" VerticalAlignment="Center" Margin="10,0,0,0">
+                            <TextBlock Text="{Binding LyricsStatusBadge}" FontSize="{StaticResource FontSize00}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
                         </Border>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="{Binding CurrentLyricLine}"
-                                       FontSize="13.5"
+                                       FontSize="{StaticResource FontSize08}"
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource TextPrimaryBrush}"
                                        TextTrimming="CharacterEllipsis" />
                             <TextBlock Text="{Binding NextLyricLine}"
-                                       FontSize="11"
+                                       FontSize="{StaticResource FontSize04}"
                                        Foreground="{StaticResource TextMutedBrush}"
                                        TextTrimming="CharacterEllipsis"
                                        Margin="0,2,0,0"
@@ -302,7 +302,7 @@
                                 <TextBlock Text="INPUT SOURCE" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding InputSourceDisplay}"
                                            HorizontalAlignment="Right"
-                                           FontSize="11.5"
+                                           FontSize="{StaticResource FontSize05}"
                                            FontWeight="SemiBold"
                                            Foreground="{StaticResource AccentCyanBrightBrush}" />
                             </DockPanel>
@@ -334,7 +334,7 @@
                                 <TextBlock Text="SOUND MODE &amp; DSP" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding SoundMode}"
                                            HorizontalAlignment="Right"
-                                           FontSize="11.5"
+                                           FontSize="{StaticResource FontSize05}"
                                            FontWeight="SemiBold"
                                            Foreground="{StaticResource AccentAmberBrush}" />
                             </DockPanel>
@@ -352,7 +352,7 @@
                                                 Command="{Binding DataContext.SelectSoundModeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 CommandParameter="{Binding}"
                                                 Padding="11,6"
-                                                FontSize="11.5"
+                                                FontSize="{StaticResource FontSize05}"
                                                 Margin="0,0,7,7" />
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -382,7 +382,7 @@
                                                         Command="{Binding DataContext.SetSleepTimerCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                         CommandParameter="{Binding}"
                                                         Padding="9,5"
-                                                        FontSize="11"
+                                                        FontSize="{StaticResource FontSize04}"
                                                         Margin="0,0,6,0" />
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
@@ -396,7 +396,7 @@
                                                 Command="{Binding SetEcoModeCommand}"
                                                 CommandParameter="AUTO"
                                                 Padding="9,5"
-                                                FontSize="11"
+                                                FontSize="{StaticResource FontSize04}"
                                                 Margin="0,0,6,0"
                                                 Style="{StaticResource ChipButton}"
                                                 infra:Chip.IsActive="{Binding EcoMode, Converter={StaticResource EqualityConverter}, ConverterParameter=AUTO}" />
@@ -404,7 +404,7 @@
                                                 Command="{Binding SetEcoModeCommand}"
                                                 CommandParameter="ON"
                                                 Padding="9,5"
-                                                FontSize="11"
+                                                FontSize="{StaticResource FontSize04}"
                                                 Margin="0,0,6,0"
                                                 Style="{StaticResource ChipButton}"
                                                 infra:Chip.IsActive="{Binding EcoMode, Converter={StaticResource EqualityConverter}, ConverterParameter=ON}" />
@@ -412,13 +412,13 @@
                                                 Command="{Binding SetEcoModeCommand}"
                                                 CommandParameter="OFF"
                                                 Padding="9,5"
-                                                FontSize="11"
+                                                FontSize="{StaticResource FontSize04}"
                                                 Margin="0,0,6,0"
                                                 Style="{StaticResource ChipButton}"
                                                 infra:Chip.IsActive="{Binding EcoMode, Converter={StaticResource EqualityConverter}, ConverterParameter=OFF}" />
                                         <Button Command="{Binding ToggleZone2Command}"
                                                 Padding="10,5"
-                                                FontSize="11">
+                                                FontSize="{StaticResource FontSize04}">
                                             <Button.Style>
                                                 <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                     <Setter Property="Content" Value="Zone 2: Off" />
@@ -458,7 +458,7 @@
                             <TextBlock Text="Scroll wheel enabled"
                                        ToolTip="Scroll your mouse wheel anywhere over this volume card to adjust volume ±2 steps"
                                        HorizontalAlignment="Right"
-                                       FontSize="10.5"
+                                       FontSize="{StaticResource FontSize03}"
                                        Foreground="{StaticResource TextMutedBrush}" />
                         </DockPanel>
 
@@ -473,11 +473,11 @@
                                     <Border Background="{StaticResource OledBgBrush}"
                                             BorderBrush="{StaticResource Ink08Brush}"
                                             BorderThickness="1"
-                                            CornerRadius="12"
+                                            CornerRadius="{StaticResource Radius05}"
                                             Padding="16,14">
                                         <StackPanel HorizontalAlignment="Center">
                                             <TextBlock Text="{Binding PrimaryVolumeText}"
-                                                       FontSize="38"
+                                                       FontSize="{StaticResource FontSize14}"
                                                        FontWeight="Bold"
                                                        HorizontalAlignment="Center"
                                                        Style="{StaticResource OledMonoText}">
@@ -486,9 +486,9 @@
                                                 </TextBlock.Effect>
                                             </TextBlock>
                                             <TextBlock Text="{Binding SecondaryVolumeText}"
-                                                       FontSize="12"
+                                                       FontSize="{StaticResource FontSize06}"
                                                        Foreground="{StaticResource TextMutedBrush}"
-                                                       FontFamily="Cascadia Mono, Consolas"
+                                                       FontFamily="{StaticResource MonoFont}"
                                                        HorizontalAlignment="Center"
                                                        Margin="0,2,0,0" />
                                         </StackPanel>
@@ -557,8 +557,8 @@
                                                 Margin="0,0,6,0"
                                                 Padding="6,8">
                                             <StackPanel HorizontalAlignment="Center">
-                                                <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                                <TextBlock Text="{Binding LevelLabel}" FontSize="12" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                                <TextBlock Text="{Binding Name}" FontSize="{StaticResource FontSize04}" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                                <TextBlock Text="{Binding LevelLabel}" FontSize="{StaticResource FontSize06}" FontWeight="Bold" FontFamily="{StaticResource MonoFont}" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                                             </StackPanel>
                                         </Button>
                                     </DataTemplate>
@@ -580,7 +580,7 @@
                     <DockPanel Grid.Row="0" Margin="0,0,0,10">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="QUICK SCENES &amp; STATIONS" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                            <TextBlock Text="  •  One-click AVR macros &amp; HEOS radio" FontSize="11.5" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+                            <TextBlock Text="  •  One-click AVR macros &amp; HEOS radio" FontSize="{StaticResource FontSize05}" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <Button Content="Scenes &amp; EQ →"
@@ -588,21 +588,21 @@
                                     CommandParameter="Acoustics"
                                     Style="{StaticResource SecondaryButton}"
                                     Padding="10,5"
-                                    FontSize="11.5"
+                                    FontSize="{StaticResource FontSize05}"
                                     Margin="0,0,6,0" />
                             <Button Content="YouTube →"
                                     Command="{Binding NavigateCommand}"
                                     CommandParameter="YouTube"
                                     Style="{StaticResource SecondaryButton}"
                                     Padding="10,5"
-                                    FontSize="11.5"
+                                    FontSize="{StaticResource FontSize05}"
                                     Margin="0,0,6,0" />
                             <Button Content="Stations →"
                                     Command="{Binding NavigateCommand}"
                                     CommandParameter="Stations"
                                     Style="{StaticResource SecondaryButton}"
                                     Padding="10,5"
-                                    FontSize="11.5" />
+                                    FontSize="{StaticResource FontSize05}" />
                         </StackPanel>
                     </DockPanel>
 
@@ -627,10 +627,10 @@
                                                 Padding="10,6"
                                                 Margin="0,0,7,7">
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Border Background="{Binding AccentBrush}" CornerRadius="4" Padding="5,1.5" Margin="0,0,7,0">
-                                                    <TextBlock Text="{Binding Badge}" FontSize="9.5" FontWeight="Black" Foreground="{StaticResource TextOnAccentBrush}" />
+                                                <Border Background="{Binding AccentBrush}" CornerRadius="{StaticResource Radius01}" Padding="5,1.5" Margin="0,0,7,0">
+                                                    <TextBlock Text="{Binding Badge}" FontSize="{StaticResource FontSize01}" FontWeight="Black" Foreground="{StaticResource TextOnAccentBrush}" />
                                                 </Border>
-                                                <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding Name}" FontSize="{StaticResource FontSize06}" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
                                             </StackPanel>
                                         </Button>
                                     </DataTemplate>
@@ -646,7 +646,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border Width="206"
-                                            CornerRadius="11"
+                                            CornerRadius="{StaticResource Radius04}"
                                             Padding="10"
                                             Margin="0,0,9,9"
                                             BorderThickness="1">
@@ -678,11 +678,11 @@
                                                 <Border Grid.Column="0"
                                                         Width="32"
                                                         Height="32"
-                                                        CornerRadius="8"
+                                                        CornerRadius="{StaticResource Radius03}"
                                                         Background="{Binding BadgeBrush}"
                                                         Margin="0,0,9,0">
                                                     <TextBlock Text="{Binding Monogram}"
-                                                               FontSize="12"
+                                                               FontSize="{StaticResource FontSize06}"
                                                                FontWeight="Black"
                                                                Foreground="{StaticResource TextOnAccentBrush}"
                                                                HorizontalAlignment="Center"
@@ -691,18 +691,18 @@
 
                                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding DisplayName}"
-                                                               FontSize="12.5"
+                                                               FontSize="{StaticResource FontSize07}"
                                                                FontWeight="SemiBold"
                                                                TextTrimming="CharacterEllipsis" />
                                                     <StackPanel Orientation="Horizontal" Margin="0,1,0,0">
                                                         <TextBlock Text="ON AIR"
-                                                                   FontSize="9"
+                                                                   FontSize="{StaticResource FontSize00}"
                                                                    FontWeight="Bold"
                                                                    Foreground="{StaticResource AccentEmeraldBrush}"
                                                                    Margin="0,0,5,0"
                                                                    Visibility="{Binding IsCurrentlyPlaying, Converter={StaticResource BoolToVis}}" />
                                                         <TextBlock Text="{Binding Alias}"
-                                                                   FontSize="10"
+                                                                   FontSize="{StaticResource FontSize02}"
                                                                    Foreground="{StaticResource TextMutedBrush}"
                                                                    TextTrimming="CharacterEllipsis" />
                                                     </StackPanel>
@@ -722,14 +722,14 @@
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource PrimaryButton}"
                                                         Padding="8,5"
-                                                        FontSize="11" />
+                                                        FontSize="{StaticResource FontSize04}" />
                                                 <Button Grid.Column="2"
                                                         Content="Low Vol"
                                                         Command="{Binding DataContext.PlayPresetLowCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource SecondaryButton}"
                                                         Padding="9,5"
-                                                        FontSize="11"
+                                                        FontSize="{StaticResource FontSize04}"
                                                         ToolTip="Play at safety low volume" />
                                             </Grid>
                                         </Grid>

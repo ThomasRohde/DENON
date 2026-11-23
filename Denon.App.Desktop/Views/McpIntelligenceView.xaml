@@ -2,11 +2,11 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Foreground="{StaticResource TextPrimaryBrush}"
-             FontFamily="Segoe UI Variable Display, Segoe UI">
+             FontFamily="{StaticResource DisplayFont}">
     <UserControl.Resources>
         <Style x:Key="TierPillBtn" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
             <Setter Property="Padding" Value="11,6" />
-            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontSize" Value="{StaticResource FontSize05}" />
             <Setter Property="Margin" Value="0,0,7,6" />
         </Style>
     </UserControl.Resources>
@@ -26,18 +26,18 @@
 
                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                             <WrapPanel VerticalAlignment="Center" Margin="0,0,0,3">
-                                <TextBlock Text="Streamable HTTP MCP Server &amp; Living-Room Brain" FontSize="16.5" FontWeight="Bold" VerticalAlignment="Center" />
-                                <Border Background="{StaticResource AccentEmeraldSubtleBgDeepBrush}" BorderBrush="{StaticResource AccentEmeraldBrush}" BorderThickness="1" CornerRadius="6" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding McpStatusBadgeText}" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentEmeraldBrush}" />
+                                <TextBlock Text="Streamable HTTP MCP Server &amp; Living-Room Brain" FontSize="{StaticResource FontSize10}" FontWeight="Bold" VerticalAlignment="Center" />
+                                <Border Background="{StaticResource AccentEmeraldSubtleBgDeepBrush}" BorderBrush="{StaticResource AccentEmeraldBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding McpStatusBadgeText}" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentEmeraldBrush}" />
                                 </Border>
                             </WrapPanel>
-                            <TextBlock Text="{Binding McpToolsSummaryText}" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding McpToolsSummaryText}" FontSize="{StaticResource FontSize05}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
                         </StackPanel>
 
                         <WrapPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center">
-                            <Button Content="Run Room Doctor" Command="{Binding RunRoomDoctorCommand}" Style="{StaticResource SecondaryButton}" Padding="10,5.5" FontSize="11.5" Margin="0,0,6,4" />
-                            <Button Content="Copy Endpoint" Command="{Binding CopyMcpEndpointCommand}" Style="{StaticResource SecondaryButton}" Padding="10,5.5" FontSize="11.5" Margin="0,0,6,4" />
-                            <Button Content="Copy MCP Config JSON" Command="{Binding CopyMcpConfigCommand}" Style="{StaticResource PrimaryButton}" Padding="11,5.5" FontSize="11.5" Margin="0,0,0,4" />
+                            <Button Content="Run Room Doctor" Command="{Binding RunRoomDoctorCommand}" Style="{StaticResource SecondaryButton}" Padding="10,5.5" FontSize="{StaticResource FontSize05}" Margin="0,0,6,4" />
+                            <Button Content="Copy Endpoint" Command="{Binding CopyMcpEndpointCommand}" Style="{StaticResource SecondaryButton}" Padding="10,5.5" FontSize="{StaticResource FontSize05}" Margin="0,0,6,4" />
+                            <Button Content="Copy MCP Config JSON" Command="{Binding CopyMcpConfigCommand}" Style="{StaticResource PrimaryButton}" Padding="11,5.5" FontSize="{StaticResource FontSize05}" Margin="0,0,0,4" />
                         </WrapPanel>
                     </Grid>
 
@@ -49,32 +49,32 @@
                             <ColumnDefinition Width="1.35*" />
                         </Grid.ColumnDefinitions>
 
-                        <Border Grid.Column="0" Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="9" Padding="10,7">
+                        <Border Grid.Column="0" Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius03}" Padding="10,7">
                             <StackPanel>
-                                <TextBlock Text="STREAMABLE HTTP ENDPOINT (POST + SSE)" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" />
-                                <TextBlock Text="{Binding McpEndpointText}" FontFamily="Cascadia Mono, Consolas" FontSize="12" Foreground="{StaticResource AccentCyanBrightBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="STREAMABLE HTTP ENDPOINT (POST + SSE)" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" />
+                                <TextBlock Text="{Binding McpEndpointText}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource AccentCyanBrightBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Column="2" Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="9" Padding="10,7">
+                        <Border Grid.Column="2" Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius03}" Padding="10,7">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock Text="BEARER AUTH TOKEN" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" />
-                                    <TextBlock Text="{Binding McpBearerToken}" FontFamily="Cascadia Mono, Consolas" FontSize="11.5" Foreground="{StaticResource TextStrongBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="BEARER AUTH TOKEN" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" />
+                                    <TextBlock Text="{Binding McpBearerToken}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource FontSize05}" Foreground="{StaticResource TextStrongBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
-                                    <Button Content="Copy" Command="{Binding CopyMcpTokenCommand}" Style="{StaticResource SecondaryButton}" Padding="9,4" FontSize="11" Margin="0,0,5,0" />
-                                    <Button Content="Regenerate" Command="{Binding RegenerateMcpTokenCommand}" Style="{StaticResource SecondaryButton}" Padding="9,4" FontSize="11" />
+                                    <Button Content="Copy" Command="{Binding CopyMcpTokenCommand}" Style="{StaticResource SecondaryButton}" Padding="9,4" FontSize="{StaticResource FontSize04}" Margin="0,0,5,0" />
+                                    <Button Content="Regenerate" Command="{Binding RegenerateMcpTokenCommand}" Style="{StaticResource SecondaryButton}" Padding="9,4" FontSize="{StaticResource FontSize04}" />
                                 </StackPanel>
                             </Grid>
                         </Border>
                     </Grid>
 
-                    <TextBlock Text="{Binding McpStatusMessage}" FontSize="11.5" Foreground="{StaticResource AccentCyanBrightBrush}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding McpStatusMessage}" FontSize="{StaticResource FontSize05}" Foreground="{StaticResource AccentCyanBrightBrush}" TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
 
@@ -96,7 +96,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="SERVER SETTINGS &amp; SAFETY GUARDRAILS" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                                <Button Grid.Column="1" Content="Save &amp; Apply" Command="{Binding SaveAndRestartMcpCommand}" Style="{StaticResource PrimaryButton}" Padding="12,5" FontSize="11.5" />
+                                <Button Grid.Column="1" Content="Save &amp; Apply" Command="{Binding SaveAndRestartMcpCommand}" Style="{StaticResource PrimaryButton}" Padding="12,5" FontSize="{StaticResource FontSize05}" />
                             </Grid>
 
                             <CheckBox Content="Enable Streamable HTTP MCP Server"
@@ -110,19 +110,19 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="HTTP PORT" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,4" />
-                                    <TextBox Text="{Binding McpPortText, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas" Padding="9,6" FontSize="12" />
+                                    <TextBlock Text="HTTP PORT" FontSize="{StaticResource FontSize02}" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,4" />
+                                    <TextBox Text="{Binding McpPortText, UpdateSourceTrigger=PropertyChanged}" FontFamily="{StaticResource MonoFont}" Padding="9,6" FontSize="{StaticResource FontSize06}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
                                     <DockPanel Margin="0,0,0,4">
-                                        <TextBlock Text="HARD MAX SAFE VOLUME CEILING" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" />
-                                        <TextBlock Text="{Binding McpMaxSafeVolumeLabel}" FontFamily="Cascadia Mono, Consolas" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentAmberBrush}" HorizontalAlignment="Right" />
+                                        <TextBlock Text="HARD MAX SAFE VOLUME CEILING" FontSize="{StaticResource FontSize02}" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" />
+                                        <TextBlock Text="{Binding McpMaxSafeVolumeLabel}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource FontSize04}" FontWeight="Bold" Foreground="{StaticResource AccentAmberBrush}" HorizontalAlignment="Right" />
                                     </DockPanel>
                                     <Slider Minimum="20" Maximum="95" Value="{Binding McpMaxSafeVolume, Mode=TwoWay}" ToolTip="AI agents can never raise Denon AVR volume above this hard safety limit" />
                                 </StackPanel>
                             </Grid>
 
-                            <TextBlock Text="PERMISSION TIER" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6" />
+                            <TextBlock Text="PERMISSION TIER" FontSize="{StaticResource FontSize02}" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6" />
                             <WrapPanel Margin="0,0,0,10">
                                 <Button Content="Observer (Read-Only)" Command="{Binding SetMcpTierCommand}" CommandParameter="Observer">
                                     <Button.Style>
@@ -176,15 +176,15 @@
                         <StackPanel>
                             <DockPanel Margin="0,0,0,8">
                                 <TextBlock Text="CLIENT CONFIG (ANTIGRAVITY / CLAUDE / CURSOR / VS CODE)" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                                <Button Content="Copy JSON" Command="{Binding CopyMcpConfigCommand}" Style="{StaticResource SecondaryButton}" Padding="9,3.5" FontSize="11" HorizontalAlignment="Right" />
+                                <Button Content="Copy JSON" Command="{Binding CopyMcpConfigCommand}" Style="{StaticResource SecondaryButton}" Padding="9,3.5" FontSize="{StaticResource FontSize04}" HorizontalAlignment="Right" />
                             </DockPanel>
-                            <Border Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource Ink08Brush}" BorderThickness="1" CornerRadius="9" Padding="12,10">
+                            <Border Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource Ink08Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius03}" Padding="12,10">
                                 <TextBox Text="{Binding McpClientConfigPreview, Mode=OneWay}"
                                          IsReadOnly="True"
                                          Background="Transparent"
                                          BorderThickness="0"
-                                         FontFamily="Cascadia Mono, Consolas"
-                                         FontSize="11"
+                                         FontFamily="{StaticResource MonoFont}"
+                                         FontSize="{StaticResource FontSize04}"
                                          Foreground="{StaticResource AccentBlueTextBrush}"
                                          TextWrapping="Wrap"
                                          Padding="0" />
@@ -201,11 +201,11 @@
                         <StackPanel>
                             <DockPanel Margin="0,0,0,10">
                                 <TextBlock Text="SELF-HEALING ROOM DOCTOR (CROSS-DEVICE INTELLIGENCE)" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                                <Button Content="Rescan" Command="{Binding RunRoomDoctorCommand}" Style="{StaticResource SecondaryButton}" Padding="9,3.5" FontSize="11" HorizontalAlignment="Right" />
+                                <Button Content="Rescan" Command="{Binding RunRoomDoctorCommand}" Style="{StaticResource SecondaryButton}" Padding="9,3.5" FontSize="{StaticResource FontSize04}" HorizontalAlignment="Right" />
                             </DockPanel>
 
                             <!-- Healthy empty state -->
-                            <Border Background="{StaticResource AccentEmeraldSubtleBgDeepBrush}" BorderBrush="{StaticResource AccentEmeraldBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12,10">
+                            <Border Background="{StaticResource AccentEmeraldSubtleBgDeepBrush}" BorderBrush="{StaticResource AccentEmeraldBorderBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="12,10">
                                 <Border.Style>
                                     <Style TargetType="Border">
                                         <Setter Property="Visibility" Value="Collapsed" />
@@ -217,7 +217,7 @@
                                     </Style>
                                 </Border.Style>
                                 <TextBlock Text="✓ All connected devices (Denon AVR, Hue, LG webOS TV, Audio Routing) look healthy with zero mismatches."
-                                           FontSize="12"
+                                           FontSize="{StaticResource FontSize06}"
                                            Foreground="{StaticResource AccentEmeraldTextBrush}"
                                            TextWrapping="Wrap" />
                             </Border>
@@ -226,7 +226,7 @@
                             <ItemsControl ItemsSource="{Binding RoomInsights}" Visibility="{Binding HasRoomInsights, Converter={StaticResource BoolToVis}}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink12Brush}" BorderThickness="1" CornerRadius="10" Padding="12,10" Margin="0,0,0,8">
+                                        <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink12Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="12,10" Margin="0,0,0,8">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
@@ -235,12 +235,12 @@
                                                 </Grid.ColumnDefinitions>
                                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                                     <WrapPanel Margin="0,0,0,3">
-                                                        <Border Background="{StaticResource AccentAmberSubtleBgBrush}" BorderBrush="{StaticResource AccentAmberBrush}" BorderThickness="1" CornerRadius="5" Padding="6,1" Margin="0,0,7,0">
-                                                            <TextBlock Text="{Binding Category}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentAmberTextBrush}" />
+                                                        <Border Background="{StaticResource AccentAmberSubtleBgBrush}" BorderBrush="{StaticResource AccentAmberBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="6,1" Margin="0,0,7,0">
+                                                            <TextBlock Text="{Binding Category}" FontSize="{StaticResource FontSize00}" FontWeight="Bold" Foreground="{StaticResource AccentAmberTextBrush}" />
                                                         </Border>
-                                                        <TextBlock Text="{Binding Title}" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding Title}" FontSize="{StaticResource FontSize07}" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap" />
                                                     </WrapPanel>
-                                                    <TextBlock Text="{Binding Explanation}" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding Explanation}" FontSize="{StaticResource FontSize05}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                                     <Button Content="{Binding FixLabel}"
@@ -248,14 +248,14 @@
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource PrimaryButton}"
                                                             Padding="10,5"
-                                                            FontSize="11"
+                                                            FontSize="{StaticResource FontSize04}"
                                                             Margin="0,0,5,0" />
                                                     <Button Content="✕"
                                                             Command="{Binding DataContext.DismissRoomInsightCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource SecondaryButton}"
                                                             Padding="7,5"
-                                                            FontSize="10.5"
+                                                            FontSize="{StaticResource FontSize03}"
                                                             ToolTip="Dismiss suggestion" />
                                                 </StackPanel>
                                             </Grid>
@@ -271,7 +271,7 @@
                         <StackPanel>
                             <TextBlock Text="ROOM STATE UNDO &amp; LOCAL HABITS MEMORY (denon://memory/habits)" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,10" />
 
-                            <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="10" Padding="12,9" Margin="0,0,0,10">
+                            <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="12,9" Margin="0,0,0,10">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
@@ -279,8 +279,8 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="1-CLICK UNDO SNAPSHOT" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" />
-                                        <TextBlock Text="{Binding LastRoomSnapshotLabel}" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                        <TextBlock Text="1-CLICK UNDO SNAPSHOT" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" />
+                                        <TextBlock Text="{Binding LastRoomSnapshotLabel}" FontSize="{StaticResource FontSize05}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
                                     </StackPanel>
                                     <Button Grid.Column="2"
                                             Content="Restore Previous State"
@@ -288,15 +288,15 @@
                                             IsEnabled="{Binding CanUndoRoomState}"
                                             Style="{StaticResource SecondaryButton}"
                                             Padding="10,5"
-                                            FontSize="11.5"
+                                            FontSize="{StaticResource FontSize05}"
                                             VerticalAlignment="Center" />
                                 </Grid>
                             </Border>
 
-                            <Border Background="{StaticResource Ink05Brush}" BorderBrush="{StaticResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="10" Padding="12,9">
+                            <Border Background="{StaticResource Ink05Brush}" BorderBrush="{StaticResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="12,9">
                                 <StackPanel>
-                                    <TextBlock Text="LEARNED LOCAL PREFERENCES (100% ON-DEVICE)" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
-                                    <TextBlock Text="{Binding LearnedHabitsSummary}" FontSize="11.5" Foreground="{StaticResource AccentBlueTextSoftBrush}" TextWrapping="Wrap" Margin="0,3,0,0" />
+                                    <TextBlock Text="LEARNED LOCAL PREFERENCES (100% ON-DEVICE)" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
+                                    <TextBlock Text="{Binding LearnedHabitsSummary}" FontSize="{StaticResource FontSize05}" Foreground="{StaticResource AccentBlueTextSoftBrush}" TextWrapping="Wrap" Margin="0,3,0,0" />
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -307,10 +307,10 @@
                         <StackPanel>
                             <DockPanel Margin="0,0,0,8">
                                 <TextBlock Text="LIVE MCP ACTIVITY FEED" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                                <Button Content="Clear" Command="{Binding ClearMcpActivityCommand}" Style="{StaticResource SecondaryButton}" Padding="9,3" FontSize="11" HorizontalAlignment="Right" />
+                                <Button Content="Clear" Command="{Binding ClearMcpActivityCommand}" Style="{StaticResource SecondaryButton}" Padding="9,3" FontSize="{StaticResource FontSize04}" HorizontalAlignment="Right" />
                             </DockPanel>
 
-                            <Border Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource Ink08Brush}" BorderThickness="1" CornerRadius="9" Padding="12,10">
+                            <Border Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource Ink08Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius03}" Padding="12,10">
                                 <Border.Style>
                                     <Style TargetType="Border">
                                         <Setter Property="Visibility" Value="Collapsed" />
@@ -322,7 +322,7 @@
                                     </Style>
                                 </Border.Style>
                                 <TextBlock Text="Waiting for MCP clients... Copy the JSON config on the left into Antigravity, Claude Desktop, Cursor, or VS Code to connect."
-                                           FontSize="11.5"
+                                           FontSize="{StaticResource FontSize05}"
                                            Foreground="{StaticResource TextMutedBrush}"
                                            TextWrapping="Wrap" />
                             </Border>
@@ -331,7 +331,7 @@
                                 <ItemsControl ItemsSource="{Binding McpActivityFeed}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink08Brush}" BorderThickness="1" CornerRadius="7" Padding="9,6" Margin="0,0,0,5">
+                                            <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink08Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="9,6" Margin="0,0,0,5">
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="62" />
@@ -339,10 +339,10 @@
                                                         <ColumnDefinition Width="*" />
                                                         <ColumnDefinition Width="Auto" />
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="{Binding TimeLabel}" FontFamily="Cascadia Mono, Consolas" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
-                                                    <TextBlock Grid.Column="1" Text="{Binding Method}" FontFamily="Cascadia Mono, Consolas" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource AccentCyanBrightBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Grid.Column="2" Text="{Binding Detail}" FontSize="11" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="6,0" />
-                                                    <TextBlock Grid.Column="3" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="{StaticResource AccentEmeraldBrush}" VerticalAlignment="Center">
+                                                    <TextBlock Grid.Column="0" Text="{Binding TimeLabel}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding Method}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource FontSize03}" FontWeight="SemiBold" Foreground="{StaticResource AccentCyanBrightBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Grid.Column="2" Text="{Binding Detail}" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="6,0" />
+                                                    <TextBlock Grid.Column="3" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource FontSize02}" Foreground="{StaticResource AccentEmeraldBrush}" VerticalAlignment="Center">
                                                         <Run Text="{Binding Outcome, Mode=OneWay}" />
                                                         <Run Text=" (" />
                                                         <Run Text="{Binding DurationMs, Mode=OneWay}" />

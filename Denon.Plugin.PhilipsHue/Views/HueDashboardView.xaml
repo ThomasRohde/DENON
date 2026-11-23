@@ -8,37 +8,37 @@
              d:DesignHeight="760"
              d:DesignWidth="960"
              Foreground="{StaticResource TextPrimaryBrush}"
-             FontFamily="Segoe UI Variable Display, Segoe UI">
+             FontFamily="{StaticResource DisplayFont}">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="HueBoolToVis" />
         <views:HexColorToBrushConverter x:Key="HexToBrush" />
 
         <Style x:Key="HueSectionLabel" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="FontSize" Value="{StaticResource FontSize03}" />
             <Setter Property="FontWeight" Value="Bold" />
             <Setter Property="Foreground" Value="{StaticResource TextFaintBrush}" />
         </Style>
 
         <Style x:Key="HueButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
             <Setter Property="Padding" Value="12,7" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="{StaticResource FontSize06}" />
         </Style>
 
         <Style x:Key="HuePrimaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
             <Setter Property="Padding" Value="12,7" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="{StaticResource FontSize06}" />
         </Style>
 
         <Style x:Key="HueTextBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
             <Setter Property="Padding" Value="10,6" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="{StaticResource FontSize06}" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
 
         <Style x:Key="HueCheckBox" TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
             <Setter Property="Foreground" Value="{StaticResource TextStrongBrush}" />
-            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FontSize" Value="{StaticResource FontSize07}" />
             <Setter Property="Margin" Value="0,4" />
             <Setter Property="Cursor" Value="Hand" />
         </Style>
@@ -57,40 +57,40 @@
                             <ColumnDefinition Width="12" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <Border Grid.Column="0" Width="34" Height="34" CornerRadius="9" Background="{StaticResource AccentAmberSubtleBgBrush}" BorderBrush="{StaticResource AccentAmberBrush}" BorderThickness="1" Margin="0,0,12,0" VerticalAlignment="Center">
-                            <TextBlock Text="💡" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Border Grid.Column="0" Width="34" Height="34" CornerRadius="{StaticResource Radius03}" Background="{StaticResource AccentAmberSubtleBgBrush}" BorderBrush="{StaticResource AccentAmberBrush}" BorderThickness="1" Margin="0,0,12,0" VerticalAlignment="Center">
+                            <TextBlock Text="💡" FontSize="{StaticResource FontSize11}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="Philips Hue Smart Lighting" FontSize="15.5" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                <TextBlock Text="Philips Hue Smart Lighting" FontSize="{StaticResource FontSize10}" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
                                 <Border Background="{StaticResource Ink03Brush}"
                                         BorderBrush="{Binding ConnectionBadgeBrush}"
                                         BorderThickness="1"
-                                        CornerRadius="10"
+                                        CornerRadius="{StaticResource Radius04}"
                                         Padding="9,2"
                                         Margin="10,0,0,0"
                                         VerticalAlignment="Center">
                                     <StackPanel Orientation="Horizontal">
                                         <Ellipse Width="7" Height="7" Fill="{Binding ConnectionBadgeBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
                                         <TextBlock Text="{Binding ConnectionBadgeText}"
-                                                   FontSize="10"
+                                                   FontSize="{StaticResource FontSize02}"
                                                    FontWeight="Bold"
                                                    Foreground="{Binding ConnectionBadgeBrush}" />
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
                             <TextBlock Text="{Binding StatusMessage}"
-                                       FontSize="11.5"
+                                       FontSize="{StaticResource FontSize05}"
                                        Foreground="{StaticResource AccentCyanBrightBrush}"
                                        TextWrapping="Wrap"
                                        Margin="0,2,0,0" />
                         </StackPanel>
 
                         <WrapPanel Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right">
-                            <Button Content="All On" Command="{Binding AllLightsOnCommand}" Style="{StaticResource HueButton}" Padding="10,5" FontSize="11.5" Margin="0,0,6,0" Visibility="{Binding IsConnectedOrDemo, Converter={StaticResource HueBoolToVis}}" />
-                            <Button Content="All Off" Command="{Binding AllLightsOffCommand}" Style="{StaticResource HueButton}" Padding="10,5" FontSize="11.5" Margin="0,0,6,0" Visibility="{Binding IsConnectedOrDemo, Converter={StaticResource HueBoolToVis}}" />
-                            <Button Content="Sync" Command="{Binding RefreshStateCommand}" Style="{StaticResource HueButton}" Padding="10,5" FontSize="11.5" Margin="0,0,6,0" Visibility="{Binding IsConnectedOrDemo, Converter={StaticResource HueBoolToVis}}" />
-                            <Button Content="{Binding SetupToggleLabel}" Command="{Binding ToggleSetupCommand}" Style="{StaticResource HueButton}" Padding="10,5" FontSize="11.5" Visibility="{Binding IsConnectedOrDemo, Converter={StaticResource HueBoolToVis}}" />
+                            <Button Content="All On" Command="{Binding AllLightsOnCommand}" Style="{StaticResource HueButton}" Padding="10,5" FontSize="{StaticResource FontSize05}" Margin="0,0,6,0" Visibility="{Binding IsConnectedOrDemo, Converter={StaticResource HueBoolToVis}}" />
+                            <Button Content="All Off" Command="{Binding AllLightsOffCommand}" Style="{StaticResource HueButton}" Padding="10,5" FontSize="{StaticResource FontSize05}" Margin="0,0,6,0" Visibility="{Binding IsConnectedOrDemo, Converter={StaticResource HueBoolToVis}}" />
+                            <Button Content="Sync" Command="{Binding RefreshStateCommand}" Style="{StaticResource HueButton}" Padding="10,5" FontSize="{StaticResource FontSize05}" Margin="0,0,6,0" Visibility="{Binding IsConnectedOrDemo, Converter={StaticResource HueBoolToVis}}" />
+                            <Button Content="{Binding SetupToggleLabel}" Command="{Binding ToggleSetupCommand}" Style="{StaticResource HueButton}" Padding="10,5" FontSize="{StaticResource FontSize05}" Visibility="{Binding IsConnectedOrDemo, Converter={StaticResource HueBoolToVis}}" />
                         </WrapPanel>
                     </Grid>
 
@@ -98,7 +98,7 @@
                     <Border Background="{StaticResource Ink03Brush}"
                             BorderBrush="{StaticResource Ink11Brush}"
                             BorderThickness="1"
-                            CornerRadius="10"
+                            CornerRadius="{StaticResource Radius04}"
                             Padding="12,10"
                             Margin="0,12,0,0"
                             Visibility="{Binding ShowSetupControls, Converter={StaticResource HueBoolToVis}}">
@@ -130,9 +130,9 @@
                                                 Padding="10,4"
                                                 Margin="0,0,6,4">
                                             <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="Bridge " Foreground="{StaticResource AccentAmberBrush}" FontWeight="Bold" FontSize="11" />
-                                                <TextBlock Text="{Binding IpAddress}" FontWeight="SemiBold" FontSize="11.5" />
-                                                <TextBlock Text="{Binding Source, StringFormat=' ({0})'}" Foreground="{StaticResource TextMutedBrush}" FontSize="10.5" />
+                                                <TextBlock Text="Bridge " Foreground="{StaticResource AccentAmberBrush}" FontWeight="Bold" FontSize="{StaticResource FontSize04}" />
+                                                <TextBlock Text="{Binding IpAddress}" FontWeight="SemiBold" FontSize="{StaticResource FontSize05}" />
+                                                <TextBlock Text="{Binding Source, StringFormat=' ({0})'}" Foreground="{StaticResource TextMutedBrush}" FontSize="{StaticResource FontSize03}" />
                                             </StackPanel>
                                         </Button>
                                     </DataTemplate>
@@ -143,11 +143,11 @@
                             <Border Background="{StaticResource AccentAmberSubtleBgBrush}"
                                     BorderBrush="{StaticResource AccentAmberBrush}"
                                     BorderThickness="1"
-                                    CornerRadius="9"
+                                    CornerRadius="{StaticResource Radius03}"
                                     Padding="12,8"
                                     Margin="0,4,0,0"
                                     Visibility="{Binding IsPairing, Converter={StaticResource HueBoolToVis}}">
-                                <TextBlock Text="{Binding PairingHintText}" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource AccentAmberTextBrush}" />
+                                <TextBlock Text="{Binding PairingHintText}" FontSize="{StaticResource FontSize07}" FontWeight="SemiBold" Foreground="{StaticResource AccentAmberTextBrush}" />
                             </Border>
                         </StackPanel>
                     </Border>
@@ -169,11 +169,11 @@
                                        Style="{StaticResource HueSectionLabel}"
                                        VerticalAlignment="Center"
                                        Margin="0,2,10,2" />
-                            <Border Background="{StaticResource Ink05Brush}" BorderBrush="{StaticResource AccentBlueBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="7,2" Margin="0,2,6,2" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding EntertainmentAreaSummary}" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
+                            <Border Background="{StaticResource Ink05Brush}" BorderBrush="{StaticResource AccentBlueBorderBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="7,2" Margin="0,2,6,2" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding EntertainmentAreaSummary}" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
                             </Border>
-                            <Border Background="{StaticResource Ink05Brush}" BorderBrush="{StaticResource Ink14Brush}" BorderThickness="1" CornerRadius="6" Padding="7,2" Margin="0,2,0,2" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding MusicSyncStatusBadge}" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentAmberBrush}" />
+                            <Border Background="{StaticResource Ink05Brush}" BorderBrush="{StaticResource Ink14Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="7,2" Margin="0,2,0,2" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding MusicSyncStatusBadge}" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentAmberBrush}" />
                             </Border>
                         </WrapPanel>
 
@@ -182,14 +182,14 @@
                                     Command="{Binding ToggleDemoBeatCommand}"
                                     Style="{StaticResource HueButton}"
                                     Padding="10,5"
-                                    FontSize="11"
+                                    FontSize="{StaticResource FontSize04}"
                                     Margin="0,0,6,0"
                                     ToolTip="Generate a 125 BPM test beat to preview FFT meters &amp; beat-reactive lighting live" />
                             <Button Content="{Binding MusicSyncToggleLabel}"
                                     Command="{Binding ToggleMusicSyncCommand}"
                                     Style="{StaticResource HuePrimaryButton}"
                                     Padding="12,5"
-                                    FontSize="11.5" />
+                                    FontSize="{StaticResource FontSize05}" />
                         </StackPanel>
                     </Grid>
 
@@ -203,7 +203,7 @@
                         <!-- Left: 4 Sync Modes + Sliders -->
                         <StackPanel Grid.Column="0">
                             <WrapPanel Margin="0,0,0,10">
-                                <Button Content="Bass Pulse" Command="{Binding SetMusicSyncModeCommand}" CommandParameter="BassPulse" Padding="10,5" FontSize="11.5" Margin="0,0,6,6">
+                                <Button Content="Bass Pulse" Command="{Binding SetMusicSyncModeCommand}" CommandParameter="BassPulse" Padding="10,5" FontSize="{StaticResource FontSize05}" Margin="0,0,6,6">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource HueButton}">
                                             <Style.Triggers>
@@ -216,7 +216,7 @@
                                         </Style>
                                     </Button.Style>
                                 </Button>
-                                <Button Content="Spectrum Split" Command="{Binding SetMusicSyncModeCommand}" CommandParameter="SpectrumSplit" Padding="10,5" FontSize="11.5" Margin="0,0,6,6">
+                                <Button Content="Spectrum Split" Command="{Binding SetMusicSyncModeCommand}" CommandParameter="SpectrumSplit" Padding="10,5" FontSize="{StaticResource FontSize05}" Margin="0,0,6,6">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource HueButton}">
                                             <Style.Triggers>
@@ -229,7 +229,7 @@
                                         </Style>
                                     </Button.Style>
                                 </Button>
-                                <Button Content="Album-Art Ambient" Command="{Binding SetMusicSyncModeCommand}" CommandParameter="AlbumArtAmbient" Padding="10,5" FontSize="11.5" Margin="0,0,6,6">
+                                <Button Content="Album-Art Ambient" Command="{Binding SetMusicSyncModeCommand}" CommandParameter="AlbumArtAmbient" Padding="10,5" FontSize="{StaticResource FontSize05}" Margin="0,0,6,6">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource HueButton}">
                                             <Style.Triggers>
@@ -242,7 +242,7 @@
                                         </Style>
                                     </Button.Style>
                                 </Button>
-                                <Button Content="Cinema Subtle" Command="{Binding SetMusicSyncModeCommand}" CommandParameter="CinemaSubtle" Padding="10,5" FontSize="11.5" Margin="0,0,6,6">
+                                <Button Content="Cinema Subtle" Command="{Binding SetMusicSyncModeCommand}" CommandParameter="CinemaSubtle" Padding="10,5" FontSize="{StaticResource FontSize05}" Margin="0,0,6,6">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource HueButton}">
                                             <Style.Triggers>
@@ -268,24 +268,24 @@
 
                                 <StackPanel Grid.Column="0">
                                     <DockPanel>
-                                        <TextBlock Text="SENSITIVITY" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" />
-                                        <TextBlock Text="{Binding MusicSyncSensitivityLabel}" FontFamily="Cascadia Mono, Consolas" FontSize="10.5" Foreground="{StaticResource AccentAmberBrush}" HorizontalAlignment="Right" />
+                                        <TextBlock Text="SENSITIVITY" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" />
+                                        <TextBlock Text="{Binding MusicSyncSensitivityLabel}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource AccentAmberBrush}" HorizontalAlignment="Right" />
                                     </DockPanel>
                                     <Slider Minimum="0.5" Maximum="2.5" SmallChange="0.1" LargeChange="0.25" Value="{Binding MusicSyncSensitivity}" Margin="0,4,0,0" />
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="2">
                                     <DockPanel>
-                                        <TextBlock Text="MIN BRIGHT" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" />
-                                        <TextBlock Text="{Binding MusicSyncMinBrightness, StringFormat='{}{0}%'}" FontFamily="Cascadia Mono, Consolas" FontSize="10.5" Foreground="{StaticResource TextSoftBrush}" HorizontalAlignment="Right" />
+                                        <TextBlock Text="MIN BRIGHT" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" />
+                                        <TextBlock Text="{Binding MusicSyncMinBrightness, StringFormat='{}{0}%'}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource TextSoftBrush}" HorizontalAlignment="Right" />
                                     </DockPanel>
                                     <Slider Minimum="5" Maximum="80" Value="{Binding MusicSyncMinBrightness}" Margin="0,4,0,0" />
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="4">
                                     <DockPanel>
-                                        <TextBlock Text="MAX BRIGHT" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" />
-                                        <TextBlock Text="{Binding MusicSyncMaxBrightness, StringFormat='{}{0}%'}" FontFamily="Cascadia Mono, Consolas" FontSize="10.5" Foreground="{StaticResource TextSoftBrush}" HorizontalAlignment="Right" />
+                                        <TextBlock Text="MAX BRIGHT" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" />
+                                        <TextBlock Text="{Binding MusicSyncMaxBrightness, StringFormat='{}{0}%'}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource TextSoftBrush}" HorizontalAlignment="Right" />
                                     </DockPanel>
                                     <Slider Minimum="25" Maximum="100" Value="{Binding MusicSyncMaxBrightness}" Margin="0,4,0,0" />
                                 </StackPanel>
@@ -293,10 +293,10 @@
                         </StackPanel>
 
                         <!-- Right: Live 3-Band FFT Audio Meter + Beat LED + Album Art Swatch -->
-                        <Border Grid.Column="2" Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="10" Padding="12">
+                        <Border Grid.Column="2" Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="12">
                             <StackPanel>
                                 <DockPanel Margin="0,0,0,8">
-                                    <TextBlock Text="LIVE FFT SPECTRUM" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Text="LIVE FFT SPECTRUM" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" VerticalAlignment="Center" />
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <Ellipse Width="9" Height="9" Margin="0,0,5,0">
                                             <Ellipse.Style>
@@ -310,7 +310,7 @@
                                                 </Style>
                                             </Ellipse.Style>
                                         </Ellipse>
-                                        <TextBlock Text="BEAT" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentAmberBrush}" />
+                                        <TextBlock Text="BEAT" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentAmberBrush}" />
                                     </StackPanel>
                                 </DockPanel>
 
@@ -319,7 +319,7 @@
                                         <ColumnDefinition Width="42" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="BASS" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentRoseTextBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="0" Text="BASS" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentRoseTextBrush}" VerticalAlignment="Center" />
                                     <ProgressBar Grid.Column="1" Height="7" Minimum="0" Maximum="100" Value="{Binding LiveBassPercent, Mode=OneWay}" Foreground="{StaticResource AccentRoseTextBrush}" Background="{StaticResource Ink08Brush}" BorderThickness="0" />
                                 </Grid>
 
@@ -328,7 +328,7 @@
                                         <ColumnDefinition Width="42" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="MIDS" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="0" Text="MIDS" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrush}" VerticalAlignment="Center" />
                                     <ProgressBar Grid.Column="1" Height="7" Minimum="0" Maximum="100" Value="{Binding LiveMidPercent, Mode=OneWay}" Foreground="{StaticResource AccentCyanBrush}" Background="{StaticResource Ink08Brush}" BorderThickness="0" />
                                 </Grid>
 
@@ -337,14 +337,14 @@
                                         <ColumnDefinition Width="42" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="HIGH" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentIndigoBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="0" Text="HIGH" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentIndigoBrush}" VerticalAlignment="Center" />
                                     <ProgressBar Grid.Column="1" Height="7" Minimum="0" Maximum="100" Value="{Binding LiveTreblePercent, Mode=OneWay}" Foreground="{StaticResource AccentIndigoBrush}" Background="{StaticResource Ink08Brush}" BorderThickness="0" />
                                 </Grid>
 
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <Ellipse Width="12" Height="12" Fill="{Binding AlbumArtDominantHex, Converter={StaticResource HexToBrush}}" Stroke="{StaticResource Ink16Brush}" StrokeThickness="1" Margin="0,0,4,0" />
                                     <Ellipse Width="12" Height="12" Fill="{Binding AlbumArtSecondaryHex, Converter={StaticResource HexToBrush}}" Stroke="{StaticResource Ink16Brush}" StrokeThickness="1" Margin="0,0,8,0" />
-                                    <TextBlock Text="{Binding AlbumArtTrackLabel}" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding AlbumArtTrackLabel}" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -366,11 +366,11 @@
                         <DockPanel Margin="0,0,0,12">
                             <TextBlock Text="MASTER &amp; ROOMS" Style="{StaticResource HueSectionLabel}" VerticalAlignment="Center" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button Content="All On" Command="{Binding AllLightsOnCommand}" Style="{StaticResource HueButton}" Padding="10,4" FontSize="11" Margin="0,0,5,0" />
-                                <Button Content="All Off" Command="{Binding AllLightsOffCommand}" Style="{StaticResource HueButton}" Padding="10,4" FontSize="11" Margin="0,0,8,0" />
-                                <Button Content="15%" Command="{Binding SetAllBrightnessCommand}" CommandParameter="15" Style="{StaticResource HueButton}" Padding="8,4" FontSize="10.5" Margin="0,0,4,0" />
-                                <Button Content="50%" Command="{Binding SetAllBrightnessCommand}" CommandParameter="50" Style="{StaticResource HueButton}" Padding="8,4" FontSize="10.5" Margin="0,0,4,0" />
-                                <Button Content="100%" Command="{Binding SetAllBrightnessCommand}" CommandParameter="100" Style="{StaticResource HueButton}" Padding="8,4" FontSize="10.5" />
+                                <Button Content="All On" Command="{Binding AllLightsOnCommand}" Style="{StaticResource HueButton}" Padding="10,4" FontSize="{StaticResource FontSize04}" Margin="0,0,5,0" />
+                                <Button Content="All Off" Command="{Binding AllLightsOffCommand}" Style="{StaticResource HueButton}" Padding="10,4" FontSize="{StaticResource FontSize04}" Margin="0,0,8,0" />
+                                <Button Content="15%" Command="{Binding SetAllBrightnessCommand}" CommandParameter="15" Style="{StaticResource HueButton}" Padding="8,4" FontSize="{StaticResource FontSize03}" Margin="0,0,4,0" />
+                                <Button Content="50%" Command="{Binding SetAllBrightnessCommand}" CommandParameter="50" Style="{StaticResource HueButton}" Padding="8,4" FontSize="{StaticResource FontSize03}" Margin="0,0,4,0" />
+                                <Button Content="100%" Command="{Binding SetAllBrightnessCommand}" CommandParameter="100" Style="{StaticResource HueButton}" Padding="8,4" FontSize="{StaticResource FontSize03}" />
                             </StackPanel>
                         </DockPanel>
 
@@ -399,11 +399,11 @@
                                                             <Border Background="{TemplateBinding Background}"
                                                                     BorderBrush="{TemplateBinding BorderBrush}"
                                                                     BorderThickness="{TemplateBinding BorderThickness}"
-                                                                    CornerRadius="10"
+                                                                    CornerRadius="{StaticResource Radius04}"
                                                                     Padding="{TemplateBinding Padding}">
                                                                 <StackPanel>
-                                                                    <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                                                                    <TextBlock Text="{Binding Subtitle}" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
+                                                                    <TextBlock Text="{Binding Name}" FontSize="{StaticResource FontSize07}" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                                                    <TextBlock Text="{Binding Subtitle}" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
                                                                 </StackPanel>
                                                             </Border>
                                                         </ControlTemplate>
@@ -423,15 +423,15 @@
                         </ItemsControl>
 
                         <!-- Selected Room Dimmer & Mood Swatches -->
-                        <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource ControlHoverBrush}" BorderThickness="1" CornerRadius="10" Padding="14">
+                        <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource ControlHoverBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="14">
                             <StackPanel>
                                 <DockPanel Margin="0,0,0,8">
-                                    <TextBlock Text="{Binding SelectedRoomHeader}" FontSize="13.5" FontWeight="Bold" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding SelectedRoomHeader}" FontSize="{StaticResource FontSize08}" FontWeight="Bold" VerticalAlignment="Center" />
                                     <Button Content="{Binding SelectedRoomToggleLabel}"
                                             Command="{Binding ToggleSelectedRoomCommand}"
                                             Style="{StaticResource HueButton}"
                                             Padding="10,4"
-                                            FontSize="11"
+                                            FontSize="{StaticResource FontSize04}"
                                             HorizontalAlignment="Right" />
                                 </DockPanel>
 
@@ -443,7 +443,7 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="DIMMER" Style="{StaticResource HueSectionLabel}" VerticalAlignment="Center" Margin="0,0,10,0" />
                                     <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding SelectedRoomBrightness}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="2" Text="{Binding SelectedRoomBrightness, StringFormat='{}{0}%'}" FontFamily="Cascadia Mono, Consolas" FontSize="12" Foreground="{StaticResource AccentAmberBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Text="{Binding SelectedRoomBrightness, StringFormat='{}{0}%'}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource AccentAmberBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
 
                                 <TextBlock Text="AMBIENCE PRESETS" Style="{StaticResource HueSectionLabel}" Margin="0,2,0,6" />
@@ -462,7 +462,7 @@
                                                     Margin="0,0,6,6">
                                                 <StackPanel Orientation="Horizontal">
                                                     <Ellipse Width="10" Height="10" Fill="{Binding HexColor, Converter={StaticResource HexToBrush}}" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                                    <TextBlock Text="{Binding Name}" FontSize="11.5" />
+                                                    <TextBlock Text="{Binding Name}" FontSize="{StaticResource FontSize05}" />
                                                 </StackPanel>
                                             </Button>
                                         </DataTemplate>
@@ -485,7 +485,7 @@
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource HueButton}"
                                                         Padding="10,4"
-                                                        FontSize="11"
+                                                        FontSize="{StaticResource FontSize04}"
                                                         Margin="0,0,6,6" />
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
@@ -501,22 +501,22 @@
                     <StackPanel>
                         <TextBlock Text="DENON AVR LIGHTING AUTOMATIONS" Style="{StaticResource HueSectionLabel}" Margin="0,0,0,6" />
                         <TextBlock Text="Automatically react when you switch Denon power, trigger Smart Scenes, or pause playback."
-                                   FontSize="11.5"
+                                   FontSize="{StaticResource FontSize05}"
                                    Foreground="{StaticResource TextMutedBrush}"
                                    TextWrapping="Wrap"
                                    Margin="0,0,0,12" />
 
-                        <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource ControlHoverBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,12">
+                        <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource ControlHoverBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="12" Margin="0,0,0,12">
                             <DockPanel>
                                 <StackPanel VerticalAlignment="Center">
                                     <TextBlock Text="TARGET ROOM" Style="{StaticResource HueSectionLabel}" />
-                                    <TextBlock Text="{Binding AutomationTargetRoomLabel}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentAmberBrush}" Margin="0,2,0,0" />
+                                    <TextBlock Text="{Binding AutomationTargetRoomLabel}" FontSize="{StaticResource FontSize08}" FontWeight="SemiBold" Foreground="{StaticResource AccentAmberBrush}" Margin="0,2,0,0" />
                                 </StackPanel>
                                 <Button Content="Use Selected Room"
                                         Command="{Binding UseSelectedRoomForAutomationCommand}"
                                         Style="{StaticResource HueButton}"
                                         Padding="10,5"
-                                        FontSize="11"
+                                        FontSize="{StaticResource FontSize04}"
                                         HorizontalAlignment="Right"
                                         VerticalAlignment="Center" />
                             </DockPanel>
@@ -525,33 +525,33 @@
                         <CheckBox IsChecked="{Binding SyncWithSmartScenes}" Style="{StaticResource HueCheckBox}">
                             <StackPanel>
                                 <TextBlock Text="Sync with Denon Smart Scenes" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                                <TextBlock Text="Movie Night → Cinema Dim • Late Night → Candlelight • Party → Neon" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
+                                <TextBlock Text="Movie Night → Cinema Dim • Late Night → Candlelight • Party → Neon" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
                             </StackPanel>
                         </CheckBox>
 
                         <CheckBox IsChecked="{Binding TurnOnWithReceiverPower}" Style="{StaticResource HueCheckBox}" Margin="0,8,0,4">
                             <StackPanel>
                                 <TextBlock Text="Turn on Hue lights when Denon powers ON" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                                <TextBlock Text="Brings up room ambiance automatically with your receiver" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
+                                <TextBlock Text="Brings up room ambiance automatically with your receiver" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
                             </StackPanel>
                         </CheckBox>
 
                         <CheckBox IsChecked="{Binding TurnOffWithReceiverStandby}" Style="{StaticResource HueCheckBox}" Margin="0,6,0,4">
                             <StackPanel>
                                 <TextBlock Text="Turn off Hue lights when Denon enters Standby" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                                <TextBlock Text="One-button room shutdown when you turn off your AVR" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
+                                <TextBlock Text="One-button room shutdown when you turn off your AVR" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
                             </StackPanel>
                         </CheckBox>
 
                         <CheckBox IsChecked="{Binding CinemaPauseLights}" Style="{StaticResource HueCheckBox}" Margin="0,6,0,10">
                             <StackPanel>
                                 <TextBlock Text="Cinema Pause Lights (Play / Pause sync)" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                                <TextBlock Text="Gently brightens to 55% on Pause, dims back to 18% on Resume" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
+                                <TextBlock Text="Gently brightens to 55% on Pause, dims back to 18% on Resume" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
                             </StackPanel>
                         </CheckBox>
 
-                        <Border Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="8" Padding="10,7">
-                            <TextBlock Text="{Binding LastAutomationEventText}" FontFamily="Cascadia Mono, Consolas" FontSize="10.5" Foreground="{StaticResource AccentCyanBrightBrush}" TextWrapping="Wrap" />
+                        <Border Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius03}" Padding="10,7">
+                            <TextBlock Text="{Binding LastAutomationEventText}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource AccentCyanBrightBrush}" TextWrapping="Wrap" />
                         </Border>
                     </StackPanel>
                 </Border>
@@ -571,11 +571,11 @@
                                     Command="{Binding ShowAllLightsCommand}"
                                     Style="{StaticResource HueButton}"
                                     Padding="9,3"
-                                    FontSize="10.5"
+                                    FontSize="{StaticResource FontSize03}"
                                     Margin="0,0,8,0"
                                     Visibility="{Binding IsFilteredToSingleRoom, Converter={StaticResource HueBoolToVis}}" />
                             <TextBlock Text="Drag sliders to dim or adjust warmth"
-                                       FontSize="11"
+                                       FontSize="{StaticResource FontSize04}"
                                        Foreground="{StaticResource TextFaintBrush}"
                                        VerticalAlignment="Center" />
                         </StackPanel>
@@ -592,7 +592,7 @@
                                 <Border Background="{StaticResource CardElevatedBrush}"
                                         BorderBrush="{StaticResource Ink11Brush}"
                                         BorderThickness="1"
-                                        CornerRadius="12"
+                                        CornerRadius="{StaticResource Radius05}"
                                         Padding="14"
                                         Width="310"
                                         Margin="0,0,10,10">
@@ -601,8 +601,8 @@
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                 <Ellipse Width="16" Height="16" Fill="{Binding PreviewBrush}" Stroke="{StaticResource Ink14Brush}" StrokeThickness="1" Margin="0,0,10,0" />
                                                 <StackPanel>
-                                                    <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                                                    <TextBlock Text="{Binding StateSummary}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                                                    <TextBlock Text="{Binding Name}" FontSize="{StaticResource FontSize08}" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                                    <TextBlock Text="{Binding StateSummary}" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" />
                                                 </StackPanel>
                                             </StackPanel>
 
@@ -612,7 +612,7 @@
                                                     VerticalAlignment="Center"
                                                     MinWidth="54"
                                                     Padding="10,4"
-                                                    FontSize="11">
+                                                    FontSize="{StaticResource FontSize04}">
                                                 <Button.Style>
                                                     <Style TargetType="Button" BasedOn="{StaticResource HueButton}">
                                                         <Style.Triggers>
@@ -634,9 +634,9 @@
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="38" />
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="BRIGHT" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="0" Text="BRIGHT" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" VerticalAlignment="Center" />
                                             <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding BrightnessPercent}" VerticalAlignment="Center" />
-                                            <TextBlock Grid.Column="2" Text="{Binding BrightnessPercent, StringFormat='{}{0}%'}" FontFamily="Cascadia Mono, Consolas" FontSize="11" Foreground="{StaticResource TextSoftBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="{Binding BrightnessPercent, StringFormat='{}{0}%'}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextSoftBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
                                         </Grid>
 
                                         <!-- Color Temp Slider -->
@@ -646,9 +646,9 @@
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="46" />
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="WARMTH" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="0" Text="WARMTH" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" VerticalAlignment="Center" />
                                             <Slider Grid.Column="1" Minimum="153" Maximum="500" Value="{Binding ColorTempMirek}" VerticalAlignment="Center" />
-                                            <TextBlock Grid.Column="2" Text="{Binding ColorTempKelvinLabel}" FontFamily="Cascadia Mono, Consolas" FontSize="10.5" Foreground="{StaticResource AccentAmberTextBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="{Binding ColorTempKelvinLabel}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource AccentAmberTextBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
                                         </Grid>
 
                                         <!-- Quick Color Dots -->

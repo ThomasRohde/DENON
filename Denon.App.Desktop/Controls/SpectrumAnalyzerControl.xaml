@@ -6,7 +6,7 @@
              MinWidth="260"
              UseLayoutRounding="True">
     <!-- Same machined deck panel as the VU pair, holding a recessed LED screen. -->
-    <Border CornerRadius="14"
+    <Border CornerRadius="{StaticResource Radius06}"
             BorderBrush="{StaticResource Ink11Brush}"
             BorderThickness="1"
             Padding="10,6,10,6">
@@ -26,26 +26,26 @@
 
             <DockPanel Grid.Row="0" Margin="2,0,2,5" LastChildFill="False">
                 <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="SPECTRUM" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" />
-                    <TextBlock Text="  31-BAND RTA  ·  25 Hz – 16 kHz" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource TextDisabledBrush}" />
+                    <TextBlock Text="SPECTRUM" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" />
+                    <TextBlock Text="  31-BAND RTA  ·  25 Hz – 16 kHz" FontSize="{StaticResource FontSize00}" FontWeight="SemiBold" Foreground="{StaticResource TextDisabledBrush}" />
                 </StackPanel>
 
                 <Border x:Name="SourcePill"
                         DockPanel.Dock="Right"
-                        CornerRadius="6"
+                        CornerRadius="{StaticResource Radius02}"
                         BorderThickness="1"
                         Padding="7,1,7,1"
                         VerticalAlignment="Center">
                     <TextBlock x:Name="SignalModeLabel"
                                Text="STANDBY"
-                               FontFamily="Cascadia Mono, Consolas"
-                               FontSize="8.5"
+                               FontFamily="{StaticResource MonoFont}"
+                               FontSize="{StaticResource FontSize00}"
                                FontWeight="Bold" />
                 </Border>
             </DockPanel>
 
             <!-- Recessed LED screen -->
-            <Border Grid.Row="1" CornerRadius="10" Background="{StaticResource OledBgBrush}" BorderBrush="{StaticResource Ink05Brush}" BorderThickness="1" Padding="9,7,9,2" ClipToBounds="True">
+            <Border Grid.Row="1" CornerRadius="{StaticResource Radius04}" Background="{StaticResource OledBgBrush}" BorderBrush="{StaticResource Ink05Brush}" BorderThickness="1" Padding="9,7,9,2" ClipToBounds="True">
                 <Grid>
                     <controls:SpectrumLedView x:Name="BarsView" />
                     <!-- Bloom: the lit segments again, blurred, over the grille. -->
@@ -55,7 +55,7 @@
                         </controls:SpectrumLedView.Effect>
                     </controls:SpectrumLedView>
                     <!-- Screen glass: soft top sheen -->
-                    <Border IsHitTestVisible="False" CornerRadius="8" Margin="-9,-7,-9,-2">
+                    <Border IsHitTestVisible="False" CornerRadius="{StaticResource Radius03}" Margin="-9,-7,-9,-2">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                                 <GradientStop Color="{StaticResource OverlayWhiteFaintColor}" Offset="0" />

@@ -15,23 +15,23 @@
             <StackPanel>
                 <DockPanel Margin="0,0,0,10">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Background="{StaticResource AccentCrimsonBgBrush}" BorderBrush="{StaticResource AccentCrimsonBrush}" BorderThickness="1" CornerRadius="5" Padding="7,2" Margin="0,0,8,0">
-                            <TextBlock Text="YOUTUBE CAST" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentCrimsonTextBrush}" />
+                        <Border Background="{StaticResource AccentCrimsonBgBrush}" BorderBrush="{StaticResource AccentCrimsonBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="7,2" Margin="0,0,8,0">
+                            <TextBlock Text="YOUTUBE CAST" FontSize="{StaticResource FontSize02}" FontWeight="Bold" Foreground="{StaticResource AccentCrimsonTextBrush}" />
                         </Border>
                         <TextBlock Text="Direct LAN Stream Bridge to Denon HEOS"
-                                   FontSize="12.5"
+                                   FontSize="{StaticResource FontSize07}"
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    VerticalAlignment="Center" />
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                        <Border Background="{StaticResource AccentCyanSubtleBgDeepBrush}" BorderBrush="{StaticResource AccentCyanBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8,3" Margin="0,0,8,0">
-                            <TextBlock Text="{Binding RelayCodecBadge}" FontSize="10" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="{StaticResource AccentCyanBrush}" />
+                        <Border Background="{StaticResource AccentCyanSubtleBgDeepBrush}" BorderBrush="{StaticResource AccentCyanBorderBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="8,3" Margin="0,0,8,0">
+                            <TextBlock Text="{Binding RelayCodecBadge}" FontSize="{StaticResource FontSize02}" FontWeight="Bold" FontFamily="{StaticResource MonoFont}" Foreground="{StaticResource AccentCyanBrush}" />
                         </Border>
                         <TextBlock Text="{Binding RelayStreamStateText}"
-                                   FontSize="11"
-                                   FontFamily="Cascadia Mono, Consolas"
+                                   FontSize="{StaticResource FontSize04}"
+                                   FontFamily="{StaticResource MonoFont}"
                                    Foreground="{StaticResource AccentEmeraldBrush}"
                                    VerticalAlignment="Center" />
                     </StackPanel>
@@ -74,7 +74,7 @@
                                 Command="{Binding SetYouTubeSearchModeCommand}"
                                 CommandParameter="Music"
                                 Padding="11,5"
-                                FontSize="11.5"
+                                FontSize="{StaticResource FontSize05}"
                                 Margin="0,0,6,0"
                                 Style="{StaticResource ChipButton}"
                                 infra:Chip.IsActive="{Binding YouTubeSearchModeName, Converter={StaticResource EqualityConverter}, ConverterParameter=Music}" />
@@ -82,7 +82,7 @@
                                 Command="{Binding SetYouTubeSearchModeCommand}"
                                 CommandParameter="Videos"
                                 Padding="11,5"
-                                FontSize="11.5"
+                                FontSize="{StaticResource FontSize05}"
                                 Margin="0,0,6,0"
                                 Style="{StaticResource ChipButton}"
                                 infra:Chip.IsActive="{Binding YouTubeSearchModeName, Converter={StaticResource EqualityConverter}, ConverterParameter=Videos}" />
@@ -90,7 +90,7 @@
                                 Command="{Binding SetYouTubeSearchModeCommand}"
                                 CommandParameter="Playlists"
                                 Padding="11,5"
-                                FontSize="11.5"
+                                FontSize="{StaticResource FontSize05}"
                                 Style="{StaticResource ChipButton}"
                                 infra:Chip.IsActive="{Binding YouTubeSearchModeName, Converter={StaticResource EqualityConverter}, ConverterParameter=Playlists}" />
                     </StackPanel>
@@ -98,7 +98,7 @@
                     <TextBlock Grid.Column="1"
                                Text="{Binding YouTubeStatusText}"
                                ToolTip="{Binding YouTubeStatusText}"
-                               FontSize="11.5"
+                               FontSize="{StaticResource FontSize05}"
                                Foreground="{StaticResource TextSecondaryBrush}"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
@@ -107,15 +107,15 @@
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="{Binding RelayEndpointText}"
                                    VerticalAlignment="Center"
-                                   FontSize="10.5"
-                                   FontFamily="Cascadia Mono, Consolas"
+                                   FontSize="{StaticResource FontSize03}"
+                                   FontFamily="{StaticResource MonoFont}"
                                    Foreground="{StaticResource TextMutedBrush}"
                                    Margin="0,0,8,0" />
                         <Button Content="Allow Firewall"
                                 Command="{Binding AllowRelayFirewallCommand}"
                                 Style="{StaticResource SecondaryButton}"
                                 Padding="8,4"
-                                FontSize="10.5"
+                                FontSize="{StaticResource FontSize03}"
                                 ToolTip="Add a Private LAN Windows Firewall inbound rule for the Denon Audio Relay port" />
                     </StackPanel>
                 </Grid>
@@ -145,13 +145,13 @@
                                     Command="{Binding PlayAllYouTubeResultsCommand}"
                                     Style="{StaticResource PrimaryButton}"
                                     Padding="10,5"
-                                    FontSize="11"
+                                    FontSize="{StaticResource FontSize04}"
                                     Margin="0,0,6,0" />
                             <Button Content="+ Queue All"
                                     Command="{Binding EnqueueAllYouTubeResultsCommand}"
                                     Style="{StaticResource SecondaryButton}"
                                     Padding="10,5"
-                                    FontSize="11" />
+                                    FontSize="{StaticResource FontSize04}" />
                         </StackPanel>
                     </DockPanel>
 
@@ -162,7 +162,7 @@
                                           Visibility="{Binding IsPlaylistResultsVisible, Converter={StaticResource BoolToVis}}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,0,8">
+                                        <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="10" Margin="0,0,0,8">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="72" />
@@ -172,12 +172,12 @@
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
 
-                                                <Border Grid.Column="0" Width="72" Height="44" CornerRadius="6" Background="{StaticResource SidebarBgBrush}" ClipToBounds="True">
+                                                <Border Grid.Column="0" Width="72" Height="44" CornerRadius="{StaticResource Radius02}" Background="{StaticResource SidebarBgBrush}" ClipToBounds="True">
                                                     <Image Source="{Binding ThumbnailUrl, Converter={StaticResource SafeImageSource}}" Stretch="UniformToFill" />
                                                 </Border>
                                                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding Title}" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Text="{Binding Author, StringFormat='Playlist • {0}'}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
+                                                    <TextBlock Text="{Binding Title}" FontSize="{StaticResource FontSize07}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Author, StringFormat='Playlist • {0}'}" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
                                                 </StackPanel>
                                                 <Button Grid.Column="4"
                                                         Content="Open Tracks →"
@@ -185,7 +185,7 @@
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource PrimaryButton}"
                                                         Padding="10,6"
-                                                        FontSize="11" />
+                                                        FontSize="{StaticResource FontSize04}" />
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
@@ -196,7 +196,7 @@
                             <ItemsControl ItemsSource="{Binding YouTubeSearchResults}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="10" Padding="9" Margin="0,0,0,8">
+                                        <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="9" Margin="0,0,0,8">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="76" />
@@ -206,7 +206,7 @@
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
 
-                                                <Border Grid.Column="0" Width="76" Height="46" CornerRadius="7" Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" ClipToBounds="True">
+                                                <Border Grid.Column="0" Width="76" Height="46" CornerRadius="{StaticResource Radius02}" Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" ClipToBounds="True">
                                                     <Grid>
                                                         <Path Data="M12,3V13.55C11.41,13.21 10.73,13 10,13A4,4 0 0,0 6,17A4,4 0 0,0 10,21A4,4 0 0,0 14,17V7H18V3H12Z"
                                                               Fill="{StaticResource Ink12Brush}"
@@ -216,15 +216,15 @@
                                                               HorizontalAlignment="Center"
                                                               VerticalAlignment="Center" />
                                                         <Image Source="{Binding ThumbnailUrl, Converter={StaticResource SafeImageSource}}" Stretch="UniformToFill" />
-                                                        <Border Background="{StaticResource OverlayScrimBrush}" CornerRadius="4" Padding="4,1" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="3">
-                                                            <TextBlock Text="{Binding DurationDisplay}" FontSize="9.5" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="{StaticResource TextPrimaryBrush}" />
+                                                        <Border Background="{StaticResource OverlayScrimBrush}" CornerRadius="{StaticResource Radius01}" Padding="4,1" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="3">
+                                                            <TextBlock Text="{Binding DurationDisplay}" FontSize="{StaticResource FontSize01}" FontWeight="Bold" FontFamily="{StaticResource MonoFont}" Foreground="{StaticResource TextPrimaryBrush}" />
                                                         </Border>
                                                     </Grid>
                                                 </Border>
 
                                                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding Title}" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Text="{Binding Author}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                                                    <TextBlock Text="{Binding Title}" FontSize="{StaticResource FontSize07}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Author}" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
                                                 </StackPanel>
 
                                                 <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
@@ -233,7 +233,7 @@
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource PrimaryButton}"
                                                             Padding="10,6"
-                                                            FontSize="11"
+                                                            FontSize="{StaticResource FontSize04}"
                                                             Margin="0,0,5,0"
                                                             ToolTip="Cast audio directly to Denon AVR" />
                                                     <Button Content="Video"
@@ -241,7 +241,7 @@
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource SecondaryButton}"
                                                             Padding="9,6"
-                                                            FontSize="11"
+                                                            FontSize="{StaticResource FontSize04}"
                                                             Margin="0,0,5,0"
                                                             ToolTip="Cast audio to Denon + open synced Cinema Video window" />
                                                     <Button Content="+ Q"
@@ -249,7 +249,7 @@
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource SecondaryButton}"
                                                             Padding="8,6"
-                                                            FontSize="11"
+                                                            FontSize="{StaticResource FontSize04}"
                                                             ToolTip="Add to Up Next queue" />
                                                 </StackPanel>
                                             </Grid>
@@ -275,14 +275,14 @@
                     <DockPanel Grid.Row="0" Margin="0,0,0,10">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="UP NEXT QUEUE" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding YouTubeQueueCountLabel, StringFormat='  •  {0}'}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding YouTubeQueueCountLabel, StringFormat='  •  {0}'}" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
                         </StackPanel>
                         <Button Content="Clear"
                                 HorizontalAlignment="Right"
                                 Command="{Binding ClearYouTubeQueueCommand}"
                                 Style="{StaticResource DangerButton}"
                                 Padding="8,4"
-                                FontSize="10.5" />
+                                FontSize="{StaticResource FontSize03}" />
                     </DockPanel>
 
                     <!-- Queue Controls Bar -->
@@ -290,7 +290,7 @@
                         <Button Content="Shuffle"
                                 Command="{Binding ToggleYouTubeShuffleCommand}"
                                 Padding="9,5"
-                                FontSize="11"
+                                FontSize="{StaticResource FontSize04}"
                                 Margin="0,0,6,6"
                                 Style="{StaticResource ChipButton}"
                                 infra:Chip.IsActive="{Binding IsYouTubeShuffleEnabled}" />
@@ -298,13 +298,13 @@
                                 Command="{Binding CycleYouTubeRepeatCommand}"
                                 Style="{StaticResource HardwareChipButton}"
                                 Padding="9,5"
-                                FontSize="11"
+                                FontSize="{StaticResource FontSize04}"
                                 Margin="0,0,6,6" />
                         <Button Content="Cinema Window"
                                 Command="{Binding OpenCinemaForCurrentTrackCommand}"
                                 Style="{StaticResource SecondaryButton}"
                                 Padding="9,5"
-                                FontSize="11"
+                                FontSize="{StaticResource FontSize04}"
                                 Margin="0,0,0,6"
                                 ToolTip="Open floating YouTube video window synced to Denon audio" />
                     </WrapPanel>
@@ -314,7 +314,7 @@
                         <ItemsControl ItemsSource="{Binding YouTubeQueue}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border CornerRadius="9" Padding="8,7" Margin="0,0,0,6" BorderThickness="1">
+                                    <Border CornerRadius="{StaticResource Radius03}" Padding="8,7" Margin="0,0,0,6" BorderThickness="1">
                                         <Border.Style>
                                             <Style TargetType="Border">
                                                 <Setter Property="Background" Value="{StaticResource CardElevatedBrush}" />
@@ -337,15 +337,15 @@
 
                                             <TextBlock Grid.Column="0"
                                                        Text="{Binding PositionLabel}"
-                                                       FontSize="11"
+                                                       FontSize="{StaticResource FontSize04}"
                                                        FontWeight="Bold"
-                                                       FontFamily="Cascadia Mono, Consolas"
+                                                       FontFamily="{StaticResource MonoFont}"
                                                        Foreground="{StaticResource AccentCyanBrush}"
                                                        VerticalAlignment="Center" />
 
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,6,0">
-                                                <TextBlock Text="{Binding Title}" FontSize="11.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis">
+                                                <TextBlock Text="{Binding Title}" FontSize="{StaticResource FontSize05}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock FontSize="{StaticResource FontSize02}" Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis">
                                                     <Run Text="{Binding Author, Mode=OneWay}" />
                                                     <Run Text=" • " />
                                                     <Run Text="{Binding DurationDisplay, Mode=OneWay}" />
@@ -358,7 +358,7 @@
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource SecondaryButton}"
                                                         Padding="7,4"
-                                                        FontSize="10"
+                                                        FontSize="{StaticResource FontSize02}"
                                                         Margin="0,0,3,0"
                                                         ToolTip="Jump to track" />
                                                 <Button Content="↑"
@@ -366,21 +366,21 @@
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource SecondaryButton}"
                                                         Padding="6,4"
-                                                        FontSize="10"
+                                                        FontSize="{StaticResource FontSize02}"
                                                         Margin="0,0,3,0" />
                                                 <Button Content="↓"
                                                         Command="{Binding DataContext.MoveYouTubeQueueDownCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource SecondaryButton}"
                                                         Padding="6,4"
-                                                        FontSize="10"
+                                                        FontSize="{StaticResource FontSize02}"
                                                         Margin="0,0,3,0" />
                                                 <Button Content="✕"
                                                         Command="{Binding DataContext.RemoveYouTubeQueueItemCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource DangerButton}"
                                                         Padding="6,4"
-                                                        FontSize="10" />
+                                                        FontSize="{StaticResource FontSize02}" />
                                             </StackPanel>
                                         </Grid>
                                     </Border>
@@ -406,7 +406,7 @@
                                                 CommandParameter="{Binding}"
                                                 Style="{StaticResource HardwareChipButton}"
                                                 Padding="8,4"
-                                                FontSize="10.5"
+                                                FontSize="{StaticResource FontSize03}"
                                                 Margin="0,0,5,5"
                                                 MaxWidth="190"
                                                 ToolTip="{Binding Title}">

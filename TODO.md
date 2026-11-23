@@ -92,7 +92,9 @@ plugins); the meters read `MeterPalette`. `ThemeTokenGuardTests` blocks new hex 
 - [x] App styles for ComboBox, ListBox and PasswordBox; the external plugins dropped their own ComboBox template.
 - [x] One chip style (`ChipButton`/`SuccessChipButton` + `infra:Chip.IsActive`) instead of 23 inline copies; page and
       sub-tab switching via the `EqualityToVis` converter instead of 14 inline styles. Zone 2 keeps its own style.
-- [ ] Typography tokens (583 literal font sizes in 21 values; 2 font families) and corner-radius tokens (172 in 14 values).
+- [x] Typography and shape tokens in `Themes/Typography.xaml`: type scale `FontSize00`–`FontSize14`, radius scale
+      `Radius00`–`Radius09`, fonts `DisplayFont`/`UiFont`/`MonoFont` (610 sizes, 175 radii, 64 font names replaced).
+- [ ] Code-built UI still has literal sizes: the meters' drawn text and the Chromecast/Apple TV dashboards.
 - [ ] Icons: move the 22 inline icon geometries to one `Icons.xaml`.
 
 ## Release / build

@@ -16,7 +16,7 @@
     <WindowChrome.WindowChrome>
         <WindowChrome x:Name="CinemaWindowChrome"
                       CaptionHeight="42"
-                      CornerRadius="12"
+                      CornerRadius="{StaticResource Radius05}"
                       GlassFrameThickness="0"
                       ResizeBorderThickness="6"
                       UseAeroCaptionButtons="False" />
@@ -39,12 +39,12 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Background="{StaticResource AccentCrimsonBgDeepBrush}" BorderBrush="{StaticResource AccentCrimsonBrush}" BorderThickness="1" CornerRadius="5" Padding="6,2" Margin="0,0,8,0">
-                            <TextBlock Text="CINEMA" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentCrimsonTextBrush}" />
+                        <Border Background="{StaticResource AccentCrimsonBgDeepBrush}" BorderBrush="{StaticResource AccentCrimsonBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="6,2" Margin="0,0,8,0">
+                            <TextBlock Text="CINEMA" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentCrimsonTextBrush}" />
                         </Border>
                         <TextBlock x:Name="TitleText"
                                    Text="YouTube Video Companion"
-                                   FontSize="12.5"
+                                   FontSize="{StaticResource FontSize07}"
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource TextPrimaryBrush}"
                                    TextTrimming="CharacterEllipsis"
@@ -58,7 +58,7 @@
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 Style="{StaticResource SecondaryButton}"
                                 Padding="9,4"
-                                FontSize="11"
+                                FontSize="{StaticResource FontSize04}"
                                 Margin="0,0,6,0"
                                 ToolTip="Hide top &amp; bottom bars for pure full-bleed cinema (move mouse for floating Show Bars / Close buttons, or press H / Esc)" />
                         <Button x:Name="FullscreenButton"
@@ -67,7 +67,7 @@
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 Style="{StaticResource SecondaryButton}"
                                 Padding="9,4"
-                                FontSize="11"
+                                FontSize="{StaticResource FontSize04}"
                                 Margin="0,0,6,0"
                                 ToolTip="Toggle borderless monitor fullscreen for the Cinema window (F11)" />
                         <Button x:Name="PinButton"
@@ -76,14 +76,14 @@
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 Style="{StaticResource SecondaryButton}"
                                 Padding="9,4"
-                                FontSize="11"
+                                FontSize="{StaticResource FontSize04}"
                                 Margin="0,0,6,0" />
                         <Button Content="Open Browser"
                                 Click="OpenInBrowser_Click"
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 Style="{StaticResource SecondaryButton}"
                                 Padding="9,4"
-                                FontSize="11"
+                                FontSize="{StaticResource FontSize04}"
                                 Margin="0,0,8,0" />
                         <Button Click="CloseButton_Click" Style="{StaticResource TitleBarCloseButton}" ToolTip="Close Cinema Window">
                             <Path Data="M1,1 L9,9 M9,1 L1,9"
@@ -101,7 +101,7 @@
                 <wv2:WebView2 x:Name="VideoWebView" DefaultBackgroundColor="Black" PreviewKeyDown="Window_PreviewKeyDown" />
                 <TextBlock x:Name="LoadingOverlay"
                            Text="Loading YouTube Cinema Player..."
-                           FontSize="13"
+                           FontSize="{StaticResource FontSize08}"
                            Foreground="{StaticResource TextSecondaryBrush}"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center" />
@@ -116,21 +116,21 @@
                                 Click="ToggleVideoMute_Click"
                                 Style="{StaticResource PrimaryButton}"
                                 Padding="11,6"
-                                FontSize="11.5"
+                                FontSize="{StaticResource FontSize05}"
                                 Margin="0,0,10,0" />
                         <TextBlock Text="A/V SYNC:" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" Margin="4,0,6,0" />
-                        <Button Content="-500ms" Click="NudgeMinus500_Click" Style="{StaticResource SecondaryButton}" Padding="8,5" FontSize="11" Margin="0,0,4,0" ToolTip="Delay video 500ms to match Denon HEOS buffer" />
-                        <Button Content="-100ms" Click="NudgeMinus100_Click" Style="{StaticResource SecondaryButton}" Padding="8,5" FontSize="11" Margin="0,0,4,0" />
-                        <Button Content="+100ms" Click="NudgePlus100_Click" Style="{StaticResource SecondaryButton}" Padding="8,5" FontSize="11" Margin="0,0,4,0" />
-                        <Button Content="+500ms" Click="NudgePlus500_Click" Style="{StaticResource SecondaryButton}" Padding="8,5" FontSize="11" Margin="0,0,8,0" />
-                        <Button Content="Re-Sync to Denon" Click="ResyncToDenon_Click" Style="{StaticResource SecondaryButton}" Padding="10,5" FontSize="11" ToolTip="Snap video to the current estimated playback position on your Denon AVR" />
+                        <Button Content="-500ms" Click="NudgeMinus500_Click" Style="{StaticResource SecondaryButton}" Padding="8,5" FontSize="{StaticResource FontSize04}" Margin="0,0,4,0" ToolTip="Delay video 500ms to match Denon HEOS buffer" />
+                        <Button Content="-100ms" Click="NudgeMinus100_Click" Style="{StaticResource SecondaryButton}" Padding="8,5" FontSize="{StaticResource FontSize04}" Margin="0,0,4,0" />
+                        <Button Content="+100ms" Click="NudgePlus100_Click" Style="{StaticResource SecondaryButton}" Padding="8,5" FontSize="{StaticResource FontSize04}" Margin="0,0,4,0" />
+                        <Button Content="+500ms" Click="NudgePlus500_Click" Style="{StaticResource SecondaryButton}" Padding="8,5" FontSize="{StaticResource FontSize04}" Margin="0,0,8,0" />
+                        <Button Content="Re-Sync to Denon" Click="ResyncToDenon_Click" Style="{StaticResource SecondaryButton}" Padding="10,5" FontSize="{StaticResource FontSize04}" ToolTip="Snap video to the current estimated playback position on your Denon AVR" />
                     </StackPanel>
 
                     <TextBlock x:Name="SyncStatusText"
                                Text="Audio routed to Denon AVR • Video muted"
                                HorizontalAlignment="Right"
                                VerticalAlignment="Center"
-                               FontSize="11.5"
+                               FontSize="{StaticResource FontSize05}"
                                Foreground="{StaticResource AccentCyanBrightBrush}" />
                 </DockPanel>
             </Border>

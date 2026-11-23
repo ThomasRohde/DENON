@@ -31,7 +31,7 @@
                     <Border Grid.Column="0"
                             Width="148"
                             Height="148"
-                            CornerRadius="12"
+                            CornerRadius="{StaticResource Radius05}"
                             Background="{StaticResource SidebarBgBrush}"
                             BorderBrush="{StaticResource AccentBlueBorderSoftBrush}"
                             BorderThickness="1"
@@ -42,41 +42,41 @@
 
                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                            <Border Background="{StaticResource AccentCyanSubtleBgBrush}" BorderBrush="{StaticResource AccentCyanBrush}" BorderThickness="1" CornerRadius="5" Padding="7,2" Margin="0,0,8,0">
-                                <TextBlock Text="PHONE REMOTE" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrush}" />
+                            <Border Background="{StaticResource AccentCyanSubtleBgBrush}" BorderBrush="{StaticResource AccentCyanBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="7,2" Margin="0,0,8,0">
+                                <TextBlock Text="PHONE REMOTE" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrush}" />
                             </Border>
-                            <Border Background="{StaticResource AccentVioletSubtleBgBrush}" BorderBrush="{StaticResource AccentVioletBrush}" BorderThickness="1" CornerRadius="5" Padding="7,2">
-                                <TextBlock Text="PARTY JUKEBOX" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentVioletTextBrush}" />
+                            <Border Background="{StaticResource AccentVioletSubtleBgBrush}" BorderBrush="{StaticResource AccentVioletBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="7,2">
+                                <TextBlock Text="PARTY JUKEBOX" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentVioletTextBrush}" />
                             </Border>
                         </StackPanel>
 
-                        <TextBlock Text="{Binding RemoteQrRoleCaption}" FontSize="14.5" FontWeight="Bold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding RemoteQrRoleCaption}" FontSize="{StaticResource FontSize09}" FontWeight="Bold" TextWrapping="Wrap" />
                         <TextBlock Text="Scan to pair securely. Owner gets full room controls; Guest can search &amp; queue YouTube tracks only."
-                                   FontSize="11.5"
+                                   FontSize="{StaticResource FontSize05}"
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    TextWrapping="Wrap"
                                    Margin="0,4,0,8" />
 
-                        <Border Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="7" Padding="9,6" Margin="0,0,0,8">
+                        <Border Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="9,6" Margin="0,0,0,8">
                             <TextBlock Text="{Binding RemoteWebUrl}"
-                                       FontSize="11.5"
+                                       FontSize="{StaticResource FontSize05}"
                                        FontWeight="Bold"
-                                       FontFamily="Cascadia Mono, Consolas"
+                                       FontFamily="{StaticResource MonoFont}"
                                        Foreground="{StaticResource AccentCyanBrush}"
                                        TextTrimming="CharacterEllipsis" />
                         </Border>
 
                         <WrapPanel Margin="0,0,0,6">
-                            <Button Content="Owner QR" Command="{Binding SetRemoteQrRoleCommand}" CommandParameter="owner" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="11" Margin="0,0,6,4" />
-                            <Button Content="Guest QR" Command="{Binding SetRemoteQrRoleCommand}" CommandParameter="guest" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="11" Margin="0,0,6,4" />
-                            <Button Content="{Binding PhoneRemoteToggleLabel}" Command="{Binding TogglePhoneRemoteEnabledCommand}" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="11" Margin="0,0,6,4" />
-                            <Button Content="Revoke &amp; Rotate" Command="{Binding RotateRemoteTokensCommand}" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="11" Margin="0,0,0,4" />
+                            <Button Content="Owner QR" Command="{Binding SetRemoteQrRoleCommand}" CommandParameter="owner" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="{StaticResource FontSize04}" Margin="0,0,6,4" />
+                            <Button Content="Guest QR" Command="{Binding SetRemoteQrRoleCommand}" CommandParameter="guest" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="{StaticResource FontSize04}" Margin="0,0,6,4" />
+                            <Button Content="{Binding PhoneRemoteToggleLabel}" Command="{Binding TogglePhoneRemoteEnabledCommand}" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="{StaticResource FontSize04}" Margin="0,0,6,4" />
+                            <Button Content="Revoke &amp; Rotate" Command="{Binding RotateRemoteTokensCommand}" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="{StaticResource FontSize04}" Margin="0,0,0,4" />
                         </WrapPanel>
 
                         <WrapPanel>
-                            <Button Content="Copy Paired URL" Command="{Binding CopyRemoteUrlCommand}" Style="{StaticResource PrimaryButton}" Padding="10,6" FontSize="11" Margin="0,0,6,0" />
-                            <Button Content="Open Browser" Command="{Binding OpenRemoteInBrowserCommand}" Style="{StaticResource SecondaryButton}" Padding="10,6" FontSize="11" Margin="0,0,6,0" />
-                            <Button Content="Allow Firewall" Command="{Binding AllowRelayFirewallCommand}" Style="{StaticResource SecondaryButton}" Padding="10,6" FontSize="11" />
+                            <Button Content="Copy Paired URL" Command="{Binding CopyRemoteUrlCommand}" Style="{StaticResource PrimaryButton}" Padding="10,6" FontSize="{StaticResource FontSize04}" Margin="0,0,6,0" />
+                            <Button Content="Open Browser" Command="{Binding OpenRemoteInBrowserCommand}" Style="{StaticResource SecondaryButton}" Padding="10,6" FontSize="{StaticResource FontSize04}" Margin="0,0,6,0" />
+                            <Button Content="Allow Firewall" Command="{Binding AllowRelayFirewallCommand}" Style="{StaticResource SecondaryButton}" Padding="10,6" FontSize="{StaticResource FontSize04}" />
                         </WrapPanel>
                     </StackPanel>
                 </Grid>
@@ -88,9 +88,9 @@
                     <DockPanel Margin="0,0,0,8">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="CAST PC AUDIO TO DENON" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                            <Border Background="{StaticResource AccentEmeraldSubtleBgBrush}" BorderBrush="{StaticResource AccentEmeraldBrush}" BorderThickness="1" CornerRadius="5" Padding="6,1.5" Margin="8,0,0,0"
+                            <Border Background="{StaticResource AccentEmeraldSubtleBgBrush}" BorderBrush="{StaticResource AccentEmeraldBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="6,1.5" Margin="8,0,0,0"
                                     Visibility="{Binding IsPcCastActive, Converter={StaticResource BoolToVis}}">
-                                <TextBlock Text="ON AIR" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentEmeraldBrush}" />
+                                <TextBlock Text="ON AIR" FontSize="{StaticResource FontSize00}" FontWeight="Bold" Foreground="{StaticResource AccentEmeraldBrush}" />
                             </Border>
                         </StackPanel>
                         <Button Content="Refresh Devices"
@@ -98,10 +98,10 @@
                                 Command="{Binding RefreshAudioDevicesCommand}"
                                 Style="{StaticResource SecondaryButton}"
                                 Padding="8,4"
-                                FontSize="10.5" />
+                                FontSize="{StaticResource FontSize03}" />
                     </DockPanel>
 
-                    <TextBlock Text="Windows Audio Output Source (WASAPI Loopback)" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,4" />
+                    <TextBlock Text="Windows Audio Output Source (WASAPI Loopback)" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,4" />
                     <ListBox ItemsSource="{Binding AudioOutputDevices}"
                              SelectedItem="{Binding SelectedAudioDevice, Mode=TwoWay}"
                              MaxHeight="68"
@@ -112,7 +112,7 @@
                              Margin="0,0,0,10">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding FriendlyName}" FontSize="11.5" Padding="4,2" Foreground="{StaticResource TextPrimaryBrush}" />
+                                <TextBlock Text="{Binding FriendlyName}" FontSize="{StaticResource FontSize05}" Padding="4,2" Foreground="{StaticResource TextPrimaryBrush}" />
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
@@ -123,7 +123,7 @@
                                     Command="{Binding SetPcCastFormatCommand}"
                                     CommandParameter="Mp3_320k"
                                     Padding="10,5"
-                                    FontSize="11"
+                                    FontSize="{StaticResource FontSize04}"
                                     Margin="0,0,6,0"
                                     Style="{StaticResource ChipButton}"
                                     infra:Chip.IsActive="{Binding SelectedPcCastFormatName, Converter={StaticResource EqualityConverter}, ConverterParameter=Mp3_320k}" />
@@ -131,7 +131,7 @@
                                     Command="{Binding SetPcCastFormatCommand}"
                                     CommandParameter="Wav_Lossless"
                                     Padding="10,5"
-                                    FontSize="11"
+                                    FontSize="{StaticResource FontSize04}"
                                     Style="{StaticResource ChipButton}"
                                     infra:Chip.IsActive="{Binding SelectedPcCastFormatName, Converter={StaticResource EqualityConverter}, ConverterParameter=Wav_Lossless}" />
                         </StackPanel>
@@ -140,7 +140,7 @@
                                 Content="{Binding PcCastButtonText}"
                                 Command="{Binding TogglePcCastCommand}"
                                 Padding="14,7"
-                                FontSize="12">
+                                FontSize="{StaticResource FontSize06}">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
                                     <Style.Triggers>
@@ -156,7 +156,7 @@
                     </DockPanel>
 
                     <TextBlock Text="{Binding PcCastStatusText}"
-                               FontSize="11"
+                               FontSize="{StaticResource FontSize04}"
                                Foreground="{StaticResource TextSecondaryBrush}"
                                TextTrimming="CharacterEllipsis" />
                 </StackPanel>
@@ -179,25 +179,25 @@
                 <DockPanel Grid.Row="0" Margin="0,0,0,8">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="LOCAL HI-RES / FLAC JUKEBOX" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding LocalTrackCountLabel, StringFormat='  •  {0}'}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
-                        <Border Background="{StaticResource Ink08Brush}" CornerRadius="5" Padding="6,2" Margin="10,0,0,0">
-                            <TextBlock Text="DRAG &amp; DROP FILES OR FOLDERS HERE" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
+                        <TextBlock Text="{Binding LocalTrackCountLabel, StringFormat='  •  {0}'}" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+                        <Border Background="{StaticResource Ink08Brush}" CornerRadius="{StaticResource Radius02}" Padding="6,2" Margin="10,0,0,0">
+                            <TextBlock Text="DRAG &amp; DROP FILES OR FOLDERS HERE" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
                         </Border>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Button Content="+ Add Files" Command="{Binding AddLocalFilesCommand}" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="11" Margin="0,0,5,0" />
-                        <Button Content="+ Add Folder" Command="{Binding AddLocalFolderCommand}" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="11" Margin="0,0,5,0" />
-                        <Button Content="▶ Play All" Command="{Binding PlayAllLocalTracksCommand}" Style="{StaticResource PrimaryButton}" Padding="10,5" FontSize="11" Margin="0,0,5,0" />
-                        <Button Content="Shuffle" Command="{Binding ToggleLocalShuffleCommand}" Padding="9,5" FontSize="11" Margin="0,0,5,0" Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsLocalShuffleEnabled}" />
-                        <Button Content="{Binding LocalRepeatLabel}" Command="{Binding CycleLocalRepeatCommand}" Style="{StaticResource HardwareChipButton}" Padding="9,5" FontSize="11" Margin="0,0,5,0" />
-                        <Button Content="Clear" Command="{Binding ClearLocalTracksCommand}" Style="{StaticResource DangerButton}" Padding="8,5" FontSize="11" />
+                        <Button Content="+ Add Files" Command="{Binding AddLocalFilesCommand}" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="{StaticResource FontSize04}" Margin="0,0,5,0" />
+                        <Button Content="+ Add Folder" Command="{Binding AddLocalFolderCommand}" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="{StaticResource FontSize04}" Margin="0,0,5,0" />
+                        <Button Content="▶ Play All" Command="{Binding PlayAllLocalTracksCommand}" Style="{StaticResource PrimaryButton}" Padding="10,5" FontSize="{StaticResource FontSize04}" Margin="0,0,5,0" />
+                        <Button Content="Shuffle" Command="{Binding ToggleLocalShuffleCommand}" Padding="9,5" FontSize="{StaticResource FontSize04}" Margin="0,0,5,0" Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsLocalShuffleEnabled}" />
+                        <Button Content="{Binding LocalRepeatLabel}" Command="{Binding CycleLocalRepeatCommand}" Style="{StaticResource HardwareChipButton}" Padding="9,5" FontSize="{StaticResource FontSize04}" Margin="0,0,5,0" />
+                        <Button Content="Clear" Command="{Binding ClearLocalTracksCommand}" Style="{StaticResource DangerButton}" Padding="8,5" FontSize="{StaticResource FontSize04}" />
                     </StackPanel>
                 </DockPanel>
 
                 <TextBlock Grid.Row="1"
                            Text="{Binding LocalJukeboxStatusText}"
-                           FontSize="11.5"
+                           FontSize="{StaticResource FontSize05}"
                            Foreground="{StaticResource TextSecondaryBrush}"
                            Margin="0,0,0,10" />
 
@@ -205,7 +205,7 @@
                     <ItemsControl ItemsSource="{Binding LocalTracks}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border CornerRadius="9" Padding="10,7" Margin="0,0,0,6" BorderThickness="1">
+                                <Border CornerRadius="{StaticResource Radius03}" Padding="10,7" Margin="0,0,0,6" BorderThickness="1">
                                     <Border.Style>
                                         <Style TargetType="Border">
                                             <Setter Property="Background" Value="{StaticResource CardElevatedBrush}" />
@@ -228,18 +228,18 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
 
-                                        <TextBlock Grid.Column="0" Text="{Binding PositionLabel}" FontSize="11.5" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="{StaticResource AccentCyanBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="0" Text="{Binding PositionLabel}" FontSize="{StaticResource FontSize05}" FontWeight="Bold" FontFamily="{StaticResource MonoFont}" Foreground="{StaticResource AccentCyanBrush}" VerticalAlignment="Center" />
 
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Title}" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding Artist}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Title}" FontSize="{StaticResource FontSize07}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Artist}" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
 
                                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <Border Background="{StaticResource Ink08Brush}" BorderBrush="{StaticResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="5" Padding="6,2" Margin="0,0,8,0">
-                                                <TextBlock Text="{Binding CodecBadge}" FontSize="10" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="{StaticResource AccentAmberBrush}" />
+                                            <Border Background="{StaticResource Ink08Brush}" BorderBrush="{StaticResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="6,2" Margin="0,0,8,0">
+                                                <TextBlock Text="{Binding CodecBadge}" FontSize="{StaticResource FontSize02}" FontWeight="Bold" FontFamily="{StaticResource MonoFont}" Foreground="{StaticResource AccentAmberBrush}" />
                                             </Border>
-                                            <TextBlock Text="{Binding SizeDisplay}" FontSize="11" FontFamily="Cascadia Mono, Consolas" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding SizeDisplay}" FontSize="{StaticResource FontSize04}" FontFamily="{StaticResource MonoFont}" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
                                         </StackPanel>
 
                                         <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
@@ -248,14 +248,14 @@
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource PrimaryButton}"
                                                     Padding="10,5"
-                                                    FontSize="11"
+                                                    FontSize="{StaticResource FontSize04}"
                                                     Margin="0,0,5,0" />
                                             <Button Content="✕"
                                                     Command="{Binding DataContext.RemoveLocalTrackCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource DangerButton}"
                                                     Padding="7,5"
-                                                    FontSize="11" />
+                                                    FontSize="{StaticResource FontSize04}" />
                                         </StackPanel>
                                     </Grid>
                                 </Border>

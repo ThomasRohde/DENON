@@ -19,7 +19,7 @@
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="46"
-                      CornerRadius="12"
+                      CornerRadius="{StaticResource Radius05}"
                       GlassFrameThickness="0"
                       ResizeBorderThickness="6"
                       UseAeroCaptionButtons="False" />
@@ -59,20 +59,20 @@
                                Margin="0,0,10,0"
                                VerticalAlignment="Center" />
                         <TextBlock Text="{Binding BrandName}"
-                                   FontSize="14"
+                                   FontSize="{StaticResource FontSize09}"
                                    FontWeight="Bold"
                                    Foreground="{StaticResource TextPrimaryBrush}"
                                    VerticalAlignment="Center" />
                         <Border Background="{StaticResource Ink08Brush}"
                                 BorderBrush="{StaticResource Ink12Brush}"
                                 BorderThickness="1"
-                                CornerRadius="5"
+                                CornerRadius="{StaticResource Radius02}"
                                 Padding="6,2"
                                 Margin="8,0,0,0"
                                 VerticalAlignment="Center"
                                 ToolTip="Auto-detected Denon / Marantz receiver model">
                             <TextBlock Text="{Binding DetectedModelBadge}"
-                                       FontSize="9.5"
+                                       FontSize="{StaticResource FontSize01}"
                                        FontWeight="Bold"
                                        Foreground="{StaticResource AccentCyanBrightBrush}" />
                         </Border>
@@ -86,7 +86,7 @@
                         <Border Background="{StaticResource CardBgBrush}"
                                 BorderBrush="{StaticResource ControlHoverBrush}"
                                 BorderThickness="1"
-                                CornerRadius="14"
+                                CornerRadius="{StaticResource Radius06}"
                                 Padding="12,5">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <Ellipse Width="8"
@@ -95,33 +95,33 @@
                                          Margin="0,0,8,0"
                                          VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding ReceiverTitle}"
-                                           FontSize="12"
+                                           FontSize="{StaticResource FontSize06}"
                                            FontWeight="SemiBold"
                                            Foreground="{StaticResource TextPrimaryBrush}"
                                            VerticalAlignment="Center" />
                                 <TextBlock Text="  •  "
-                                           FontSize="11"
+                                           FontSize="{StaticResource FontSize04}"
                                            Foreground="{StaticResource TextMutedBrush}"
                                            VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding ConnectionBadgeText}"
-                                           FontSize="11"
+                                           FontSize="{StaticResource FontSize04}"
                                            FontWeight="Bold"
                                            Foreground="{Binding ConnectionBadgeBrush}"
                                            VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding FirmwareVersion, StringFormat='  •  {0}'}"
-                                           FontSize="11"
+                                           FontSize="{StaticResource FontSize04}"
                                            Foreground="{StaticResource TextMutedBrush}"
                                            Visibility="{Binding FirmwareVersion, Converter={StaticResource StringToVis}}"
                                            VerticalAlignment="Center" />
                                 <Border Background="{StaticResource AccentEmeraldSubtleBgBrush}"
                                         BorderBrush="{StaticResource AccentEmeraldBrush}"
                                         BorderThickness="1"
-                                        CornerRadius="6"
+                                        CornerRadius="{StaticResource Radius02}"
                                         Padding="6,1.5"
                                         Margin="9,0,0,0"
                                         ToolTip="Subscribed to real-time HEOS change events (&lt;50ms zero-lag volume &amp; play state sync)"
                                         Visibility="{Binding IsLivePushConnected, Converter={StaticResource BoolToVis}}">
-                                    <TextBlock Text="LIVE PUSH" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentEmeraldBrush}" />
+                                    <TextBlock Text="LIVE PUSH" FontSize="{StaticResource FontSize00}" FontWeight="Bold" Foreground="{StaticResource AccentEmeraldBrush}" />
                                 </Border>
                             </StackPanel>
                         </Border>
@@ -134,7 +134,7 @@
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 Style="{StaticResource SecondaryButton}"
                                 Padding="9,4"
-                                FontSize="11"
+                                FontSize="{StaticResource FontSize04}"
                                 Margin="0,0,6,0"
                                 ToolTip="Open Streamable HTTP MCP Server, Room Doctor &amp; Habits Memory">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -157,7 +157,7 @@
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 Style="{StaticResource SecondaryButton}"
                                 Padding="9,4"
-                                FontSize="11"
+                                FontSize="{StaticResource FontSize04}"
                                 Margin="0,0,6,0"
                                 ToolTip="Open Context-Aware Help &amp; Interactive Guide for this screen (F1)">
                             <TextBlock Text="? Help" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
@@ -167,7 +167,7 @@
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 Style="{StaticResource SecondaryButton}"
                                 Padding="9,4"
-                                FontSize="11"
+                                FontSize="{StaticResource FontSize04}"
                                 Margin="0,0,6,0"
                                 ToolTip="Open Couch Phone Remote QR Code, PC Audio Cast &amp; Local FLAC Jukebox">
                             <TextBlock Text="Phone QR" Foreground="{StaticResource AccentCyanBrightBrush}" FontWeight="SemiBold" />
@@ -203,7 +203,7 @@
                                                         Background="{TemplateBinding Background}"
                                                         BorderBrush="{TemplateBinding BorderBrush}"
                                                         BorderThickness="{TemplateBinding BorderThickness}"
-                                                        CornerRadius="15"
+                                                        CornerRadius="{StaticResource Radius06}"
                                                         Padding="{TemplateBinding Padding}">
                                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                         <Path Data="M11,2H13V12H11V2M16.24,4.76L14.83,6.17C16.17,7.27 17,8.94 17,10.8C17,14.11 14.31,16.8 11,16.8C7.69,16.8 5,14.11 5,10.8C5,8.94 5.83,7.27 7.17,6.17L5.76,4.76C4.07,6.23 3,8.39 3,10.8C3,15.22 6.58,18.8 11,18.8C15.42,18.8 19,15.22 19,10.8C19,8.39 17.93,6.23 16.24,4.76Z"
@@ -213,7 +213,7 @@
                                                               Stretch="Uniform"
                                                               Margin="0,0,6,0" />
                                                         <TextBlock Text="{Binding PowerStateLabel}"
-                                                                   FontSize="10.5"
+                                                                   FontSize="{StaticResource FontSize03}"
                                                                    FontWeight="Bold"
                                                                    Foreground="{TemplateBinding Foreground}"
                                                                    VerticalAlignment="Center" />
@@ -244,7 +244,7 @@
                             <Rectangle Width="10" Height="1.5" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                         </Button>
                         <Button Click="MaximizeRestoreButton_Click" Style="{StaticResource TitleBarButton}" ToolTip="Maximize / Restore">
-                            <Border Width="10" Height="10" BorderThickness="1.3" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" CornerRadius="1.5" />
+                            <Border Width="10" Height="10" BorderThickness="1.3" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" CornerRadius="{StaticResource Radius00}" />
                         </Button>
                         <Button Click="CloseButton_Click" Style="{StaticResource TitleBarCloseButton}" ToolTip="Close">
                             <Path Data="M1,1 L9,9 M9,1 L1,9"
@@ -370,11 +370,11 @@
                                             Background="{StaticResource Ink08Brush}"
                                             BorderBrush="{StaticResource Ink12Brush}"
                                             BorderThickness="1"
-                                            CornerRadius="8"
+                                            CornerRadius="{StaticResource Radius03}"
                                             Padding="6,1"
                                             VerticalAlignment="Center">
                                         <TextBlock Text="{Binding ActivePluginsBadgeText}"
-                                                   FontSize="9.5"
+                                                   FontSize="{StaticResource FontSize01}"
                                                    FontWeight="Bold"
                                                    Foreground="{StaticResource AccentAmberBrush}" />
                                     </Border>
@@ -475,7 +475,7 @@
                                                                 Background="{StaticResource CardBgBrush}"
                                                                 BorderBrush="{StaticResource Ink08Brush}"
                                                                 BorderThickness="1"
-                                                                CornerRadius="9"
+                                                                CornerRadius="{StaticResource Radius03}"
                                                                 Padding="9,6.5">
                                                             <Grid>
                                                                 <Grid.ColumnDefinitions>
@@ -486,14 +486,14 @@
                                                                 <Border Grid.Column="0"
                                                                         Width="26"
                                                                         Height="20"
-                                                                        CornerRadius="5"
+                                                                        CornerRadius="{StaticResource Radius02}"
                                                                         Background="{StaticResource SidebarBgBrush}"
                                                                         BorderBrush="{Binding AccentBrush}"
                                                                         BorderThickness="1"
                                                                         Margin="0,0,8,0"
                                                                         VerticalAlignment="Center">
                                                                     <TextBlock Text="{Binding IconGlyph}"
-                                                                               FontSize="8.5"
+                                                                               FontSize="{StaticResource FontSize00}"
                                                                                FontWeight="Black"
                                                                                Foreground="{Binding AccentBrush}"
                                                                                HorizontalAlignment="Center"
@@ -501,12 +501,12 @@
                                                                 </Border>
                                                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                                     <TextBlock Text="{Binding ShortName}"
-                                                                               FontSize="11.5"
+                                                                               FontSize="{StaticResource FontSize05}"
                                                                                FontWeight="SemiBold"
                                                                                Foreground="{StaticResource TextPrimaryBrush}"
                                                                                TextTrimming="CharacterEllipsis" />
                                                                     <TextBlock Text="{Binding StatusText}"
-                                                                               FontSize="9.5"
+                                                                               FontSize="{StaticResource FontSize01}"
                                                                                Foreground="{StaticResource TextMutedBrush}"
                                                                                TextTrimming="CharacterEllipsis" />
                                                                 </StackPanel>
@@ -538,26 +538,26 @@
                                 Background="{StaticResource CardBgBrush}"
                                 BorderBrush="{StaticResource BorderHairlineBrush}"
                                 BorderThickness="1"
-                                CornerRadius="12"
+                                CornerRadius="{StaticResource Radius05}"
                                 Padding="12">
                             <StackPanel>
                                 <TextBlock Text="TELEMETRY" Style="{StaticResource SectionLabelStyle}" />
                                 <TextBlock Text="{Binding ReceiverDetails}"
-                                           FontSize="11.5"
+                                           FontSize="{StaticResource FontSize05}"
                                            Foreground="{StaticResource TextSecondaryBrush}"
                                            TextWrapping="Wrap"
                                            Margin="0,6,0,0" />
                                 <TextBlock Text="{Binding StatusMessage}"
-                                           FontSize="11"
+                                           FontSize="{StaticResource FontSize04}"
                                            Foreground="{StaticResource AccentCyanBrightBrush}"
                                            TextWrapping="Wrap"
                                            Margin="0,8,0,0" />
                                 <TextBlock Text="{Binding LastUpdatedText}"
-                                           FontSize="10.5"
+                                           FontSize="{StaticResource FontSize03}"
                                            Foreground="{StaticResource TextMutedBrush}"
                                            Margin="0,6,0,0" />
                                 <TextBlock Text="{Binding LastError}"
-                                           FontSize="10.5"
+                                           FontSize="{StaticResource FontSize03}"
                                            Foreground="{StaticResource AccentCrimsonBrush}"
                                            TextWrapping="Wrap"
                                            Margin="0,6,0,0"

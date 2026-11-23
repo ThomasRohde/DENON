@@ -23,7 +23,7 @@
                                     Style="{StaticResource PrimaryButton}"
                                     Padding="12,6" />
                         </DockPanel>
-                        <TextBlock Text="{Binding DiscoveryStatusText}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding DiscoveryStatusText}" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
 
                         <ItemsControl ItemsSource="{Binding DiscoveredReceivers}" Margin="0,10,0,0">
                             <ItemsControl.ItemTemplate>
@@ -35,7 +35,7 @@
                                             Margin="0,0,0,6">
                                         <StackPanel>
                                             <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrush}" />
-                                            <TextBlock FontSize="11" Foreground="{StaticResource TextSecondaryBrush}">
+                                            <TextBlock FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextSecondaryBrush}">
                                                 <Run Text="{Binding Model, Mode=OneWay}" />
                                                 <Run Text=" • " />
                                                 <Run Text="{Binding IpAddress, Mode=OneWay}" />
@@ -61,16 +61,16 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0">
-                                <TextBlock Text="Receiver IP / Host (leave blank to auto-detect)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                <TextBlock Text="Receiver IP / Host (leave blank to auto-detect)" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
                                 <TextBox Text="{Binding SettingsHost, UpdateSourceTrigger=PropertyChanged}" Tag="Auto-detect via LAN SSDP scan..." Margin="0,0,0,12" />
                             </StackPanel>
                             <StackPanel Grid.Column="2">
-                                <TextBlock Text="HEOS Port" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                <TextBlock Text="HEOS Port" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
                                 <TextBox Text="{Binding SettingsPort, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
                             </StackPanel>
                         </Grid>
 
-                        <TextBlock Text="HEOS Player Name (leave blank to auto-detect model)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                        <TextBlock Text="HEOS Player Name (leave blank to auto-detect model)" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
                         <TextBox Text="{Binding SettingsPlayerName, UpdateSourceTrigger=PropertyChanged}" Tag="Auto-detect receiver model name..." Margin="0,0,0,12" />
 
                         <Grid>
@@ -80,16 +80,16 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0">
-                                <TextBlock Text="Poll Interval (sec)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                <TextBlock Text="Poll Interval (sec)" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
                                 <TextBox Text="{Binding SettingsPollIntervalSeconds, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
                             </StackPanel>
                             <StackPanel Grid.Column="2">
-                                <TextBlock Text="Safety Low Volume (0-98)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                <TextBlock Text="Safety Low Volume (0-98)" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
                                 <TextBox Text="{Binding SettingsLowVolume, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
                             </StackPanel>
                         </Grid>
 
-                        <TextBlock Text="Quick Volume Presets (comma-separated, 0-98)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                        <TextBlock Text="Quick Volume Presets (comma-separated, 0-98)" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
                         <TextBox Text="{Binding SettingsVolumePresetsText, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,18" />
 
                         <WrapPanel>
@@ -108,7 +108,7 @@
                         <CheckBox Content="Record smart device, media &amp; external remote events locally"
                                   IsChecked="{Binding SettingsTelemetryEnabled}"
                                   Style="{StaticResource ToggleSwitchStyle}"
-                                  FontSize="12"
+                                  FontSize="{StaticResource FontSize06}"
                                   Margin="0,0,0,10" />
 
                         <Grid Margin="0,0,0,10">
@@ -118,17 +118,17 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0">
-                                <TextBlock Text="Retention (days)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                <TextBlock Text="Retention (days)" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
                                 <TextBox Text="{Binding SettingsTelemetryRetentionDays, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                             <StackPanel Grid.Column="2">
-                                <TextBlock Text="Media dwell filter (sec)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                <TextBlock Text="Media dwell filter (sec)" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
                                 <TextBox Text="{Binding SettingsTelemetryMediaDwellSeconds, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                         </Grid>
 
                         <TextBlock Text="{Binding TelemetryStatsSummaryText}"
-                                   FontSize="11.5"
+                                   FontSize="{StaticResource FontSize05}"
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    TextWrapping="Wrap"
                                    Margin="0,0,0,12" />
@@ -161,14 +161,14 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <CheckBox Content="Start minimized in tray" IsChecked="{Binding SettingsStartMinimizedToTray}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="12" />
-                            <CheckBox Content="Minimize window to tray" IsChecked="{Binding SettingsMinimizeToTray}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="12" />
-                            <CheckBox Content="Close hides to tray" IsChecked="{Binding SettingsCloseToTray}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="12" />
+                            <CheckBox Content="Start minimized in tray" IsChecked="{Binding SettingsStartMinimizedToTray}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="{StaticResource FontSize06}" />
+                            <CheckBox Content="Minimize window to tray" IsChecked="{Binding SettingsMinimizeToTray}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="{StaticResource FontSize06}" />
+                            <CheckBox Content="Close hides to tray" IsChecked="{Binding SettingsCloseToTray}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="{StaticResource FontSize06}" />
                         </StackPanel>
                         <StackPanel Grid.Column="2">
-                            <CheckBox Content="Tray notifications" IsChecked="{Binding SettingsShowNotifications}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="12" />
-                            <CheckBox Content="Primary dB readout" IsChecked="{Binding SettingsDisplayVolumeInDb}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="12" />
-                            <CheckBox Content="Launch at startup" IsChecked="{Binding SettingsLaunchAtWindowsStartup}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="12" />
+                            <CheckBox Content="Tray notifications" IsChecked="{Binding SettingsShowNotifications}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="{StaticResource FontSize06}" />
+                            <CheckBox Content="Primary dB readout" IsChecked="{Binding SettingsDisplayVolumeInDb}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="{StaticResource FontSize06}" />
+                            <CheckBox Content="Launch at startup" IsChecked="{Binding SettingsLaunchAtWindowsStartup}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="{StaticResource FontSize06}" />
                         </StackPanel>
                     </Grid>
                 </StackPanel>
@@ -187,16 +187,16 @@
                             <ColumnDefinition Width="1.4*" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="Relay Port" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                            <TextBox Text="{Binding SettingsRelayPort, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
+                            <TextBlock Text="Relay Port" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                            <TextBox Text="{Binding SettingsRelayPort, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="{StaticResource FontSize06}" />
                         </StackPanel>
                         <StackPanel Grid.Column="2">
-                            <TextBlock Text="Cinema Offset (ms)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                            <TextBox Text="{Binding SettingsCinemaSyncOffsetMs, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
+                            <TextBlock Text="Cinema Offset (ms)" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                            <TextBox Text="{Binding SettingsCinemaSyncOffsetMs, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="{StaticResource FontSize06}" />
                         </StackPanel>
                         <StackPanel Grid.Column="4">
-                            <TextBlock Text="FFmpeg Path (optional)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                            <TextBox Text="{Binding SettingsFfmpegPath, UpdateSourceTrigger=PropertyChanged}" Tag="Auto-detect..." Padding="8,6" FontSize="12" />
+                            <TextBlock Text="FFmpeg Path (optional)" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                            <TextBox Text="{Binding SettingsFfmpegPath, UpdateSourceTrigger=PropertyChanged}" Tag="Auto-detect..." Padding="8,6" FontSize="{StaticResource FontSize06}" />
                         </StackPanel>
                     </Grid>
 
@@ -204,23 +204,23 @@
                               IsChecked="{Binding SettingsPreferFfmpegMp3}"
                               Style="{StaticResource ToggleSwitchStyle}"
                               Margin="0,2,0,8"
-                              FontSize="12" />
+                              FontSize="{StaticResource FontSize06}" />
 
                     <!-- 1-Click Acoustic Lip-Sync Auto-Calibration (PC Mic Chirp) -->
-                    <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="10" Padding="10,8">
+                    <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="10,8">
                         <DockPanel>
                             <Button DockPanel.Dock="Right"
                                     Content="{Binding CalibrateSyncButtonLabel}"
                                     Command="{Binding RunAcousticCalibrationCommand}"
                                     Style="{StaticResource PrimaryButton}"
                                     Padding="11,5"
-                                    FontSize="11"
+                                    FontSize="{StaticResource FontSize04}"
                                     VerticalAlignment="Center"
                                     Margin="10,0,0,0" />
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="ACOUSTIC LIP-SYNC AUTO-CALIBRATION" Style="{StaticResource SectionLabelStyle}" />
                                 <TextBlock Text="{Binding AcousticCalibrationStatus}"
-                                           FontSize="11"
+                                           FontSize="{StaticResource FontSize04}"
                                            Foreground="{StaticResource TextSecondaryBrush}"
                                            TextWrapping="Wrap"
                                            Margin="0,2,0,0" />
@@ -246,26 +246,26 @@
                                     Command="{Binding CheckShortcutCollisionsCommand}"
                                     Style="{StaticResource SecondaryButton}"
                                     Padding="8,4"
-                                    FontSize="10.5"
+                                    FontSize="{StaticResource FontSize03}"
                                     Margin="0,0,5,0"
                                     ToolTip="Re-check internal duplicates, reserved Windows combos, and live Win32 global hotkey availability" />
                             <Button Content="Reset"
                                     Command="{Binding ResetShortcutsToDefaultCommand}"
                                     Style="{StaticResource SecondaryButton}"
                                     Padding="8,4"
-                                    FontSize="10.5"
+                                    FontSize="{StaticResource FontSize03}"
                                     Margin="0,0,5,0" />
                             <Button Content="Save"
                                     Command="{Binding SaveSettingsCommand}"
                                     Style="{StaticResource PrimaryButton}"
                                     Padding="10,4"
-                                    FontSize="10.5" />
+                                    FontSize="{StaticResource FontSize03}" />
                         </StackPanel>
                     </DockPanel>
 
                     <TextBlock Grid.Row="1"
                                Text="{Binding ShortcutSummaryText}"
-                               FontSize="11.5"
+                               FontSize="{StaticResource FontSize05}"
                                TextWrapping="Wrap"
                                Margin="0,0,0,8">
                         <TextBlock.Style>
@@ -289,7 +289,7 @@
                         <ItemsControl ItemsSource="{Binding ShortcutEditors}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border CornerRadius="9" Padding="9,7" Margin="0,0,0,6" BorderThickness="1">
+                                    <Border CornerRadius="{StaticResource Radius03}" Padding="9,7" Margin="0,0,0,6" BorderThickness="1">
                                         <Border.Style>
                                             <Style TargetType="Border">
                                                 <Setter Property="Background" Value="{StaticResource CardBgBrush}" />
@@ -320,7 +320,7 @@
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
 
-                                                <Border Grid.Column="0" CornerRadius="4" Padding="5,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                <Border Grid.Column="0" CornerRadius="{StaticResource Radius01}" Padding="5,2" Margin="0,0,8,0" VerticalAlignment="Center">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
                                                             <Setter Property="Background" Value="{StaticResource Ink08Brush}" />
@@ -331,7 +331,7 @@
                                                             </Style.Triggers>
                                                         </Style>
                                                     </Border.Style>
-                                                    <TextBlock Text="{Binding ScopeBadge}" FontSize="9" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas">
+                                                    <TextBlock Text="{Binding ScopeBadge}" FontSize="{StaticResource FontSize00}" FontWeight="Bold" FontFamily="{StaticResource MonoFont}">
                                                         <TextBlock.Style>
                                                             <Style TargetType="TextBlock">
                                                                 <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
@@ -347,7 +347,7 @@
 
                                                 <TextBlock Grid.Column="1"
                                                            Text="{Binding Label}"
-                                                           FontSize="12"
+                                                           FontSize="{StaticResource FontSize06}"
                                                            FontWeight="SemiBold"
                                                            VerticalAlignment="Center"
                                                            TextTrimming="CharacterEllipsis"
@@ -357,21 +357,21 @@
                                                         Background="{StaticResource SidebarBgBrush}"
                                                         BorderBrush="{StaticResource Ink12Brush}"
                                                         BorderThickness="1"
-                                                        CornerRadius="6"
+                                                        CornerRadius="{StaticResource Radius02}"
                                                         Padding="8,4"
                                                         Margin="0,0,6,0"
                                                         VerticalAlignment="Center">
                                                     <StackPanel Orientation="Horizontal">
                                                         <TextBlock Text="{Binding GestureDisplay}"
-                                                                   FontSize="11"
+                                                                   FontSize="{StaticResource FontSize04}"
                                                                    FontWeight="Bold"
-                                                                   FontFamily="Cascadia Mono, Consolas"
+                                                                   FontFamily="{StaticResource MonoFont}"
                                                                    Foreground="{StaticResource TextPrimaryBrush}"
                                                                    VerticalAlignment="Center" />
                                                         <TextBlock Text="{Binding StatusLabel, StringFormat='  [{0}]'}"
-                                                                   FontSize="9.5"
+                                                                   FontSize="{StaticResource FontSize01}"
                                                                    FontWeight="Bold"
-                                                                   FontFamily="Cascadia Mono, Consolas"
+                                                                   FontFamily="{StaticResource MonoFont}"
                                                                    Foreground="{Binding StatusBrush}"
                                                                    VerticalAlignment="Center" />
                                                     </StackPanel>
@@ -383,20 +383,20 @@
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource SecondaryButton}"
                                                             Padding="8,4"
-                                                            FontSize="10.5"
+                                                            FontSize="{StaticResource FontSize03}"
                                                             Margin="0,0,4,0" />
                                                     <Button Content="✕"
                                                             Command="{Binding DataContext.ClearShortcutCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource DangerButton}"
                                                             Padding="6,4"
-                                                            FontSize="10.5"
+                                                            FontSize="{StaticResource FontSize03}"
                                                             ToolTip="Clear shortcut" />
                                                 </StackPanel>
                                             </Grid>
 
                                             <TextBlock Text="{Binding CollisionMessage}"
-                                                       FontSize="10.5"
+                                                       FontSize="{StaticResource FontSize03}"
                                                        Foreground="{Binding StatusBrush}"
                                                        TextWrapping="Wrap"
                                                        Margin="0,5,0,0"
@@ -410,7 +410,7 @@
 
                     <StackPanel Grid.Row="3" Margin="0,8,0,0">
                         <!-- Quick-Add Global Hotkey for any Smart Scene or Plugin Action -->
-                        <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="9" Padding="9,7" Margin="0,0,0,6">
+                        <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius03}" Padding="9,7" Margin="0,0,0,6">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -425,28 +425,28 @@
                                           ItemsSource="{Binding ScenePresets}"
                                           SelectedItem="{Binding ShortcutSceneToAdd}"
                                           DisplayMemberPath="Name"
-                                          FontSize="11" />
+                                          FontSize="{StaticResource FontSize04}" />
                                 <Button Grid.Column="2"
                                         Content="+ Scene Key"
                                         Command="{Binding AddSceneShortcutCommand}"
                                         Style="{StaticResource SecondaryButton}"
                                         Padding="8,4"
-                                        FontSize="10.5" />
+                                        FontSize="{StaticResource FontSize03}" />
                                 <ComboBox Grid.Column="4"
                                           ItemsSource="{Binding AvailablePluginActions}"
                                           SelectedItem="{Binding ShortcutPluginActionToAdd}"
                                           DisplayMemberPath="FullLabel"
-                                          FontSize="11" />
+                                          FontSize="{StaticResource FontSize04}" />
                                 <Button Grid.Column="6"
                                         Content="+ Plugin Key"
                                         Command="{Binding AddPluginActionShortcutCommand}"
                                         Style="{StaticResource SecondaryButton}"
                                         Padding="8,4"
-                                        FontSize="10.5" />
+                                        FontSize="{StaticResource FontSize03}" />
                             </Grid>
                         </Border>
                         <TextBlock Text="Built-in: Ctrl+1..7 switches views • Ctrl+R refreshes • Mouse wheel over Volume adjusts ±2 steps"
-                                   FontSize="10.5"
+                                   FontSize="{StaticResource FontSize03}"
                                    Foreground="{StaticResource TextMutedBrush}" />
                     </StackPanel>
                 </Grid>

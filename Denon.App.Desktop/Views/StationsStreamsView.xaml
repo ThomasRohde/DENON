@@ -16,7 +16,7 @@
                     Command="{Binding SetStationsSubTabCommand}"
                     CommandParameter="Presets"
                     Padding="14,7"
-                    FontSize="12"
+                    FontSize="{StaticResource FontSize06}"
                     Margin="0,0,8,0"
                     Style="{StaticResource ChipButton}"
                     infra:Chip.IsActive="{Binding StationsSubTab, Converter={StaticResource EqualityConverter}, ConverterParameter=Presets}" />
@@ -24,7 +24,7 @@
                     Command="{Binding SetStationsSubTabCommand}"
                     CommandParameter="Explorer"
                     Padding="14,7"
-                    FontSize="12"
+                    FontSize="{StaticResource FontSize06}"
                     Style="{StaticResource ChipButton}"
                     infra:Chip.IsActive="{Binding StationsSubTab, Converter={StaticResource EqualityConverter}, ConverterParameter=Explorer}" />
         </StackPanel>
@@ -77,8 +77,8 @@
 
                     <TextBlock Text="{Binding CustomStreamProbeStatus}"
                                Foreground="{Binding CustomStreamProbeSuccess, Converter={StaticResource NullableBoolToBrush}}"
-                               FontSize="12"
-                               FontFamily="Cascadia Mono, Consolas"
+                               FontSize="{StaticResource FontSize06}"
+                               FontFamily="{StaticResource MonoFont}"
                                Margin="0,8,0,0"
                                Visibility="{Binding CustomStreamProbeStatus, Converter={StaticResource StringToVis}}" />
                 </StackPanel>
@@ -121,7 +121,7 @@
                                     <Border Background="{StaticResource CardElevatedBrush}"
                                             BorderBrush="{StaticResource ControlHoverBrush}"
                                             BorderThickness="1"
-                                            CornerRadius="10"
+                                            CornerRadius="{StaticResource Radius04}"
                                             Padding="10,9"
                                             Margin="0,0,0,8">
                                         <StackPanel>
@@ -140,15 +140,15 @@
                                                 <Border Grid.Column="0"
                                                         Width="34"
                                                         Height="34"
-                                                        CornerRadius="8"
+                                                        CornerRadius="{StaticResource Radius03}"
                                                         Background="{Binding BadgeBrush}"
                                                         Margin="0,0,10,0">
-                                                    <TextBlock Text="{Binding Monogram}" FontSize="12" FontWeight="Black" Foreground="{StaticResource TextOnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    <TextBlock Text="{Binding Monogram}" FontSize="{StaticResource FontSize06}" FontWeight="Black" Foreground="{StaticResource TextOnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                 </Border>
 
                                                 <TextBox Grid.Column="1" Text="{Binding Alias, UpdateSourceTrigger=PropertyChanged}" ToolTip="Alias" Padding="8,6" />
                                                 <TextBox Grid.Column="3" Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}" ToolTip="Display Name" Padding="8,6" />
-                                                <TextBox Grid.Column="5" Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}" ToolTip="Stream URL" Padding="8,6" FontFamily="Cascadia Mono, Consolas" FontSize="12" />
+                                                <TextBox Grid.Column="5" Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}" ToolTip="Stream URL" Padding="8,6" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource FontSize06}" />
 
                                                 <StackPanel Grid.Column="7" Orientation="Horizontal" VerticalAlignment="Center">
                                                     <Button Content="▶"
@@ -190,8 +190,8 @@
 
                                             <TextBlock Text="{Binding ProbeStatusText}"
                                                        Foreground="{Binding ProbeSucceeded, Converter={StaticResource NullableBoolToBrush}}"
-                                                       FontSize="11"
-                                                       FontFamily="Cascadia Mono, Consolas"
+                                                       FontSize="{StaticResource FontSize04}"
+                                                       FontFamily="{StaticResource MonoFont}"
                                                        Margin="44,6,0,0"
                                                        Visibility="{Binding ProbeStatusText, Converter={StaticResource StringToVis}}" />
                                         </StackPanel>
@@ -214,7 +214,7 @@
                                 Style="{StaticResource SecondaryButton}"
                                 Padding="12,6" />
                     </DockPanel>
-                    <TextBlock Text="{Binding FavoritesStatusText}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,8" />
+                    <TextBlock Text="{Binding FavoritesStatusText}" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,8" />
 
                     <ScrollViewer MaxHeight="110"
                                   VerticalScrollBarVisibility="Auto"
@@ -276,19 +276,19 @@
 
                     <DockPanel>
                         <WrapPanel VerticalAlignment="Center">
-                            <Button Content="FLAC / Hi-Res" Command="{Binding QuickRadioTagCommand}" CommandParameter="FLAC" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="11" Margin="0,0,6,0" />
-                            <Button Content="Denmark" Command="{Binding QuickRadioTagCommand}" CommandParameter="Denmark" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="11" Margin="0,0,6,0" />
-                            <Button Content="Jazz" Command="{Binding QuickRadioTagCommand}" CommandParameter="jazz" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="11" Margin="0,0,6,0" />
-                            <Button Content="Lo-Fi" Command="{Binding QuickRadioTagCommand}" CommandParameter="lofi" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="11" Margin="0,0,6,0" />
-                            <Button Content="Electronic" Command="{Binding QuickRadioTagCommand}" CommandParameter="electronic" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="11" Margin="0,0,6,0" />
-                            <Button Content="Classical" Command="{Binding QuickRadioTagCommand}" CommandParameter="classical" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="11" Margin="0,0,6,0" />
-                            <Button Content="Rock" Command="{Binding QuickRadioTagCommand}" CommandParameter="rock" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="11" Margin="0,0,12,0" />
+                            <Button Content="FLAC / Hi-Res" Command="{Binding QuickRadioTagCommand}" CommandParameter="FLAC" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="{StaticResource FontSize04}" Margin="0,0,6,0" />
+                            <Button Content="Denmark" Command="{Binding QuickRadioTagCommand}" CommandParameter="Denmark" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="{StaticResource FontSize04}" Margin="0,0,6,0" />
+                            <Button Content="Jazz" Command="{Binding QuickRadioTagCommand}" CommandParameter="jazz" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="{StaticResource FontSize04}" Margin="0,0,6,0" />
+                            <Button Content="Lo-Fi" Command="{Binding QuickRadioTagCommand}" CommandParameter="lofi" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="{StaticResource FontSize04}" Margin="0,0,6,0" />
+                            <Button Content="Electronic" Command="{Binding QuickRadioTagCommand}" CommandParameter="electronic" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="{StaticResource FontSize04}" Margin="0,0,6,0" />
+                            <Button Content="Classical" Command="{Binding QuickRadioTagCommand}" CommandParameter="classical" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="{StaticResource FontSize04}" Margin="0,0,6,0" />
+                            <Button Content="Rock" Command="{Binding QuickRadioTagCommand}" CommandParameter="rock" Style="{StaticResource HardwareChipButton}" Padding="9,4" FontSize="{StaticResource FontSize04}" Margin="0,0,12,0" />
                         </WrapPanel>
 
                         <CheckBox HorizontalAlignment="Right" Content="Hi-Res (256k+ / FLAC) only" IsChecked="{Binding RadioBrowserHiResOnly}" Style="{StaticResource ToggleSwitchStyle}" Margin="0" />
                     </DockPanel>
 
-                    <TextBlock Text="{Binding RadioBrowserStatusText}" FontSize="11.5" Foreground="{StaticResource AccentCyanBrightBrush}" Margin="0,8,0,0" />
+                    <TextBlock Text="{Binding RadioBrowserStatusText}" FontSize="{StaticResource FontSize05}" Foreground="{StaticResource AccentCyanBrightBrush}" Margin="0,8,0,0" />
                 </StackPanel>
             </Border>
 
@@ -297,7 +297,7 @@
                     <ItemsControl ItemsSource="{Binding RadioBrowserResults}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,0,0,7">
+                                <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="10,8" Margin="0,0,0,7">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="36" />
@@ -309,7 +309,7 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
 
-                                        <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{StaticResource Ink05Brush}" BorderBrush="{StaticResource Ink12Brush}" BorderThickness="1" ClipToBounds="True">
+                                        <Border Grid.Column="0" Width="36" Height="36" CornerRadius="{StaticResource Radius03}" Background="{StaticResource Ink05Brush}" BorderBrush="{StaticResource Ink12Brush}" BorderThickness="1" ClipToBounds="True">
                                             <Grid>
                                                 <Path Data="M20,6H8.3L16.56,2.59L15.81,0.74L3.24,5.96C2.5,6.27 2,7 2,7.8V20A2,2 0 0,0 4,22H20A2,2 0 0,0 22,20V8A2,2 0 0,0 20,6M7,20A3,3 0 0,1 4,17A3,3 0 0,1 7,14A3,3 0 0,1 10,17A3,3 0 0,1 7,20M20,12H18V10H16V12H4V8H20V12Z"
                                                       Fill="{StaticResource AccentBlueSubtleBgBrush}"
@@ -323,12 +323,12 @@
                                         </Border>
 
                                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding SubtitleLine}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                                            <TextBlock Text="{Binding Name}" FontSize="{StaticResource FontSize07}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding SubtitleLine}" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
                                         </StackPanel>
 
-                                        <Border Grid.Column="4" Background="{StaticResource Ink08Brush}" BorderBrush="{StaticResource Ink15Brush}" BorderThickness="1" CornerRadius="5" Padding="7,3" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding CodecBadge}" FontSize="10" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="{StaticResource AccentAmberBrush}" />
+                                        <Border Grid.Column="4" Background="{StaticResource Ink08Brush}" BorderBrush="{StaticResource Ink15Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="7,3" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding CodecBadge}" FontSize="{StaticResource FontSize02}" FontWeight="Bold" FontFamily="{StaticResource MonoFont}" Foreground="{StaticResource AccentAmberBrush}" />
                                         </Border>
 
                                         <StackPanel Grid.Column="6" Orientation="Horizontal" VerticalAlignment="Center">
@@ -337,14 +337,14 @@
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource PrimaryButton}"
                                                     Padding="10,6"
-                                                    FontSize="11"
+                                                    FontSize="{StaticResource FontSize04}"
                                                     Margin="0,0,5,0" />
                                             <Button Content="+ Save"
                                                     Command="{Binding DataContext.SaveRadioBrowserStationCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource SecondaryButton}"
                                                     Padding="10,6"
-                                                    FontSize="11" />
+                                                    FontSize="{StaticResource FontSize04}" />
                                         </StackPanel>
                                     </Grid>
                                 </Border>

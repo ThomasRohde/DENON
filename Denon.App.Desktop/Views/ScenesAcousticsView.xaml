@@ -18,7 +18,7 @@
                             Command="{Binding SetAcousticsSubTabCommand}"
                             CommandParameter="Scenes"
                             Padding="12,6"
-                            FontSize="12"
+                            FontSize="{StaticResource FontSize06}"
                             Margin="0,0,8,0"
                             Style="{StaticResource ChipButton}"
                             infra:Chip.IsActive="{Binding AcousticsSubTab, Converter={StaticResource EqualityConverter}, ConverterParameter=Scenes}" />
@@ -26,20 +26,20 @@
                     <Button Command="{Binding SetAcousticsSubTabCommand}"
                             CommandParameter="Automations"
                             Padding="12,6"
-                            FontSize="12"
+                            FontSize="{StaticResource FontSize06}"
                             Style="{StaticResource ChipButton}"
                             infra:Chip.IsActive="{Binding AcousticsSubTab, Converter={StaticResource EqualityConverter}, ConverterParameter=Automations}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Automation Rules" VerticalAlignment="Center" />
-                            <Border Background="{StaticResource Ink08Brush}" BorderBrush="{StaticResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="7" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding EnabledAutomationsBadge}" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentEmeraldBrush}" />
+                            <Border Background="{StaticResource Ink08Brush}" BorderBrush="{StaticResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding EnabledAutomationsBadge}" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentEmeraldBrush}" />
                             </Border>
                         </StackPanel>
                     </Button>
                 </StackPanel>
 
                 <TextBlock Text="Chain Philips Hue &amp; plugin actions onto Smart Scenes, or auto-trigger on App Launch &amp; Night Guard schedules"
-                           FontSize="11"
+                           FontSize="{StaticResource FontSize04}"
                            Foreground="{StaticResource TextMutedBrush}"
                            HorizontalAlignment="Right"
                            VerticalAlignment="Center" />
@@ -77,20 +77,20 @@
                                     Command="{Binding CaptureCurrentStateToSceneCommand}"
                                     Style="{StaticResource SecondaryButton}"
                                     Padding="9,5"
-                                    FontSize="11"
+                                    FontSize="{StaticResource FontSize04}"
                                     Margin="0,0,6,0"
                                     ToolTip="Save current receiver input, sound mode, volume &amp; acoustics as a new scene" />
                             <Button Content="+ New"
                                     Command="{Binding AddSceneCommand}"
                                     Style="{StaticResource SecondaryButton}"
                                     Padding="9,5"
-                                    FontSize="11"
+                                    FontSize="{StaticResource FontSize04}"
                                     Margin="0,0,6,0" />
                             <Button Content="Save Scenes"
                                     Command="{Binding SaveSettingsCommand}"
                                     Style="{StaticResource PrimaryButton}"
                                     Padding="10,5"
-                                    FontSize="11" />
+                                    FontSize="{StaticResource FontSize04}" />
                         </StackPanel>
                     </DockPanel>
 
@@ -98,7 +98,7 @@
                         <ItemsControl ItemsSource="{Binding ScenePresets}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="11" Padding="12,10" Margin="0,0,0,9">
+                                    <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="12,10" Margin="0,0,0,9">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto" />
@@ -109,17 +109,17 @@
                                             <Border Grid.Column="0"
                                                     Width="44"
                                                     Height="44"
-                                                    CornerRadius="10"
+                                                    CornerRadius="{StaticResource Radius04}"
                                                     Background="{Binding AccentBrush}"
                                                     Margin="0,0,12,0"
                                                     VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Badge}" FontSize="11" FontWeight="Black" Foreground="{StaticResource TextOnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding Badge}" FontSize="{StaticResource FontSize04}" FontWeight="Black" Foreground="{StaticResource TextOnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             </Border>
 
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,10,0">
-                                                <TextBlock Text="{Binding Name}" FontSize="13.5" FontWeight="Bold" />
-                                                <TextBlock Text="{Binding Description}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,2,0,3" />
-                                                <TextBlock Text="{Binding SummaryLine}" FontSize="10.5" FontFamily="Cascadia Mono, Consolas" Foreground="{StaticResource AccentCyanBrightBrush}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Name}" FontSize="{StaticResource FontSize08}" FontWeight="Bold" />
+                                                <TextBlock Text="{Binding Description}" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,2,0,3" />
+                                                <TextBlock Text="{Binding SummaryLine}" FontSize="{StaticResource FontSize03}" FontFamily="{StaticResource MonoFont}" Foreground="{StaticResource AccentCyanBrightBrush}" TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
 
                                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
@@ -128,14 +128,14 @@
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource PrimaryButton}"
                                                         Padding="11,7"
-                                                        FontSize="11.5"
+                                                        FontSize="{StaticResource FontSize05}"
                                                         Margin="0,0,6,0" />
                                                 <Button Content="Edit"
                                                         Command="{Binding DataContext.SelectSceneCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource SecondaryButton}"
                                                         Padding="9,7"
-                                                        FontSize="11" />
+                                                        FontSize="{StaticResource FontSize04}" />
                                             </StackPanel>
                                         </Grid>
                                     </Border>
@@ -161,14 +161,14 @@
                                     Command="{Binding DataContext.DuplicateSceneCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                     Style="{StaticResource SecondaryButton}"
                                     Padding="8,4"
-                                    FontSize="10.5"
+                                    FontSize="{StaticResource FontSize03}"
                                     Margin="0,0,5,0" />
                             <Button Content="Delete"
                                     Command="{Binding DataContext.RemoveSceneCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                     CommandParameter="{Binding}"
                                     Style="{StaticResource DangerButton}"
                                     Padding="8,4"
-                                    FontSize="10.5" />
+                                    FontSize="{StaticResource FontSize03}" />
                         </StackPanel>
                     </DockPanel>
 
@@ -183,21 +183,21 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Name" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                    <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
+                                    <TextBlock Text="Name" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="{StaticResource FontSize06}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="Badge" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                    <TextBox Text="{Binding Badge, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
+                                    <TextBlock Text="Badge" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding Badge, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="{StaticResource FontSize06}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="4">
-                                    <TextBlock Text="Accent Hex" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                    <TextBox Text="{Binding AccentHex, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" FontFamily="Cascadia Mono, Consolas" />
+                                    <TextBlock Text="Accent Hex" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding AccentHex, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="{StaticResource FontSize06}" FontFamily="{StaticResource MonoFont}" />
                                 </StackPanel>
                             </Grid>
 
-                            <TextBlock Text="Description" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                            <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" Margin="0,0,0,8" />
+                            <TextBlock Text="Description" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                            <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="{StaticResource FontSize06}" Margin="0,0,0,8" />
 
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
@@ -208,38 +208,16 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Input (TV/NET/BD)" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                    <TextBox Text="{Binding InputSource, UpdateSourceTrigger=PropertyChanged}" Tag="Leave blank" Padding="8,6" FontSize="12" />
+                                    <TextBlock Text="Input (TV/NET/BD)" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding InputSource, UpdateSourceTrigger=PropertyChanged}" Tag="Leave blank" Padding="8,6" FontSize="{StaticResource FontSize06}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="Sound Mode" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                    <TextBox Text="{Binding SoundMode, UpdateSourceTrigger=PropertyChanged}" Tag="MOVIE / STEREO" Padding="8,6" FontSize="12" />
+                                    <TextBlock Text="Sound Mode" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding SoundMode, UpdateSourceTrigger=PropertyChanged}" Tag="MOVIE / STEREO" Padding="8,6" FontSize="{StaticResource FontSize06}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="4">
-                                    <TextBlock Text="Target Vol (0-98)" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                    <TextBox Text="{Binding TargetVolumeText, UpdateSourceTrigger=PropertyChanged}" Tag="e.g. 42" Padding="8,6" FontSize="12" />
-                                </StackPanel>
-                            </Grid>
-
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="8" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="8" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="DynVol (OFF/LIT/HEV)" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                    <TextBox Text="{Binding DynamicVolume, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Text="Dimmer (BRI/DIM/OFF)" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                    <TextBox Text="{Binding Dimmer, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="4">
-                                    <TextBlock Text="DynEQ (ON/OFF)" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                    <TextBox Text="{Binding DynamicEqChoice, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
+                                    <TextBlock Text="Target Vol (0-98)" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding TargetVolumeText, UpdateSourceTrigger=PropertyChanged}" Tag="e.g. 42" Padding="8,6" FontSize="{StaticResource FontSize06}" />
                                 </StackPanel>
                             </Grid>
 
@@ -252,28 +230,50 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Sub Trim (-12..12)" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                    <TextBox Text="{Binding SubwooferTrimText, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
+                                    <TextBlock Text="DynVol (OFF/LIT/HEV)" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding DynamicVolume, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="{StaticResource FontSize06}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="Dialog (-12..12)" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                    <TextBox Text="{Binding DialogTrimText, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
+                                    <TextBlock Text="Dimmer (BRI/DIM/OFF)" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding Dimmer, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="{StaticResource FontSize06}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="4">
-                                    <TextBlock Text="Sleep (min)" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                    <TextBox Text="{Binding SleepTimerText, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" />
+                                    <TextBlock Text="DynEQ (ON/OFF)" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding DynamicEqChoice, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="{StaticResource FontSize06}" />
                                 </StackPanel>
                             </Grid>
 
-                            <TextBlock Text="Optional Auto-Play Stream URL" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                            <TextBox Text="{Binding StreamUrl, UpdateSourceTrigger=PropertyChanged}" Tag="Optional http:// stream URL..." Padding="8,6" FontSize="11.5" FontFamily="Cascadia Mono, Consolas" Margin="0,0,0,6" />
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Sub Trim (-12..12)" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding SubwooferTrimText, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="{StaticResource FontSize06}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Dialog (-12..12)" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding DialogTrimText, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="{StaticResource FontSize06}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="4">
+                                    <TextBlock Text="Sleep (min)" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding SleepTimerText, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="{StaticResource FontSize06}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock Text="Optional Auto-Play Stream URL" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                            <TextBox Text="{Binding StreamUrl, UpdateSourceTrigger=PropertyChanged}" Tag="Optional http:// stream URL..." Padding="8,6" FontSize="{StaticResource FontSize05}" FontFamily="{StaticResource MonoFont}" Margin="0,0,0,6" />
 
                             <CheckBox Content="Smooth gentle volume ramp" IsChecked="{Binding SmoothVolumeRamp}" Style="{StaticResource ToggleSwitchStyle}" />
                             <CheckBox Content="Power on AVR" IsChecked="{Binding PowerOn}" Style="{StaticResource ToggleSwitchStyle}" />
                             <CheckBox Content="Auto-unmute AVR" IsChecked="{Binding Unmute}" Style="{StaticResource ToggleSwitchStyle}" />
 
                             <!-- Smart Scenes 2.0: Plugin Action Chain -->
-                            <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,10,0,0">
+                            <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="10" Margin="0,10,0,0">
                                 <StackPanel>
                                     <TextBlock Text="PLUGIN ACTION CHAIN" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,6" />
                                     <Grid Margin="0,0,0,8">
@@ -288,24 +288,24 @@
                                                   ItemsSource="{Binding DataContext.AvailablePluginActions, RelativeSource={RelativeSource AncestorType=Window}}"
                                                   SelectedItem="{Binding DataContext.SelectedScenePluginAction, RelativeSource={RelativeSource AncestorType=Window}}"
                                                   DisplayMemberPath="FullLabel"
-                                                  FontSize="11.5" />
+                                                  FontSize="{StaticResource FontSize05}" />
                                         <TextBox Grid.Column="2"
                                                  Text="{Binding DataContext.SceneActionDelayMsText, RelativeSource={RelativeSource AncestorType=Window}, UpdateSourceTrigger=PropertyChanged}"
                                                  Padding="6,5"
-                                                 FontSize="11"
+                                                 FontSize="{StaticResource FontSize04}"
                                                  ToolTip="Optional delay in ms before running this plugin step" />
                                         <Button Grid.Column="4"
                                                 Content="+ Step"
                                                 Command="{Binding DataContext.AddPluginActionToSceneCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 Style="{StaticResource SecondaryButton}"
                                                 Padding="9,5"
-                                                FontSize="11" />
+                                                FontSize="{StaticResource FontSize04}" />
                                     </Grid>
 
                                     <ItemsControl ItemsSource="{Binding PluginActions}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink12Brush}" BorderThickness="1" CornerRadius="7" Padding="8,5" Margin="0,0,0,5">
+                                                <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink12Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="8,5" Margin="0,0,0,5">
                                                     <DockPanel>
                                                         <Button DockPanel.Dock="Right"
                                                                 Content="✕"
@@ -313,11 +313,11 @@
                                                                 CommandParameter="{Binding}"
                                                                 Style="{StaticResource DangerButton}"
                                                                 Padding="6,2"
-                                                                FontSize="10" />
+                                                                FontSize="{StaticResource FontSize02}" />
                                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                            <TextBlock Text="⚡ " Foreground="{StaticResource AccentAmberBrush}" FontSize="11" />
-                                                            <TextBlock Text="{Binding DisplayName}" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                                                            <TextBlock Text="{Binding DelayMs, StringFormat=' (+{0}ms)'}" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" />
+                                                            <TextBlock Text="⚡ " Foreground="{StaticResource AccentAmberBrush}" FontSize="{StaticResource FontSize04}" />
+                                                            <TextBlock Text="{Binding DisplayName}" FontSize="{StaticResource FontSize05}" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                                            <TextBlock Text="{Binding DelayMs, StringFormat=' (+{0}ms)'}" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource TextMutedBrush}" />
                                                         </StackPanel>
                                                     </DockPanel>
                                                 </Border>
@@ -339,7 +339,7 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="LIVE ACOUSTIC TUNING &amp; AUDYSSEY" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
                         <TextBlock Text="{Binding AcousticsStatusText, StringFormat='  •  {0}'}"
-                                   FontSize="11.5"
+                                   FontSize="{StaticResource FontSize05}"
                                    Foreground="{StaticResource AccentCyanBrightBrush}"
                                    VerticalAlignment="Center" />
                     </StackPanel>
@@ -348,13 +348,13 @@
                                 Command="{Binding ResetAcousticTrimsCommand}"
                                 Style="{StaticResource SecondaryButton}"
                                 Padding="10,5"
-                                FontSize="11"
+                                FontSize="{StaticResource FontSize04}"
                                 Margin="0,0,6,0" />
                         <Button Content="Sync from AVR"
                                 Command="{Binding RefreshAcousticsCommand}"
                                 Style="{StaticResource PrimaryButton}"
                                 Padding="11,5"
-                                FontSize="11" />
+                                FontSize="{StaticResource FontSize04}" />
                     </StackPanel>
                 </DockPanel>
 
@@ -386,7 +386,7 @@
                                                     Command="{Binding DataContext.SetMultEqCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     CommandParameter="{Binding}"
                                                     Padding="10,5"
-                                                    FontSize="11"
+                                                    FontSize="{StaticResource FontSize04}"
                                                     Margin="0,0,6,0" />
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
@@ -398,7 +398,7 @@
                                 <Button Content="{Binding DynamicEqLabel}"
                                         Command="{Binding ToggleDynamicEqCommand}"
                                         Padding="11,5"
-                                        FontSize="11"
+                                        FontSize="{StaticResource FontSize04}"
                                         Style="{StaticResource SuccessChipButton}"
                                         infra:Chip.IsActive="{Binding DynamicEqEnabled}" />
                             </StackPanel>
@@ -424,7 +424,7 @@
                                                     Command="{Binding DataContext.SetDynamicVolumeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     CommandParameter="{Binding}"
                                                     Padding="9,5"
-                                                    FontSize="11"
+                                                    FontSize="{StaticResource FontSize04}"
                                                     Margin="0,0,5,5" />
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
@@ -444,7 +444,7 @@
                                                     Command="{Binding DataContext.SetRestorerCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     CommandParameter="{Binding}"
                                                     Padding="9,5"
-                                                    FontSize="11"
+                                                    FontSize="{StaticResource FontSize04}"
                                                     Margin="0,0,5,5" />
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
@@ -465,7 +465,7 @@
                                                 Command="{Binding DataContext.SetDimmerCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 CommandParameter="{Binding}"
                                                 Padding="11,5"
-                                                FontSize="11"
+                                                FontSize="{StaticResource FontSize04}"
                                                 Margin="0,0,6,0" />
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -476,7 +476,7 @@
                     <!-- Right Acoustic Column: Sub Trim, Dialog Enhancer & Bass/Treble -->
                     <StackPanel Grid.Column="2">
                         <!-- Subwoofer Level Adjust -->
-                        <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource ControlHoverBrush}" BorderThickness="1" CornerRadius="10" Padding="11,8" Margin="0,0,0,8">
+                        <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource ControlHoverBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="11,8" Margin="0,0,0,8">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -488,20 +488,20 @@
                                             Style="{StaticResource HardwareChipButton}"
                                             HorizontalAlignment="Left"
                                             Padding="8,3"
-                                            FontSize="10.5" />
-                                    <TextBlock Text="{Binding SubwooferTrimDisplay}" Style="{StaticResource OledMonoText}" FontSize="17" FontWeight="Bold" Margin="2,3,0,0" />
+                                            FontSize="{StaticResource FontSize03}" />
+                                    <TextBlock Text="{Binding SubwooferTrimDisplay}" Style="{StaticResource OledMonoText}" FontSize="{StaticResource FontSize11}" FontWeight="Bold" Margin="2,3,0,0" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button Content="-3" Command="{Binding StepSubwooferTrimCommand}" CommandParameter="-3" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="11" Margin="0,0,4,0" />
-                                    <Button Content="-1" Command="{Binding StepSubwooferTrimCommand}" CommandParameter="-1" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="11" Margin="0,0,4,0" />
-                                    <Button Content="+1" Command="{Binding StepSubwooferTrimCommand}" CommandParameter="1" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="11" Margin="0,0,4,0" />
-                                    <Button Content="+3" Command="{Binding StepSubwooferTrimCommand}" CommandParameter="3" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="11" />
+                                    <Button Content="-3" Command="{Binding StepSubwooferTrimCommand}" CommandParameter="-3" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="{StaticResource FontSize04}" Margin="0,0,4,0" />
+                                    <Button Content="-1" Command="{Binding StepSubwooferTrimCommand}" CommandParameter="-1" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="{StaticResource FontSize04}" Margin="0,0,4,0" />
+                                    <Button Content="+1" Command="{Binding StepSubwooferTrimCommand}" CommandParameter="1" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="{StaticResource FontSize04}" Margin="0,0,4,0" />
+                                    <Button Content="+3" Command="{Binding StepSubwooferTrimCommand}" CommandParameter="3" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="{StaticResource FontSize04}" />
                                 </StackPanel>
                             </Grid>
                         </Border>
 
                         <!-- Dialog Level Adjust -->
-                        <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource ControlHoverBrush}" BorderThickness="1" CornerRadius="10" Padding="11,8" Margin="0,0,0,8">
+                        <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource ControlHoverBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="11,8" Margin="0,0,0,8">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -513,31 +513,31 @@
                                             Style="{StaticResource HardwareChipButton}"
                                             HorizontalAlignment="Left"
                                             Padding="8,3"
-                                            FontSize="10.5" />
-                                    <TextBlock Text="{Binding DialogTrimDisplay}" Style="{StaticResource OledMonoText}" FontSize="17" FontWeight="Bold" Margin="2,3,0,0" />
+                                            FontSize="{StaticResource FontSize03}" />
+                                    <TextBlock Text="{Binding DialogTrimDisplay}" Style="{StaticResource OledMonoText}" FontSize="{StaticResource FontSize11}" FontWeight="Bold" Margin="2,3,0,0" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button Content="-3" Command="{Binding StepDialogTrimCommand}" CommandParameter="-3" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="11" Margin="0,0,4,0" />
-                                    <Button Content="-1" Command="{Binding StepDialogTrimCommand}" CommandParameter="-1" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="11" Margin="0,0,4,0" />
-                                    <Button Content="+1" Command="{Binding StepDialogTrimCommand}" CommandParameter="1" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="11" Margin="0,0,4,0" />
-                                    <Button Content="+3" Command="{Binding StepDialogTrimCommand}" CommandParameter="3" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="11" />
+                                    <Button Content="-3" Command="{Binding StepDialogTrimCommand}" CommandParameter="-3" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="{StaticResource FontSize04}" Margin="0,0,4,0" />
+                                    <Button Content="-1" Command="{Binding StepDialogTrimCommand}" CommandParameter="-1" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="{StaticResource FontSize04}" Margin="0,0,4,0" />
+                                    <Button Content="+1" Command="{Binding StepDialogTrimCommand}" CommandParameter="1" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="{StaticResource FontSize04}" Margin="0,0,4,0" />
+                                    <Button Content="+3" Command="{Binding StepDialogTrimCommand}" CommandParameter="3" Style="{StaticResource SecondaryButton}" Padding="9,6" FontSize="{StaticResource FontSize04}" />
                                 </StackPanel>
                             </Grid>
                         </Border>
 
                         <!-- Tone Control (Bass & Treble) -->
-                        <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource ControlHoverBrush}" BorderThickness="1" CornerRadius="10" Padding="11,8">
+                        <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource ControlHoverBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="11,8">
                             <StackPanel>
                                 <DockPanel Margin="0,0,0,6">
                                     <Button Content="{Binding ToneControlToggleLabel}"
                                             Command="{Binding ToggleToneControlCommand}"
                                             Style="{StaticResource HardwareChipButton}"
                                             Padding="8,3"
-                                            FontSize="10.5" />
+                                            FontSize="{StaticResource FontSize03}" />
                                     <TextBlock Text="Note: disabled when Dynamic EQ is ON"
                                                HorizontalAlignment="Right"
                                                VerticalAlignment="Center"
-                                               FontSize="10"
+                                               FontSize="{StaticResource FontSize02}"
                                                Foreground="{StaticResource TextMutedBrush}" />
                                 </DockPanel>
                                 <Grid>
@@ -547,17 +547,17 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <DockPanel Grid.Column="0">
-                                        <TextBlock Text="{Binding BassDisplay, StringFormat='Bass {0}'}" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource AccentAmberBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding BassDisplay, StringFormat='Bass {0}'}" FontSize="{StaticResource FontSize05}" FontWeight="SemiBold" Foreground="{StaticResource AccentAmberBrush}" VerticalAlignment="Center" />
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                            <Button Content="-1" Command="{Binding StepBassCommand}" CommandParameter="-1" Style="{StaticResource SecondaryButton}" Padding="8,4" FontSize="10.5" Margin="0,0,3,0" />
-                                            <Button Content="+1" Command="{Binding StepBassCommand}" CommandParameter="1" Style="{StaticResource SecondaryButton}" Padding="8,4" FontSize="10.5" />
+                                            <Button Content="-1" Command="{Binding StepBassCommand}" CommandParameter="-1" Style="{StaticResource SecondaryButton}" Padding="8,4" FontSize="{StaticResource FontSize03}" Margin="0,0,3,0" />
+                                            <Button Content="+1" Command="{Binding StepBassCommand}" CommandParameter="1" Style="{StaticResource SecondaryButton}" Padding="8,4" FontSize="{StaticResource FontSize03}" />
                                         </StackPanel>
                                     </DockPanel>
                                     <DockPanel Grid.Column="2">
-                                        <TextBlock Text="{Binding TrebleDisplay, StringFormat='Treble {0}'}" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource AccentCyanBrightBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding TrebleDisplay, StringFormat='Treble {0}'}" FontSize="{StaticResource FontSize05}" FontWeight="SemiBold" Foreground="{StaticResource AccentCyanBrightBrush}" VerticalAlignment="Center" />
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                            <Button Content="-1" Command="{Binding StepTrebleCommand}" CommandParameter="-1" Style="{StaticResource SecondaryButton}" Padding="8,4" FontSize="10.5" Margin="0,0,3,0" />
-                                            <Button Content="+1" Command="{Binding StepTrebleCommand}" CommandParameter="1" Style="{StaticResource SecondaryButton}" Padding="8,4" FontSize="10.5" />
+                                            <Button Content="-1" Command="{Binding StepTrebleCommand}" CommandParameter="-1" Style="{StaticResource SecondaryButton}" Padding="8,4" FontSize="{StaticResource FontSize03}" Margin="0,0,3,0" />
+                                            <Button Content="+1" Command="{Binding StepTrebleCommand}" CommandParameter="1" Style="{StaticResource SecondaryButton}" Padding="8,4" FontSize="{StaticResource FontSize03}" />
                                         </StackPanel>
                                     </DockPanel>
                                 </Grid>
@@ -596,9 +596,9 @@
                         <DockPanel Grid.Row="0" Margin="0,0,0,12">
                             <TextBlock Text="AUTOMATION TRIGGERS" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button Content="+ App Trigger" Command="{Binding AddAppLaunchRuleCommand}" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="11" Margin="0,0,5,0" />
-                                <Button Content="+ Schedule" Command="{Binding AddScheduleRuleCommand}" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="11" Margin="0,0,5,0" />
-                                <Button Content="Save Automations" Command="{Binding SaveAutomationsCommand}" Style="{StaticResource PrimaryButton}" Padding="11,5" FontSize="11" />
+                                <Button Content="+ App Trigger" Command="{Binding AddAppLaunchRuleCommand}" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="{StaticResource FontSize04}" Margin="0,0,5,0" />
+                                <Button Content="+ Schedule" Command="{Binding AddScheduleRuleCommand}" Style="{StaticResource SecondaryButton}" Padding="9,5" FontSize="{StaticResource FontSize04}" Margin="0,0,5,0" />
+                                <Button Content="Save Automations" Command="{Binding SaveAutomationsCommand}" Style="{StaticResource PrimaryButton}" Padding="11,5" FontSize="{StaticResource FontSize04}" />
                             </StackPanel>
                         </DockPanel>
 
@@ -606,7 +606,7 @@
                             <ItemsControl ItemsSource="{Binding AutomationRules}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="12" Padding="12" Margin="0,0,0,8">
+                                        <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius05}" Padding="12" Margin="0,0,0,8">
                                             <DockPanel>
                                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                                                     <CheckBox IsChecked="{Binding IsEnabled}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,8,0" ToolTip="Enable or pause this automation rule (click Save Automations to persist)" />
@@ -615,23 +615,23 @@
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource SecondaryButton}"
                                                             Padding="9,4"
-                                                            FontSize="10.5"
+                                                            FontSize="{StaticResource FontSize03}"
                                                             Margin="0,0,5,0" />
                                                     <Button Content="Edit"
                                                             Command="{Binding DataContext.SelectAutomationRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource SecondaryButton}"
                                                             Padding="9,4"
-                                                            FontSize="10.5" />
+                                                            FontSize="{StaticResource FontSize03}" />
                                                 </StackPanel>
                                                 <StackPanel VerticalAlignment="Center">
                                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
-                                                        <Border Background="{StaticResource Ink11Brush}" BorderBrush="{StaticResource Ink14Brush}" BorderThickness="1" CornerRadius="5" Padding="6,1.5" Margin="0,0,8,0">
-                                                            <TextBlock Text="{Binding TriggerBadge}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
+                                                        <Border Background="{StaticResource Ink11Brush}" BorderBrush="{StaticResource Ink14Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="6,1.5" Margin="0,0,8,0">
+                                                            <TextBlock Text="{Binding TriggerBadge}" FontSize="{StaticResource FontSize00}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
                                                         </Border>
-                                                        <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                                        <TextBlock Text="{Binding Name}" FontSize="{StaticResource FontSize08}" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
                                                     </StackPanel>
-                                                    <TextBlock Text="{Binding SummaryLine}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding SummaryLine}" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
                                                 </StackPanel>
                                             </DockPanel>
                                         </Border>
@@ -657,23 +657,23 @@
                                     CommandParameter="{Binding}"
                                     Style="{StaticResource DangerButton}"
                                     Padding="8,4"
-                                    FontSize="10.5"
+                                    FontSize="{StaticResource FontSize03}"
                                     HorizontalAlignment="Right" />
                         </DockPanel>
 
                         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,6,0">
                             <StackPanel>
-                                <TextBlock Text="Rule Name" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="12" Margin="0,0,0,8" />
+                                <TextBlock Text="Rule Name" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="{StaticResource FontSize06}" Margin="0,0,0,8" />
 
                                 <CheckBox Content="Rule enabled" IsChecked="{Binding IsEnabled}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,8" />
 
                                 <!-- AppLaunch Fields -->
                                 <StackPanel Visibility="{Binding IsAppLaunchTrigger, Converter={StaticResource BoolToVis}}" Margin="0,0,0,8">
-                                    <TextBlock Text="Watched Process Names (comma-separated, without .exe)" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                    <TextBox Text="{Binding ProcessNames, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas" Padding="8,6" FontSize="11.5" Margin="0,0,0,6" />
-                                    <TextBlock Text="Cooldown (seconds)" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                    <TextBox Text="{Binding CooldownSecondsText, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="11.5" Width="100" HorizontalAlignment="Left" />
+                                    <TextBlock Text="Watched Process Names (comma-separated, without .exe)" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding ProcessNames, UpdateSourceTrigger=PropertyChanged}" FontFamily="{StaticResource MonoFont}" Padding="8,6" FontSize="{StaticResource FontSize05}" Margin="0,0,0,6" />
+                                    <TextBlock Text="Cooldown (seconds)" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding CooldownSecondsText, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="{StaticResource FontSize05}" Width="100" HorizontalAlignment="Left" />
                                 </StackPanel>
 
                                 <!-- TimeOfDay Schedule Fields -->
@@ -684,24 +684,24 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0">
-                                        <TextBlock Text="Local Time (24h HH:mm)" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                        <TextBox Text="{Binding ScheduleTime, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas" Padding="8,6" FontSize="12" />
+                                        <TextBlock Text="Local Time (24h HH:mm)" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                        <TextBox Text="{Binding ScheduleTime, UpdateSourceTrigger=PropertyChanged}" FontFamily="{StaticResource MonoFont}" Padding="8,6" FontSize="{StaticResource FontSize06}" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="2">
-                                        <TextBlock Text="Days" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                        <TextBlock Text="Days" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
                                         <ComboBox ItemsSource="{Binding DataContext.ScheduleDayOptions, RelativeSource={RelativeSource AncestorType=Window}}"
                                                   SelectedItem="{Binding DaysFilter}" />
                                     </StackPanel>
                                 </Grid>
 
-                                <TextBlock Text="Activate Smart Scene (optional Scene ID, e.g. movie-night, late-night)" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                <TextBlock Text="Activate Smart Scene (optional Scene ID, e.g. movie-night, late-night)" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
                                 <ComboBox ItemsSource="{Binding DataContext.ScenePresets, RelativeSource={RelativeSource AncestorType=Window}}"
                                           SelectedValuePath="Id"
                                           DisplayMemberPath="Name"
                                           SelectedValue="{Binding TargetSceneId}"
                                           Margin="0,0,0,10" />
 
-                                <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="10" Padding="10">
+                                <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="10">
                                     <StackPanel>
                                         <TextBlock Text="EXTRA PLUGIN ACTIONS" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,6" />
                                         <Grid Margin="0,0,0,8">
@@ -714,18 +714,18 @@
                                                       ItemsSource="{Binding DataContext.AvailablePluginActions, RelativeSource={RelativeSource AncestorType=Window}}"
                                                       SelectedItem="{Binding DataContext.SelectedRulePluginAction, RelativeSource={RelativeSource AncestorType=Window}}"
                                                       DisplayMemberPath="FullLabel"
-                                                      FontSize="11.5" />
+                                                      FontSize="{StaticResource FontSize05}" />
                                             <Button Grid.Column="2"
                                                     Content="+ Add"
                                                     Command="{Binding DataContext.AddPluginActionToRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     Style="{StaticResource SecondaryButton}"
                                                     Padding="10,5"
-                                                    FontSize="11" />
+                                                    FontSize="{StaticResource FontSize04}" />
                                         </Grid>
                                         <ItemsControl ItemsSource="{Binding PluginActions}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink12Brush}" BorderThickness="1" CornerRadius="7" Padding="8,5" Margin="0,0,0,5">
+                                                    <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink12Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="8,5" Margin="0,0,0,5">
                                                         <DockPanel>
                                                             <Button DockPanel.Dock="Right"
                                                                     Content="✕"
@@ -733,8 +733,8 @@
                                                                     CommandParameter="{Binding}"
                                                                     Style="{StaticResource DangerButton}"
                                                                     Padding="6,2"
-                                                                    FontSize="10" />
-                                                            <TextBlock Text="{Binding DisplayName}" FontSize="11.5" VerticalAlignment="Center" />
+                                                                    FontSize="{StaticResource FontSize02}" />
+                                                            <TextBlock Text="{Binding DisplayName}" FontSize="{StaticResource FontSize05}" VerticalAlignment="Center" />
                                                         </DockPanel>
                                                     </Border>
                                                 </DataTemplate>
@@ -757,13 +757,13 @@
                     </Grid.RowDefinitions>
                     <DockPanel Grid.Row="0" Margin="0,0,0,6">
                         <TextBlock Text="AUTOMATION ACTIVITY LOG" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding AutomationsStatusText}" FontSize="11" Foreground="{StaticResource AccentCyanBrightBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding AutomationsStatusText}" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource AccentCyanBrightBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
                     </DockPanel>
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                         <ItemsControl ItemsSource="{Binding AutomationActivityLog}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding}" FontFamily="Cascadia Mono, Consolas" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,3" />
+                                    <TextBlock Text="{Binding}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,3" />
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>

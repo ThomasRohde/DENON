@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using Denon.App.Desktop.Services;
+using Denon.App.Desktop.Infrastructure;
 using Brush = System.Windows.Media.Brush;
 using Color = System.Windows.Media.Color;
 using FlowDirection = System.Windows.FlowDirection;
@@ -29,8 +30,8 @@ public sealed class VuDial : FrameworkElement
     private const double MaxDesignWidth = 760;
     private const double PivotY = 238;
 
-    private static readonly FontFamily ScaleFont = new("Segoe UI Variable Display, Segoe UI");
-    private static readonly FontFamily ReadoutFont = new("Cascadia Mono, Consolas");
+    private static readonly FontFamily ScaleFont = ThemeResources.Font("DisplayFont");
+    private static readonly FontFamily ReadoutFont = ThemeResources.Font("MonoFont");
     private static readonly Typeface ScaleTypeface = new(ScaleFont, FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
     private static readonly Typeface LightTypeface = new(ScaleFont, FontStyles.Normal, FontWeights.Light, FontStretches.Normal);
     private static readonly Typeface LegendTypeface = new(ScaleFont, FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);

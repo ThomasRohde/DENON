@@ -20,12 +20,12 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="Plugins &amp; Extensions" FontSize="15.5" FontWeight="Bold" VerticalAlignment="Center" />
-                        <Border Background="{StaticResource Ink08Brush}" BorderBrush="{StaticResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="6" Padding="7,1.5" Margin="9,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding PluginSdkBadgeText}" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
+                        <TextBlock Text="Plugins &amp; Extensions" FontSize="{StaticResource FontSize10}" FontWeight="Bold" VerticalAlignment="Center" />
+                        <Border Background="{StaticResource Ink08Brush}" BorderBrush="{StaticResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="7,1.5" Margin="9,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding PluginSdkBadgeText}" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
                         </Border>
                         <TextBlock Text="{Binding PluginsStatusText}"
-                                   FontSize="11"
+                                   FontSize="{StaticResource FontSize04}"
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    Margin="12,0,0,0"
                                    VerticalAlignment="Center"
@@ -38,7 +38,7 @@
                                 CommandParameter="{Binding SelectedPlugin}"
                                 Style="{StaticResource SecondaryButton}"
                                 Padding="10,4.5"
-                                FontSize="11"
+                                FontSize="{StaticResource FontSize04}"
                                 Margin="0,0,6,0"
                                 Visibility="{Binding HasSelectedPlugin, Converter={StaticResource BoolToVis}}"
                                 ToolTip="Enable or disable the currently selected plugin" />
@@ -46,13 +46,13 @@
                                 Command="{Binding RescanPluginsCommand}"
                                 Style="{StaticResource SecondaryButton}"
                                 Padding="10,4.5"
-                                FontSize="11"
+                                FontSize="{StaticResource FontSize04}"
                                 Margin="0,0,6,0" />
                         <Button Content="Plugins Folder"
                                 Command="{Binding OpenExternalPluginsFolderCommand}"
                                 Style="{StaticResource SecondaryButton}"
                                 Padding="10,4.5"
-                                FontSize="11"
+                                FontSize="{StaticResource FontSize04}"
                                 ToolTip="Drop external .NET 10 plugins implementing IDenonPlugin (Denon.App.PluginSdk.dll) here" />
                     </WrapPanel>
                 </Grid>
@@ -83,7 +83,7 @@
                                                             Background="{TemplateBinding Background}"
                                                             BorderBrush="{TemplateBinding BorderBrush}"
                                                             BorderThickness="{TemplateBinding BorderThickness}"
-                                                            CornerRadius="10"
+                                                            CornerRadius="{StaticResource Radius04}"
                                                             Padding="11,7"
                                                             MinWidth="215">
                                                         <ContentPresenter />
@@ -115,14 +115,14 @@
                                     <Border Grid.Column="0"
                                             Width="32"
                                             Height="26"
-                                            CornerRadius="7"
+                                            CornerRadius="{StaticResource Radius02}"
                                             Background="{StaticResource Ink03Brush}"
                                             BorderBrush="{Binding AccentBrush}"
                                             BorderThickness="1"
                                             Margin="0,0,9,0"
                                             VerticalAlignment="Center">
                                         <TextBlock Text="{Binding IconGlyph}"
-                                                   FontSize="9.5"
+                                                   FontSize="{StaticResource FontSize01}"
                                                    FontWeight="Black"
                                                    Foreground="{Binding AccentBrush}"
                                                    HorizontalAlignment="Center"
@@ -130,20 +130,20 @@
                                     </Border>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center" MaxWidth="175">
                                         <DockPanel LastChildFill="True">
-                                            <TextBlock DockPanel.Dock="Right" Text="{Binding VersionTag, StringFormat=' {0}'}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
-                                            <TextBlock Text="{Binding ShortName}" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding VersionTag, StringFormat=' {0}'}" FontSize="{StaticResource FontSize02}" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding ShortName}" FontSize="{StaticResource FontSize07}" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
                                         </DockPanel>
-                                        <TextBlock Text="{Binding StatusText}" FontSize="10.5" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding StatusText}" FontSize="{StaticResource FontSize03}" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                     <Border Grid.Column="2"
                                             Background="{StaticResource Ink03Brush}"
                                             BorderBrush="{Binding HealthBadgeBrush}"
                                             BorderThickness="1"
-                                            CornerRadius="6"
+                                            CornerRadius="{StaticResource Radius02}"
                                             Padding="6,1.5"
                                             Margin="10,0,0,0"
                                             VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding HealthBadgeText}" FontSize="8.5" FontWeight="Bold" Foreground="{Binding HealthBadgeBrush}" />
+                                        <TextBlock Text="{Binding HealthBadgeText}" FontSize="{StaticResource FontSize00}" FontWeight="Bold" Foreground="{Binding HealthBadgeBrush}" />
                                     </Border>
                                 </Grid>
                             </Button>
@@ -171,10 +171,10 @@
                     </Style>
                 </Border.Style>
                 <StackPanel>
-                    <TextBlock Text="{Binding SelectedPlugin.Name}" FontSize="16" FontWeight="Bold" />
-                    <TextBlock Text="{Binding SelectedPlugin.Description}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,12" />
+                    <TextBlock Text="{Binding SelectedPlugin.Name}" FontSize="{StaticResource FontSize10}" FontWeight="Bold" />
+                    <TextBlock Text="{Binding SelectedPlugin.Description}" FontSize="{StaticResource FontSize07}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,12" />
                     <TextBlock Text="Enable this plugin to activate its dashboard, AVR event hooks, and actions."
-                               FontSize="12"
+                               FontSize="{StaticResource FontSize06}"
                                Foreground="{StaticResource AccentAmberBrush}"
                                Margin="0,0,0,12" />
                     <Button Content="{Binding SelectedPlugin.EnableButtonLabel}"
@@ -197,7 +197,7 @@
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="PLUGIN ACTIONS &amp; CAPABILITIES" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
                     <TextBlock Text="{Binding SelectedPlugin.CapabilitiesText, StringFormat='  •  {0}'}"
-                               FontSize="11"
+                               FontSize="{StaticResource FontSize04}"
                                Foreground="{StaticResource TextSecondaryBrush}"
                                VerticalAlignment="Center" />
                 </StackPanel>
@@ -219,16 +219,16 @@
                                     Margin="0,0,6,6"
                                     ToolTip="{Binding Description}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="▶ " Foreground="{StaticResource AccentCyanBrush}" FontSize="10" VerticalAlignment="Center" />
-                                    <TextBlock Text="{Binding DisplayName}" FontSize="11.5" />
+                                    <TextBlock Text="▶ " Foreground="{StaticResource AccentCyanBrush}" FontSize="{StaticResource FontSize02}" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding DisplayName}" FontSize="{StaticResource FontSize05}" />
                                 </StackPanel>
                             </Button>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <TextBlock Text="{Binding SelectedPlugin.AssemblyPath, StringFormat='Source: {0}'}"
-                           FontFamily="Cascadia Mono, Consolas"
-                           FontSize="10.5"
+                           FontFamily="{StaticResource MonoFont}"
+                           FontSize="{StaticResource FontSize03}"
                            Foreground="{StaticResource TextMutedBrush}"
                            Margin="0,4,0,0" />
             </StackPanel>

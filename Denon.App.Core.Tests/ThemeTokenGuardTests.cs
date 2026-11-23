@@ -52,6 +52,18 @@ public sealed partial class ThemeTokenGuardTests
     }
 
     [Fact]
+    public void Xaml_has_no_literal_font_sizes_radii_or_font_names_outside_the_typography_file()
+    {
+        var offenders = XamlFiles()
+            .Where(f => Path.GetFileName(f) is not ("Typography.xaml" or "Colors.Dark.xaml"))
+            .SelectMany(f => Lines(f).Where(l => XamlTypographyLiteral().IsMatch(l.Text)).Select(l => $"{Rel(f)}:{l.Number}: {l.Text.Trim()}"))
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            "Use FontSizeNN, RadiusNN or the font tokens from Themes/Typography.xaml instead of literal values:\n" + string.Join("\n", offenders));
+    }
+
+    [Fact]
     public void Code_has_no_literal_colors_outside_the_allowed_content_files()
     {
         var offenders = CodeFiles()
@@ -88,6 +100,7 @@ public sealed partial class ThemeTokenGuardTests
         var brushes = XKey().Matches(File.ReadAllText(Path.Combine(themes, "Brushes.xaml"))).Select(m => m.Groups[1].Value).ToHashSet();
         var colors = XKey().Matches(File.ReadAllText(Path.Combine(themes, "Colors.Dark.xaml"))).Select(m => m.Groups[1].Value).ToHashSet();
         var styles = XKey().Matches(File.ReadAllText(Path.Combine(themes, "DenonTheme.xaml"))).Select(m => m.Groups[1].Value).ToHashSet();
+        var typography = XKey().Matches(File.ReadAllText(Path.Combine(themes, "Typography.xaml"))).Select(m => m.Groups[1].Value).ToHashSet();
 
         var missing = CodeFiles()
             .SelectMany(f => TokenRead().Matches(File.ReadAllText(f)).Select(m => (File: Rel(f), Kind: m.Groups[1].Value, Token: m.Groups[2].Value)))
@@ -95,6 +108,7 @@ public sealed partial class ThemeTokenGuardTests
             {
                 "Brush" => !brushes.Contains(r.Token + "Brush"),
                 "Style" => !styles.Contains(r.Token),
+                "Font" => !typography.Contains(r.Token),
                 _ => !colors.Contains(r.Token + "Color"),
             })
             .Select(r => $"{r.File}: {r.Kind}(\"{r.Token}\")")
@@ -147,6 +161,10 @@ public sealed partial class ThemeTokenGuardTests
     [GeneratedRegex("""(=\s*"|>)\s*#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?\s*("|<)""")]
     private static partial Regex XamlHexColor();
 
+    // FontSize="11", CornerRadius="8" (a single value; "4,0,0,4" stays allowed), FontFamily="Segoe UI", and the same as setters.
+    [GeneratedRegex("""(\b(FontSize|CornerRadius)="\d+(\.\d+)?"|\bFontFamily="[^"{]+"|Property="(FontSize|CornerRadius)" Value="\d+(\.\d+)?"|Property="FontFamily" Value="[^"{]+")""")]
+    private static partial Regex XamlTypographyLiteral();
+
     [GeneratedRegex("\"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?\"")]
     private static partial Regex CodeHexColor();
 
@@ -160,7 +178,7 @@ public sealed partial class ThemeTokenGuardTests
     [GeneratedRegex(@"\{(?:Static|Dynamic)Resource\s+([A-Za-z_][\w.]*)\s*\}")]
     private static partial Regex ResourceReference();
 
-    [GeneratedRegex("""(?:ThemeResources|HostTheme)\.(Brush|Color|DrawingColor|Hex|Style)\("(\w+)"\)""")]
+    [GeneratedRegex("""(?:ThemeResources|HostTheme)\.(Brush|Color|DrawingColor|Hex|Style|Font)\("(\w+)"\)""")]
     private static partial Regex TokenRead();
 
     [GeneratedRegex(@"<SolidColorBrush[^>]*x:Key=""(\w+Brush)""[^>]*Color=""\{StaticResource (\w+Color)\}""")]
