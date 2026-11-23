@@ -305,7 +305,7 @@ internal sealed class CastDeviceClient : IAsyncDisposable
             next = next with
             {
                 AppId = GetString(a, "appId"),
-                AppName = GetString(a, "displayName"),
+                AppName = CastAppNames.Friendly(GetString(a, "appId"), GetString(a, "displayName")),
                 StatusText = GetString(a, "statusText"),
                 IsIdleScreen = a.TryGetProperty("isIdleScreen", out var idle) && idle.ValueKind == JsonValueKind.True,
                 SessionId = sessionId,

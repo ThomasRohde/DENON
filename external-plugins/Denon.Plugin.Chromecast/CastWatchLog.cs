@@ -14,6 +14,7 @@ namespace Denon.Plugin.Chromecast;
 /// - A session is logged only after it lasts <see cref="DwellSeconds"/> (same 15 s dwell as the host).
 /// - If the title arrives after the app started, the open session gets the title. It does not restart.
 /// - <c>watchedSec</c> counts only PLAYING/BUFFERING time. <c>durationSec</c> is wall-clock time.
+///   Both start when the program first shows (the dwell time is included in both).
 /// - One <c>cast.app_ended</c> summary per app run, with the titles seen.
 /// </summary>
 internal sealed class CastWatchLog
@@ -84,10 +85,21 @@ internal sealed class CastWatchLog
                 if (slot.Active is null && slot.Pending is { } pending &&
                     (now - pending.StartedUtc).TotalSeconds >= DwellSeconds)
                 {
+                    // The receiver may not have been known when the program started (plugin just loaded).
+                    if (pending.ReceiverInput is null && receiverFor(slot.DeviceId) is { IsPoweredOn: true } rx)
+                    {
+                        pending = pending with { ReceiverInput = rx.InputSource, ReceiverSoundMode = rx.SoundMode };
+                    }
+
+                    if (slot.AppRun is { ReceiverInput: null or "" } run && !string.IsNullOrEmpty(pending.ReceiverInput))
+                    {
+                        run.ReceiverInput = pending.ReceiverInput;
+                    }
+
                     slot.Pending = null;
                     slot.Active = new ActiveSession(pending);
                     var data = Payload(slot, pending);
-                    data["dwellConfirmedSec"] = DwellSeconds;
+                    data["dwellConfirmedSec"] = (int)Math.Round((now - pending.StartedUtc).TotalSeconds); // Real seconds since start.
                     _record("session.started", data);
                 }
 
@@ -170,7 +182,7 @@ internal sealed class CastWatchLog
         slot.Active = null;
         var data = Payload(slot, active.Candidate);
         data["durationSec"] = Math.Max(1, (int)Math.Round((now - active.Candidate.StartedUtc).TotalSeconds));
-        data["watchedSec"] = (int)Math.Round(active.WatchedSec);
+        data["watchedSec"] = (int)Math.Round(Math.Min(active.Candidate.WatchedSec, (now - active.Candidate.StartedUtc).TotalSeconds));
         data["reason"] = reason;
         if (active.AverageVolume is { } volume)
         {
@@ -267,9 +279,12 @@ internal sealed class CastWatchLog
             if (_lastTick is { } last && PlayerState is "PLAYING" or "BUFFERING")
             {
                 var seconds = Math.Clamp((now - last).TotalSeconds, 0, 120);
-                if (Active is not null)
+
+                // Count play time from the start of the program, also during the dwell,
+                // so watchedSec and durationSec measure the same period.
+                if ((Active?.Candidate ?? Pending) is { } program)
                 {
-                    Active.WatchedSec += seconds;
+                    program.WatchedSec += seconds;
                 }
 
                 if (AppRun is not null)
@@ -293,6 +308,9 @@ internal sealed class CastWatchLog
         public string? Title { get; set; }
 
         public string? Subtitle { get; set; }
+
+        /// <summary>PLAYING/BUFFERING seconds since <see cref="StartedUtc"/>, dwell included.</summary>
+        public double WatchedSec { get; set; }
     }
 
     private sealed class ActiveSession(Candidate candidate)
@@ -301,8 +319,6 @@ internal sealed class CastWatchLog
         private int _volumeSamples;
 
         public Candidate Candidate { get; } = candidate;
-
-        public double WatchedSec { get; set; }
 
         public double? AverageVolume => _volumeSamples > 0 ? _volumeSum / _volumeSamples : null;
 
@@ -323,7 +339,7 @@ internal sealed class CastWatchLog
 
         public DateTimeOffset StartedUtc { get; } = startedUtc;
 
-        public string ReceiverInput { get; } = receiverInput;
+        public string ReceiverInput { get; set; } = receiverInput;
 
         public double WatchedSec { get; set; }
 

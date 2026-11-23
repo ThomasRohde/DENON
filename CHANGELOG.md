@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Plugins view**: The plugin card now always shows the version (a long name no longer pushes it out), and the header badge shows `SDK v1.15`.
 - **Chromecast dashboard**: Dark-themed drop-downs (the host has no ComboBox theme) and a "No artwork" placeholder.
 - **Local release build**: `release-out/` is now ignored by git.
+- **No double counting of watch time**: Every `session.ended` on the `media` stream now has `coveredSec`, `exclusiveSec` and (when covered) `coveredBy`. One viewing makes parallel sessions (Cast program, LG TV on the HDMI input, Denon "TV Audio" via ARC); the less specific ones are marked as covered for that time. Sum `exclusiveSec` to get real time. New `MediaSessionOverlapTracker` with xUnit tests.
+- **Sessions lost when Windows closes the app**: On logoff, shutdown or an installer upgrade, the app only disposed the host and never stopped plugins or hosted services, so open sessions got no `session.ended`. Both exit paths now share one ordered, bounded stop (plugins → services → dispose). LG TV sessions now end with `app_shutdown` (not `standby`) at app exit, and `plugin_stopped` when the TV plugin is stopped or disabled.
+- **Exact session start times**: `dwellConfirmedSec` on `session.started` is now the real time since the session began (it was always 15, but the check runs on a timer, so the real value is often 16–20 s). `ts - dwellConfirmedSec` is the exact start.
+- **Chromecast watch log**: `watchedSec` now includes play time during the 15 s dwell (it was too low by up to 15 s per program; a 15 s clip was logged as 3 s). Apps get clean names by Cast app id (e.g. DR TV instead of "AXIS 10 PROD - www.drtv-platform.dr.dk"). `receiverInput` is filled in when the Denon becomes known after the program started.
 
 ## [1.14.0] - 2026-11-22
 

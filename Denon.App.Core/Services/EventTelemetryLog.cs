@@ -71,6 +71,7 @@ public sealed class EventTelemetryLog : IAsyncDisposable
     private readonly Channel<TelemetryEventEnvelope> _channel;
     private readonly ConcurrentDictionary<string, OriginWatermark> _originWatermarks = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _ioGate = new(1, 1);
+    private readonly MediaSessionOverlapTracker _sessionOverlap = new();
     private readonly CancellationTokenSource _writerCts = new();
     private readonly Task _writerTask;
 
@@ -177,6 +178,13 @@ public sealed class EventTelemetryLog : IAsyncDisposable
 
         var cleanStream = NormalizeStreamName(stream);
         var now = DateTimeOffset.Now;
+        if (cleanStream == StreamMedia)
+        {
+            // Adds coveredSec / exclusiveSec to session.ended so parallel sessions of one viewing
+            // (cast + LG HDMI + Denon TV Audio) are not counted twice.
+            data = _sessionOverlap.Annotate(device?.Trim() ?? string.Empty, eventName?.Trim() ?? string.Empty, data, now);
+        }
+
         var envelope = new TelemetryEventEnvelope(
             Timestamp: now.ToString("yyyy-MM-ddTHH:mm:sszzz", CultureInfo.InvariantCulture),
             DayOfWeek: now.ToString("ddd", CultureInfo.InvariantCulture),

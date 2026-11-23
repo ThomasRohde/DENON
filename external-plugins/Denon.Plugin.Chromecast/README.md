@@ -37,6 +37,10 @@ Rules:
 - **`watchedSec` counts only PLAYING/BUFFERING time.** `durationSec` is wall-clock time, so a long pause shows as a gap.
 - `avgVolume` is the Denon volume during the session. `receiverInput` lets you join a Cast session to the
   AVR's HDMI session for the same time span.
+- **No double counting.** Denon Desktop 1.15+ adds `coveredSec`, `exclusiveSec` and `coveredBy` to every
+  `session.ended` on the `media` stream. While you cast, the LG TV session on the HDMI input and the Denon
+  "TV Audio" session get `coveredBy: ["cast:<device>"]` for that time. Sum `exclusiveSec` (not `durationSec`)
+  to get real watching time; use the cast session's `title`/`source` to see *what* was watched.
 - `hasTitle: false` means the app does not report titles (for example Netflix). Then `title` is the app name.
 
 Example:

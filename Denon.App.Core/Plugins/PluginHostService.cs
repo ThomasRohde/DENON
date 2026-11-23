@@ -371,8 +371,13 @@ public sealed class PluginHostService : IAsyncDisposable
         return outcomes;
     }
 
+    /// <summary>True from the first <see cref="StopAllAsync"/> call (app exit). Lets telemetry tell an app
+    /// shutdown apart from a device that went offline while plugins report their stop.</summary>
+    public bool IsStoppingAll { get; private set; }
+
     public async Task StopAllAsync(CancellationToken cancellationToken = default)
     {
+        IsStoppingAll = true;
         _stateStore.StateChanged -= OnReceiverStateChanged;
         _receiverController.SceneActivated -= OnReceiverSceneActivated;
 

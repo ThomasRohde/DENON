@@ -314,23 +314,29 @@ public partial class App : System.Windows.Application
         _activationSignal?.Dispose();
         _trayIconController?.Dispose();
 
+        // Reached without ExitApplicationAsync when Windows ends the app (logoff, shutdown,
+        // Restart Manager during an upgrade). Stop plugins and hosted services first, so open
+        // habit sessions get their session.ended events, then dispose. Bounded: Windows gives ~5 s.
         var remainingHost = _host;
         _host = null;
         if (remainingHost is not null)
         {
             try
             {
-                Task.Run(async () =>
-                {
-                    if (remainingHost is IAsyncDisposable asyncHost)
-                    {
-                        await asyncHost.DisposeAsync();
-                    }
-                    else
-                    {
-                        remainingHost.Dispose();
-                    }
-                }).Wait(TimeSpan.FromSeconds(2));
+                remainingHost.Services.GetRequiredService<AppLogStore>().Info("Application shutting down (Windows session ending).");
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                Task.Run(() => StopHostAsync(
+                        remainingHost,
+                        pluginTimeout: TimeSpan.FromSeconds(1.5),
+                        stopTimeout: TimeSpan.FromSeconds(1.5),
+                        disposeTimeout: TimeSpan.FromSeconds(1.5)))
+                    .Wait(TimeSpan.FromSeconds(4.5));
             }
             catch
             {
@@ -384,6 +390,49 @@ public partial class App : System.Windows.Application
         _ = ExitApplicationAsync();
     }
 
+    /// <summary>
+    /// Ordered, bounded host stop shared by both exit paths: plugins first (they write their
+    /// own session.ended), then hosted services (telemetry flushes app_shutdown sessions), then disposal.
+    /// Call it off the Dispatcher thread.
+    /// </summary>
+    private static async Task StopHostAsync(IHost host, TimeSpan pluginTimeout, TimeSpan stopTimeout, TimeSpan disposeTimeout)
+    {
+        try
+        {
+            var pluginHost = host.Services.GetService<PluginHostService>();
+            if (pluginHost is not null)
+            {
+                await pluginHost.StopAllAsync().WaitAsync(pluginTimeout);
+            }
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            await host.StopAsync(stopTimeout);
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            if (host is IAsyncDisposable asyncHost)
+            {
+                await asyncHost.DisposeAsync().AsTask().WaitAsync(disposeTimeout);
+            }
+            else
+            {
+                host.Dispose();
+            }
+        }
+        catch
+        {
+        }
+    }
+
     private async Task ExitApplicationAsync()
     {
         if (_isExiting)
@@ -425,43 +474,12 @@ public partial class App : System.Windows.Application
                 // can never deadlock against DispatcherSynchronizationContext!
                 try
                 {
-                    await Task.Run(async () =>
-                    {
-                        try
-                        {
-                            var pluginHost = hostToStop.Services.GetService<PluginHostService>();
-                            if (pluginHost is not null)
-                            {
-                                await pluginHost.StopAllAsync().WaitAsync(TimeSpan.FromSeconds(2));
-                            }
-                        }
-                        catch
-                        {
-                        }
-
-                        try
-                        {
-                            await hostToStop.StopAsync(TimeSpan.FromSeconds(3));
-                        }
-                        catch
-                        {
-                        }
-
-                        try
-                        {
-                            if (hostToStop is IAsyncDisposable asyncHost)
-                            {
-                                await asyncHost.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3));
-                            }
-                            else
-                            {
-                                hostToStop.Dispose();
-                            }
-                        }
-                        catch
-                        {
-                        }
-                    }).WaitAsync(TimeSpan.FromSeconds(5));
+                    await Task.Run(() => StopHostAsync(
+                            hostToStop,
+                            pluginTimeout: TimeSpan.FromSeconds(2),
+                            stopTimeout: TimeSpan.FromSeconds(3),
+                            disposeTimeout: TimeSpan.FromSeconds(3)))
+                        .WaitAsync(TimeSpan.FromSeconds(5));
                 }
                 catch
                 {

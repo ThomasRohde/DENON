@@ -560,7 +560,12 @@ public sealed class EventTelemetryMonitorService : BackgroundService
             // Track LG Smart TV watching sessions on the `media` stream
             var tv = plugins.FirstOrDefault(static p => p.Id.Equals("smart-tv", StringComparison.OrdinalIgnoreCase));
             var tvCandidate = BuildTvMediaCandidate(tv, nowUtc);
-            var tvEndReason = tv is null || tv.Health != PluginHealthState.Connected ? "standby" : "switched";
+            // App exit or a stopped/disabled plugin is not the TV going to standby.
+            var tvEndReason = _pluginHostService.IsStoppingAll
+                ? "app_shutdown"
+                : tv is { IsStarted: false } || tv is { IsEnabled: false }
+                    ? "plugin_stopped"
+                    : tv is null || tv.Health != PluginHealthState.Connected ? "standby" : "switched";
             UpdateMediaSlotLocked(_tvSession, tvCandidate, nowUtc, tvEndReason);
 
             // Track Philips Hue lighting status transitions on the `lighting` stream
@@ -704,7 +709,9 @@ public sealed class EventTelemetryMonitorService : BackgroundService
         slot.Active = active;
 
         var data = BuildSessionPayload(candidate);
-        data["dwellConfirmedSec"] = dwellSeconds;
+        // Real seconds since the candidate started (>= dwellSeconds; ticks add a few seconds),
+        // so readers can compute the exact start time as ts - dwellConfirmedSec.
+        data["dwellConfirmedSec"] = (int)Math.Round((nowUtc - candidate.StartedUtc).TotalSeconds);
         if (candidate.InitialVolume.HasValue)
         {
             data["volume"] = candidate.InitialVolume.Value;
