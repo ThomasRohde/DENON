@@ -71,6 +71,29 @@ public sealed class AudioMeterSyncTests
     }
 
     [Fact]
+    public void Vu_scale_follows_the_classic_law()
+    {
+        // 0 VU at -7.2 dBFS (level 0.82); +3 VU is full scale; deflection is proportional to amplitude.
+        Assert.Equal(0.0, VuMeterScale.LevelToVu(0.82), 6);
+        Assert.Equal(1.0, VuMeterScale.VuToDeflection(3), 6);
+        Assert.Equal(Math.Pow(10, -3 / 20.0), VuMeterScale.VuToDeflection(0), 6); // ≈0.708
+        Assert.Equal(0.5, VuMeterScale.VuToDeflection(-3), 2);
+        Assert.True(VuMeterScale.VuToDeflection(-20) < 0.08);
+
+        Assert.Equal(0, VuMeterScale.LevelToDeflection(0));                       // Silence rests at the stop.
+        Assert.Equal(VuMeterScale.MaxDeflection, VuMeterScale.LevelToDeflection(1)); // Overload pins slightly past +3.
+    }
+
+    [Theory]
+    [InlineData(0.0, "−∞")]
+    [InlineData(0.82, "−7.2")]
+    [InlineData(1.0, "0.0")]
+    public void Vu_readout_uses_a_true_minus_sign(double level, string expected)
+    {
+        Assert.Equal(expected, VuMeterScale.FormatDbfs(level));
+    }
+
+    [Fact]
     public void Simulation_fades_out_at_very_low_volume()
     {
         Assert.Equal(0, AudioMeterSourceRouter.SimulationScale(0, 0.30, 0.66));

@@ -70,6 +70,19 @@ public partial class App : System.Windows.Application
         }
 
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        if (isScreenshotMode)
+        {
+            // Screenshots use default settings and no plugins from this PC: README images must not show
+            // the user's own receiver, stations, lights, TV or IP addresses.
+            var showcaseRoot = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "DenonDesktop-showcase-" + Environment.ProcessId);
+            if (System.IO.Directory.Exists(showcaseRoot))
+            {
+                System.IO.Directory.Delete(showcaseRoot, recursive: true);
+            }
+
+            AppDataPaths.UseRootDirectory(showcaseRoot);
+        }
+
         AppDataPaths.EnsureCreated();
 
         try

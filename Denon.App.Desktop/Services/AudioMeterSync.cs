@@ -96,6 +96,35 @@ public static class AudioMeterSourceRouter
 }
 
 /// <summary>
+/// Classic VU scale law for the analog dials. Meter levels are 0..1 over 40 dB (-40 dBFS = 0, 0 dBFS = 1).
+/// 0 VU sits at <see cref="ZeroVuDbfs"/>; needle deflection is proportional to amplitude (not dB), with
+/// +3 VU at full scale, so -20..-3 spreads over the left half and 0..+3 crowds into the red zone, like a real VU.
+/// </summary>
+public static class VuMeterScale
+{
+    /// <summary>Program level that reads 0 VU.</summary>
+    public const double ZeroVuDbfs = -7.2;
+
+    /// <summary>Highest deflection: a touch past +3 VU, against the pin.</summary>
+    public const double MaxDeflection = 1.04;
+
+    public static double LevelToDbfs(double level) => (Math.Clamp(level, 0.0, 1.0) * 40.0) - 40.0;
+
+    public static double LevelToVu(double level) => LevelToDbfs(level) - ZeroVuDbfs;
+
+    /// <summary>0 at rest, 1 at +3 VU.</summary>
+    public static double VuToDeflection(double vu) => Math.Clamp(Math.Pow(10.0, (vu - 3.0) / 20.0), 0.0, MaxDeflection);
+
+    /// <summary>Needle deflection for a meter level; silence rests at 0.</summary>
+    public static double LevelToDeflection(double level) => level <= 0.003 ? 0.0 : VuToDeflection(LevelToVu(level));
+
+    /// <summary>"−7.4" style readout in dBFS (true minus sign); "−∞" for silence.</summary>
+    public static string FormatDbfs(double level) => level <= 0.003
+        ? "−∞"
+        : LevelToDbfs(level).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture).Replace('-', '−');
+}
+
+/// <summary>
 /// Thread-safe ring of recent meter frames (stereo level + optional 31 RTA bands) with tick timestamps.
 /// Lets the UI show the frame from <c>delayMs</c> ago, so meters for audio streamed to the Denon line up
 /// with what the speakers play after the HEOS buffer.

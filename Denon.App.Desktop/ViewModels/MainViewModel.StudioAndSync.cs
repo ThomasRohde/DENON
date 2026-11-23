@@ -160,6 +160,17 @@ public sealed partial class MainViewModel
             return AudioMeterSource.Off;
         }
 
+        if (_freezeVuForScreenshots)
+        {
+            // Screenshot showcase: a static, music-like spectrum (warm low end, gentle high-frequency roll-off).
+            for (var i = 0; i < 31; i++)
+            {
+                bandsBuffer[i] = Math.Clamp(0.86 - (Math.Pow((i - 7) / 25.0, 2) * 0.5) + (0.09 * Math.Sin(i * 1.9)), 0.05, 0.97);
+            }
+
+            return AudioMeterSource.Denon;
+        }
+
         var hasPcSignal = _liveAudioAnalyzer?.GetLatestFrame().IsLiveSignal ?? false;
         var hasStreamFrame = TryGetAppStreamMeterFrame(out _, out _, bandsBuffer);
         var source = ResolveMeterSource(hasPcSignal, hasStreamFrame);

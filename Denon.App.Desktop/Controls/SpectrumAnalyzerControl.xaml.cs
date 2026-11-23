@@ -1,148 +1,94 @@
-using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Shapes;
 using Denon.App.Desktop.Services;
 using Color = System.Windows.Media.Color;
-using Rectangle = System.Windows.Shapes.Rectangle;
 
 namespace Denon.App.Desktop.Controls;
 
+/// <summary>31-band LED spectrum (RTA) with gravity peak caps and bloom (<see cref="SpectrumLedView"/>).</summary>
 public partial class SpectrumAnalyzerControl : System.Windows.Controls.UserControl
 {
     private const int BandCount = 31;
+    private const double PeakHoldSeconds = 0.45;
+    private const double PeakGravity = 2.4; // level units per second², after the hold
 
-    private readonly Rectangle[] _bars = new Rectangle[BandCount];
-    private readonly Rectangle[] _peaks = new Rectangle[BandCount];
-    private readonly double[] _smoothed = new double[BandCount];
-    private readonly double[] _peakHold = new double[BandCount];
-    private readonly LinearGradientBrush _barBrush;
-    private readonly SolidColorBrush _peakBrush;
-    private bool _barsBuilt;
+    private readonly SpectrumState _state = new(BandCount);
+    private readonly double[] _peakVelocity = new double[BandCount];
+    private readonly double[] _peakHoldLeft = new double[BandCount];
     private AudioMeterSource? _lastSource;
 
     public SpectrumAnalyzerControl()
     {
         InitializeComponent();
-
-        _barBrush = new LinearGradientBrush
-        {
-            StartPoint = new System.Windows.Point(0, 1),
-            EndPoint = new System.Windows.Point(0, 0),
-        };
-        _barBrush.GradientStops.Add(new GradientStop(Color.FromRgb(14, 165, 233), 0.0));
-        _barBrush.GradientStops.Add(new GradientStop(Color.FromRgb(0, 212, 255), 0.58));
-        _barBrush.GradientStops.Add(new GradientStop(Color.FromRgb(245, 158, 11), 0.84));
-        _barBrush.GradientStops.Add(new GradientStop(Color.FromRgb(239, 68, 68), 1.0));
-        _barBrush.Freeze();
-
-        _peakBrush = new SolidColorBrush(Color.FromRgb(251, 191, 36));
-        _peakBrush.Freeze();
+        BarsView.State = _state;
+        GlowView.State = _state;
+        ApplySource(AudioMeterSource.Off);
     }
 
     public void SetBandsImmediate(double[] bands, double deltaSeconds, AudioMeterSource source)
     {
-        if (!_barsBuilt)
-        {
-            BuildVisualBars();
-        }
-
-        var w = BarsCanvas.ActualWidth;
-        var h = BarsCanvas.ActualHeight;
-        if (w <= 10 || h <= 10 || bands.Length < BandCount)
+        if (bands.Length < BandCount)
         {
             return;
         }
 
-        if (_lastSource != source)
-        {
-            _lastSource = source;
-            SignalModeLabel.Text = AudioMeterSourceRouter.RtaLabel(source);
-        }
+        ApplySource(source);
 
         var dt = Math.Clamp(deltaSeconds, 0.001, 0.08);
-        var attack = 1.0 - Math.Exp(-dt / 0.012);
-        var release = 1.0 - Math.Exp(-dt / 0.095);
-        var peakFall = dt * 0.42;
-
-        var slotWidth = w / BandCount;
-        var barWidth = Math.Max(3.0, slotWidth - 3.0);
+        var attack = 1.0 - Math.Exp(-dt / 0.010);
+        var release = 1.0 - Math.Exp(-dt / 0.110);
+        var levels = _state.Levels;
+        var peaks = _state.Peaks;
 
         for (var i = 0; i < BandCount; i++)
         {
             var target = Math.Clamp(bands[i], 0.0, 1.0);
-            _smoothed[i] += (target - _smoothed[i]) * (target > _smoothed[i] ? attack : release);
-            if (_smoothed[i] < 0.004) _smoothed[i] = 0;
-
-            if (_smoothed[i] >= _peakHold[i])
+            levels[i] += (target - levels[i]) * (target > levels[i] ? attack : release);
+            if (levels[i] < 0.004)
             {
-                _peakHold[i] = _smoothed[i];
+                levels[i] = 0;
+            }
+
+            // Peak caps: jump up, hold, then fall with gravity.
+            if (levels[i] >= peaks[i])
+            {
+                peaks[i] = levels[i];
+                _peakVelocity[i] = 0;
+                _peakHoldLeft[i] = PeakHoldSeconds;
+            }
+            else if (_peakHoldLeft[i] > 0)
+            {
+                _peakHoldLeft[i] -= dt;
             }
             else
             {
-                _peakHold[i] = Math.Max(_smoothed[i], _peakHold[i] - peakFall);
+                _peakVelocity[i] += PeakGravity * dt;
+                peaks[i] = Math.Max(levels[i], peaks[i] - (_peakVelocity[i] * dt));
             }
-
-            var barH = Math.Max(2.0, _smoothed[i] * (h - 4.0));
-            var left = (i * slotWidth) + 1.5;
-
-            var rect = _bars[i];
-            rect.Width = barWidth;
-            rect.Height = barH;
-            Canvas.SetLeft(rect, left);
-            Canvas.SetTop(rect, h - barH);
-
-            var peak = _peaks[i];
-            peak.Width = barWidth;
-            var peakY = Math.Max(0, h - Math.Max(3.0, _peakHold[i] * (h - 4.0)) - 3.0);
-            Canvas.SetLeft(peak, left);
-            Canvas.SetTop(peak, peakY);
-            peak.Opacity = _peakHold[i] > 0.03 ? 0.92 : 0.12;
         }
+
+        BarsView.InvalidateVisual();
+        GlowView.InvalidateVisual();
     }
 
-    private void BarsCanvas_SizeChanged(object sender, SizeChangedEventArgs e)
+    private void ApplySource(AudioMeterSource source)
     {
-        if (!_barsBuilt)
-        {
-            BuildVisualBars();
-        }
-    }
-
-    private void BuildVisualBars()
-    {
-        if (_barsBuilt)
+        if (_lastSource == source)
         {
             return;
         }
 
-        _barsBuilt = true;
-        BarsCanvas.Children.Clear();
+        _lastSource = source;
+        var color = AnalogVuMeterControl.SourceColor(source);
+        SignalModeLabel.Text = AudioMeterSourceRouter.RtaLabel(source);
+        SignalModeLabel.Foreground = Frozen(new SolidColorBrush(color));
+        SourcePill.Background = Frozen(new SolidColorBrush(Color.FromArgb(28, color.R, color.G, color.B)));
+        SourcePill.BorderBrush = Frozen(new SolidColorBrush(Color.FromArgb(90, color.R, color.G, color.B)));
+        SourcePill.ToolTip = AnalogVuMeterControl.SourceToolTip(source);
+    }
 
-        for (var i = 0; i < BandCount; i++)
-        {
-            var bar = new Rectangle
-            {
-                Fill = _barBrush,
-                RadiusX = 1.5,
-                RadiusY = 1.5,
-                Width = 5,
-                Height = 2,
-            };
-            var peak = new Rectangle
-            {
-                Fill = _peakBrush,
-                RadiusX = 1,
-                RadiusY = 1,
-                Width = 5,
-                Height = 2.5,
-                Opacity = 0.12,
-            };
-
-            _bars[i] = bar;
-            _peaks[i] = peak;
-            BarsCanvas.Children.Add(bar);
-            BarsCanvas.Children.Add(peak);
-        }
+    private static SolidColorBrush Frozen(SolidColorBrush brush)
+    {
+        brush.Freeze();
+        return brush;
     }
 }

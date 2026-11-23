@@ -949,11 +949,13 @@ public sealed partial class MainViewModel
         _hasLoadedAcousticsOnce = true;
         _freezeVuForScreenshots = true;
         _vuSource = AudioMeterSource.Denon;
+        OnPropertyChanged(nameof(ShowControlDeckInsights));
 
         IsLivePushConnected = true;
         ShowVuMeters = true;
-        VuLeftLevel = 0.68;
-        VuRightLevel = 0.74;
+        MeterDisplayMode = "Both"; // Show the VU pair and the LED spectrum.
+        VuLeftLevel = 0.80;        // ≈ −1 VU
+        VuRightLevel = 0.835;      // ≈ +0.6 VU
         IsVuLiveSignal = true;
 
         // Populate Acoustics showcase

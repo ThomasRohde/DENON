@@ -172,7 +172,8 @@ public sealed partial class MainViewModel
 
     public bool HasRoomInsights => RoomInsights.Count > 0;
 
-    public bool ShowControlDeckInsights => McpEnableRoomDoctor && RoomInsights.Count > 0;
+    // The screenshot showcase has no live receiver connection, so its "AVR offline" insight is not real.
+    public bool ShowControlDeckInsights => McpEnableRoomDoctor && RoomInsights.Count > 0 && !_freezeVuForScreenshots;
 
     public RoomInsight? PrimaryRoomInsight => RoomInsights.FirstOrDefault();
 
