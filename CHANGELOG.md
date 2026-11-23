@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-11-23
+
+### Changed
+- **Front-panel layout**: The 206-px sidebar is now a slim icon rail in three groups (listen: Deck, Music, Stations, Cast; room: Scenes, Plugins; system: Brain, Settings, Health, Help) with one badge per connected device at the bottom. The telemetry card became a status line along the bottom of the window, and Help moved from the title bar to the rail (F1 still works).
+- **Control Deck in two columns**: a listening stage (now playing, meters, scenes and stations) and a control rail with everything that changes the receiver: volume, source, sound mode, and a new "Power & zones" card for the sleep timer, ECO and Zone 2.
+- **Apple TV artwork in the now-playing hero**: the hero accepts an artwork file from a plugin's own data folder (and nothing else on disk), and asks again every 15 s while the artwork is missing, as for the Chromecast. Needs Apple TV plugin 0.3.0.
+- **README screenshots** show the front-panel layout.
+
 ## [1.21.0] - 2026-11-23
 
 ### Removed

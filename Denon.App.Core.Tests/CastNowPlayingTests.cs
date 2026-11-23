@@ -81,6 +81,17 @@ public sealed class CastNowPlayingTests
         Assert.Equal(expected, NowPlayingResolver.TryReadCastImageUrl(json));
     }
 
+    [Theory]
+    [InlineData("file:///C:/Data/plugins/data/appletv/artwork/tv1/abc.jpg", "file:///C:/Data/plugins/data/appletv/artwork/tv1/abc.jpg")]
+    [InlineData("file:///C:/Data/plugins/data/appletv/../secret.jpg", null)]
+    [InlineData("file:///C:/Data/plugins/data/appletv-other/x.jpg", null)]
+    [InlineData("file://server/share/x.jpg", null)]
+    public void Local_artwork_is_read_only_from_the_plugin_data_folder(string url, string? expected)
+    {
+        var json = $"{{\"imageUrl\":\"{url}\"}}";
+        Assert.Equal(expected, NowPlayingResolver.TryReadCastImageUrl(json, @"C:\Data\plugins\data\appletv"));
+    }
+
     [Fact]
     public void Netflix_without_title_shows_the_app_name()
     {

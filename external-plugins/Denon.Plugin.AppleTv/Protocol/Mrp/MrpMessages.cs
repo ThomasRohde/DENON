@@ -29,6 +29,7 @@ internal static class MrpExtension
     public const int SetState = 9;
     public const int DeviceInfo = 20;
     public const int ClientUpdatesConfig = 21;
+    public const int PlaybackQueueRequest = 37;
     public const int SetConnectionState = 42;
     public const int SetNowPlayingClient = 50;
     public const int SetNowPlayingPlayer = 51;
@@ -116,6 +117,19 @@ internal static class MrpMessages
     /// <summary>SEND_COMMAND (pyatv: messages.command): SendCommandMessage { command = 1 }.</summary>
     public static byte[] SendCommand(string identifier, MrpCommand command) =>
         Create(MrpType.SendCommand, identifier, (MrpExtension.SendCommand, new ProtoWriter().Uint(1, (ulong)command)));
+
+    /// <summary>
+    /// PLAYBACK_QUEUE_REQUEST (pyatv: messages.playback_queue_request): location (1), length (2) = 1,
+    /// artworkWidth (4) = -1 (keep the aspect), artworkHeight (5), returnContentItemAssetsInUserCompletion (13).
+    /// The Apple TV answers with SET_STATE that holds the playing item, its artwork bytes included.
+    /// </summary>
+    public static byte[] PlaybackQueueRequest(string identifier, int location, double artworkHeight = 400) =>
+        Create(MrpType.PlaybackQueueRequest, identifier, (MrpExtension.PlaybackQueueRequest, new ProtoWriter()
+            .Int(1, location)
+            .Int(2, 1)
+            .Double(4, -1)
+            .Double(5, artworkHeight)
+            .Bool(13, true)));
 
     public static byte[] Heartbeat(string identifier) => Create(MrpType.GenericMessage, identifier);
 }

@@ -1,3 +1,4 @@
+using Denon.App.Core.Infrastructure;
 using Denon.App.Core.Services;
 
 namespace Denon.App.Desktop.ViewModels;
@@ -43,10 +44,10 @@ public sealed partial class MainViewModel
             _castArtUrl = string.Empty;
         }
 
-        // Fetch on a new program; for a Chromecast retry a missing artwork at most every 15 s (it can arrive after
-        // the title). The Apple TV plugin has artwork only when the app sends an artwork URL: ask once per program.
+        // Fetch on a new program; retry a missing artwork at most every 15 s (it can arrive after the title: the
+        // Chromecast sends it later, the Apple TV plugin fetches it from the Apple TV first).
         if (isNewProgram ||
-            (!cast.IsAppleTv && _castArtUrl.Length == 0 && DateTimeOffset.UtcNow - _castArtFetchedUtc > TimeSpan.FromSeconds(15)))
+            (_castArtUrl.Length == 0 && DateTimeOffset.UtcNow - _castArtFetchedUtc > TimeSpan.FromSeconds(15)))
         {
             _castArtFetchedUtc = DateTimeOffset.UtcNow;
             _ = FetchCastArtworkAsync(key, cast.PluginId, cast.DeviceName);
@@ -64,7 +65,9 @@ public sealed partial class MainViewModel
                 "now-playing",
                 new Dictionary<string, string> { ["device"] = deviceName, ["includeImage"] = "false" });
 
-            var url = result.Success ? NowPlayingResolver.TryReadCastImageUrl(result.DataJson) : null;
+            var url = result.Success
+                ? NowPlayingResolver.TryReadCastImageUrl(result.DataJson, AppDataPaths.GetPluginDataDirectory(pluginId))
+                : null;
             if (url is null)
             {
                 return;

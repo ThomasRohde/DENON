@@ -2,6 +2,16 @@
 
 Released separately from Denon Desktop with tags `appletv-vX.Y.Z`.
 
+## [0.3.0] - 2026-11-23
+
+Needs Denon Desktop **1.22.0** or later to show the artwork.
+
+### Added
+- **Artwork**: when the app has artwork for the program, the plugin asks the Apple TV for it (PLAYBACK_QUEUE_REQUEST, as pyatv does), saves it in the plugin data folder (the newest 30 images per Apple TV) and gives it to the now-playing hero.
+
+### Fixed
+- **DRTV autoplay**: when an app goes on to the next program by itself, tvOS sometimes names no player until you pause. While the Apple TV is awake and nothing is reported, the plugin now asks for the playback queue once a minute, and shows a player that starts to play without being named.
+
 ## [0.2.0] - 2026-11-23
 
 Needs Denon Desktop **1.21.0** or later (Plugin SDK 2.0).

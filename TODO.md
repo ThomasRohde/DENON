@@ -72,6 +72,12 @@ Native .NET (no Python), protocol logic ported from pyatv (MIT). See `external-p
 - [ ] Hide or grey out the hero's pause button when the app does not support pause (read `supportedCommands`
       from SET_STATE).
 - [ ] Verify live with the user's OK: Denon automations on wake/sleep, `key`, `launch-app`, `power-on/off`.
+- [ ] DRTV autoplay: when DRTV goes on to the next episode by itself, tvOS reports no player until the user
+      pauses/resumes (seen 2026-11-23: "Løftet" -> "Straffen"; 7 stale paused avkit players, no now-playing client).
+      0.3.0 asks for the playback queue once a minute while nothing is reported, and shows a player that starts
+      playing without a client. Not verified live yet: check at the next autoplay (log line "Playback queue shows …").
+- [x] DRTV artwork for the hero: fetched with PLAYBACK_QUEUE_REQUEST, saved in the plugin data folder (0.3.0;
+      fetched live 2026-11-23 for "Maria Wern: Straffen").
 
 ## Theming and skinning (2.0.0)
 

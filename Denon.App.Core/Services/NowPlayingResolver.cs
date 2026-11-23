@@ -346,10 +346,11 @@ public static class NowPlayingResolver
     }
 
     /// <summary>
-    /// The artwork URL from the Chromecast plugin's <c>now-playing</c> action data (<c>"imageUrl"</c>).
-    /// Only absolute http(s) URLs; null otherwise.
+    /// The artwork URL from a streamer plugin's <c>now-playing</c> action data (<c>"imageUrl"</c>).
+    /// Absolute http(s) URLs, and local files inside <paramref name="pluginDataDirectory"/> (the Apple TV plugin
+    /// saves the artwork it fetches there); null otherwise.
     /// </summary>
-    public static string? TryReadCastImageUrl(string? nowPlayingDataJson)
+    public static string? TryReadCastImageUrl(string? nowPlayingDataJson, string? pluginDataDirectory = null)
     {
         if (string.IsNullOrWhiteSpace(nowPlayingDataJson))
         {
@@ -363,7 +364,7 @@ public static class NowPlayingResolver
                 doc.RootElement.TryGetProperty("imageUrl", out var image) &&
                 image.ValueKind == System.Text.Json.JsonValueKind.String &&
                 Uri.TryCreate(image.GetString(), UriKind.Absolute, out var uri) &&
-                uri.Scheme is "http" or "https")
+                (uri.Scheme is "http" or "https" || IsFileInside(uri, pluginDataDirectory)))
             {
                 return uri.AbsoluteUri;
             }
@@ -373,6 +374,17 @@ public static class NowPlayingResolver
         }
 
         return null;
+    }
+
+    private static bool IsFileInside(Uri uri, string? directory)
+    {
+        if (!uri.IsFile || uri.IsUnc || string.IsNullOrWhiteSpace(directory))
+        {
+            return false;
+        }
+
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory)) + Path.DirectorySeparatorChar;
+        return Path.GetFullPath(uri.LocalPath).StartsWith(root, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string BuildMetadataDetail(

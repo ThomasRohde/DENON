@@ -5,63 +5,70 @@
              xmlns:infra="clr-namespace:Denon.App.Desktop.Infrastructure"
              xmlns:controls="clr-namespace:Denon.App.Desktop.Controls">
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="344" />
+        </Grid.ColumnDefinitions>
 
-        <!-- Zero-Clutter Live Room Brain Insight Strip (only visible when Room Doctor spots an actionable fix!) -->
-        <Border Grid.Row="0"
-                Background="{StaticResource CardElevatedBrush}"
-                BorderBrush="{StaticResource AccentAmberBrush}"
-                BorderThickness="1"
-                CornerRadius="{StaticResource Radius04}"
-                Padding="12,8"
-                Margin="0,0,0,10"
-                Visibility="{Binding ShowControlDeckInsights, Converter={StaticResource BoolToVis}}">
-            <Grid DataContext="{Binding PrimaryRoomInsight}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <Border Grid.Column="0" Background="{StaticResource AccentAmberSubtleBgBrush}" BorderBrush="{StaticResource AccentAmberBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="7,2" Margin="0,0,10,0" VerticalAlignment="Center">
-                    <TextBlock Text="ROOM BRAIN" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentAmberTextBrush}" />
-                </Border>
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding Title}" FontSize="{StaticResource FontSize06}" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding Explanation}" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                </StackPanel>
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
-                    <Button Content="{Binding FixLabel}"
-                            Command="{Binding DataContext.ExecuteRoomInsightCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                            CommandParameter="{Binding}"
-                            Style="{StaticResource PrimaryButton}"
-                            Padding="10,4.5"
-                            FontSize="{StaticResource FontSize04}"
-                            Margin="0,0,6,0" />
-                    <Button Content="Undo"
-                            Command="{Binding DataContext.RestorePreviousRoomStateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                            Style="{StaticResource SecondaryButton}"
-                            Padding="9,4.5"
-                            FontSize="{StaticResource FontSize04}"
-                            Margin="0,0,6,0"
-                            Visibility="{Binding DataContext.CanUndoRoomState, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}" />
-                    <Button Content="✕"
-                            Command="{Binding DataContext.DismissRoomInsightCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                            CommandParameter="{Binding}"
-                            Style="{StaticResource SecondaryButton}"
-                            Padding="7,4.5"
-                            FontSize="{StaticResource FontSize03}"
-                            ToolTip="Dismiss insight" />
-                </StackPanel>
-            </Grid>
-        </Border>
+        <!-- LISTENING STAGE: what plays, the meters, one-click scenes -->
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Zero-Clutter Live Room Brain Insight Strip (only visible when Room Doctor spots an actionable fix!) -->
+            <Border Grid.Row="0"
+                    Background="{StaticResource CardElevatedBrush}"
+                    BorderBrush="{StaticResource AccentAmberBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource Radius04}"
+                    Padding="12,8"
+                    Margin="0,0,0,10"
+                    Visibility="{Binding ShowControlDeckInsights, Converter={StaticResource BoolToVis}}">
+                <Grid DataContext="{Binding PrimaryRoomInsight}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="{StaticResource AccentAmberSubtleBgBrush}" BorderBrush="{StaticResource AccentAmberBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="7,2" Margin="0,0,10,0" VerticalAlignment="Center">
+                        <TextBlock Text="ROOM BRAIN" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentAmberTextBrush}" />
+                    </Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Title}" FontSize="{StaticResource FontSize06}" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Explanation}" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                        <Button Content="{Binding FixLabel}"
+                                Command="{Binding DataContext.ExecuteRoomInsightCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}"
+                                Style="{StaticResource PrimaryButton}"
+                                Padding="10,4.5"
+                                FontSize="{StaticResource FontSize04}"
+                                Margin="0,0,6,0" />
+                        <Button Content="Undo"
+                                Command="{Binding DataContext.RestorePreviousRoomStateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                Style="{StaticResource SecondaryButton}"
+                                Padding="9,4.5"
+                                FontSize="{StaticResource FontSize04}"
+                                Margin="0,0,6,0"
+                                Visibility="{Binding DataContext.CanUndoRoomState, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}" />
+                        <Button Content="✕"
+                                Command="{Binding DataContext.DismissRoomInsightCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}"
+                                Style="{StaticResource SecondaryButton}"
+                                Padding="7,4.5"
+                                FontSize="{StaticResource FontSize03}"
+                                ToolTip="Dismiss insight" />
+                    </StackPanel>
+                </Grid>
+            </Border>
 
             <!-- HERO OLED NOW PLAYING DECK -->
-            <Border Grid.Row="1" Style="{StaticResource HeroOledCard}" Padding="16,14" Margin="0,0,0,12">
+            <Border Grid.Row="1" Style="{StaticResource HeroOledCard}" Padding="16,14" Margin="0,0,0,14">
                 <StackPanel>
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -285,292 +292,8 @@
                 </StackPanel>
             </Border>
 
-            <!-- MIDDLE CONTROL GRID: INPUTS/MODES + MASTER VOLUME -->
-            <Grid Grid.Row="2" Margin="0,0,0,12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.18*" />
-                    <ColumnDefinition Width="14" />
-                    <ColumnDefinition Width="0.82*" />
-                </Grid.ColumnDefinitions>
-
-                <!-- LEFT COLUMN: INPUT SELECTOR + SOUND MODES & UTILITIES -->
-                <StackPanel Grid.Column="0">
-                    <!-- Input Source Matrix -->
-                    <Border Style="{StaticResource SurfaceCard}" Margin="0,0,0,12">
-                        <StackPanel>
-                            <DockPanel Margin="0,0,0,12">
-                                <TextBlock Text="INPUT SOURCE" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding InputSourceDisplay}"
-                                           HorizontalAlignment="Right"
-                                           FontSize="{StaticResource FontSize05}"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource AccentCyanBrightBrush}" />
-                            </DockPanel>
-
-                            <ItemsControl ItemsSource="{Binding InputSources}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Button Content="{Binding DisplayName}"
-                                                Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
-                                                Command="{Binding DataContext.SelectInputCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                CommandParameter="{Binding}"
-                                                Margin="0,0,8,8"
-                                                MinWidth="84" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Sound Modes + Sleep / ECO / Zone 2 -->
-                    <Border Style="{StaticResource SurfaceCard}">
-                        <StackPanel>
-                            <DockPanel Margin="0,0,0,12">
-                                <TextBlock Text="SOUND MODE &amp; DSP" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding SoundMode}"
-                                           HorizontalAlignment="Right"
-                                           FontSize="{StaticResource FontSize05}"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource AccentAmberBrush}" />
-                            </DockPanel>
-
-                            <ItemsControl ItemsSource="{Binding SoundModes}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Button Content="{Binding DisplayName}"
-                                                Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
-                                                Command="{Binding DataContext.SelectSoundModeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                CommandParameter="{Binding}"
-                                                Padding="11,6"
-                                                FontSize="{StaticResource FontSize05}"
-                                                Margin="0,0,7,7" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-
-                            <Border Height="1" Background="{StaticResource BorderHairlineBrush}" Margin="0,10,0,12" />
-
-                            <!-- Utility Strip: Sleep Timer, ECO Mode, Zone 2 -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="SLEEP TIMER" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,7" />
-                                    <ItemsControl ItemsSource="{Binding SleepTimerOptions}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <WrapPanel />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Button Content="{Binding Label}"
-                                                        Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
-                                                        Command="{Binding DataContext.SetSleepTimerCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                        CommandParameter="{Binding}"
-                                                        Padding="9,5"
-                                                        FontSize="{StaticResource FontSize04}"
-                                                        Margin="0,0,6,0" />
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-
-                                <StackPanel Grid.Column="1" Margin="14,0,0,0">
-                                    <TextBlock Text="ECO / ZONE 2" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,7" />
-                                    <StackPanel Orientation="Horizontal">
-                                        <Button Content="ECO Auto"
-                                                Command="{Binding SetEcoModeCommand}"
-                                                CommandParameter="AUTO"
-                                                Padding="9,5"
-                                                FontSize="{StaticResource FontSize04}"
-                                                Margin="0,0,6,0"
-                                                Style="{StaticResource ChipButton}"
-                                                infra:Chip.IsActive="{Binding EcoMode, Converter={StaticResource EqualityConverter}, ConverterParameter=AUTO}" />
-                                        <Button Content="ECO On"
-                                                Command="{Binding SetEcoModeCommand}"
-                                                CommandParameter="ON"
-                                                Padding="9,5"
-                                                FontSize="{StaticResource FontSize04}"
-                                                Margin="0,0,6,0"
-                                                Style="{StaticResource ChipButton}"
-                                                infra:Chip.IsActive="{Binding EcoMode, Converter={StaticResource EqualityConverter}, ConverterParameter=ON}" />
-                                        <Button Content="ECO Off"
-                                                Command="{Binding SetEcoModeCommand}"
-                                                CommandParameter="OFF"
-                                                Padding="9,5"
-                                                FontSize="{StaticResource FontSize04}"
-                                                Margin="0,0,6,0"
-                                                Style="{StaticResource ChipButton}"
-                                                infra:Chip.IsActive="{Binding EcoMode, Converter={StaticResource EqualityConverter}, ConverterParameter=OFF}" />
-                                        <Button Command="{Binding ToggleZone2Command}"
-                                                Padding="10,5"
-                                                FontSize="{StaticResource FontSize04}">
-                                            <Button.Style>
-                                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
-                                                    <Setter Property="Content" Value="Zone 2: Off" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsZone2On}" Value="True">
-                                                            <Setter Property="Content" Value="Zone 2: ON" />
-                                                            <Setter Property="Background" Value="{StaticResource AccentEmeraldSubtleBgBrush}" />
-                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentEmeraldBrush}" />
-                                                            <Setter Property="Foreground" Value="{StaticResource AccentEmeraldBrush}" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Button.Style>
-                                        </Button>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-
-                <!-- RIGHT COLUMN: PRECISION MASTER VOLUME DECK -->
-                <Border Grid.Column="2"
-                        Style="{StaticResource SurfaceCard}"
-                        PreviewMouseWheel="VolumeCard_PreviewMouseWheel">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-
-                        <DockPanel Grid.Row="0" Margin="0,0,0,10">
-                            <TextBlock Text="MASTER VOLUME" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                            <TextBlock Text="Scroll wheel enabled"
-                                       ToolTip="Scroll your mouse wheel anywhere over this volume card to adjust volume ±2 steps"
-                                       HorizontalAlignment="Right"
-                                       FontSize="{StaticResource FontSize03}"
-                                       Foreground="{StaticResource TextMutedBrush}" />
-                        </DockPanel>
-
-                        <!-- Clickable OLED Readout (click to swap dB vs Absolute) -->
-                        <Button Grid.Row="1"
-                                Command="{Binding ToggleVolumeDisplayModeCommand}"
-                                Cursor="Hand"
-                                ToolTip="Click to switch primary display between dB and 0-98 scale"
-                                Margin="0,0,0,14">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{StaticResource OledBgBrush}"
-                                            BorderBrush="{StaticResource Ink08Brush}"
-                                            BorderThickness="1"
-                                            CornerRadius="{StaticResource Radius05}"
-                                            Padding="16,14">
-                                        <StackPanel HorizontalAlignment="Center">
-                                            <TextBlock Text="{Binding PrimaryVolumeText}"
-                                                       FontSize="{StaticResource FontSize14}"
-                                                       FontWeight="Bold"
-                                                       HorizontalAlignment="Center"
-                                                       Style="{StaticResource OledMonoText}">
-                                                <TextBlock.Effect>
-                                                    <DropShadowEffect Color="{StaticResource AccentCyanColor}" BlurRadius="14" ShadowDepth="0" Opacity="0.35" />
-                                                </TextBlock.Effect>
-                                            </TextBlock>
-                                            <TextBlock Text="{Binding SecondaryVolumeText}"
-                                                       FontSize="{StaticResource FontSize06}"
-                                                       Foreground="{StaticResource TextMutedBrush}"
-                                                       FontFamily="{StaticResource MonoFont}"
-                                                       HorizontalAlignment="Center"
-                                                       Margin="0,2,0,0" />
-                                        </StackPanel>
-                                    </Border>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-
-                        <!-- Precision Live Volume Slider -->
-                        <Slider Grid.Row="2"
-                                Style="{StaticResource VolumeSliderStyle}"
-                                Minimum="0"
-                                Maximum="{Binding MaxVolume}"
-                                Value="{Binding TargetVolume, Mode=TwoWay}"
-                                Thumb.DragStarted="VolumeSlider_DragStarted"
-                                Thumb.DragCompleted="VolumeSlider_DragCompleted"
-                                Margin="0,0,0,14" />
-
-                        <!-- Fine / Coarse Steps + Mute -->
-                        <Grid Grid.Row="3" Margin="0,0,0,16">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="6" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="6" />
-                                <ColumnDefinition Width="1.4*" />
-                                <ColumnDefinition Width="6" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="6" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <Button Grid.Column="0" Content="-5" Command="{Binding VolumeDownCommand}" Style="{StaticResource SecondaryButton}" Padding="0,9" />
-                            <Button Grid.Column="2" Content="-1" Command="{Binding VolumeFineDownCommand}" Style="{StaticResource SecondaryButton}" Padding="0,9" />
-                            <Button Grid.Column="4" Command="{Binding ToggleMuteCommand}" Content="{Binding MuteButtonText}" Padding="0,9" ToolTip="Toggle Mute (M)">
-                                <Button.Style>
-                                    <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsMuted}" Value="True">
-                                                <Setter Property="Background" Value="{StaticResource AccentCrimsonBgStrongBrush}" />
-                                                <Setter Property="BorderBrush" Value="{StaticResource AccentCrimsonBrush}" />
-                                                <Setter Property="Foreground" Value="{StaticResource AccentCrimsonTextBrush}" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                            </Button>
-                            <Button Grid.Column="6" Content="+1" Command="{Binding VolumeFineUpCommand}" Style="{StaticResource SecondaryButton}" Padding="0,9" />
-                            <Button Grid.Column="8" Content="+5" Command="{Binding VolumeUpCommand}" Style="{StaticResource SecondaryButton}" Padding="0,9" />
-                        </Grid>
-
-                        <!-- One-Tap Volume Presets -->
-                        <StackPanel Grid.Row="4" VerticalAlignment="Bottom">
-                            <TextBlock Text="QUICK LEVELS" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,8" />
-                            <ItemsControl ItemsSource="{Binding VolumePresets}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <UniformGrid Rows="1" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Button Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
-                                                Command="{Binding DataContext.SetVolumePresetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                CommandParameter="{Binding}"
-                                                Margin="0,0,6,0"
-                                                Padding="6,8">
-                                            <StackPanel HorizontalAlignment="Center">
-                                                <TextBlock Text="{Binding Name}" FontSize="{StaticResource FontSize04}" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                                <TextBlock Text="{Binding LevelLabel}" FontSize="{StaticResource FontSize06}" FontWeight="Bold" FontFamily="{StaticResource MonoFont}" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                            </StackPanel>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-            </Grid>
-
             <!-- QUICK-PLAY PRESET STATIONS SHELF (Internally Scrollable) -->
-            <Border Grid.Row="3" Style="{StaticResource SurfaceCard}" MinHeight="155">
+            <Border Grid.Row="2" Style="{StaticResource SurfaceCard}" MinHeight="155">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -741,5 +464,283 @@
                     </ScrollViewer>
                 </Grid>
             </Border>
+        </Grid>
+
+        <!-- CONTROL RAIL: everything that changes the receiver -->
+        <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+                <!-- Volume -->
+                <Border Margin="0,0,0,12"
+                        Style="{StaticResource SurfaceCard}"
+                        PreviewMouseWheel="VolumeCard_PreviewMouseWheel">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <DockPanel Grid.Row="0" Margin="0,0,0,10">
+                            <TextBlock Text="MASTER VOLUME" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                            <TextBlock Text="Scroll wheel enabled"
+                                       ToolTip="Scroll your mouse wheel anywhere over this volume card to adjust volume ±2 steps"
+                                       HorizontalAlignment="Right"
+                                       FontSize="{StaticResource FontSize03}"
+                                       Foreground="{StaticResource TextMutedBrush}" />
+                        </DockPanel>
+
+                        <!-- Clickable OLED Readout (click to swap dB vs Absolute) -->
+                        <Button Grid.Row="1"
+                                Command="{Binding ToggleVolumeDisplayModeCommand}"
+                                Cursor="Hand"
+                                ToolTip="Click to switch primary display between dB and 0-98 scale"
+                                Margin="0,0,0,14">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{StaticResource OledBgBrush}"
+                                            BorderBrush="{StaticResource Ink08Brush}"
+                                            BorderThickness="1"
+                                            CornerRadius="{StaticResource Radius05}"
+                                            Padding="16,14">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="{Binding PrimaryVolumeText}"
+                                                       FontSize="{StaticResource FontSize14}"
+                                                       FontWeight="Bold"
+                                                       HorizontalAlignment="Center"
+                                                       Style="{StaticResource OledMonoText}">
+                                                <TextBlock.Effect>
+                                                    <DropShadowEffect Color="{StaticResource AccentCyanColor}" BlurRadius="14" ShadowDepth="0" Opacity="0.35" />
+                                                </TextBlock.Effect>
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding SecondaryVolumeText}"
+                                                       FontSize="{StaticResource FontSize06}"
+                                                       Foreground="{StaticResource TextMutedBrush}"
+                                                       FontFamily="{StaticResource MonoFont}"
+                                                       HorizontalAlignment="Center"
+                                                       Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <!-- Precision Live Volume Slider -->
+                        <Slider Grid.Row="2"
+                                Style="{StaticResource VolumeSliderStyle}"
+                                Minimum="0"
+                                Maximum="{Binding MaxVolume}"
+                                Value="{Binding TargetVolume, Mode=TwoWay}"
+                                Thumb.DragStarted="VolumeSlider_DragStarted"
+                                Thumb.DragCompleted="VolumeSlider_DragCompleted"
+                                Margin="0,0,0,14" />
+
+                        <!-- Fine / Coarse Steps + Mute -->
+                        <Grid Grid.Row="3" Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="6" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="6" />
+                                <ColumnDefinition Width="1.4*" />
+                                <ColumnDefinition Width="6" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="6" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Button Grid.Column="0" Content="-5" Command="{Binding VolumeDownCommand}" Style="{StaticResource SecondaryButton}" Padding="0,9" />
+                            <Button Grid.Column="2" Content="-1" Command="{Binding VolumeFineDownCommand}" Style="{StaticResource SecondaryButton}" Padding="0,9" />
+                            <Button Grid.Column="4" Command="{Binding ToggleMuteCommand}" Content="{Binding MuteButtonText}" Padding="0,9" ToolTip="Toggle Mute (M)">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsMuted}" Value="True">
+                                                <Setter Property="Background" Value="{StaticResource AccentCrimsonBgStrongBrush}" />
+                                                <Setter Property="BorderBrush" Value="{StaticResource AccentCrimsonBrush}" />
+                                                <Setter Property="Foreground" Value="{StaticResource AccentCrimsonTextBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <Button Grid.Column="6" Content="+1" Command="{Binding VolumeFineUpCommand}" Style="{StaticResource SecondaryButton}" Padding="0,9" />
+                            <Button Grid.Column="8" Content="+5" Command="{Binding VolumeUpCommand}" Style="{StaticResource SecondaryButton}" Padding="0,9" />
+                        </Grid>
+
+                        <!-- One-Tap Volume Presets -->
+                        <StackPanel Grid.Row="4" VerticalAlignment="Bottom">
+                            <TextBlock Text="QUICK LEVELS" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,8" />
+                            <ItemsControl ItemsSource="{Binding VolumePresets}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Rows="1" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
+                                                Command="{Binding DataContext.SetVolumePresetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}"
+                                                Margin="0,0,6,0"
+                                                Padding="6,8">
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontSize="{StaticResource FontSize04}" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                                <TextBlock Text="{Binding LevelLabel}" FontSize="{StaticResource FontSize06}" FontWeight="Bold" FontFamily="{StaticResource MonoFont}" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Source -->
+                <Border Style="{StaticResource SurfaceCard}" Margin="0,0,0,12">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,12">
+                            <TextBlock Text="INPUT SOURCE" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding InputSourceDisplay}"
+                                       HorizontalAlignment="Right"
+                                       FontSize="{StaticResource FontSize05}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource AccentCyanBrightBrush}" />
+                        </DockPanel>
+
+                        <ItemsControl ItemsSource="{Binding InputSources}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Content="{Binding DisplayName}"
+                                            Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
+                                            Command="{Binding DataContext.SelectInputCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}"
+                                            Margin="0,0,8,8"
+                                            MinWidth="84" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- Sound mode -->
+                <Border Style="{StaticResource SurfaceCard}" Margin="0,0,0,12">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,12">
+                            <TextBlock Text="SOUND MODE &amp; DSP" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding SoundMode}"
+                                       HorizontalAlignment="Right"
+                                       FontSize="{StaticResource FontSize05}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource AccentAmberBrush}" />
+                        </DockPanel>
+
+                        <ItemsControl ItemsSource="{Binding SoundModes}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Content="{Binding DisplayName}"
+                                            Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
+                                            Command="{Binding DataContext.SelectSoundModeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}"
+                                            Padding="11,6"
+                                            FontSize="{StaticResource FontSize05}"
+                                            Margin="0,0,7,7" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                    </StackPanel>
+                </Border>
+
+                <!-- Power &amp; zones: sleep timer, ECO, Zone 2 -->
+                <Border Style="{StaticResource SurfaceCard}">
+                    <StackPanel>
+                        <TextBlock Text="POWER &amp; ZONES" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,12" />
+                        <StackPanel>
+
+                            <StackPanel Margin="0,0,0,14">
+                                <TextBlock Text="SLEEP TIMER" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,7" />
+                                <ItemsControl ItemsSource="{Binding SleepTimerOptions}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding Label}"
+                                                    Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
+                                                    Command="{Binding DataContext.SetSleepTimerCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}"
+                                                    Padding="9,5"
+                                                    FontSize="{StaticResource FontSize04}"
+                                                    Margin="0,0,6,0" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <StackPanel>
+                                <TextBlock Text="ECO &amp; ZONE 2" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,7" />
+                                <WrapPanel>
+                                    <Button Content="ECO Auto"
+                                            Command="{Binding SetEcoModeCommand}"
+                                            CommandParameter="AUTO"
+                                            Padding="9,5"
+                                            FontSize="{StaticResource FontSize04}"
+                                            Margin="0,0,6,0"
+                                            Style="{StaticResource ChipButton}"
+                                            infra:Chip.IsActive="{Binding EcoMode, Converter={StaticResource EqualityConverter}, ConverterParameter=AUTO}" />
+                                    <Button Content="ECO On"
+                                            Command="{Binding SetEcoModeCommand}"
+                                            CommandParameter="ON"
+                                            Padding="9,5"
+                                            FontSize="{StaticResource FontSize04}"
+                                            Margin="0,0,6,0"
+                                            Style="{StaticResource ChipButton}"
+                                            infra:Chip.IsActive="{Binding EcoMode, Converter={StaticResource EqualityConverter}, ConverterParameter=ON}" />
+                                    <Button Content="ECO Off"
+                                            Command="{Binding SetEcoModeCommand}"
+                                            CommandParameter="OFF"
+                                            Padding="9,5"
+                                            FontSize="{StaticResource FontSize04}"
+                                            Margin="0,0,6,0"
+                                            Style="{StaticResource ChipButton}"
+                                            infra:Chip.IsActive="{Binding EcoMode, Converter={StaticResource EqualityConverter}, ConverterParameter=OFF}" />
+                                    <Button Command="{Binding ToggleZone2Command}"
+                                            Padding="10,5"
+                                            FontSize="{StaticResource FontSize04}">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+                                                <Setter Property="Content" Value="Zone 2: Off" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsZone2On}" Value="True">
+                                                        <Setter Property="Content" Value="Zone 2: ON" />
+                                                        <Setter Property="Background" Value="{StaticResource AccentEmeraldSubtleBgBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentEmeraldBrush}" />
+                                                        <Setter Property="Foreground" Value="{StaticResource AccentEmeraldBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                </WrapPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </UserControl>

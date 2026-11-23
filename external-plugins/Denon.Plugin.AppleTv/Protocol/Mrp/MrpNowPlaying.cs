@@ -17,11 +17,23 @@ internal sealed record NowPlayingSnapshot(
     bool ArtworkAvailable,
     string? ArtworkUrl,
     string? ContentIdentifier,
+    string? ArtworkIdentifier,
+    string? ItemIdentifier,
+    int QueueLocation,
     DateTimeOffset UpdatedUtc)
 {
-    public static NowPlayingSnapshot Empty { get; } = new(null, null, MrpPlaybackState.Unknown, null, null, null, null, null, null, null, null, null, false, null, null, DateTimeOffset.MinValue);
+    public static NowPlayingSnapshot Empty { get; } = new(
+        null, null, MrpPlaybackState.Unknown, null, null, null, null, null, null, null, null, null, false, null, null, null, null, 0,
+        DateTimeOffset.MinValue);
 
     public bool HasMedia => !string.IsNullOrEmpty(Title) || State is MrpPlaybackState.Playing or MrpPlaybackState.Paused;
+
+    /// <summary>
+    /// Names the artwork of this program (pyatv's artwork cache key): artworkIdentifier, else contentIdentifier,
+    /// else the content item, else the title. Null when there is nothing to name.
+    /// </summary>
+    public string? ArtworkKey =>
+        (ArtworkIdentifier ?? ContentIdentifier ?? ItemIdentifier ?? Title) is { Length: > 0 } key ? $"{AppBundleId}|{key}" : null;
 }
 
 /// <summary>
@@ -37,6 +49,8 @@ internal sealed class MrpNowPlayingTracker
     private readonly object _sync = new();
     private readonly Dictionary<string, ClientState> _clients = new(StringComparer.Ordinal);
     private string? _activeBundle;
+    private string? _lastBundle;
+    private DateTimeOffset _clientClearedUtc = DateTimeOffset.MinValue;
 
     public NowPlayingSnapshot Current
     {
@@ -44,7 +58,12 @@ internal sealed class MrpNowPlayingTracker
         {
             lock (_sync)
             {
-                if (_activeBundle is null || !_clients.TryGetValue(_activeBundle, out var client))
+                if (_activeBundle is null)
+                {
+                    return PlayingWithoutClient() ?? NowPlayingSnapshot.Empty;
+                }
+
+                if (!_clients.TryGetValue(_activeBundle, out var client))
                 {
                     return NowPlayingSnapshot.Empty with { AppBundleId = _activeBundle };
                 }
@@ -54,6 +73,51 @@ internal sealed class MrpNowPlayingTracker
                     ? NowPlayingSnapshot.Empty with { AppBundleId = _activeBundle, AppName = client.Name }
                     : player.Snapshot(_activeBundle, client.Name);
             }
+        }
+    }
+
+    /// <summary>
+    /// Without a now-playing app (tvOS sometimes names none, for example when DRTV goes on to the next episode
+    /// by itself): the player that most recently reported Playing after the app was cleared, if any. Players
+    /// that played before stay out: an app that quits does not always say so.
+    /// </summary>
+    private NowPlayingSnapshot? PlayingWithoutClient()
+    {
+        var best = _clients
+            .SelectMany(c => c.Value.Players.Select(p => (Bundle: c.Key, Client: c.Value, Player: p)))
+            .Where(x => x.Player.State == MrpPlaybackState.Playing && x.Player.HasContent && x.Player.Updated > _clientClearedUtc)
+            .OrderByDescending(x => x.Player.Updated)
+            .FirstOrDefault();
+        return best.Player is null ? null : best.Player.Snapshot(best.Bundle, best.Client.Name);
+    }
+
+    /// <summary>
+    /// Applies the SET_STATE reply to a PLAYBACK_QUEUE_REQUEST. A reply without a player path belongs to the
+    /// active app, else to the app that was active last. When no app is active and the reply says Playing, its
+    /// app becomes the active one. Returns true when the visible state may have changed.
+    /// </summary>
+    public bool ApplyQueueReply(ProtoReader message)
+    {
+        var state = message.Message(MrpExtension.SetState);
+        if (state is null)
+        {
+            return false;
+        }
+
+        lock (_sync)
+        {
+            var bundle = PathOf(state.Message(9)).Bundle ?? _activeBundle ?? _lastBundle;
+            if (bundle is null || !ApplySetState(state, bundle))
+            {
+                return false;
+            }
+
+            if (_activeBundle is null && state.Uint(6) == (ulong)MrpPlaybackState.Playing)
+            {
+                _activeBundle = _lastBundle = bundle;
+            }
+
+            return true;
         }
     }
 
@@ -70,7 +134,12 @@ internal sealed class MrpNowPlayingTracker
                     _activeBundle = clientInfo?.String(2);
                     if (_activeBundle is not null)
                     {
+                        _lastBundle = _activeBundle;
                         Client(_activeBundle).SetName(clientInfo?.String(7));
+                    }
+                    else
+                    {
+                        _clientClearedUtc = DateTimeOffset.UtcNow;
                     }
 
                     return true;
@@ -92,40 +161,8 @@ internal sealed class MrpNowPlayingTracker
                         return false;
                     }
 
-                    var path = state.Message(9);
-                    var (bundle, id) = PathOf(path);
-                    bundle ??= _activeBundle;
-                    if (bundle is null)
-                    {
-                        return false;
-                    }
-
-                    var client = Client(bundle);
-                    client.SetName(path?.Message(2)?.String(7) ?? state.String(5));
-                    var player = client.Player(id ?? DefaultPlayerId);
-
-                    if (state.Uint(6) is { } playback)
-                    {
-                        player.State = (MrpPlaybackState)(int)playback;
-                    }
-
-                    if (state.Message(1) is { } info)
-                    {
-                        player.ApplyNowPlayingInfo(info);
-                    }
-
-                    if (state.Message(3) is { } queue)
-                    {
-                        var items = queue.Messages(2).ToList();
-                        var location = (int)(queue.Int(1) ?? 0);
-                        var item = location >= 0 && location < items.Count ? items[location] : items.FirstOrDefault();
-                        if (item is not null)
-                        {
-                            player.ApplyContentItem(item, replace: true);
-                        }
-                    }
-
-                    return true;
+                    var bundle = PathOf(state.Message(9)).Bundle ?? _activeBundle;
+                    return bundle is not null && ApplySetState(state, bundle);
 
                 case MrpType.UpdateContentItem:
                     var update = message.Message(MrpExtension.UpdateContentItem);
@@ -152,6 +189,39 @@ internal sealed class MrpNowPlayingTracker
         }
     }
 
+    /// <summary>SetStateMessage: nowPlayingInfo (1), playbackQueue (3), displayName (5), playbackState (6), playerPath (9).</summary>
+    private bool ApplySetState(ProtoReader state, string bundle)
+    {
+        var path = state.Message(9);
+        var client = Client(bundle);
+        client.SetName(path?.Message(2)?.String(7) ?? state.String(5));
+        var player = client.Player(PathOf(path).PlayerId ?? DefaultPlayerId);
+
+        if (state.Uint(6) is { } playback)
+        {
+            player.State = (MrpPlaybackState)(int)playback;
+        }
+
+        if (state.Message(1) is { } info)
+        {
+            player.ApplyNowPlayingInfo(info);
+        }
+
+        if (state.Message(3) is { } queue)
+        {
+            var items = queue.Messages(2).ToList();
+            var location = (int)(queue.Int(1) ?? 0);
+            var item = location >= 0 && location < items.Count ? items[location] : items.FirstOrDefault();
+            if (item is not null)
+            {
+                player.ApplyContentItem(item, replace: true);
+                player.QueueLocation = Math.Max(0, location);
+            }
+        }
+
+        return true;
+    }
+
     /// <summary>PlayerPath: client (2) → bundleIdentifier (2); player (3) → identifier (1).</summary>
     private static (string? Bundle, string? PlayerId) PathOf(ProtoReader? path) =>
         (path?.Message(2)?.String(2), path?.Message(3)?.String(1));
@@ -174,6 +244,8 @@ internal sealed class MrpNowPlayingTracker
         public string? Name { get; private set; }
 
         public string? ActivePlayerId { get; set; }
+
+        public IEnumerable<PlayerState> Players => _players.Values;
 
         public void SetName(string? name)
         {
@@ -225,8 +297,21 @@ internal sealed class MrpNowPlayingTracker
         private bool _artworkAvailable;
         private string? _artworkUrl;
         private string? _contentId;
+        private string? _artworkId;
+        private MrpPlaybackState _state;
 
-        public MrpPlaybackState State { get; set; }
+        public MrpPlaybackState State
+        {
+            get => _state;
+            set
+            {
+                _state = value;
+                Updated = DateTimeOffset.UtcNow;
+            }
+        }
+
+        /// <summary>Index of the playing item in the playback queue (for PLAYBACK_QUEUE_REQUEST).</summary>
+        public int QueueLocation { get; set; }
 
         public DateTimeOffset Updated { get; private set; }
 
@@ -253,7 +338,7 @@ internal sealed class MrpNowPlayingTracker
 
             if (replace && id != _itemId)
             {
-                _title = _subtitle = _artist = _album = _series = _artworkUrl = _contentId = null;
+                _title = _subtitle = _artist = _album = _series = _artworkUrl = _contentId = _artworkId = null;
                 _season = _episode = null;
                 _duration = _elapsed = null;
                 _artworkAvailable = false;
@@ -274,6 +359,7 @@ internal sealed class MrpNowPlayingTracker
                 _contentId = m.String(44) ?? _contentId;
                 _series = m.String(63) ?? _series;
                 _artworkUrl = m.String(70) ?? _artworkUrl;
+                _artworkId = m.String(80) ?? _artworkId;
             }
 
             if (item.Bytes(3) is { Length: > 0 })
@@ -287,6 +373,6 @@ internal sealed class MrpNowPlayingTracker
 
         public NowPlayingSnapshot Snapshot(string bundle, string? appName) => new(
             bundle, appName, State, _title, _subtitle, _artist, _album, _series, _season, _episode,
-            _duration, _elapsed, _artworkAvailable, _artworkUrl, _contentId, Updated);
+            _duration, _elapsed, _artworkAvailable, _artworkUrl, _contentId, _artworkId, _itemId, QueueLocation, Updated);
     }
 }

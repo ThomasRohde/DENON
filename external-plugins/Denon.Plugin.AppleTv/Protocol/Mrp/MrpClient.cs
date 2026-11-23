@@ -103,6 +103,37 @@ internal sealed class MrpClient : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Asks for the playing item of the playback queue (with its artwork) and applies the reply to the
+    /// now-playing tracker. Returns the artwork when the reply has one.
+    /// </summary>
+    public async Task<MrpArtwork?> RequestPlaybackQueueAsync(int location, CancellationToken cancellationToken)
+    {
+        var reply = await SendAndReceiveAsync(id => MrpMessages.PlaybackQueueRequest(id, location), cancellationToken);
+        bool changed;
+        try
+        {
+            changed = NowPlaying.ApplyQueueReply(reply);
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+
+        if (changed)
+        {
+            try
+            {
+                NowPlayingChanged?.Invoke(NowPlaying.Current);
+            }
+            catch
+            {
+            }
+        }
+
+        return MrpArtwork.FromQueueReply(reply);
+    }
+
     private static string StatusHint(ulong status) => status switch
     {
         1 => ": no such content",

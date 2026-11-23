@@ -536,7 +536,8 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
             }
 
             client = new AppleTvDeviceClient(config.Id, config.Host, config.CompanionPort, config.AirPlayPort,
-                HapCredentials.Parse(config.Credentials), config.Identity!);
+                HapCredentials.Parse(config.Credentials), config.Identity!,
+                Path.Combine(_context!.Storage.PluginDataDirectory, "artwork", string.Concat(config.Id.Where(char.IsLetterOrDigit))));
             _clients[config.Id] = client;
         }
 
@@ -1006,7 +1007,7 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
         artist = state.NowPlaying.Artist,
         durationSec = state.NowPlaying.DurationSeconds,
         elapsedSec = state.NowPlaying.ElapsedSeconds,
-        imageUrl = state.NowPlaying.ArtworkUrl, // read by the host's now-playing hero
+        imageUrl = state.ImageUrl, // read by the host's now-playing hero (a file URI for fetched artwork)
         error = state.Error,
     };
 }

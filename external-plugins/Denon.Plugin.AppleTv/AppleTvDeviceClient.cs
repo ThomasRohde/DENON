@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Denon.Plugin.AppleTv.Protocol.Companion;
 using Denon.Plugin.AppleTv.Protocol.Hap;
 using Denon.Plugin.AppleTv.Protocol.Mrp;
@@ -23,6 +25,13 @@ internal sealed record AppleTvDeviceState(string DeviceId)
 
     public NowPlayingSnapshot NowPlaying { get; init; } = NowPlayingSnapshot.Empty;
 
+    /// <summary>The last artwork saved to disk (its program key and file URI).</summary>
+    public AppleTvArtwork? Artwork { get; init; }
+
+    /// <summary>The artwork image for the program that plays now: the saved file, else the app's artwork URL.</summary>
+    public string? ImageUrl =>
+        Artwork is { } art && art.Key == NowPlaying.ArtworkKey ? art.FileUri : NowPlaying.ArtworkUrl;
+
     /// <summary>Readable app name (from MRP, else from the Apple TV's app list).</summary>
     public string? AppName { get; init; }
 
@@ -36,6 +45,9 @@ internal sealed record AppleTvDeviceState(string DeviceId)
     public bool IsPlaying => HasMedia && NowPlaying.State == MrpPlaybackState.Playing;
 }
 
+/// <summary>Artwork of one program, saved as a file.</summary>
+internal sealed record AppleTvArtwork(string Key, string FileUri);
+
 /// <summary>
 /// Keeps one Apple TV connected. The light Companion link (power state, keys, apps) stays open with
 /// reconnect and backoff; the AirPlay MRP tunnel (now playing) is opened only while the Apple TV is awake
@@ -45,12 +57,16 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
 {
     private static readonly TimeSpan PowerPollInterval = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan NowPlayingRetry = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan QueuePollInterval = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan ArtworkRetry = TimeSpan.FromSeconds(60);
+    private const int ArtworkFilesKept = 30;
 
     private readonly string _host;
     private readonly int _companionPort;
     private readonly int _airPlayPort;
     private readonly HapCredentials _credentials;
     private readonly CompanionIdentity _identity;
+    private readonly string _artworkDirectory;
     private readonly object _sync = new();
     private readonly SemaphoreSlim _poke = new(0);
     private readonly CancellationTokenSource _cts = new();
@@ -60,14 +76,19 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
     private DateTimeOffset _mrpRetryAt = DateTimeOffset.MinValue;
     private IReadOnlyDictionary<string, string> _appNames = new Dictionary<string, string>();
     private Task? _loop;
+    private DateTimeOffset _queuePollAt = DateTimeOffset.MinValue;
+    private string? _artworkKey;
+    private DateTimeOffset _artworkRetryAt = DateTimeOffset.MinValue;
 
-    public AppleTvDeviceClient(string deviceId, string host, int companionPort, int airPlayPort, HapCredentials credentials, CompanionIdentity identity)
+    public AppleTvDeviceClient(string deviceId, string host, int companionPort, int airPlayPort, HapCredentials credentials, CompanionIdentity identity,
+        string artworkDirectory)
     {
         _host = host;
         _companionPort = companionPort;
         _airPlayPort = airPlayPort;
         _credentials = credentials;
         _identity = identity;
+        _artworkDirectory = artworkDirectory;
         State = new AppleTvDeviceState(deviceId);
     }
 
@@ -240,7 +261,14 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
             return;
         }
 
-        if (_mrp is not null || DateTimeOffset.UtcNow < _mrpRetryAt)
+        if (_mrp is { } open)
+        {
+            await PollQueueWhenSilentAsync(open, ct);
+            RequestArtwork(open, State.NowPlaying);
+            return;
+        }
+
+        if (DateTimeOffset.UtcNow < _mrpRetryAt)
         {
             return;
         }
@@ -248,7 +276,11 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
         try
         {
             var mrp = await MrpClient.ConnectAsync(_host, _airPlayPort, _credentials, _identity, ct);
-            mrp.NowPlayingChanged += snapshot => SetState(s => s with { NowPlaying = snapshot, AppName = NameFor(snapshot) });
+            mrp.NowPlayingChanged += snapshot =>
+            {
+                SetState(s => s with { NowPlaying = snapshot, AppName = NameFor(snapshot) });
+                RequestArtwork(mrp, snapshot);
+            };
             mrp.Closed += _ =>
             {
                 _mrpDead = true;
@@ -259,6 +291,7 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
             var now = mrp.NowPlaying.Current;
             SetState(s => s with { NowPlayingLinked = true, NowPlaying = now, AppName = NameFor(now) });
             Diagnostic?.Invoke("Now-playing link open.");
+            RequestArtwork(mrp, now);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -268,6 +301,120 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
         {
             _mrpRetryAt = DateTimeOffset.UtcNow + NowPlayingRetry;
             Diagnostic?.Invoke($"Now-playing link failed (retry in {NowPlayingRetry.TotalSeconds:0} s): {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// tvOS sometimes names no player when an app goes on to the next program by itself (DRTV autoplay): the
+    /// plugin then shows nothing until the user pauses. While awake and nothing is reported, ask for the
+    /// playback queue at most once a minute.
+    /// </summary>
+    private async Task PollQueueWhenSilentAsync(MrpClient mrp, CancellationToken ct)
+    {
+        if (State.HasMedia || DateTimeOffset.UtcNow < _queuePollAt)
+        {
+            return;
+        }
+
+        _queuePollAt = DateTimeOffset.UtcNow + QueuePollInterval;
+        try
+        {
+            await mrp.RequestPlaybackQueueAsync(0, ct);
+            if (State.HasMedia)
+            {
+                Diagnostic?.Invoke($"Playback queue shows {State.NowPlaying.Title ?? "a program"} ({State.NowPlaying.State}).");
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is CompanionProtocolException or IOException or ObjectDisposedException)
+        {
+        }
+    }
+
+    /// <summary>
+    /// Gets the artwork of the program when the app has one: from the disk cache, else with a
+    /// PLAYBACK_QUEUE_REQUEST (in the background). One request per program; a failed one is retried after a minute.
+    /// </summary>
+    private void RequestArtwork(MrpClient mrp, NowPlayingSnapshot snapshot)
+    {
+        if (!snapshot.ArtworkAvailable || snapshot.ArtworkKey is not { } key || State.Artwork?.Key == key)
+        {
+            return;
+        }
+
+        lock (_sync)
+        {
+            if (_artworkKey == key && DateTimeOffset.UtcNow < _artworkRetryAt)
+            {
+                return;
+            }
+
+            _artworkKey = key;
+            _artworkRetryAt = DateTimeOffset.UtcNow + ArtworkRetry;
+        }
+
+        var name = ArtworkFileName(key);
+        var cached = Directory.Exists(_artworkDirectory)
+            ? Directory.EnumerateFiles(_artworkDirectory, name + ".*").FirstOrDefault()
+            : null;
+        if (cached is not null)
+        {
+            SetState(s => s with { Artwork = new AppleTvArtwork(key, new Uri(cached).AbsoluteUri) });
+            return;
+        }
+
+        _ = Task.Run(() => FetchArtworkAsync(mrp, key, name, snapshot.QueueLocation));
+    }
+
+    private async Task FetchArtworkAsync(MrpClient mrp, string key, string name, int location)
+    {
+        try
+        {
+            var artwork = await mrp.RequestPlaybackQueueAsync(location, _cts.Token);
+            if (artwork is null)
+            {
+                Diagnostic?.Invoke("The app sent no artwork.");
+                return;
+            }
+
+            Directory.CreateDirectory(_artworkDirectory);
+            var path = Path.Combine(_artworkDirectory, name + artwork.Extension);
+            await File.WriteAllBytesAsync(path, artwork.Data, _cts.Token);
+            PruneArtwork();
+            SetState(s => s with { Artwork = new AppleTvArtwork(key, new Uri(path).AbsoluteUri) });
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Diagnostic?.Invoke($"Artwork not fetched (retry in {ArtworkRetry.TotalSeconds:0} s): {ex.Message}");
+        }
+    }
+
+    /// <summary>A file name from the program key (the key can hold any character).</summary>
+    private static string ArtworkFileName(string key) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..24];
+
+    /// <summary>Keeps the newest artwork files only.</summary>
+    private void PruneArtwork()
+    {
+        try
+        {
+            foreach (var old in new DirectoryInfo(_artworkDirectory).EnumerateFiles()
+                         .OrderByDescending(f => f.LastWriteTimeUtc).Skip(ArtworkFilesKept))
+            {
+                old.Delete();
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
         }
     }
 

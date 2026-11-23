@@ -153,15 +153,6 @@
                                 <TextBlock Text="{Binding McpTitleBarBadge}" Foreground="{StaticResource AccentEmeraldBrush}" FontWeight="SemiBold" />
                             </StackPanel>
                         </Button>
-                        <Button Command="{Binding OpenContextHelpCommand}"
-                                WindowChrome.IsHitTestVisibleInChrome="True"
-                                Style="{StaticResource SecondaryButton}"
-                                Padding="9,4"
-                                FontSize="{StaticResource FontSize04}"
-                                Margin="0,0,6,0"
-                                ToolTip="Open Context-Aware Help &amp; Interactive Guide for this screen (F1)">
-                            <TextBlock Text="? Help" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
-                        </Button>
                         <Button Command="{Binding NavigateCommand}"
                                 CommandParameter="CastRemote"
                                 WindowChrome.IsHitTestVisibleInChrome="True"
@@ -259,312 +250,281 @@
 
             <!-- ======================== MAIN APP SHELL ======================== -->
             <Grid Grid.Row="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="206" />
+                    <ColumnDefinition Width="84" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <!-- LEFT NAVIGATION SIDEBAR -->
+                <!-- ICON RAIL: listen, room and system groups; connected devices at the bottom -->
                 <Border Grid.Column="0"
                         Background="{StaticResource SidebarBgBrush}"
                         BorderBrush="{StaticResource BorderHairlineBrush}"
-                        BorderThickness="0,0,1,0"
-                        Padding="12,16,12,14">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <StackPanel Grid.Row="0">
-                            <TextBlock Text="NAVIGATION" Style="{StaticResource SectionLabelStyle}" Margin="10,0,0,10" />
-
-                            <RadioButton GroupName="NavRail"
-                                         Style="{StaticResource NavRailItem}"
-                                         IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Control}"
-                                         Command="{Binding NavigateCommand}"
-                                         CommandParameter="Control">
-                                <StackPanel Orientation="Horizontal">
-                                    <Path Data="{StaticResource IconNavControlDeck}"
-                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                          Width="15"
-                                          Height="15"
-                                          Stretch="Uniform"
-                                          Margin="0,0,11,0" />
-                                    <TextBlock Text="Control Deck" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
-                                </StackPanel>
-                            </RadioButton>
-
-                            <RadioButton GroupName="NavRail"
-                                         Style="{StaticResource NavRailItem}"
-                                         IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=YouTube}"
-                                         Command="{Binding NavigateCommand}"
-                                         CommandParameter="YouTube">
-                                <StackPanel Orientation="Horizontal">
-                                    <Path Data="{StaticResource IconNavYouTube}"
-                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                          Width="15"
-                                          Height="15"
-                                          Stretch="Uniform"
-                                          Margin="0,0,11,0" />
-                                    <TextBlock Text="YouTube &amp; Music" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
-                                </StackPanel>
-                            </RadioButton>
-
-                            <RadioButton GroupName="NavRail"
-                                         Style="{StaticResource NavRailItem}"
-                                         IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Acoustics}"
-                                         Command="{Binding NavigateCommand}"
-                                         CommandParameter="Acoustics">
-                                <StackPanel Orientation="Horizontal">
-                                    <Path Data="{StaticResource IconNavScenes}"
-                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                          Width="15"
-                                          Height="15"
-                                          Stretch="Uniform"
-                                          Margin="0,0,11,0" />
-                                    <TextBlock Text="Scenes &amp; Acoustics" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
-                                </StackPanel>
-                            </RadioButton>
-
-                            <RadioButton GroupName="NavRail"
-                                         Style="{StaticResource NavRailItem}"
-                                         IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=CastRemote}"
-                                         Command="{Binding NavigateCommand}"
-                                         CommandParameter="CastRemote">
-                                <StackPanel Orientation="Horizontal">
-                                    <Path Data="{StaticResource IconNavCast}"
-                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                          Width="15"
-                                          Height="15"
-                                          Stretch="Uniform"
-                                          Margin="0,0,11,0" />
-                                    <TextBlock Text="Cast &amp; Remote" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
-                                </StackPanel>
-                            </RadioButton>
-
-                            <RadioButton GroupName="NavRail"
-                                         Style="{StaticResource NavRailItem}"
-                                         IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Stations}"
-                                         Command="{Binding NavigateCommand}"
-                                         CommandParameter="Stations">
-                                <StackPanel Orientation="Horizontal">
-                                    <Path Data="{StaticResource IconRadio}"
-                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                          Width="15"
-                                          Height="15"
-                                          Stretch="Uniform"
-                                          Margin="0,0,11,0" />
-                                    <TextBlock Text="Stations &amp; Streams" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
-                                </StackPanel>
-                            </RadioButton>
-
-                            <RadioButton GroupName="NavRail"
-                                         Style="{StaticResource NavRailItem}"
-                                         IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Plugins}"
-                                         Command="{Binding NavigateCommand}"
-                                         CommandParameter="Plugins">
-                                <DockPanel LastChildFill="True">
-                                    <Border DockPanel.Dock="Right"
-                                            Background="{StaticResource Ink08Brush}"
-                                            BorderBrush="{StaticResource Ink12Brush}"
-                                            BorderThickness="1"
-                                            CornerRadius="{StaticResource Radius03}"
-                                            Padding="6,1"
-                                            VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding ActivePluginsBadgeText}"
-                                                   FontSize="{StaticResource FontSize01}"
-                                                   FontWeight="Bold"
-                                                   Foreground="{StaticResource AccentAmberBrush}" />
-                                    </Border>
-                                    <StackPanel Orientation="Horizontal">
-                                        <Path Data="{StaticResource IconNavPlugins}"
-                                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                              Width="15"
-                                              Height="15"
-                                              Stretch="Uniform"
-                                              Margin="0,0,11,0" />
-                                        <TextBlock Text="Plugins" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
-                                    </StackPanel>
-                                </DockPanel>
-                            </RadioButton>
-
-                            <RadioButton GroupName="NavRail"
-                                         Style="{StaticResource NavRailItem}"
-                                         IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Mcp}"
-                                         Command="{Binding NavigateCommand}"
-                                         CommandParameter="Mcp"
-                                         ToolTip="Streamable HTTP MCP Server, Self-Healing Room Doctor, Snapshot Undo &amp; Local Habits Memory">
-                                <StackPanel Orientation="Horizontal">
-                                    <Path Data="{StaticResource IconNavMcp}"
-                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                          Width="15"
-                                          Height="15"
-                                          Stretch="Uniform"
-                                          Margin="0,0,11,0" />
-                                    <TextBlock Text="MCP &amp; Room Brain" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
-                                </StackPanel>
-                            </RadioButton>
-
-                            <RadioButton GroupName="NavRail"
-                                         Style="{StaticResource NavRailItem}"
-                                         IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Settings}"
-                                         Command="{Binding NavigateCommand}"
-                                         CommandParameter="Settings">
-                                <StackPanel Orientation="Horizontal">
-                                    <Path Data="{StaticResource IconNavSettings}"
-                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                          Width="15"
-                                          Height="15"
-                                          Stretch="Uniform"
-                                          Margin="0,0,11,0" />
-                                    <TextBlock Text="Settings" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
-                                </StackPanel>
-                            </RadioButton>
-
-                            <RadioButton GroupName="NavRail"
-                                         Style="{StaticResource NavRailItem}"
-                                         IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Diagnostics}"
-                                         Command="{Binding NavigateCommand}"
-                                         CommandParameter="Diagnostics">
-                                <StackPanel Orientation="Horizontal">
-                                    <Path Data="{StaticResource IconNavHealth}"
-                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                          Width="15"
-                                          Height="15"
-                                          Stretch="Uniform"
-                                          Margin="0,0,11,0" />
-                                    <TextBlock Text="Health &amp; Support" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
-                                </StackPanel>
-                            </RadioButton>
-
-                            <RadioButton GroupName="NavRail"
-                                         Style="{StaticResource NavRailItem}"
-                                         IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Help}"
-                                         Command="{Binding OpenContextHelpCommand}"
-                                         ToolTip="Interactive Help, Setup Checklist, Shortcuts &amp; Troubleshooting (F1)">
-                                <StackPanel Orientation="Horizontal">
-                                    <Path Data="{StaticResource IconNavHelp}"
-                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                          Width="15"
-                                          Height="15"
-                                          Stretch="Uniform"
-                                          Margin="0,0,11,0" />
-                                    <TextBlock Text="Help &amp; Guide" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
-                                </StackPanel>
-                            </RadioButton>
-                        </StackPanel>
-
-                        <!-- Live Smart-Home Ecosystem Quick-Jump Pills -->
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,14,0,10">
-                            <StackPanel>
-                                <TextBlock Text="LIVE ECOSYSTEM" Style="{StaticResource SectionLabelStyle}" Margin="10,0,0,7" />
-                                <ItemsControl ItemsSource="{Binding InstalledPlugins}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Button Command="{Binding DataContext.OpenPluginCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                    CommandParameter="{Binding}"
-                                                    Margin="0,0,0,5"
-                                                    HorizontalContentAlignment="Stretch"
-                                                    Cursor="Hand"
-                                                    ToolTip="{Binding StatusText}">
-                                                <Button.Template>
-                                                    <ControlTemplate TargetType="Button">
-                                                        <Border x:Name="PillBd"
-                                                                Background="{StaticResource CardBgBrush}"
-                                                                BorderBrush="{StaticResource Ink08Brush}"
-                                                                BorderThickness="1"
-                                                                CornerRadius="{StaticResource Radius03}"
-                                                                Padding="9,6.5">
-                                                            <Grid>
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="Auto" />
-                                                                    <ColumnDefinition Width="*" />
-                                                                    <ColumnDefinition Width="Auto" />
-                                                                </Grid.ColumnDefinitions>
-                                                                <Border Grid.Column="0"
-                                                                        Width="26"
-                                                                        Height="20"
-                                                                        CornerRadius="{StaticResource Radius02}"
-                                                                        Background="{StaticResource SidebarBgBrush}"
-                                                                        BorderBrush="{Binding AccentBrush}"
-                                                                        BorderThickness="1"
-                                                                        Margin="0,0,8,0"
-                                                                        VerticalAlignment="Center">
-                                                                    <TextBlock Text="{Binding IconGlyph}"
-                                                                               FontSize="{StaticResource FontSize00}"
-                                                                               FontWeight="Black"
-                                                                               Foreground="{Binding AccentBrush}"
-                                                                               HorizontalAlignment="Center"
-                                                                               VerticalAlignment="Center" />
-                                                                </Border>
-                                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                                    <TextBlock Text="{Binding ShortName}"
-                                                                               FontSize="{StaticResource FontSize05}"
-                                                                               FontWeight="SemiBold"
-                                                                               Foreground="{StaticResource TextPrimaryBrush}"
-                                                                               TextTrimming="CharacterEllipsis" />
-                                                                    <TextBlock Text="{Binding StatusText}"
-                                                                               FontSize="{StaticResource FontSize01}"
-                                                                               Foreground="{StaticResource TextMutedBrush}"
-                                                                               TextTrimming="CharacterEllipsis" />
-                                                                </StackPanel>
-                                                                <Ellipse Grid.Column="2"
-                                                                         Width="7"
-                                                                         Height="7"
-                                                                         Fill="{Binding HealthBadgeBrush}"
-                                                                         Margin="6,0,0,0"
-                                                                         VerticalAlignment="Center" />
-                                                            </Grid>
-                                                        </Border>
-                                                        <ControlTemplate.Triggers>
-                                                            <Trigger Property="IsMouseOver" Value="True">
-                                                                <Setter TargetName="PillBd" Property="Background" Value="{StaticResource Ink08Brush}" />
-                                                                <Setter TargetName="PillBd" Property="BorderBrush" Value="{StaticResource Ink15Brush}" />
-                                                            </Trigger>
-                                                        </ControlTemplate.Triggers>
-                                                    </ControlTemplate>
-                                                </Button.Template>
-                                            </Button>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                        BorderThickness="0,0,1,0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel HorizontalAlignment="Center" Margin="0,12">
+                        <RadioButton GroupName="NavRail"
+                                     Style="{StaticResource NavRailIconItem}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Control}"
+                                     Command="{Binding NavigateCommand}"
+                                     CommandParameter="Control"
+                                     ToolTip="Control Deck">
+                            <StackPanel HorizontalAlignment="Center">
+                                <Path Data="{StaticResource IconNavControlDeck}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                      Width="18"
+                                      Height="18"
+                                      Stretch="Uniform"
+                                      HorizontalAlignment="Center" />
+                                <TextBlock Text="Deck"
+                                           Margin="0,5,0,0"
+                                           HorizontalAlignment="Center"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                             </StackPanel>
-                        </ScrollViewer>
-
-                        <!-- Bottom Hardware Telemetry Card in Sidebar -->
-                        <Border Grid.Row="2"
-                                Background="{StaticResource CardBgBrush}"
-                                BorderBrush="{StaticResource BorderHairlineBrush}"
-                                BorderThickness="1"
-                                CornerRadius="{StaticResource Radius05}"
-                                Padding="12">
-                            <StackPanel>
-                                <TextBlock Text="TELEMETRY" Style="{StaticResource SectionLabelStyle}" />
-                                <TextBlock Text="{Binding ReceiverDetails}"
-                                           FontSize="{StaticResource FontSize05}"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
-                                           TextWrapping="Wrap"
-                                           Margin="0,6,0,0" />
-                                <TextBlock Text="{Binding StatusMessage}"
-                                           FontSize="{StaticResource FontSize04}"
-                                           Foreground="{StaticResource AccentCyanBrightBrush}"
-                                           TextWrapping="Wrap"
-                                           Margin="0,8,0,0" />
-                                <TextBlock Text="{Binding LastUpdatedText}"
-                                           FontSize="{StaticResource FontSize03}"
-                                           Foreground="{StaticResource TextMutedBrush}"
-                                           Margin="0,6,0,0" />
-                                <TextBlock Text="{Binding LastError}"
-                                           FontSize="{StaticResource FontSize03}"
-                                           Foreground="{StaticResource AccentCrimsonBrush}"
-                                           TextWrapping="Wrap"
-                                           Margin="0,6,0,0"
-                                           Visibility="{Binding LastError, Converter={StaticResource StringToVis}}" />
+                        </RadioButton>
+                        <RadioButton GroupName="NavRail"
+                                     Style="{StaticResource NavRailIconItem}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=YouTube}"
+                                     Command="{Binding NavigateCommand}"
+                                     CommandParameter="YouTube"
+                                     ToolTip="YouTube &amp; Music">
+                            <StackPanel HorizontalAlignment="Center">
+                                <Path Data="{StaticResource IconNavYouTube}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                      Width="18"
+                                      Height="18"
+                                      Stretch="Uniform"
+                                      HorizontalAlignment="Center" />
+                                <TextBlock Text="Music"
+                                           Margin="0,5,0,0"
+                                           HorizontalAlignment="Center"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                             </StackPanel>
-                        </Border>
-                    </Grid>
+                        </RadioButton>
+                        <RadioButton GroupName="NavRail"
+                                     Style="{StaticResource NavRailIconItem}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Stations}"
+                                     Command="{Binding NavigateCommand}"
+                                     CommandParameter="Stations"
+                                     ToolTip="Stations &amp; Streams">
+                            <StackPanel HorizontalAlignment="Center">
+                                <Path Data="{StaticResource IconRadio}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                      Width="18"
+                                      Height="18"
+                                      Stretch="Uniform"
+                                      HorizontalAlignment="Center" />
+                                <TextBlock Text="Stations"
+                                           Margin="0,5,0,0"
+                                           HorizontalAlignment="Center"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton GroupName="NavRail"
+                                     Style="{StaticResource NavRailIconItem}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=CastRemote}"
+                                     Command="{Binding NavigateCommand}"
+                                     CommandParameter="CastRemote"
+                                     ToolTip="Cast &amp; Remote">
+                            <StackPanel HorizontalAlignment="Center">
+                                <Path Data="{StaticResource IconNavCast}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                      Width="18"
+                                      Height="18"
+                                      Stretch="Uniform"
+                                      HorizontalAlignment="Center" />
+                                <TextBlock Text="Cast"
+                                           Margin="0,5,0,0"
+                                           HorizontalAlignment="Center"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                            </StackPanel>
+                        </RadioButton>
+                        <Border Width="40" Height="1" Background="{StaticResource BorderHairlineBrush}" Margin="0,8" HorizontalAlignment="Center" />
+                        <RadioButton GroupName="NavRail"
+                                     Style="{StaticResource NavRailIconItem}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Acoustics}"
+                                     Command="{Binding NavigateCommand}"
+                                     CommandParameter="Acoustics"
+                                     ToolTip="Scenes &amp; Acoustics">
+                            <StackPanel HorizontalAlignment="Center">
+                                <Path Data="{StaticResource IconNavScenes}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                      Width="18"
+                                      Height="18"
+                                      Stretch="Uniform"
+                                      HorizontalAlignment="Center" />
+                                <TextBlock Text="Scenes"
+                                           Margin="0,5,0,0"
+                                           HorizontalAlignment="Center"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton GroupName="NavRail"
+                                     Style="{StaticResource NavRailIconItem}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Plugins}"
+                                     Command="{Binding NavigateCommand}"
+                                     CommandParameter="Plugins"
+                                     ToolTip="Plugins">
+                            <Grid>
+                                <StackPanel HorizontalAlignment="Center">
+                                    <Path Data="{StaticResource IconNavPlugins}"
+                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                          Width="18"
+                                          Height="18"
+                                          Stretch="Uniform"
+                                          HorizontalAlignment="Center" />
+                                    <TextBlock Text="Plugins"
+                                               Margin="0,5,0,0"
+                                               HorizontalAlignment="Center"
+                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                                </StackPanel>
+                                <Border Background="{StaticResource Ink08Brush}"
+                                        BorderBrush="{StaticResource Ink12Brush}"
+                                        BorderThickness="1"
+                                        CornerRadius="{StaticResource Radius03}"
+                                        Padding="4,0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Top"
+                                        Margin="0,-6,-14,0">
+                                    <TextBlock Text="{Binding ActivePluginsBadgeText}"
+                                               FontSize="{StaticResource FontSize00}"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource AccentAmberBrush}" />
+                                </Border>
+                            </Grid>
+                        </RadioButton>
+                        <Border Width="40" Height="1" Background="{StaticResource BorderHairlineBrush}" Margin="0,8" HorizontalAlignment="Center" />
+                        <RadioButton GroupName="NavRail"
+                                     Style="{StaticResource NavRailIconItem}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Mcp}"
+                                     Command="{Binding NavigateCommand}"
+                                     CommandParameter="Mcp"
+                                     ToolTip="MCP Server &amp; Room Brain">
+                            <StackPanel HorizontalAlignment="Center">
+                                <Path Data="{StaticResource IconNavMcp}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                      Width="18"
+                                      Height="18"
+                                      Stretch="Uniform"
+                                      HorizontalAlignment="Center" />
+                                <TextBlock Text="Brain"
+                                           Margin="0,5,0,0"
+                                           HorizontalAlignment="Center"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton GroupName="NavRail"
+                                     Style="{StaticResource NavRailIconItem}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Settings}"
+                                     Command="{Binding NavigateCommand}"
+                                     CommandParameter="Settings"
+                                     ToolTip="Settings">
+                            <StackPanel HorizontalAlignment="Center">
+                                <Path Data="{StaticResource IconNavSettings}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                      Width="18"
+                                      Height="18"
+                                      Stretch="Uniform"
+                                      HorizontalAlignment="Center" />
+                                <TextBlock Text="Settings"
+                                           Margin="0,5,0,0"
+                                           HorizontalAlignment="Center"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton GroupName="NavRail"
+                                     Style="{StaticResource NavRailIconItem}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Diagnostics}"
+                                     Command="{Binding NavigateCommand}"
+                                     CommandParameter="Diagnostics"
+                                     ToolTip="Health &amp; Support">
+                            <StackPanel HorizontalAlignment="Center">
+                                <Path Data="{StaticResource IconNavHealth}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                      Width="18"
+                                      Height="18"
+                                      Stretch="Uniform"
+                                      HorizontalAlignment="Center" />
+                                <TextBlock Text="Health"
+                                           Margin="0,5,0,0"
+                                           HorizontalAlignment="Center"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton GroupName="NavRail"
+                                     Style="{StaticResource NavRailIconItem}"
+                                     IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Help}"
+                                     Command="{Binding OpenContextHelpCommand}"
+                                     ToolTip="Help &amp; Guide (F1)">
+                            <StackPanel HorizontalAlignment="Center">
+                                <Path Data="{StaticResource IconNavHelp}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                      Width="18"
+                                      Height="18"
+                                      Stretch="Uniform"
+                                      HorizontalAlignment="Center" />
+                                <TextBlock Text="Help"
+                                           Margin="0,5,0,0"
+                                           HorizontalAlignment="Center"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                            </StackPanel>
+                        </RadioButton>
+                        <Border Width="40" Height="1" Background="{StaticResource BorderHairlineBrush}" Margin="0,8" HorizontalAlignment="Center" />
+                        <!-- Connected devices: one badge per plugin; click opens it -->
+                        <ItemsControl ItemsSource="{Binding InstalledPlugins}" Margin="0,6,0,0" HorizontalAlignment="Center">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Command="{Binding DataContext.OpenPluginCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}"
+                                            Margin="0,4"
+                                            Cursor="Hand">
+                                        <Button.ToolTip>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding ShortName}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource TextMutedBrush}" />
+                                            </StackPanel>
+                                        </Button.ToolTip>
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Grid Width="48" Height="30">
+                                                    <Border x:Name="Badge"
+                                                            Background="Transparent"
+                                                            BorderBrush="{StaticResource BorderSpecBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="{StaticResource Radius02}"
+                                                            Margin="2,4,4,0">
+                                                        <TextBlock Text="{Binding IconGlyph}"
+                                                                   FontSize="{StaticResource FontSize00}"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="{Binding AccentBrush}"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center" />
+                                                    </Border>
+                                                    <Ellipse Width="9"
+                                                             Height="9"
+                                                             Fill="{Binding HealthBadgeBrush}"
+                                                             Stroke="{StaticResource SidebarBgBrush}"
+                                                             StrokeThickness="2"
+                                                             HorizontalAlignment="Right"
+                                                             VerticalAlignment="Top" />
+                                                </Grid>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Badge" Property="Background" Value="{StaticResource CardElevatedBrush}" />
+                                                        <Setter TargetName="Badge" Property="BorderBrush" Value="{StaticResource Ink15Brush}" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    </ScrollViewer>
                 </Border>
 
                 <!-- ======================== CONTENT STAGE ======================== -->
@@ -620,6 +580,35 @@
                         <views:McpIntelligenceView />
                     </Grid>
                 </Grid>
+                <!-- STATUS LINE: receiver, last action, last sync (was the sidebar telemetry card) -->
+                <Border Grid.Row="1"
+                        Grid.ColumnSpan="2"
+                        Background="{StaticResource SidebarBgBrush}"
+                        BorderBrush="{StaticResource BorderHairlineBrush}"
+                        BorderThickness="0,1,0,0"
+                        Padding="16,6">
+                    <DockPanel LastChildFill="True">
+                        <TextBlock DockPanel.Dock="Right"
+                                   Text="{Binding LastUpdatedText}"
+                                   FontSize="{StaticResource FontSize03}"
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   Margin="16,0,0,0" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding ReceiverDetails}"
+                                       FontSize="{StaticResource FontSize03}"
+                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBlock Text="{Binding StatusMessage, StringFormat='   ·   {0}'}"
+                                       FontSize="{StaticResource FontSize03}"
+                                       Foreground="{StaticResource AccentCyanBrightBrush}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding LastError, StringFormat='   ·   {0}'}"
+                                       FontSize="{StaticResource FontSize03}"
+                                       Foreground="{StaticResource AccentCrimsonBrush}"
+                                       TextTrimming="CharacterEllipsis"
+                                       Visibility="{Binding LastError, Converter={StaticResource StringToVis}}" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
             </Grid>
         </Grid>
     </Border>
