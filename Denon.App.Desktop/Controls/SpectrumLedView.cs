@@ -34,18 +34,13 @@ public sealed class SpectrumLedView : FrameworkElement
     private const double MinFrequency = 25.0;
     private const double MaxFrequency = 16000.0;
 
-    private static readonly (double Offset, Color Color)[] Palette =
-    [
-        (0.00, Color.FromRgb(3, 105, 161)),
-        (0.40, Color.FromRgb(6, 182, 212)),
-        (0.64, Color.FromRgb(103, 232, 249)),
-        (0.78, Color.FromRgb(251, 191, 36)),
-        (0.90, Color.FromRgb(249, 115, 22)),
-        (1.00, Color.FromRgb(239, 68, 68)),
-    ];
 
     private static readonly Typeface LabelTypeface = new(new FontFamily("Cascadia Mono, Consolas"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
-    private static readonly Color ScreenColor = Color.FromRgb(5, 7, 11);
+    private static MeterPalette P => MeterPalette.Current;
+
+    private static IReadOnlyList<(double Offset, Color Color)> Palette => P.LedHeat;
+
+    private static Color ScreenColor => P.LedScreen;
 
     private Size _laidOutFor;
     private double _ppd = 1;
@@ -225,20 +220,20 @@ public sealed class SpectrumLedView : FrameworkElement
             EndPoint = new Point(0, _baseline - ReflectionHeight),
             GradientStops =
             {
-                new GradientStop(Color.FromArgb(105, 0, 0, 0), 0),
-                new GradientStop(Color.FromArgb(0, 0, 0, 0), 1),
+                new GradientStop(WithAlpha(P.Shade, 105), 0),
+                new GradientStop(WithAlpha(P.Shade, 0), 1),
             },
         };
         mask.Freeze();
         _reflectionMask = mask;
 
-        var floor = new LinearGradientBrush(Color.FromArgb(0, 34, 211, 238), Color.FromArgb(0, 34, 211, 238), 0)
+        var floor = new LinearGradientBrush(WithAlpha(P.LedFloorGlow, 0), WithAlpha(P.LedFloorGlow, 0), 0)
         {
             GradientStops =
             {
-                new GradientStop(Color.FromArgb(0, 34, 211, 238), 0),
-                new GradientStop(Color.FromArgb(70, 34, 211, 238), 0.5),
-                new GradientStop(Color.FromArgb(0, 34, 211, 238), 1),
+                new GradientStop(WithAlpha(P.LedFloorGlow, 0), 0),
+                new GradientStop(WithAlpha(P.LedFloorGlow, 70), 0.5),
+                new GradientStop(WithAlpha(P.LedFloorGlow, 0), 1),
             },
         };
         floor.Freeze();
@@ -252,7 +247,7 @@ public sealed class SpectrumLedView : FrameworkElement
     {
         var ratio = Math.Pow(MaxFrequency / MinFrequency, 1.0 / bands);
         var slot = width / bands;
-        var brush = new SolidColorBrush(Color.FromRgb(91, 107, 130));
+        var brush = new SolidColorBrush(P.LedLabel);
         brush.Freeze();
 
         (double Hz, string Text)[] marks = [(31.5, "31"), (63, "63"), (125, "125"), (250, "250"), (500, "500"), (1000, "1k"), (2000, "2k"), (4000, "4k"), (8000, "8k"), (16000, "16k")];
@@ -273,7 +268,7 @@ public sealed class SpectrumLedView : FrameworkElement
     private static Color PaletteAt(double t)
     {
         t = Math.Clamp(t, 0, 1);
-        for (var i = 1; i < Palette.Length; i++)
+        for (var i = 1; i < Palette.Count; i++)
         {
             if (t <= Palette[i].Offset)
             {
@@ -289,6 +284,8 @@ public sealed class SpectrumLedView : FrameworkElement
 
         return Palette[^1].Color;
     }
+
+    private static Color WithAlpha(Color c, byte a) => Color.FromArgb(a, c.R, c.G, c.B);
 
     private static double Snap(double v, double ppd) => Math.Round(v * ppd) / ppd;
 }

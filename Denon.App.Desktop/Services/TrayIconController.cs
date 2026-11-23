@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Windows;
 using Denon.App.Core.Models;
 using Denon.App.Core.Services;
+using Denon.App.Desktop.Infrastructure;
 using Forms = System.Windows.Forms;
 
 namespace Denon.App.Desktop.Services;
@@ -157,8 +158,8 @@ public sealed class TrayIconController : IDisposable
         var menu = new Forms.ContextMenuStrip
         {
             Renderer = new DarkTrayMenuRenderer(),
-            BackColor = Color.FromArgb(18, 22, 31),
-            ForeColor = Color.FromArgb(241, 245, 249),
+            BackColor = ThemeResources.DrawingColor("Ink04"),
+            ForeColor = ThemeResources.DrawingColor("TextPrimary"),
             ShowImageMargin = false,
             Font = new Font("Segoe UI", 9.5f),
         };
@@ -239,8 +240,8 @@ public sealed class TrayIconController : IDisposable
         if (parent.DropDown is Forms.ToolStripDropDownMenu dropDown)
         {
             dropDown.ShowImageMargin = false;
-            dropDown.BackColor = Color.FromArgb(18, 22, 31);
-            dropDown.ForeColor = Color.FromArgb(241, 245, 249);
+            dropDown.BackColor = ThemeResources.DrawingColor("Ink04");
+            dropDown.ForeColor = ThemeResources.DrawingColor("TextPrimary");
             dropDown.Renderer = new DarkTrayMenuRenderer();
         }
     }
@@ -250,8 +251,8 @@ public sealed class TrayIconController : IDisposable
         var item = new Forms.ToolStripMenuItem(text)
         {
             Enabled = enabled,
-            ForeColor = enabled ? Color.FromArgb(241, 245, 249) : Color.FromArgb(148, 163, 184),
-            BackColor = Color.FromArgb(18, 22, 31),
+            ForeColor = ThemeResources.DrawingColor(enabled ? "TextPrimary" : "TextMuted"),
+            BackColor = ThemeResources.DrawingColor("Ink04"),
             Padding = new Forms.Padding(6, 3, 6, 3),
         };
 
@@ -377,13 +378,13 @@ public sealed class TrayIconController : IDisposable
 
     private sealed class DarkTrayMenuRenderer : Forms.ToolStripProfessionalRenderer
     {
-        private static readonly Color BgColor = Color.FromArgb(16, 20, 29);
-        private static readonly Color HoverFillColor = Color.FromArgb(18, 54, 74);
-        private static readonly Color HoverBorderColor = Color.FromArgb(0, 212, 255);
-        private static readonly Color SeparatorColor = Color.FromArgb(38, 46, 64);
-        private static readonly Color NormalTextColor = Color.FromArgb(232, 238, 246);
-        private static readonly Color HoverTextColor = Color.White;
-        private static readonly Color HeaderTextColor = Color.FromArgb(148, 163, 184);
+        private static Color BgColor => ThemeResources.DrawingColor("Ink03");
+        private static Color HoverFillColor => ThemeResources.DrawingColor("AccentCyanDim");
+        private static Color HoverBorderColor => ThemeResources.DrawingColor("AccentCyan");
+        private static Color SeparatorColor => ThemeResources.DrawingColor("Ink11");
+        private static Color NormalTextColor => ThemeResources.DrawingColor("TextStrong");
+        private static Color HoverTextColor => ThemeResources.DrawingColor("TextPrimary");
+        private static Color HeaderTextColor => ThemeResources.DrawingColor("TextMuted");
 
         public DarkTrayMenuRenderer() : base(new DarkColorTable())
         {

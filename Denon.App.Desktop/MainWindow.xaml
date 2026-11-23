@@ -30,7 +30,7 @@
         <Style x:Key="ActiveAwareChipStyle" TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsActive}" Value="True">
-                    <Setter Property="Background" Value="#0C2E3D" />
+                    <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                     <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                     <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                 </DataTrigger>
@@ -50,7 +50,7 @@
     <!-- Root Border handles maximized margin compensation cleanly -->
     <Border x:Name="WindowRootBorder"
             Background="{StaticResource ChassisBgBrush}"
-            BorderBrush="#1E2433"
+            BorderBrush="{StaticResource Ink08Brush}"
             BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>
@@ -60,7 +60,7 @@
 
             <!-- ======================== CUSTOM INTEGRATED TITLE BAR ======================== -->
             <Border Grid.Row="0"
-                    Background="#0D1017"
+                    Background="{StaticResource SidebarBgBrush}"
                     BorderBrush="{StaticResource BorderHairlineBrush}"
                     BorderThickness="0,0,0,1"
                     Padding="14,0,8,0">
@@ -84,8 +84,8 @@
                                    FontWeight="Bold"
                                    Foreground="{StaticResource TextPrimaryBrush}"
                                    VerticalAlignment="Center" />
-                        <Border Background="#172130"
-                                BorderBrush="#24344D"
+                        <Border Background="{StaticResource Ink08Brush}"
+                                BorderBrush="{StaticResource Ink12Brush}"
                                 BorderThickness="1"
                                 CornerRadius="5"
                                 Padding="6,2"
@@ -104,8 +104,8 @@
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center">
-                        <Border Background="#121620"
-                                BorderBrush="#23293A"
+                        <Border Background="{StaticResource CardBgBrush}"
+                                BorderBrush="{StaticResource ControlHoverBrush}"
                                 BorderThickness="1"
                                 CornerRadius="14"
                                 Padding="12,5">
@@ -134,8 +134,8 @@
                                            Foreground="{StaticResource TextMutedBrush}"
                                            Visibility="{Binding FirmwareVersion, Converter={StaticResource StringToVis}}"
                                            VerticalAlignment="Center" />
-                                <Border Background="#0B2A20"
-                                        BorderBrush="#10B981"
+                                <Border Background="{StaticResource AccentEmeraldSubtleBgBrush}"
+                                        BorderBrush="{StaticResource AccentEmeraldBrush}"
                                         BorderThickness="1"
                                         CornerRadius="6"
                                         Padding="6,1.5"
@@ -162,7 +162,7 @@
                                 <Ellipse Width="6.5" Height="6.5" Margin="0,0,6,0" VerticalAlignment="Center">
                                     <Ellipse.Style>
                                         <Style TargetType="Ellipse">
-                                            <Setter Property="Fill" Value="#64748B" />
+                                            <Setter Property="Fill" Value="{StaticResource TextFaintBrush}" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsMcpRunning}" Value="True">
                                                     <Setter Property="Fill" Value="{StaticResource AccentEmeraldBrush}" />
@@ -213,9 +213,9 @@
                                 <Style TargetType="Button">
                                     <Setter Property="Height" Value="30" />
                                     <Setter Property="Padding" Value="11,0" />
-                                    <Setter Property="Background" Value="#1E2330" />
+                                    <Setter Property="Background" Value="{StaticResource ControlBgBrush}" />
                                     <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
-                                    <Setter Property="BorderBrush" Value="#2D3548" />
+                                    <Setter Property="BorderBrush" Value="{StaticResource BorderSpecBrush}" />
                                     <Setter Property="BorderThickness" Value="1" />
                                     <Setter Property="Template">
                                         <Setter.Value>
@@ -250,7 +250,7 @@
                                     </Setter>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding PowerStateLabel}" Value="ACTIVE">
-                                            <Setter Property="Background" Value="#0C2D22" />
+                                            <Setter Property="Background" Value="{StaticResource AccentEmeraldSubtleBgBrush}" />
                                             <Setter Property="BorderBrush" Value="{StaticResource AccentEmeraldBrush}" />
                                             <Setter Property="Foreground" Value="{StaticResource AccentEmeraldBrush}" />
                                         </DataTrigger>
@@ -259,7 +259,7 @@
                             </Button.Style>
                         </Button>
 
-                        <Border Width="1" Height="18" Background="#232836" Margin="0,0,6,0" />
+                        <Border Width="1" Height="18" Background="{StaticResource BorderHairlineBrush}" Margin="0,0,6,0" />
 
                         <Button Click="MinimizeButton_Click" Style="{StaticResource TitleBarButton}" ToolTip="Minimize">
                             <Rectangle Width="10" Height="1.5" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
@@ -388,8 +388,8 @@
                                          CommandParameter="Plugins">
                                 <DockPanel LastChildFill="True">
                                     <Border DockPanel.Dock="Right"
-                                            Background="#1A2233"
-                                            BorderBrush="#2C3852"
+                                            Background="{StaticResource Ink08Brush}"
+                                            BorderBrush="{StaticResource Ink12Brush}"
                                             BorderThickness="1"
                                             CornerRadius="8"
                                             Padding="6,1"
@@ -493,8 +493,8 @@
                                                 <Button.Template>
                                                     <ControlTemplate TargetType="Button">
                                                         <Border x:Name="PillBd"
-                                                                Background="#121620"
-                                                                BorderBrush="#1F2535"
+                                                                Background="{StaticResource CardBgBrush}"
+                                                                BorderBrush="{StaticResource Ink08Brush}"
                                                                 BorderThickness="1"
                                                                 CornerRadius="9"
                                                                 Padding="9,6.5">
@@ -508,7 +508,7 @@
                                                                         Width="26"
                                                                         Height="20"
                                                                         CornerRadius="5"
-                                                                        Background="#0B0F17"
+                                                                        Background="{StaticResource SidebarBgBrush}"
                                                                         BorderBrush="{Binding AccentBrush}"
                                                                         BorderThickness="1"
                                                                         Margin="0,0,8,0"
@@ -541,8 +541,8 @@
                                                         </Border>
                                                         <ControlTemplate.Triggers>
                                                             <Trigger Property="IsMouseOver" Value="True">
-                                                                <Setter TargetName="PillBd" Property="Background" Value="#182030" />
-                                                                <Setter TargetName="PillBd" Property="BorderBrush" Value="#34425E" />
+                                                                <Setter TargetName="PillBd" Property="Background" Value="{StaticResource Ink08Brush}" />
+                                                                <Setter TargetName="PillBd" Property="BorderBrush" Value="{StaticResource Ink15Brush}" />
                                                             </Trigger>
                                                         </ControlTemplate.Triggers>
                                                     </ControlTemplate>
@@ -556,7 +556,7 @@
 
                         <!-- Bottom Hardware Telemetry Card in Sidebar -->
                         <Border Grid.Row="2"
-                                Background="#12151E"
+                                Background="{StaticResource CardBgBrush}"
                                 BorderBrush="{StaticResource BorderHairlineBrush}"
                                 BorderThickness="1"
                                 CornerRadius="12"
@@ -613,8 +613,8 @@
 
                         <!-- Zero-Clutter Live Room Brain Insight Strip (only visible when Room Doctor spots an actionable fix!) -->
                         <Border Grid.Row="0"
-                                Background="#131B26"
-                                BorderBrush="#F59E0B"
+                                Background="{StaticResource CardElevatedBrush}"
+                                BorderBrush="{StaticResource AccentAmberBrush}"
                                 BorderThickness="1"
                                 CornerRadius="11"
                                 Padding="12,8"
@@ -626,8 +626,8 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <Border Grid.Column="0" Background="#261C0A" BorderBrush="#F59E0B" BorderThickness="1" CornerRadius="6" Padding="7,2" Margin="0,0,10,0" VerticalAlignment="Center">
-                                    <TextBlock Text="ROOM BRAIN" FontSize="9.5" FontWeight="Bold" Foreground="#FDE68A" />
+                                <Border Grid.Column="0" Background="{StaticResource AccentAmberSubtleBgBrush}" BorderBrush="{StaticResource AccentAmberBrush}" BorderThickness="1" CornerRadius="6" Padding="7,2" Margin="0,0,10,0" VerticalAlignment="Center">
+                                    <TextBlock Text="ROOM BRAIN" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentAmberTextBrush}" />
                                 </Border>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
@@ -674,18 +674,18 @@
                                             Width="88"
                                             Height="88"
                                             CornerRadius="14"
-                                            Background="#0A0E16"
-                                            BorderBrush="#223144"
+                                            Background="{StaticResource SidebarBgBrush}"
+                                            BorderBrush="{StaticResource Ink12Brush}"
                                             BorderThickness="1"
                                             ClipToBounds="True"
                                             Margin="0,0,20,0">
                                         <Grid>
                                             <!-- Default Hi-Fi Disc Emblem -->
                                             <Grid Visibility="{Binding HasArtwork, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}">
-                                                <Ellipse Width="60" Height="60" Stroke="#1D3347" StrokeThickness="2" Fill="#0D1824" />
-                                                <Ellipse Width="38" Height="38" Stroke="#0E4F6B" StrokeThickness="1.2" />
+                                                <Ellipse Width="60" Height="60" Stroke="{StaticResource AccentBlueBorderSoftBrush}" StrokeThickness="2" Fill="{StaticResource Ink05Brush}" />
+                                                <Ellipse Width="38" Height="38" Stroke="{StaticResource AccentCyanBorderBrush}" StrokeThickness="1.2" />
                                                 <Ellipse Width="16" Height="16" Fill="{StaticResource AccentCyanBrush}" Opacity="0.85" />
-                                                <Ellipse Width="5" Height="5" Fill="#07090D" />
+                                                <Ellipse Width="5" Height="5" Fill="{StaticResource OledBgBrush}" />
                                             </Grid>
 
                                             <!-- Live Album/Station Artwork -->
@@ -724,22 +724,22 @@
                                                 <Border x:Name="Eq5" Style="{StaticResource EqBarStyle}" Height="6" />
                                             </StackPanel>
 
-                                            <Border Background="#112736" CornerRadius="5" Padding="7,2.5" Margin="0,0,6,0">
+                                            <Border Background="{StaticResource AccentCyanSubtleBgDeepBrush}" CornerRadius="5" Padding="7,2.5" Margin="0,0,6,0">
                                                 <TextBlock Text="{Binding InputSourceDisplay}" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrush}" />
                                             </Border>
-                                            <Border Background="#191E2A" CornerRadius="5" Padding="7,2.5" Margin="0,0,6,0">
+                                            <Border Background="{StaticResource ControlBgBrush}" CornerRadius="5" Padding="7,2.5" Margin="0,0,6,0">
                                                 <TextBlock Text="{Binding PlayState}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" />
                                             </Border>
-                                            <Border Background="#191E2A" CornerRadius="5" Padding="7,2.5" Margin="0,0,6,0">
+                                            <Border Background="{StaticResource ControlBgBrush}" CornerRadius="5" Padding="7,2.5" Margin="0,0,6,0">
                                                 <TextBlock Text="{Binding SoundMode}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource AccentAmberBrush}" />
                                             </Border>
-                                            <Border Background="#191E2A" CornerRadius="5" Padding="7,2.5" Margin="0,0,6,0"
+                                            <Border Background="{StaticResource ControlBgBrush}" CornerRadius="5" Padding="7,2.5" Margin="0,0,6,0"
                                                     Visibility="{Binding HasSleepTimer, Converter={StaticResource BoolToVis}}">
-                                                <TextBlock Text="{Binding SleepTimerDisplay}" FontSize="10.5" FontWeight="SemiBold" Foreground="#A78BFA" />
+                                                <TextBlock Text="{Binding SleepTimerDisplay}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource AccentVioletBrush}" />
                                             </Border>
-                                            <Border Background="#38131A" BorderBrush="#EF4444" BorderThickness="1" CornerRadius="5" Padding="7,2" Margin="0,0,6,0"
+                                            <Border Background="{StaticResource AccentCrimsonBgBrush}" BorderBrush="{StaticResource AccentCrimsonBrush}" BorderThickness="1" CornerRadius="5" Padding="7,2" Margin="0,0,6,0"
                                                     Visibility="{Binding IsYouTubeActive, Converter={StaticResource BoolToVis}}">
-                                                <TextBlock Text="YOUTUBE CAST" FontSize="9.5" FontWeight="Bold" Foreground="#FCA5A5" />
+                                                <TextBlock Text="YOUTUBE CAST" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentCrimsonTextBrush}" />
                                             </Border>
                                             <Button Content="Watch Video"
                                                     Command="{Binding OpenCinemaForCurrentTrackCommand}"
@@ -804,7 +804,7 @@
                                             <Grid>
                                                 <!-- Play Icon -->
                                                 <Path Data="M8,5.14V19.14L19,12.14L8,5.14Z"
-                                                      Fill="#04151C"
+                                                      Fill="{StaticResource AccentCyanInkBrush}"
                                                       Width="20"
                                                       Height="20"
                                                       Margin="3,0,0,0"
@@ -812,7 +812,7 @@
                                                       Visibility="{Binding IsTransportPlaying, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
                                                 <!-- Pause Icon -->
                                                 <Path Data="M14,19H18V5H14M6,19H10V5H6V19Z"
-                                                      Fill="#04151C"
+                                                      Fill="{StaticResource AccentCyanInkBrush}"
                                                       Width="18"
                                                       Height="18"
                                                       Stretch="Uniform"
@@ -855,15 +855,15 @@
                                                                   Visibility="{Binding ShowRtaSpectrum, Converter={StaticResource BoolToVis}}" />
 
                                 <!-- Toggleable Synced Live Lyrics Bar (LRCLIB) -->
-                                <Border Background="#090D16"
-                                        BorderBrush="#1F2C40"
+                                <Border Background="{StaticResource SidebarBgBrush}"
+                                        BorderBrush="{StaticResource Ink11Brush}"
                                         BorderThickness="1"
                                         CornerRadius="10"
                                         Padding="12,8"
                                         Margin="0,10,0,0"
                                         Visibility="{Binding ShowLiveLyrics, Converter={StaticResource BoolToVis}}">
                                     <DockPanel>
-                                        <Border DockPanel.Dock="Right" Background="#122133" BorderBrush="#264060" BorderThickness="1" CornerRadius="6" Padding="7,2" VerticalAlignment="Center" Margin="10,0,0,0">
+                                        <Border DockPanel.Dock="Right" Background="{StaticResource Ink08Brush}" BorderBrush="{StaticResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="6" Padding="7,2" VerticalAlignment="Center" Margin="10,0,0,0">
                                             <TextBlock Text="{Binding LyricsStatusBadge}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
                                         </Border>
                                         <StackPanel VerticalAlignment="Center">
@@ -1001,7 +1001,7 @@
                                                                 <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                                     <Style.Triggers>
                                                                         <DataTrigger Binding="{Binding EcoMode}" Value="AUTO">
-                                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                                            <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                                             <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                                             <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                                                         </DataTrigger>
@@ -1019,7 +1019,7 @@
                                                                 <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                                     <Style.Triggers>
                                                                         <DataTrigger Binding="{Binding EcoMode}" Value="ON">
-                                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                                            <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                                             <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                                             <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                                                         </DataTrigger>
@@ -1037,7 +1037,7 @@
                                                                 <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                                     <Style.Triggers>
                                                                         <DataTrigger Binding="{Binding EcoMode}" Value="OFF">
-                                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                                            <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                                             <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                                             <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                                                         </DataTrigger>
@@ -1054,7 +1054,7 @@
                                                                     <Style.Triggers>
                                                                         <DataTrigger Binding="{Binding IsZone2On}" Value="True">
                                                                             <Setter Property="Content" Value="Zone 2: ON" />
-                                                                            <Setter Property="Background" Value="#0C2D22" />
+                                                                            <Setter Property="Background" Value="{StaticResource AccentEmeraldSubtleBgBrush}" />
                                                                             <Setter Property="BorderBrush" Value="{StaticResource AccentEmeraldBrush}" />
                                                                             <Setter Property="Foreground" Value="{StaticResource AccentEmeraldBrush}" />
                                                                         </DataTrigger>
@@ -1100,7 +1100,7 @@
                                             <Button.Template>
                                                 <ControlTemplate TargetType="Button">
                                                     <Border Background="{StaticResource OledBgBrush}"
-                                                            BorderBrush="#1C2738"
+                                                            BorderBrush="{StaticResource Ink08Brush}"
                                                             BorderThickness="1"
                                                             CornerRadius="12"
                                                             Padding="16,14">
@@ -1111,7 +1111,7 @@
                                                                        HorizontalAlignment="Center"
                                                                        Style="{StaticResource OledMonoText}">
                                                                 <TextBlock.Effect>
-                                                                    <DropShadowEffect Color="#00D4FF" BlurRadius="14" ShadowDepth="0" Opacity="0.35" />
+                                                                    <DropShadowEffect Color="{StaticResource AccentCyanColor}" BlurRadius="14" ShadowDepth="0" Opacity="0.35" />
                                                                 </TextBlock.Effect>
                                                             </TextBlock>
                                                             <TextBlock Text="{Binding SecondaryVolumeText}"
@@ -1157,9 +1157,9 @@
                                                     <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding IsMuted}" Value="True">
-                                                                <Setter Property="Background" Value="#4C151B" />
+                                                                <Setter Property="Background" Value="{StaticResource AccentCrimsonBgStrongBrush}" />
                                                                 <Setter Property="BorderBrush" Value="{StaticResource AccentCrimsonBrush}" />
-                                                                <Setter Property="Foreground" Value="#FCA5A5" />
+                                                                <Setter Property="Foreground" Value="{StaticResource AccentCrimsonTextBrush}" />
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
@@ -1257,7 +1257,7 @@
                                                                 Margin="0,0,7,7">
                                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                                 <Border Background="{Binding AccentBrush}" CornerRadius="4" Padding="5,1.5" Margin="0,0,7,0">
-                                                                    <TextBlock Text="{Binding Badge}" FontSize="9.5" FontWeight="Black" Foreground="#06121A" />
+                                                                    <TextBlock Text="{Binding Badge}" FontSize="9.5" FontWeight="Black" Foreground="{StaticResource TextOnAccentBrush}" />
                                                                 </Border>
                                                                 <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
                                                             </StackPanel>
@@ -1281,11 +1281,11 @@
                                                             BorderThickness="1">
                                                         <Border.Style>
                                                             <Style TargetType="Border">
-                                                                <Setter Property="Background" Value="#171B24" />
-                                                                <Setter Property="BorderBrush" Value="#252C3D" />
+                                                                <Setter Property="Background" Value="{StaticResource CardElevatedBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{StaticResource Ink11Brush}" />
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding IsCurrentlyPlaying}" Value="True">
-                                                                        <Setter Property="Background" Value="#0E2430" />
+                                                                        <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgDeepBrush}" />
                                                                         <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
@@ -1313,7 +1313,7 @@
                                                                     <TextBlock Text="{Binding Monogram}"
                                                                                FontSize="12"
                                                                                FontWeight="Black"
-                                                                               Foreground="#06121A"
+                                                                               Foreground="{StaticResource TextOnAccentBrush}"
                                                                                HorizontalAlignment="Center"
                                                                                VerticalAlignment="Center" />
                                                                 </Border>
@@ -1395,8 +1395,8 @@
                             <StackPanel>
                                 <DockPanel Margin="0,0,0,10">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Border Background="#38131A" BorderBrush="#EF4444" BorderThickness="1" CornerRadius="5" Padding="7,2" Margin="0,0,8,0">
-                                            <TextBlock Text="YOUTUBE CAST" FontSize="10" FontWeight="Bold" Foreground="#FCA5A5" />
+                                        <Border Background="{StaticResource AccentCrimsonBgBrush}" BorderBrush="{StaticResource AccentCrimsonBrush}" BorderThickness="1" CornerRadius="5" Padding="7,2" Margin="0,0,8,0">
+                                            <TextBlock Text="YOUTUBE CAST" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentCrimsonTextBrush}" />
                                         </Border>
                                         <TextBlock Text="Direct LAN Stream Bridge to Denon HEOS"
                                                    FontSize="12.5"
@@ -1406,7 +1406,7 @@
                                     </StackPanel>
 
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                        <Border Background="#0E2430" BorderBrush="#1C4B63" BorderThickness="1" CornerRadius="6" Padding="8,3" Margin="0,0,8,0">
+                                        <Border Background="{StaticResource AccentCyanSubtleBgDeepBrush}" BorderBrush="{StaticResource AccentCyanBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8,3" Margin="0,0,8,0">
                                             <TextBlock Text="{Binding RelayCodecBadge}" FontSize="10" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="{StaticResource AccentCyanBrush}" />
                                         </Border>
                                         <TextBlock Text="{Binding RelayStreamStateText}"
@@ -1460,7 +1460,7 @@
                                                 <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding YouTubeSearchModeName}" Value="Music">
-                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                             <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                             <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                                         </DataTrigger>
@@ -1478,7 +1478,7 @@
                                                 <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding YouTubeSearchModeName}" Value="Videos">
-                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                             <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                             <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                                         </DataTrigger>
@@ -1495,7 +1495,7 @@
                                                 <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding YouTubeSearchModeName}" Value="Playlists">
-                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                             <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                             <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                                         </DataTrigger>
@@ -1572,7 +1572,7 @@
                                                           Visibility="{Binding IsPlaylistResultsVisible, Converter={StaticResource BoolToVis}}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Border Background="#161A24" BorderBrush="#262F42" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,0,8">
+                                                        <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,0,8">
                                                             <Grid>
                                                                 <Grid.ColumnDefinitions>
                                                                     <ColumnDefinition Width="72" />
@@ -1582,7 +1582,7 @@
                                                                     <ColumnDefinition Width="Auto" />
                                                                 </Grid.ColumnDefinitions>
 
-                                                                <Border Grid.Column="0" Width="72" Height="44" CornerRadius="6" Background="#0A0E16" ClipToBounds="True">
+                                                                <Border Grid.Column="0" Width="72" Height="44" CornerRadius="6" Background="{StaticResource SidebarBgBrush}" ClipToBounds="True">
                                                                     <Image Source="{Binding ThumbnailUrl, Converter={StaticResource SafeImageSource}}" Stretch="UniformToFill" />
                                                                 </Border>
                                                                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
@@ -1606,7 +1606,7 @@
                                             <ItemsControl ItemsSource="{Binding YouTubeSearchResults}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Border Background="#161A24" BorderBrush="#242C3D" BorderThickness="1" CornerRadius="10" Padding="9" Margin="0,0,0,8">
+                                                        <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="10" Padding="9" Margin="0,0,0,8">
                                                             <Grid>
                                                                 <Grid.ColumnDefinitions>
                                                                     <ColumnDefinition Width="76" />
@@ -1616,17 +1616,17 @@
                                                                     <ColumnDefinition Width="Auto" />
                                                                 </Grid.ColumnDefinitions>
 
-                                                                <Border Grid.Column="0" Width="76" Height="46" CornerRadius="7" Background="#0C111B" BorderBrush="#212B3E" BorderThickness="1" ClipToBounds="True">
+                                                                <Border Grid.Column="0" Width="76" Height="46" CornerRadius="7" Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" ClipToBounds="True">
                                                                     <Grid>
                                                                         <Path Data="M12,3V13.55C11.41,13.21 10.73,13 10,13A4,4 0 0,0 6,17A4,4 0 0,0 10,21A4,4 0 0,0 14,17V7H18V3H12Z"
-                                                                              Fill="#22324A"
+                                                                              Fill="{StaticResource Ink12Brush}"
                                                                               Width="18"
                                                                               Height="18"
                                                                               Stretch="Uniform"
                                                                               HorizontalAlignment="Center"
                                                                               VerticalAlignment="Center" />
                                                                         <Image Source="{Binding ThumbnailUrl, Converter={StaticResource SafeImageSource}}" Stretch="UniformToFill" />
-                                                                        <Border Background="#CC07090D" CornerRadius="4" Padding="4,1" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="3">
+                                                                        <Border Background="{StaticResource OverlayScrimBrush}" CornerRadius="4" Padding="4,1" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="3">
                                                                             <TextBlock Text="{Binding DurationDisplay}" FontSize="9.5" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="{StaticResource TextPrimaryBrush}" />
                                                                         </Border>
                                                                     </Grid>
@@ -1706,7 +1706,7 @@
                                                 <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsYouTubeShuffleEnabled}" Value="True">
-                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                             <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                             <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                                         </DataTrigger>
@@ -1737,11 +1737,11 @@
                                                     <Border CornerRadius="9" Padding="8,7" Margin="0,0,0,6" BorderThickness="1">
                                                         <Border.Style>
                                                             <Style TargetType="Border">
-                                                                <Setter Property="Background" Value="#151923" />
-                                                                <Setter Property="BorderBrush" Value="#232A3A" />
+                                                                <Setter Property="Background" Value="{StaticResource CardElevatedBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{StaticResource ControlHoverBrush}" />
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding IsCurrent}" Value="True">
-                                                                        <Setter Property="Background" Value="#0E2430" />
+                                                                        <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgDeepBrush}" />
                                                                         <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
@@ -1874,7 +1874,7 @@
                                             <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding AcousticsSubTab}" Value="Scenes">
-                                                        <Setter Property="Background" Value="#0C2E3D" />
+                                                        <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                         <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                         <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                                     </DataTrigger>
@@ -1891,7 +1891,7 @@
                                             <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding AcousticsSubTab}" Value="Automations">
-                                                        <Setter Property="Background" Value="#0C2E3D" />
+                                                        <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                         <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                         <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                                     </DataTrigger>
@@ -1900,7 +1900,7 @@
                                         </Button.Style>
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="Automation Rules" VerticalAlignment="Center" />
-                                            <Border Background="#1B2334" BorderBrush="#2D3B56" BorderThickness="1" CornerRadius="7" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                            <Border Background="{StaticResource Ink08Brush}" BorderBrush="{StaticResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="7" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding EnabledAutomationsBadge}" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentEmeraldBrush}" />
                                             </Border>
                                         </StackPanel>
@@ -1977,7 +1977,7 @@
                                         <ItemsControl ItemsSource="{Binding ScenePresets}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Border Background="#161A24" BorderBrush="#262E40" BorderThickness="1" CornerRadius="11" Padding="12,10" Margin="0,0,0,9">
+                                                    <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="11" Padding="12,10" Margin="0,0,0,9">
                                                         <Grid>
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="Auto" />
@@ -1992,7 +1992,7 @@
                                                                     Background="{Binding AccentBrush}"
                                                                     Margin="0,0,12,0"
                                                                     VerticalAlignment="Center">
-                                                                <TextBlock Text="{Binding Badge}" FontSize="11" FontWeight="Black" Foreground="#06121A" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                <TextBlock Text="{Binding Badge}" FontSize="11" FontWeight="Black" Foreground="{StaticResource TextOnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                             </Border>
 
                                                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,10,0">
@@ -2152,7 +2152,7 @@
                                             <CheckBox Content="Auto-unmute AVR" IsChecked="{Binding Unmute}" Style="{StaticResource ToggleSwitchStyle}" />
 
                                             <!-- Smart Scenes 2.0: Plugin Action Chain -->
-                                            <Border Background="#0E121B" BorderBrush="#232B3D" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,10,0,0">
+                                            <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,10,0,0">
                                                 <StackPanel>
                                                     <TextBlock Text="PLUGIN ACTION CHAIN" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,6" />
                                                     <Grid Margin="0,0,0,8">
@@ -2184,7 +2184,7 @@
                                                     <ItemsControl ItemsSource="{Binding PluginActions}">
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate>
-                                                                <Border Background="#161C29" BorderBrush="#2B364E" BorderThickness="1" CornerRadius="7" Padding="8,5" Margin="0,0,0,5">
+                                                                <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink12Brush}" BorderThickness="1" CornerRadius="7" Padding="8,5" Margin="0,0,0,5">
                                                                     <DockPanel>
                                                                         <Button DockPanel.Dock="Right"
                                                                                 Content="✕"
@@ -2282,7 +2282,7 @@
                                                         <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding DynamicEqEnabled}" Value="True">
-                                                                    <Setter Property="Background" Value="#0C2D22" />
+                                                                    <Setter Property="Background" Value="{StaticResource AccentEmeraldSubtleBgBrush}" />
                                                                     <Setter Property="BorderBrush" Value="{StaticResource AccentEmeraldBrush}" />
                                                                     <Setter Property="Foreground" Value="{StaticResource AccentEmeraldBrush}" />
                                                                 </DataTrigger>
@@ -2365,7 +2365,7 @@
                                     <!-- Right Acoustic Column: Sub Trim, Dialog Enhancer & Bass/Treble -->
                                     <StackPanel Grid.Column="2">
                                         <!-- Subwoofer Level Adjust -->
-                                        <Border Background="#11151E" BorderBrush="#232A3A" BorderThickness="1" CornerRadius="10" Padding="11,8" Margin="0,0,0,8">
+                                        <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource ControlHoverBrush}" BorderThickness="1" CornerRadius="10" Padding="11,8" Margin="0,0,0,8">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
@@ -2390,7 +2390,7 @@
                                         </Border>
 
                                         <!-- Dialog Level Adjust -->
-                                        <Border Background="#11151E" BorderBrush="#232A3A" BorderThickness="1" CornerRadius="10" Padding="11,8" Margin="0,0,0,8">
+                                        <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource ControlHoverBrush}" BorderThickness="1" CornerRadius="10" Padding="11,8" Margin="0,0,0,8">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
@@ -2415,7 +2415,7 @@
                                         </Border>
 
                                         <!-- Tone Control (Bass & Treble) -->
-                                        <Border Background="#11151E" BorderBrush="#232A3A" BorderThickness="1" CornerRadius="10" Padding="11,8">
+                                        <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource ControlHoverBrush}" BorderThickness="1" CornerRadius="10" Padding="11,8">
                                             <StackPanel>
                                                 <DockPanel Margin="0,0,0,6">
                                                     <Button Content="{Binding ToneControlToggleLabel}"
@@ -2505,7 +2505,7 @@
                                             <ItemsControl ItemsSource="{Binding AutomationRules}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Border Background="#151923" BorderBrush="#262D40" BorderThickness="1" CornerRadius="12" Padding="12" Margin="0,0,0,8">
+                                                        <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="12" Padding="12" Margin="0,0,0,8">
                                                             <DockPanel>
                                                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                                                                     <CheckBox IsChecked="{Binding IsEnabled}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,8,0" ToolTip="Enable or pause this automation rule (click Save Automations to persist)" />
@@ -2525,7 +2525,7 @@
                                                                 </StackPanel>
                                                                 <StackPanel VerticalAlignment="Center">
                                                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
-                                                                        <Border Background="#1E273A" BorderBrush="#334155" BorderThickness="1" CornerRadius="5" Padding="6,1.5" Margin="0,0,8,0">
+                                                                        <Border Background="{StaticResource Ink11Brush}" BorderBrush="{StaticResource Ink14Brush}" BorderThickness="1" CornerRadius="5" Padding="6,1.5" Margin="0,0,8,0">
                                                                             <TextBlock Text="{Binding TriggerBadge}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
                                                                         </Border>
                                                                         <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
@@ -2600,7 +2600,7 @@
                                                           SelectedValue="{Binding TargetSceneId}"
                                                           Margin="0,0,0,10" />
 
-                                                <Border Background="#0E121B" BorderBrush="#232B3D" BorderThickness="1" CornerRadius="10" Padding="10">
+                                                <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="10" Padding="10">
                                                     <StackPanel>
                                                         <TextBlock Text="EXTRA PLUGIN ACTIONS" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,6" />
                                                         <Grid Margin="0,0,0,8">
@@ -2624,7 +2624,7 @@
                                                         <ItemsControl ItemsSource="{Binding PluginActions}">
                                                             <ItemsControl.ItemTemplate>
                                                                 <DataTemplate>
-                                                                    <Border Background="#161C29" BorderBrush="#2B364E" BorderThickness="1" CornerRadius="7" Padding="8,5" Margin="0,0,0,5">
+                                                                    <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink12Brush}" BorderThickness="1" CornerRadius="7" Padding="8,5" Margin="0,0,0,5">
                                                                         <DockPanel>
                                                                             <Button DockPanel.Dock="Right"
                                                                                     Content="✕"
@@ -2712,8 +2712,8 @@
                                             Width="148"
                                             Height="148"
                                             CornerRadius="12"
-                                            Background="#0A0E16"
-                                            BorderBrush="#22364C"
+                                            Background="{StaticResource SidebarBgBrush}"
+                                            BorderBrush="{StaticResource AccentBlueBorderSoftBrush}"
                                             BorderThickness="1"
                                             Padding="8"
                                             VerticalAlignment="Center">
@@ -2722,11 +2722,11 @@
 
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                            <Border Background="#0C2E3D" BorderBrush="{StaticResource AccentCyanBrush}" BorderThickness="1" CornerRadius="5" Padding="7,2" Margin="0,0,8,0">
+                                            <Border Background="{StaticResource AccentCyanSubtleBgBrush}" BorderBrush="{StaticResource AccentCyanBrush}" BorderThickness="1" CornerRadius="5" Padding="7,2" Margin="0,0,8,0">
                                                 <TextBlock Text="PHONE REMOTE" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrush}" />
                                             </Border>
-                                            <Border Background="#1B1830" BorderBrush="#A78BFA" BorderThickness="1" CornerRadius="5" Padding="7,2">
-                                                <TextBlock Text="PARTY JUKEBOX" FontSize="9.5" FontWeight="Bold" Foreground="#C4B5FD" />
+                                            <Border Background="{StaticResource AccentVioletSubtleBgBrush}" BorderBrush="{StaticResource AccentVioletBrush}" BorderThickness="1" CornerRadius="5" Padding="7,2">
+                                                <TextBlock Text="PARTY JUKEBOX" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentVioletTextBrush}" />
                                             </Border>
                                         </StackPanel>
 
@@ -2737,7 +2737,7 @@
                                                    TextWrapping="Wrap"
                                                    Margin="0,4,0,8" />
 
-                                        <Border Background="#090D14" BorderBrush="#1F2C3D" BorderThickness="1" CornerRadius="7" Padding="9,6" Margin="0,0,0,8">
+                                        <Border Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="7" Padding="9,6" Margin="0,0,0,8">
                                             <TextBlock Text="{Binding RemoteWebUrl}"
                                                        FontSize="11.5"
                                                        FontWeight="Bold"
@@ -2768,7 +2768,7 @@
                                     <DockPanel Margin="0,0,0,8">
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <TextBlock Text="CAST PC AUDIO TO DENON" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                                            <Border Background="#0C2D22" BorderBrush="{StaticResource AccentEmeraldBrush}" BorderThickness="1" CornerRadius="5" Padding="6,1.5" Margin="8,0,0,0"
+                                            <Border Background="{StaticResource AccentEmeraldSubtleBgBrush}" BorderBrush="{StaticResource AccentEmeraldBrush}" BorderThickness="1" CornerRadius="5" Padding="6,1.5" Margin="8,0,0,0"
                                                     Visibility="{Binding IsPcCastActive, Converter={StaticResource BoolToVis}}">
                                                 <TextBlock Text="ON AIR" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentEmeraldBrush}" />
                                             </Border>
@@ -2785,8 +2785,8 @@
                                     <ListBox ItemsSource="{Binding AudioOutputDevices}"
                                              SelectedItem="{Binding SelectedAudioDevice, Mode=TwoWay}"
                                              MaxHeight="68"
-                                             Background="#0C0F15"
-                                             BorderBrush="#252C3D"
+                                             Background="{StaticResource SidebarBgBrush}"
+                                             BorderBrush="{StaticResource Ink11Brush}"
                                              BorderThickness="1"
                                              Foreground="{StaticResource TextPrimaryBrush}"
                                              Margin="0,0,0,10">
@@ -2809,7 +2809,7 @@
                                                     <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding SelectedPcCastFormatName}" Value="Mp3_320k">
-                                                                <Setter Property="Background" Value="#0C2E3D" />
+                                                                <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                                 <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                                 <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                                             </DataTrigger>
@@ -2826,7 +2826,7 @@
                                                     <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding SelectedPcCastFormatName}" Value="Wav_Lossless">
-                                                                <Setter Property="Background" Value="#0C2E3D" />
+                                                                <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                                 <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                                 <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                                             </DataTrigger>
@@ -2845,9 +2845,9 @@
                                                 <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsPcCastActive}" Value="True">
-                                                            <Setter Property="Background" Value="#4C151B" />
+                                                            <Setter Property="Background" Value="{StaticResource AccentCrimsonBgStrongBrush}" />
                                                             <Setter Property="BorderBrush" Value="{StaticResource AccentCrimsonBrush}" />
-                                                            <Setter Property="Foreground" Value="#FCA5A5" />
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentCrimsonTextBrush}" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -2880,7 +2880,7 @@
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                         <TextBlock Text="LOCAL HI-RES / FLAC JUKEBOX" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
                                         <TextBlock Text="{Binding LocalTrackCountLabel, StringFormat='  •  {0}'}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
-                                        <Border Background="#182230" CornerRadius="5" Padding="6,2" Margin="10,0,0,0">
+                                        <Border Background="{StaticResource Ink08Brush}" CornerRadius="5" Padding="6,2" Margin="10,0,0,0">
                                             <TextBlock Text="DRAG &amp; DROP FILES OR FOLDERS HERE" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
                                         </Border>
                                     </StackPanel>
@@ -2894,7 +2894,7 @@
                                                 <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsLocalShuffleEnabled}" Value="True">
-                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                             <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                             <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                                         </DataTrigger>
@@ -2920,11 +2920,11 @@
                                                 <Border CornerRadius="9" Padding="10,7" Margin="0,0,0,6" BorderThickness="1">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
-                                                            <Setter Property="Background" Value="#151923" />
-                                                            <Setter Property="BorderBrush" Value="#242B3B" />
+                                                            <Setter Property="Background" Value="{StaticResource CardElevatedBrush}" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource ControlHoverBrush}" />
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding IsCurrent}" Value="True">
-                                                                    <Setter Property="Background" Value="#0E2430" />
+                                                                    <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgDeepBrush}" />
                                                                     <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                                 </DataTrigger>
                                                             </Style.Triggers>
@@ -2948,7 +2948,7 @@
                                                         </StackPanel>
 
                                                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                                            <Border Background="#1B2434" BorderBrush="#2E3F5B" BorderThickness="1" CornerRadius="5" Padding="6,2" Margin="0,0,8,0">
+                                                            <Border Background="{StaticResource Ink08Brush}" BorderBrush="{StaticResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="5" Padding="6,2" Margin="0,0,8,0">
                                                                 <TextBlock Text="{Binding CodecBadge}" FontSize="10" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="{StaticResource AccentAmberBrush}" />
                                                             </Border>
                                                             <TextBlock Text="{Binding SizeDisplay}" FontSize="11" FontFamily="Cascadia Mono, Consolas" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
@@ -3009,7 +3009,7 @@
                                     <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding StationsSubTab}" Value="Presets">
-                                                <Setter Property="Background" Value="#0C2E3D" />
+                                                <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                 <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                 <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                             </DataTrigger>
@@ -3026,7 +3026,7 @@
                                     <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding StationsSubTab}" Value="Explorer">
-                                                <Setter Property="Background" Value="#0C2E3D" />
+                                                <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                 <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                 <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                             </DataTrigger>
@@ -3135,8 +3135,8 @@
                                         <ItemsControl ItemsSource="{Binding FilteredStationPresets}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Border Background="#161A23"
-                                                            BorderBrush="#242B3B"
+                                                    <Border Background="{StaticResource CardElevatedBrush}"
+                                                            BorderBrush="{StaticResource ControlHoverBrush}"
                                                             BorderThickness="1"
                                                             CornerRadius="10"
                                                             Padding="10,9"
@@ -3160,7 +3160,7 @@
                                                                         CornerRadius="8"
                                                                         Background="{Binding BadgeBrush}"
                                                                         Margin="0,0,10,0">
-                                                                    <TextBlock Text="{Binding Monogram}" FontSize="12" FontWeight="Black" Foreground="#06121A" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                    <TextBlock Text="{Binding Monogram}" FontSize="12" FontWeight="Black" Foreground="{StaticResource TextOnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                                 </Border>
 
                                                                 <TextBox Grid.Column="1" Text="{Binding Alias, UpdateSourceTrigger=PropertyChanged}" ToolTip="Alias" Padding="8,6" />
@@ -3324,7 +3324,7 @@
                                     <ItemsControl ItemsSource="{Binding RadioBrowserResults}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Background="#151923" BorderBrush="#242C3D" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,0,0,7">
+                                                <Border Background="{StaticResource CardElevatedBrush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,0,0,7">
                                                     <Grid>
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="36" />
@@ -3336,10 +3336,10 @@
                                                             <ColumnDefinition Width="Auto" />
                                                         </Grid.ColumnDefinitions>
 
-                                                        <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="#0C1320" BorderBrush="#233148" BorderThickness="1" ClipToBounds="True">
+                                                        <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{StaticResource Ink05Brush}" BorderBrush="{StaticResource Ink12Brush}" BorderThickness="1" ClipToBounds="True">
                                                             <Grid>
                                                                 <Path Data="M20,6H8.3L16.56,2.59L15.81,0.74L3.24,5.96C2.5,6.27 2,7 2,7.8V20A2,2 0 0,0 4,22H20A2,2 0 0,0 22,20V8A2,2 0 0,0 20,6M7,20A3,3 0 0,1 4,17A3,3 0 0,1 7,14A3,3 0 0,1 10,17A3,3 0 0,1 7,20M20,12H18V10H16V12H4V8H20V12Z"
-                                                                      Fill="#27405E"
+                                                                      Fill="{StaticResource AccentBlueSubtleBgBrush}"
                                                                       Width="16"
                                                                       Height="16"
                                                                       Stretch="Uniform"
@@ -3354,7 +3354,7 @@
                                                             <TextBlock Text="{Binding SubtitleLine}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
                                                         </StackPanel>
 
-                                                        <Border Grid.Column="4" Background="#1B2434" BorderBrush="#2F405B" BorderThickness="1" CornerRadius="5" Padding="7,3" VerticalAlignment="Center">
+                                                        <Border Grid.Column="4" Background="{StaticResource Ink08Brush}" BorderBrush="{StaticResource Ink15Brush}" BorderThickness="1" CornerRadius="5" Padding="7,3" VerticalAlignment="Center">
                                                             <TextBlock Text="{Binding CodecBadge}" FontSize="10" FontWeight="Bold" FontFamily="Cascadia Mono, Consolas" Foreground="{StaticResource AccentAmberBrush}" />
                                                         </Border>
 
@@ -3599,7 +3599,7 @@
                                               FontSize="12" />
 
                                     <!-- 1-Click Acoustic Lip-Sync Auto-Calibration (PC Mic Chirp) -->
-                                    <Border Background="#0E121B" BorderBrush="#232B3D" BorderThickness="1" CornerRadius="10" Padding="10,8">
+                                    <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="10" Padding="10,8">
                                         <DockPanel>
                                             <Button DockPanel.Dock="Right"
                                                     Content="{Binding CalibrateSyncButtonLabel}"
@@ -3684,19 +3684,19 @@
                                                     <Border CornerRadius="9" Padding="9,7" Margin="0,0,0,6" BorderThickness="1">
                                                         <Border.Style>
                                                             <Style TargetType="Border">
-                                                                <Setter Property="Background" Value="#141822" />
-                                                                <Setter Property="BorderBrush" Value="#232A3A" />
+                                                                <Setter Property="Background" Value="{StaticResource CardBgBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{StaticResource ControlHoverBrush}" />
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding IsRecording}" Value="True">
-                                                                        <Setter Property="Background" Value="#0C2636" />
+                                                                        <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgDeepBrush}" />
                                                                         <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                                     </DataTrigger>
                                                                     <DataTrigger Binding="{Binding HasCollision}" Value="True">
-                                                                        <Setter Property="Background" Value="#2A1216" />
+                                                                        <Setter Property="Background" Value="{StaticResource AccentCrimsonBgDeepBrush}" />
                                                                         <Setter Property="BorderBrush" Value="{StaticResource AccentCrimsonBrush}" />
                                                                     </DataTrigger>
                                                                     <DataTrigger Binding="{Binding IsWarningOnly}" Value="True">
-                                                                        <Setter Property="Background" Value="#251E10" />
+                                                                        <Setter Property="Background" Value="{StaticResource AccentAmberSubtleBgBrush}" />
                                                                         <Setter Property="BorderBrush" Value="{StaticResource AccentAmberBrush}" />
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
@@ -3715,10 +3715,10 @@
                                                                 <Border Grid.Column="0" CornerRadius="4" Padding="5,2" Margin="0,0,8,0" VerticalAlignment="Center">
                                                                     <Border.Style>
                                                                         <Style TargetType="Border">
-                                                                            <Setter Property="Background" Value="#1E2534" />
+                                                                            <Setter Property="Background" Value="{StaticResource Ink08Brush}" />
                                                                             <Style.Triggers>
                                                                                 <DataTrigger Binding="{Binding IsGlobal}" Value="True">
-                                                                                    <Setter Property="Background" Value="#0E2D3D" />
+                                                                                    <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                                                 </DataTrigger>
                                                                             </Style.Triggers>
                                                                         </Style>
@@ -3746,8 +3746,8 @@
                                                                            Margin="0,0,8,0" />
 
                                                                 <Border Grid.Column="2"
-                                                                        Background="#0A0E16"
-                                                                        BorderBrush="#293246"
+                                                                        Background="{StaticResource SidebarBgBrush}"
+                                                                        BorderBrush="{StaticResource Ink12Brush}"
                                                                         BorderThickness="1"
                                                                         CornerRadius="6"
                                                                         Padding="8,4"
@@ -3802,7 +3802,7 @@
 
                                     <StackPanel Grid.Row="3" Margin="0,8,0,0">
                                         <!-- Quick-Add Global Hotkey for any Smart Scene or Plugin Action -->
-                                        <Border Background="#0E121B" BorderBrush="#232B3D" BorderThickness="1" CornerRadius="9" Padding="9,7" Margin="0,0,0,6">
+                                        <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="9" Padding="9,7" Margin="0,0,0,6">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
@@ -3918,8 +3918,8 @@
                                     <ItemsControl ItemsSource="{Binding DiagnosticChecks}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Background="#151923"
-                                                        BorderBrush="#242B3B"
+                                                <Border Background="{StaticResource CardElevatedBrush}"
+                                                        BorderBrush="{StaticResource ControlHoverBrush}"
                                                         BorderThickness="1"
                                                         CornerRadius="10"
                                                         Padding="12,9"
@@ -3997,7 +3997,7 @@
                                                 <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding LogFilterLevel}" Value="All">
-                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                             <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                             <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                                         </DataTrigger>
@@ -4010,7 +4010,7 @@
                                                 <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding LogFilterLevel}" Value="Info">
-                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                             <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                             <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                                         </DataTrigger>
@@ -4023,7 +4023,7 @@
                                                 <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding LogFilterLevel}" Value="Warning">
-                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                             <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                             <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                                         </DataTrigger>
@@ -4036,7 +4036,7 @@
                                                 <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding LogFilterLevel}" Value="Error">
-                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                             <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                             <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                                         </DataTrigger>
@@ -4061,7 +4061,7 @@
 
                                 <Border Grid.Row="1"
                                         Background="{StaticResource OledBgBrush}"
-                                        BorderBrush="#1E2536"
+                                        BorderBrush="{StaticResource Ink08Brush}"
                                         BorderThickness="1"
                                         CornerRadius="8"
                                         Padding="8">
@@ -4082,7 +4082,7 @@
                                                             </Border>
                                                             <ControlTemplate.Triggers>
                                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                                    <Setter Property="Background" Value="#141925" />
+                                                                    <Setter Property="Background" Value="{StaticResource CardElevatedBrush}" />
                                                                 </Trigger>
                                                             </ControlTemplate.Triggers>
                                                         </ControlTemplate>
@@ -4156,7 +4156,7 @@
                                                 <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding ConsoleProtocol}" Value="AVR">
-                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                             <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                             <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                                         </DataTrigger>
@@ -4173,7 +4173,7 @@
                                                 <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding ConsoleProtocol}" Value="HEOS">
-                                                            <Setter Property="Background" Value="#0C2E3D" />
+                                                            <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
                                                             <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                             <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
                                                         </DataTrigger>
@@ -4203,7 +4203,7 @@
                                 </Grid>
 
                                 <Border Background="{StaticResource OledBgBrush}"
-                                        BorderBrush="#1E2536"
+                                        BorderBrush="{StaticResource Ink08Brush}"
                                         BorderThickness="1"
                                         CornerRadius="8"
                                         Padding="10"
@@ -4254,7 +4254,7 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                                         <TextBlock Text="Plugins &amp; Extensions" FontSize="15.5" FontWeight="Bold" VerticalAlignment="Center" />
-                                        <Border Background="#1B2334" BorderBrush="#2D3B56" BorderThickness="1" CornerRadius="6" Padding="7,1.5" Margin="9,0,0,0" VerticalAlignment="Center">
+                                        <Border Background="{StaticResource Ink08Brush}" BorderBrush="{StaticResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="6" Padding="7,1.5" Margin="9,0,0,0" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding PluginSdkBadgeText}" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
                                         </Border>
                                         <TextBlock Text="{Binding PluginsStatusText}"
@@ -4306,8 +4306,8 @@
                                                     ToolTip="{Binding Description}">
                                                 <Button.Style>
                                                     <Style TargetType="Button">
-                                                        <Setter Property="Background" Value="#151923" />
-                                                        <Setter Property="BorderBrush" Value="#252C3E" />
+                                                        <Setter Property="Background" Value="{StaticResource CardElevatedBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{StaticResource Ink11Brush}" />
                                                         <Setter Property="BorderThickness" Value="1" />
                                                         <Setter Property="Template">
                                                             <Setter.Value>
@@ -4323,8 +4323,8 @@
                                                                     </Border>
                                                                     <ControlTemplate.Triggers>
                                                                         <Trigger Property="IsMouseOver" Value="True">
-                                                                            <Setter TargetName="TabBd" Property="Background" Value="#1B2231" />
-                                                                            <Setter TargetName="TabBd" Property="BorderBrush" Value="#3A4763" />
+                                                                            <Setter TargetName="TabBd" Property="Background" Value="{StaticResource Ink08Brush}" />
+                                                                            <Setter TargetName="TabBd" Property="BorderBrush" Value="{StaticResource Ink15Brush}" />
                                                                         </Trigger>
                                                                     </ControlTemplate.Triggers>
                                                                 </ControlTemplate>
@@ -4332,7 +4332,7 @@
                                                         </Setter>
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                                <Setter Property="Background" Value="#142334" />
+                                                                <Setter Property="Background" Value="{StaticResource Ink08Brush}" />
                                                                 <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
                                                             </DataTrigger>
                                                         </Style.Triggers>
@@ -4349,7 +4349,7 @@
                                                             Width="32"
                                                             Height="26"
                                                             CornerRadius="7"
-                                                            Background="#0C1018"
+                                                            Background="{StaticResource Ink03Brush}"
                                                             BorderBrush="{Binding AccentBrush}"
                                                             BorderThickness="1"
                                                             Margin="0,0,9,0"
@@ -4369,7 +4369,7 @@
                                                         <TextBlock Text="{Binding StatusText}" FontSize="10.5" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
                                                     </StackPanel>
                                                     <Border Grid.Column="2"
-                                                            Background="#0C111B"
+                                                            Background="{StaticResource Ink03Brush}"
                                                             BorderBrush="{Binding HealthBadgeBrush}"
                                                             BorderThickness="1"
                                                             CornerRadius="6"

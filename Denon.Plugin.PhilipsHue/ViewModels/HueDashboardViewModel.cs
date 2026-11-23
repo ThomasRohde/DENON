@@ -395,7 +395,7 @@ public sealed class HueDashboardViewModel : HueObservableObject
     private bool _isPaired;
     private bool _isPairing;
     private string _connectionBadgeText = "NOT CONNECTED";
-    private Brush _connectionBadgeBrush = Brushes.Orange;
+    private Brush _connectionBadgeBrush = HostTheme.Brush("AccentAmber");
     private string _statusMessage = "Discover your Philips Hue Bridge on LAN, enter its IP, or try Demo Mode.";
     private string _pairingHintText = string.Empty;
     private bool _isBusy;
@@ -1478,17 +1478,17 @@ public sealed class HueDashboardViewModel : HueObservableObject
         if (IsDemoMode)
         {
             ConnectionBadgeText = "DEMO SIMULATOR";
-            ConnectionBadgeBrush = CreateFrozenBrush("#38BDF8");
+            ConnectionBadgeBrush = HostTheme.Brush("AccentCyanBright");
         }
         else if (IsPaired)
         {
             ConnectionBadgeText = $"CONNECTED • {BridgeIpInput}";
-            ConnectionBadgeBrush = CreateFrozenBrush("#10B981");
+            ConnectionBadgeBrush = HostTheme.Brush("AccentEmerald");
         }
         else
         {
             ConnectionBadgeText = "SETUP REQUIRED";
-            ConnectionBadgeBrush = CreateFrozenBrush("#F59E0B");
+            ConnectionBadgeBrush = HostTheme.Brush("AccentAmber");
         }
     }
 

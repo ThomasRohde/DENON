@@ -6,14 +6,14 @@
              UseLayoutRounding="True">
     <!-- Machined deck panel holding two backlit VU windows (left amber, right cyan). -->
     <Border CornerRadius="14"
-            BorderBrush="#232C3D"
+            BorderBrush="{StaticResource Ink11Brush}"
             BorderThickness="1"
             Padding="6">
         <Border.Background>
             <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                <GradientStop Color="#151A25" Offset="0" />
-                <GradientStop Color="#0C0F16" Offset="0.5" />
-                <GradientStop Color="#090B10" Offset="1" />
+                <GradientStop Color="{StaticResource Ink06Color}" Offset="0" />
+                <GradientStop Color="{StaticResource Ink02Color}" Offset="0.5" />
+                <GradientStop Color="{StaticResource Ink01Color}" Offset="1" />
             </LinearGradientBrush>
         </Border.Background>
 
@@ -22,9 +22,9 @@
             <Border CornerRadius="10" BorderThickness="0,1,0,0" Margin="-5,-5,-5,0" IsHitTestVisible="False">
                 <Border.BorderBrush>
                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                        <GradientStop Color="#00FFFFFF" Offset="0" />
-                        <GradientStop Color="#1FFFFFFF" Offset="0.5" />
-                        <GradientStop Color="#00FFFFFF" Offset="1" />
+                        <GradientStop Color="{StaticResource OverlayWhiteClearColor}" Offset="0" />
+                        <GradientStop Color="{StaticResource OverlayWhiteSoftColor}" Offset="0.5" />
+                        <GradientStop Color="{StaticResource OverlayWhiteClearColor}" Offset="1" />
                     </LinearGradientBrush>
                 </Border.BorderBrush>
             </Border>
@@ -37,15 +37,15 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Recessed window wells give the glass a seat in the panel -->
-                <Border Grid.Column="0" CornerRadius="12" Background="#05060A" Padding="1.5" VerticalAlignment="Center">
-                    <controls:VuDial x:Name="LeftDial" Accent="#F59E0B" Channel="L" ChannelName="LEFT" />
+                <Border Grid.Column="0" CornerRadius="12" Background="{StaticResource OledBgBrush}" Padding="1.5" VerticalAlignment="Center">
+                    <controls:VuDial x:Name="LeftDial" Accent="{StaticResource AccentAmberColor}" Channel="L" ChannelName="LEFT" />
                 </Border>
 
                 <!-- Center seam: a fine vertical groove between the windows -->
-                <Rectangle Grid.Column="1" Width="1" Margin="0,10" Fill="#1A2130" HorizontalAlignment="Center" />
+                <Rectangle Grid.Column="1" Width="1" Margin="0,10" Fill="{StaticResource Ink08Brush}" HorizontalAlignment="Center" />
 
-                <Border Grid.Column="2" CornerRadius="12" Background="#05060A" Padding="1.5" VerticalAlignment="Center">
-                    <controls:VuDial x:Name="RightDial" Accent="#22D3EE" Channel="R" ChannelName="RIGHT" />
+                <Border Grid.Column="2" CornerRadius="12" Background="{StaticResource OledBgBrush}" Padding="1.5" VerticalAlignment="Center">
+                    <controls:VuDial x:Name="RightDial" Accent="{StaticResource AccentTealColor}" Channel="R" ChannelName="RIGHT" />
                 </Border>
             </Grid>
         </Grid>

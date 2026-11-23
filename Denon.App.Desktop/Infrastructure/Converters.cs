@@ -54,9 +54,9 @@ public sealed class EqualityConverter : IValueConverter
 
 public sealed class LogLevelToBrushConverter : IValueConverter
 {
-    private static readonly Brush InfoBrush = CreateFrozenBrush(56, 189, 248);
-    private static readonly Brush WarningBrush = CreateFrozenBrush(245, 158, 11);
-    private static readonly Brush ErrorBrush = CreateFrozenBrush(248, 113, 113);
+    private static Brush InfoBrush => ThemeResources.Brush("AccentCyanBright");
+    private static Brush WarningBrush => ThemeResources.Brush("AccentAmber");
+    private static Brush ErrorBrush => ThemeResources.Brush("AccentCrimsonBright");
 
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
         value switch
@@ -68,20 +68,13 @@ public sealed class LogLevelToBrushConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         throw new NotSupportedException();
-
-    private static Brush CreateFrozenBrush(byte r, byte g, byte b)
-    {
-        var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
-        brush.Freeze();
-        return brush;
-    }
 }
 
 public sealed class NullableBoolToBrushConverter : IValueConverter
 {
-    private static readonly Brush SuccessBrush = CreateFrozenBrush(16, 185, 129);
-    private static readonly Brush FailureBrush = CreateFrozenBrush(248, 113, 113);
-    private static readonly Brush NeutralBrush = CreateFrozenBrush(148, 163, 184);
+    private static Brush SuccessBrush => ThemeResources.Brush("AccentEmerald");
+    private static Brush FailureBrush => ThemeResources.Brush("AccentCrimsonBright");
+    private static Brush NeutralBrush => ThemeResources.Brush("TextMuted");
 
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
         value switch
@@ -93,13 +86,6 @@ public sealed class NullableBoolToBrushConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         throw new NotSupportedException();
-
-    private static Brush CreateFrozenBrush(byte r, byte g, byte b)
-    {
-        var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
-        brush.Freeze();
-        return brush;
-    }
 }
 
 public sealed class SafeImageSourceConverter : IValueConverter

@@ -36,12 +36,12 @@ public sealed class VuDial : FrameworkElement
     private static readonly Typeface LegendTypeface = new(ScaleFont, FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
     private static readonly Typeface ReadoutTypeface = new(ReadoutFont, FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
 
-    private static readonly Color Red = Color.FromRgb(239, 68, 68);
-    private static readonly Color RedInk = Color.FromRgb(252, 128, 128);
+    private static Color Red => P.RedZone;
+    private static Color RedInk => P.RedZoneInk;
 
     public static readonly DependencyProperty AccentProperty = DependencyProperty.Register(
         nameof(Accent), typeof(Color), typeof(VuDial),
-        new FrameworkPropertyMetadata(Color.FromRgb(245, 158, 11), (d, _) => ((VuDial)d).RebuildStatic()));
+        new FrameworkPropertyMetadata(MeterPalette.Current.DefaultAccent, (d, _) => ((VuDial)d).RebuildStatic()));
 
     public static readonly DependencyProperty ChannelProperty = DependencyProperty.Register(
         nameof(Channel), typeof(string), typeof(VuDial),
@@ -66,7 +66,7 @@ public sealed class VuDial : FrameworkElement
     private double _w = 500;
 
     private string _sourceText = "IDLE";
-    private Color _sourceColor = Color.FromRgb(100, 116, 139);
+    private Color _sourceColor = MeterPalette.Current.IdleSource;
     private double _level;
     private double _peakLevel;
     private long _peakLevelUntil;
@@ -248,7 +248,9 @@ public sealed class VuDial : FrameworkElement
 
     private double PixelsPerDip => VisualTreeHelper.GetDpi(this).PixelsPerDip;
 
-    private Color Ink => Blend(Color.FromRgb(241, 236, 226), Accent, 0.10);
+    private static MeterPalette P => MeterPalette.Current;
+
+    private Color Ink => Blend(P.PaperInk, Accent, 0.10);
 
     private void DrawFace()
     {
@@ -259,16 +261,16 @@ public sealed class VuDial : FrameworkElement
             EndPoint = new Point(0, 1),
             GradientStops =
             {
-                new GradientStop(Color.FromRgb(13, 16, 23), 0.0),
-                new GradientStop(Blend(Color.FromRgb(10, 12, 17), Accent, 0.05), 0.55),
-                new GradientStop(Blend(Color.FromRgb(8, 9, 13), Accent, 0.16), 1.0),
+                new GradientStop(P.FaceTop, 0.0),
+                new GradientStop(Blend(P.FaceMiddle, Accent, 0.05), 0.55),
+                new GradientStop(Blend(P.FaceBottom, Accent, 0.16), 1.0),
             },
         };
         face.Freeze();
         dc.DrawRoundedRectangle(face, null, new Rect(0, 0, _w, DesignHeight), CornerRadius, CornerRadius);
 
         // Fine engine-turned texture: faint concentric rings around the pivot, like a printed meter card.
-        var ring = new Pen(new SolidColorBrush(Color.FromArgb(9, 255, 255, 255)), 0.6);
+        var ring = new Pen(new SolidColorBrush(WithAlpha(P.Glint, 9)), 0.6);
         ring.Freeze();
         for (var r = 60.0; r < 330; r += 7)
         {
@@ -382,9 +384,9 @@ public sealed class VuDial : FrameworkElement
 
         // Unlit peak lamp and its caption (the lit lamp is its own layer).
         var lampCenter = PeakLampCenter;
-        var unlit = new RadialGradientBrush(Color.FromRgb(74, 28, 30), Color.FromRgb(36, 14, 16));
+        var unlit = new RadialGradientBrush(P.PeakLampUnlitCenter, P.PeakLampUnlitEdge);
         unlit.Freeze();
-        dc.DrawEllipse(unlit, Frozen(new Pen(Frozen(new SolidColorBrush(Color.FromArgb(70, 255, 255, 255))), 0.6)), lampCenter, 4.8, 4.8);
+        dc.DrawEllipse(unlit, Frozen(new Pen(Frozen(new SolidColorBrush(WithAlpha(P.Glint, 70))), 0.6)), lampCenter, 4.8, 4.8);
         var caption = Text("PEAK", ScaleTypeface, 7, Frozen(new SolidColorBrush(WithAlpha(ink, 110))), ppd);
         caption.SetFontWeight(FontWeights.Bold);
         dc.DrawText(caption, new Point(isRight ? lampCenter.X + 9 : lampCenter.X - 9 - caption.Width, lampCenter.Y - (caption.Height / 2)));
@@ -457,7 +459,7 @@ public sealed class VuDial : FrameworkElement
         var halo = new RadialGradientBrush(WithAlpha(Red, 150), WithAlpha(Red, 0));
         halo.Freeze();
         lit.DrawEllipse(halo, null, center, 15, 15);
-        var core = new RadialGradientBrush(Color.FromRgb(255, 214, 214), Red)
+        var core = new RadialGradientBrush(P.PeakLampCore, Red)
         {
             GradientOrigin = new Point(0.38, 0.35),
         };
@@ -476,14 +478,14 @@ public sealed class VuDial : FrameworkElement
         using (var dc = _needle.RenderOpen())
         {
             dc.DrawGeometry(Frozen(new SolidColorBrush(WithAlpha(Accent, 70))), null, glow);
-            var body = new LinearGradientBrush(Color.FromRgb(255, 250, 240), Blend(Color.FromRgb(255, 244, 222), Accent, 0.25), new Point(0.5, 0), new Point(0.5, 1));
+            var body = new LinearGradientBrush(P.NeedleTip, Blend(P.NeedleBase, Accent, 0.25), new Point(0.5, 0), new Point(0.5, 1));
             body.Freeze();
             dc.DrawGeometry(body, null, needle);
         }
 
         using (var dc = _needleShadow.RenderOpen())
         {
-            dc.DrawGeometry(Frozen(new SolidColorBrush(Color.FromArgb(120, 0, 0, 0))), null, NeedleGeometry(baseR, tip, 4.2, 1.6));
+            dc.DrawGeometry(Frozen(new SolidColorBrush(WithAlpha(P.Shade, 120))), null, NeedleGeometry(baseR, tip, 4.2, 1.6));
         }
     }
 
@@ -502,9 +504,9 @@ public sealed class VuDial : FrameworkElement
             RadiusY = hoodR,
             GradientStops =
             {
-                new GradientStop(Color.FromRgb(6, 7, 10), 0.0),
-                new GradientStop(Color.FromRgb(13, 15, 21), 0.93),
-                new GradientStop(Color.FromRgb(28, 32, 43), 1.0),
+                new GradientStop(P.HoodCenter, 0.0),
+                new GradientStop(P.HoodMiddle, 0.93),
+                new GradientStop(P.HoodEdge, 1.0),
             },
         };
         hood.Freeze();
@@ -512,7 +514,7 @@ public sealed class VuDial : FrameworkElement
         dc.DrawGeometry(null, Frozen(new Pen(Frozen(new SolidColorBrush(WithAlpha(Accent, 70))), 0.8)), Arc(-31, 31, hoodR));
 
         // Bezel depth: darker inner edge along the top.
-        var bezel = new LinearGradientBrush(Color.FromArgb(150, 0, 0, 0), Color.FromArgb(0, 0, 0, 0), new Point(0, 0), new Point(0, 0.14));
+        var bezel = new LinearGradientBrush(WithAlpha(P.Shade, 150), WithAlpha(P.Shade, 0), new Point(0, 0), new Point(0, 0.14));
         bezel.Freeze();
         dc.DrawRectangle(bezel, null, new Rect(0, 0, _w, DesignHeight));
 
@@ -523,8 +525,8 @@ public sealed class VuDial : FrameworkElement
             RadiusY = 1.05,
             GradientStops =
             {
-                new GradientStop(Color.FromArgb(0, 0, 0, 0), 0.55),
-                new GradientStop(Color.FromArgb(110, 0, 0, 0), 1.0),
+                new GradientStop(WithAlpha(P.Shade, 0), 0.55),
+                new GradientStop(WithAlpha(P.Shade, 110), 1.0),
             },
         };
         vignette.Freeze();
@@ -541,12 +543,12 @@ public sealed class VuDial : FrameworkElement
         }
 
         sheen.Freeze();
-        var sheenBrush = new LinearGradientBrush(Color.FromArgb(24, 255, 255, 255), Color.FromArgb(2, 255, 255, 255), new Point(0, 0), new Point(0.15, 1));
+        var sheenBrush = new LinearGradientBrush(WithAlpha(P.Glint, 24), WithAlpha(P.Glint, 2), new Point(0, 0), new Point(0.15, 1));
         sheenBrush.Freeze();
         dc.DrawGeometry(sheenBrush, null, sheen);
 
         // Crisp glass edge.
-        dc.DrawRoundedRectangle(null, Frozen(new Pen(Frozen(new SolidColorBrush(Color.FromArgb(26, 255, 255, 255))), 1)),
+        dc.DrawRoundedRectangle(null, Frozen(new Pen(Frozen(new SolidColorBrush(WithAlpha(P.Glint, 26))), 1)),
             new Rect(0.5, 0.5, _w - 1, DesignHeight - 1), CornerRadius - 0.5, CornerRadius - 0.5);
     }
 

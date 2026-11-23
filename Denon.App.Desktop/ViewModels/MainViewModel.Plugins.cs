@@ -137,11 +137,11 @@ public sealed class PluginCardViewModel : ObservableObject
 
     public Brush HealthBadgeBrush => Health switch
     {
-        PluginHealthState.Connected => CreateBrush("#10B981", "#10B981"),
-        PluginHealthState.Warning => CreateBrush("#F59E0B", "#F59E0B"),
-        PluginHealthState.Error => CreateBrush("#EF4444", "#EF4444"),
-        PluginHealthState.Disabled => CreateBrush("#64748B", "#64748B"),
-        _ => CreateBrush("#38BDF8", "#38BDF8"),
+        PluginHealthState.Connected => ThemeResources.Brush("AccentEmerald"),
+        PluginHealthState.Warning => ThemeResources.Brush("AccentAmber"),
+        PluginHealthState.Error => ThemeResources.Brush("AccentCrimson"),
+        PluginHealthState.Disabled => ThemeResources.Brush("TextFaint"),
+        _ => ThemeResources.Brush("AccentCyanBright"),
     };
 
     public void UpdateFrom(PluginRecordSnapshot snapshot)

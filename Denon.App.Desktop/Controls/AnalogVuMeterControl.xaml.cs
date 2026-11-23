@@ -3,6 +3,7 @@ using System.Windows.Media;
 using Denon.App.Desktop.Services;
 using Color = System.Windows.Media.Color;
 using UserControl = System.Windows.Controls.UserControl;
+using Denon.App.Desktop.Infrastructure;
 
 namespace Denon.App.Desktop.Controls;
 
@@ -66,11 +67,11 @@ public partial class AnalogVuMeterControl : UserControl
     /// <summary>Color of the source print under "VU".</summary>
     public static Color SourceColor(AudioMeterSource source) => source switch
     {
-        AudioMeterSource.Denon => Color.FromRgb(52, 211, 153),
-        AudioMeterSource.Pc => Color.FromRgb(251, 191, 36),
-        AudioMeterSource.Muted => Color.FromRgb(248, 113, 113),
-        AudioMeterSource.Simulated => Color.FromRgb(148, 163, 184),
-        _ => Color.FromRgb(100, 116, 139),
+        AudioMeterSource.Denon => ThemeResources.Color("AccentEmeraldBright"),
+        AudioMeterSource.Pc => ThemeResources.Color("AccentAmberBright"),
+        AudioMeterSource.Muted => ThemeResources.Color("AccentCrimsonBright"),
+        AudioMeterSource.Simulated => ThemeResources.Color("TextMuted"),
+        _ => ThemeResources.Color("TextFaint"),
     };
 
     public static string SourceToolTip(AudioMeterSource source) => source switch

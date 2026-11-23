@@ -80,7 +80,7 @@ public partial class SmartTvDashboardView : UserControl
         _pendingDx = 0;
         _pendingDy = 0;
         TrackpadSurface.CaptureMouse();
-        TrackpadSurface.BorderBrush = new SolidColorBrush(Color.FromRgb(56, 189, 248));
+        TrackpadSurface.BorderBrush = HostTheme.Brush("AccentCyanBright");
     }
 
     private void Trackpad_MouseMove(object sender, MouseEventArgs e)
@@ -115,7 +115,7 @@ public partial class SmartTvDashboardView : UserControl
 
         _isDraggingTrackpad = false;
         TrackpadSurface.ReleaseMouseCapture();
-        TrackpadSurface.BorderBrush = new SolidColorBrush(Color.FromRgb(39, 52, 74));
+        TrackpadSurface.BorderBrush = HostTheme.Brush("Ink12");
 
         if (_dragDistanceAccum < 6.0)
         {

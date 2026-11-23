@@ -1,0 +1,125 @@
+<!--
+    Brushes for every color token in Colors.*.xaml (same name, "Brush" instead of "Color").
+    Frozen: code may read them from any thread (Infrastructure/ThemeResources).
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options"
+                    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                    mc:Ignorable="po">
+
+    <SolidColorBrush po:Freeze="True" x:Key="Ink00Brush" Color="{StaticResource Ink00Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="Ink01Brush" Color="{StaticResource Ink01Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="Ink02Brush" Color="{StaticResource Ink02Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="Ink03Brush" Color="{StaticResource Ink03Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="Ink04Brush" Color="{StaticResource Ink04Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="Ink05Brush" Color="{StaticResource Ink05Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="Ink06Brush" Color="{StaticResource Ink06Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="Ink07Brush" Color="{StaticResource Ink07Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="Ink08Brush" Color="{StaticResource Ink08Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="Ink09Brush" Color="{StaticResource Ink09Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="Ink10Brush" Color="{StaticResource Ink10Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="Ink11Brush" Color="{StaticResource Ink11Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="Ink12Brush" Color="{StaticResource Ink12Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="Ink13Brush" Color="{StaticResource Ink13Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="Ink14Brush" Color="{StaticResource Ink14Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="Ink15Brush" Color="{StaticResource Ink15Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="Ink16Brush" Color="{StaticResource Ink16Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="TextStrongBrush" Color="{StaticResource TextStrongColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="TextSoftBrush" Color="{StaticResource TextSoftColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="TextFaintBrush" Color="{StaticResource TextFaintColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="TextDisabledBrush" Color="{StaticResource TextDisabledColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="TextOnAccentBrush" Color="{StaticResource TextOnAccentColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCyanBrush" Color="{StaticResource AccentCyanColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCyanVividBrush" Color="{StaticResource AccentCyanVividColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCyanInkBrush" Color="{StaticResource AccentCyanInkColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCyanBrightBrush" Color="{StaticResource AccentCyanBrightColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentSkyBrush" Color="{StaticResource AccentSkyColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentSkyDeepBrush" Color="{StaticResource AccentSkyDeepColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCyanTextBrush" Color="{StaticResource AccentCyanTextColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCyanDimBrush" Color="{StaticResource AccentCyanDimColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCyanSubtleBgBrush" Color="{StaticResource AccentCyanSubtleBgColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCyanSubtleBgDeepBrush" Color="{StaticResource AccentCyanSubtleBgDeepColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCyanBorderBrush" Color="{StaticResource AccentCyanBorderColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCyanBorderStrongBrush" Color="{StaticResource AccentCyanBorderStrongColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentBlueTextBrush" Color="{StaticResource AccentBlueTextColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentBlueTextSoftBrush" Color="{StaticResource AccentBlueTextSoftColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentBlueBorderBrush" Color="{StaticResource AccentBlueBorderColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentBlueBorderSoftBrush" Color="{StaticResource AccentBlueBorderSoftColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentBlueSubtleBgBrush" Color="{StaticResource AccentBlueSubtleBgColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentEmeraldBrush" Color="{StaticResource AccentEmeraldColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentEmeraldDeepBrush" Color="{StaticResource AccentEmeraldDeepColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentEmeraldDeeperBrush" Color="{StaticResource AccentEmeraldDeeperColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentEmeraldTextBrush" Color="{StaticResource AccentEmeraldTextColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentEmeraldSubtleBgBrush" Color="{StaticResource AccentEmeraldSubtleBgColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentEmeraldSubtleBgDeepBrush" Color="{StaticResource AccentEmeraldSubtleBgDeepColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentEmeraldBorderBrush" Color="{StaticResource AccentEmeraldBorderColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentAmberBrush" Color="{StaticResource AccentAmberColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentAmberDeepBrush" Color="{StaticResource AccentAmberDeepColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentAmberTextBrush" Color="{StaticResource AccentAmberTextColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentAmberSubtleBgBrush" Color="{StaticResource AccentAmberSubtleBgColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentAmberSubtleBgDeepBrush" Color="{StaticResource AccentAmberSubtleBgDeepColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCrimsonBrush" Color="{StaticResource AccentCrimsonColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCrimsonDeepBrush" Color="{StaticResource AccentCrimsonDeepColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCrimsonTextBrush" Color="{StaticResource AccentCrimsonTextColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentRoseTextBrush" Color="{StaticResource AccentRoseTextColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCrimsonBgBrush" Color="{StaticResource AccentCrimsonBgColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCrimsonBgDeepBrush" Color="{StaticResource AccentCrimsonBgDeepColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCrimsonBgStrongBrush" Color="{StaticResource AccentCrimsonBgStrongColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCrimsonBorderBrush" Color="{StaticResource AccentCrimsonBorderColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentIndigoBrush" Color="{StaticResource AccentIndigoColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentIndigoDeepBrush" Color="{StaticResource AccentIndigoDeepColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentIndigoTextBrush" Color="{StaticResource AccentIndigoTextColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentIndigoSubtleBgBrush" Color="{StaticResource AccentIndigoSubtleBgColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentVioletBrush" Color="{StaticResource AccentVioletColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentVioletTextBrush" Color="{StaticResource AccentVioletTextColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentVioletBorderBrush" Color="{StaticResource AccentVioletBorderColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentVioletSubtleBgBrush" Color="{StaticResource AccentVioletSubtleBgColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentPinkBrush" Color="{StaticResource AccentPinkColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentPinkTextBrush" Color="{StaticResource AccentPinkTextColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentPinkSubtleBgBrush" Color="{StaticResource AccentPinkSubtleBgColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentTealBrush" Color="{StaticResource AccentTealColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="OverlayWhiteClearBrush" Color="{StaticResource OverlayWhiteClearColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="OverlayWhiteFaintBrush" Color="{StaticResource OverlayWhiteFaintColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="OverlayWhiteSoftBrush" Color="{StaticResource OverlayWhiteSoftColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="OverlayScrimBrush" Color="{StaticResource OverlayScrimColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCyanGlowBrush" Color="{StaticResource AccentCyanGlowColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentEmeraldBrightBrush" Color="{StaticResource AccentEmeraldBrightColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentAmberBrightBrush" Color="{StaticResource AccentAmberBrightColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentAmberBgBrush" Color="{StaticResource AccentAmberBgColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="AccentCrimsonBrightBrush" Color="{StaticResource AccentCrimsonBrightColor}" />
+
+    <!-- Role names for ramp steps (used across the app before the ramp existed). -->
+    <SolidColorBrush po:Freeze="True" x:Key="OledBgBrush" Color="{StaticResource Ink00Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="ChassisBgBrush" Color="{StaticResource Ink01Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="SidebarBgBrush" Color="{StaticResource Ink02Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="CardBgBrush" Color="{StaticResource Ink04Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="CardElevatedBrush" Color="{StaticResource Ink06Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="ControlBgBrush" Color="{StaticResource Ink07Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="BorderHairlineBrush" Color="{StaticResource Ink09Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="ControlHoverBrush" Color="{StaticResource Ink10Color}" />
+    <SolidColorBrush po:Freeze="True" x:Key="BorderSpecBrush" Color="{StaticResource Ink13Color}" />
+
+    <!-- Gradients -->
+    <LinearGradientBrush po:Freeze="True" x:Key="HeroCardGradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="{StaticResource Ink06Color}" Offset="0" />
+        <GradientStop Color="{StaticResource Ink02Color}" Offset="0.65" />
+        <GradientStop Color="{StaticResource TextOnAccentColor}" Offset="1" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush po:Freeze="True" x:Key="CyanAccentGradient" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="{StaticResource AccentSkyDeepColor}" Offset="0" />
+        <GradientStop Color="{StaticResource AccentCyanColor}" Offset="1" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush po:Freeze="True" x:Key="VolumeTrackGradient" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="{StaticResource AccentSkyColor}" Offset="0" />
+        <GradientStop Color="{StaticResource AccentCyanVividColor}" Offset="0.72" />
+        <GradientStop Color="{StaticResource AccentAmberColor}" Offset="0.92" />
+        <GradientStop Color="{StaticResource AccentCrimsonColor}" Offset="1" />
+    </LinearGradientBrush>
+
+</ResourceDictionary>

@@ -1,30 +1,30 @@
 <UserControl x:Class="Denon.Plugin.SmartTv.SmartTvDashboardView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Foreground="#F1F5F9"
+             Foreground="{StaticResource TextPrimaryBrush}"
              FontFamily="Segoe UI Variable Display, Segoe UI">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="TvBoolToVis" />
         <Style x:Key="TvCard" TargetType="Border">
-            <Setter Property="Background" Value="#13161E" />
-            <Setter Property="BorderBrush" Value="#232836" />
+            <Setter Property="Background" Value="{StaticResource CardBgBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderHairlineBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="14" />
             <Setter Property="Padding" Value="16" />
         </Style>
 
         <Style x:Key="TelemetryTile" TargetType="Border">
-            <Setter Property="Background" Value="#0C0F16" />
-            <Setter Property="BorderBrush" Value="#1E2534" />
+            <Setter Property="Background" Value="{StaticResource SidebarBgBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Ink08Brush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="10" />
             <Setter Property="Padding" Value="10,8" />
         </Style>
 
         <Style x:Key="TvBtn" TargetType="Button">
-            <Setter Property="Background" Value="#1C202C" />
-            <Setter Property="Foreground" Value="#F1F5F9" />
-            <Setter Property="BorderBrush" Value="#2D3548" />
+            <Setter Property="Background" Value="{StaticResource ControlBgBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderSpecBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="11,6.5" />
             <Setter Property="FontSize" Value="12" />
@@ -43,11 +43,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#252C3D" />
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="#3E4B66" />
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Ink11Brush}" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Ink15Brush}" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#172033" />
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Ink08Brush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -56,21 +56,21 @@
         </Style>
 
         <Style x:Key="TvPrimaryBtn" TargetType="Button" BasedOn="{StaticResource TvBtn}">
-            <Setter Property="Background" Value="#0284C7" />
-            <Setter Property="BorderBrush" Value="#38BDF8" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Background" Value="{StaticResource AccentSkyDeepBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrightBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
         </Style>
 
         <Style x:Key="TvOledBtn" TargetType="Button" BasedOn="{StaticResource TvBtn}">
-            <Setter Property="Background" Value="#1A1330" />
-            <Setter Property="BorderBrush" Value="#6366F1" />
-            <Setter Property="Foreground" Value="#E0E7FF" />
+            <Setter Property="Background" Value="{StaticResource AccentVioletSubtleBgBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentIndigoDeepBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource AccentBlueTextSoftBrush}" />
         </Style>
 
         <Style x:Key="TvDangerBtn" TargetType="Button" BasedOn="{StaticResource TvBtn}">
-            <Setter Property="Background" Value="#261419" />
-            <Setter Property="BorderBrush" Value="#7F1D1D" />
-            <Setter Property="Foreground" Value="#FCA5A5" />
+            <Setter Property="Background" Value="{StaticResource AccentCrimsonBgDeepBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentCrimsonBorderBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource AccentCrimsonTextBrush}" />
         </Style>
 
         <Style x:Key="DPadBtn" TargetType="Button" BasedOn="{StaticResource TvBtn}">
@@ -93,9 +93,9 @@
         <Style x:Key="ActiveArcBtn" TargetType="Button" BasedOn="{StaticResource TvChipBtn}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsAudioArcActive}" Value="True">
-                    <Setter Property="Background" Value="#0B2E3D" />
-                    <Setter Property="BorderBrush" Value="#38BDF8" />
-                    <Setter Property="Foreground" Value="#7DD3FC" />
+                    <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
+                    <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrightBrush}" />
+                    <Setter Property="Foreground" Value="{StaticResource AccentCyanTextBrush}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -103,9 +103,9 @@
         <Style x:Key="ActiveSpeakersBtn" TargetType="Button" BasedOn="{StaticResource TvChipBtn}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsAudioSpeakersActive}" Value="True">
-                    <Setter Property="Background" Value="#0B2E3D" />
-                    <Setter Property="BorderBrush" Value="#38BDF8" />
-                    <Setter Property="Foreground" Value="#7DD3FC" />
+                    <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
+                    <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrightBrush}" />
+                    <Setter Property="Foreground" Value="{StaticResource AccentCyanTextBrush}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -113,9 +113,9 @@
         <Style x:Key="ActiveOpticalBtn" TargetType="Button" BasedOn="{StaticResource TvChipBtn}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsAudioOpticalActive}" Value="True">
-                    <Setter Property="Background" Value="#0B2E3D" />
-                    <Setter Property="BorderBrush" Value="#38BDF8" />
-                    <Setter Property="Foreground" Value="#7DD3FC" />
+                    <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
+                    <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrightBrush}" />
+                    <Setter Property="Foreground" Value="{StaticResource AccentCyanTextBrush}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -123,9 +123,9 @@
         <Style x:Key="ActiveBluetoothBtn" TargetType="Button" BasedOn="{StaticResource TvChipBtn}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsAudioBluetoothActive}" Value="True">
-                    <Setter Property="Background" Value="#0B2E3D" />
-                    <Setter Property="BorderBrush" Value="#38BDF8" />
-                    <Setter Property="Foreground" Value="#7DD3FC" />
+                    <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
+                    <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrightBrush}" />
+                    <Setter Property="Foreground" Value="{StaticResource AccentCyanTextBrush}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -146,7 +146,7 @@
                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,3">
                                 <TextBlock Text="Smart TV Control (LG webOS)" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
-                                <Border Background="#0C1420"
+                                <Border Background="{StaticResource Ink05Brush}"
                                         BorderBrush="{Binding ConnectionBadgeBrush}"
                                         BorderThickness="1"
                                         CornerRadius="6"
@@ -161,7 +161,7 @@
                             </StackPanel>
                             <TextBlock Text="Persistent SSAP WebSocket • Live Subscriptions, Magic Remote, Screen Off, eARC &amp; Installed Apps"
                                        FontSize="11.5"
-                                       Foreground="#94A3B8"
+                                       Foreground="{StaticResource TextMutedBrush}"
                                        TextWrapping="Wrap" />
                         </StackPanel>
 
@@ -174,8 +174,8 @@
                     </Grid>
 
                     <!-- Collapsible Connection Setup Row (automatically collapses once paired!) -->
-                    <Border Background="#0D111A"
-                            BorderBrush="#1F2739"
+                    <Border Background="{StaticResource Ink03Brush}"
+                            BorderBrush="{StaticResource Ink11Brush}"
                             BorderThickness="1"
                             CornerRadius="10"
                             Padding="12,10"
@@ -191,15 +191,15 @@
                                     <ColumnDefinition Width="1.25*" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="TV NAME" FontSize="10" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,4" />
+                                    <TextBlock Text="TV NAME" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" Margin="0,0,0,4" />
                                     <TextBox Text="{Binding TvName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TvInput}" Tag="e.g. Living Room OLED TV" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="TV LAN IP ADDRESS" FontSize="10" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,4" />
+                                    <TextBlock Text="TV LAN IP ADDRESS" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" Margin="0,0,0,4" />
                                     <TextBox Text="{Binding TvIp, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TvInput}" FontFamily="Cascadia Mono, Consolas" Tag="192.168.1.28" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="4">
-                                    <TextBlock Text="MAC ADDRESS (WAKE-ON-LAN)" FontSize="10" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,4" />
+                                    <TextBlock Text="MAC ADDRESS (WAKE-ON-LAN)" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" Margin="0,0,0,4" />
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -233,35 +233,35 @@
 
                         <Border Grid.Column="0" Style="{StaticResource TelemetryTile}">
                             <StackPanel>
-                                <TextBlock Text="TV MODEL / WEBOS" FontSize="9.5" FontWeight="Bold" Foreground="#64748B" />
-                                <TextBlock Text="{Binding ModelSummary}" FontSize="12" FontWeight="SemiBold" Foreground="#E2E8F0" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                                <TextBlock Text="TV MODEL / WEBOS" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" />
+                                <TextBlock Text="{Binding ModelSummary}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextStrongBrush}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
                             </StackPanel>
                         </Border>
                         <Border Grid.Column="2" Style="{StaticResource TelemetryTile}">
                             <StackPanel>
-                                <TextBlock Text="NOW SHOWING" FontSize="9.5" FontWeight="Bold" Foreground="#64748B" />
-                                <TextBlock Text="{Binding NowShowingText}" FontSize="12" FontWeight="SemiBold" Foreground="#38BDF8" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                                <TextBlock Text="NOW SHOWING" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" />
+                                <TextBlock Text="{Binding NowShowingText}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AccentCyanBrightBrush}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
                             </StackPanel>
                         </Border>
                         <Border Grid.Column="4" Style="{StaticResource TelemetryTile}">
                             <StackPanel>
-                                <TextBlock Text="AUDIO OUTPUT" FontSize="9.5" FontWeight="Bold" Foreground="#64748B" />
-                                <TextBlock Text="{Binding SoundOutputText}" FontSize="12" FontWeight="SemiBold" Foreground="#10B981" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                                <TextBlock Text="AUDIO OUTPUT" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" />
+                                <TextBlock Text="{Binding SoundOutputText}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AccentEmeraldBrush}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
                             </StackPanel>
                         </Border>
                         <Border Grid.Column="6" Style="{StaticResource TelemetryTile}">
                             <StackPanel>
-                                <TextBlock Text="DISPLAY &amp; VOL" FontSize="9.5" FontWeight="Bold" Foreground="#64748B" />
+                                <TextBlock Text="DISPLAY &amp; VOL" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" />
                                 <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                    <TextBlock Text="{Binding ScreenStateText}" FontSize="12" FontWeight="SemiBold" Foreground="#E2E8F0" />
-                                    <TextBlock Text=" • " FontSize="12" Foreground="#475569" />
-                                    <TextBlock Text="{Binding TvVolumeLabel}" FontSize="12" FontWeight="SemiBold" Foreground="#F59E0B" />
+                                    <TextBlock Text="{Binding ScreenStateText}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextStrongBrush}" />
+                                    <TextBlock Text=" • " FontSize="12" Foreground="{StaticResource TextDisabledBrush}" />
+                                    <TextBlock Text="{Binding TvVolumeLabel}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AccentAmberBrush}" />
                                 </StackPanel>
                             </StackPanel>
                         </Border>
                     </Grid>
 
-                    <TextBlock Text="{Binding StatusMessage}" FontSize="11.5" Foreground="#38BDF8" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding StatusMessage}" FontSize="11.5" Foreground="{StaticResource AccentCyanBrightBrush}" TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
 
@@ -276,9 +276,9 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="LIVE TV SCREEN &amp; VIRTUAL TRACKPAD" FontSize="10.5" FontWeight="Bold" Foreground="#64748B" VerticalAlignment="Center" />
-                                <Border Background="#0E1726" BorderBrush="#243248" BorderThickness="1" CornerRadius="5" Padding="7,1.5" Margin="8,0,0,0">
-                                    <TextBlock Text="{Binding PreviewStatusText}" FontSize="10" Foreground="#38BDF8" />
+                                <TextBlock Text="LIVE TV SCREEN &amp; VIRTUAL TRACKPAD" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" VerticalAlignment="Center" />
+                                <Border Background="{StaticResource Ink05Brush}" BorderBrush="{StaticResource Ink12Brush}" BorderThickness="1" CornerRadius="5" Padding="7,1.5" Margin="8,0,0,0">
+                                    <TextBlock Text="{Binding PreviewStatusText}" FontSize="10" Foreground="{StaticResource AccentCyanBrightBrush}" />
                                 </Border>
                             </StackPanel>
                         </StackPanel>
@@ -286,7 +286,7 @@
                         <WrapPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center">
                             <CheckBox Content="Auto-Refresh"
                                       IsChecked="{Binding AutoRefreshPreview, Mode=TwoWay}"
-                                      Foreground="#CBD5E1"
+                                      Foreground="{StaticResource TextSoftBrush}"
                                       FontSize="11.5"
                                       VerticalAlignment="Center"
                                       Margin="0,0,10,0"
@@ -320,8 +320,8 @@
                         <!-- Left: Clickable 16:9 Live TV Preview + Browser URL Bar -->
                         <StackPanel Grid.Column="0">
                             <Border x:Name="PreviewSurface"
-                                    Background="#080B11"
-                                    BorderBrush="#243044"
+                                    Background="{StaticResource ChassisBgBrush}"
+                                    BorderBrush="{StaticResource Ink12Brush}"
                                     BorderThickness="1"
                                     CornerRadius="10"
                                     ClipToBounds="True"
@@ -343,9 +343,9 @@
                                         <Ellipse x:Name="ClickMarker"
                                                  Width="18"
                                                  Height="18"
-                                                 Stroke="#38BDF8"
+                                                 Stroke="{StaticResource AccentCyanBrightBrush}"
                                                  StrokeThickness="2"
-                                                 Fill="#4438BDF8"
+                                                 Fill="{StaticResource AccentCyanGlowBrush}"
                                                  Visibility="Collapsed" />
                                     </Canvas>
 
@@ -357,12 +357,12 @@
                                         <TextBlock Text="Live LG webOS Screen Preview"
                                                    FontSize="13.5"
                                                    FontWeight="SemiBold"
-                                                   Foreground="#94A3B8"
+                                                   Foreground="{StaticResource TextMutedBrush}"
                                                    HorizontalAlignment="Center"
                                                    Margin="0,0,0,5" />
                                         <TextBlock Text="Click Snap Now or enable Auto-Refresh to view your TV screen here. Left-click directly on the image to point &amp; click on the TV."
                                                    FontSize="11.5"
-                                                   Foreground="#64748B"
+                                                   Foreground="{StaticResource TextFaintBrush}"
                                                    TextAlignment="Center"
                                                    TextWrapping="Wrap"
                                                    MaxWidth="380" />
@@ -406,8 +406,8 @@
 
                             <Border x:Name="TrackpadSurface"
                                     Grid.Row="0"
-                                    Background="#0B0F18"
-                                    BorderBrush="#27344A"
+                                    Background="{StaticResource Ink03Brush}"
+                                    BorderBrush="{StaticResource Ink12Brush}"
                                     BorderThickness="1"
                                     CornerRadius="12"
                                     Cursor="Hand"
@@ -423,13 +423,13 @@
                                         <TextBlock Text="VIRTUAL TRACKPAD"
                                                    FontSize="11"
                                                    FontWeight="Bold"
-                                                   Foreground="#38BDF8"
+                                                   Foreground="{StaticResource AccentCyanBrightBrush}"
                                                    HorizontalAlignment="Center"
                                                    Margin="0,0,0,6" />
                                         <TextBlock x:Name="TrackpadHintText"
                                                    Text="Hold &amp; drag to move pointer&#x0a;Click to select • Right-click Back&#x0a;Scroll wheel to scroll page"
                                                    FontSize="11"
-                                                   Foreground="#64748B"
+                                                   Foreground="{StaticResource TextFaintBrush}"
                                                    TextAlignment="Center"
                                                    LineHeight="17" />
                                     </StackPanel>
@@ -486,7 +486,7 @@
                     <!-- Power, OLED & Audio Output Card -->
                     <Border Style="{StaticResource TvCard}" Margin="0,0,0,14">
                         <StackPanel>
-                            <TextBlock Text="POWER &amp; DISPLAY" FontSize="10.5" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,9" />
+                            <TextBlock Text="POWER &amp; DISPLAY" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" Margin="0,0,0,9" />
                             <WrapPanel Margin="0,0,0,10">
                                 <Button Content="Wake TV (WoL)" Command="{Binding RunActionCommand}" CommandParameter="tv.power_on" Style="{StaticResource TvPrimaryBtn}" Margin="0,0,7,7" />
                                 <Button Content="Power Off" Command="{Binding RunActionCommand}" CommandParameter="tv.power_off" Style="{StaticResource TvDangerBtn}" Margin="0,0,7,7" />
@@ -496,7 +496,7 @@
                                 <Button Content="Close App" Command="{Binding RunActionCommand}" CommandParameter="tv.close_app" Style="{StaticResource TvBtn}" Margin="0,0,7,7" />
                             </WrapPanel>
 
-                            <TextBlock Text="TV AUDIO OUTPUT (DENON AVR SYNERGY)" FontSize="10.5" FontWeight="Bold" Foreground="#64748B" Margin="0,2,0,8" />
+                            <TextBlock Text="TV AUDIO OUTPUT (DENON AVR SYNERGY)" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" Margin="0,2,0,8" />
                             <WrapPanel Margin="0,0,0,10">
                                 <Button Content="HDMI ARC / eARC" Command="{Binding SetAudioOutputCommand}" CommandParameter="external_arc" Style="{StaticResource ActiveArcBtn}" Margin="0,0,7,6" />
                                 <Button Content="TV Speakers" Command="{Binding SetAudioOutputCommand}" CommandParameter="tv_speaker" Style="{StaticResource ActiveSpeakersBtn}" Margin="0,0,7,6" />
@@ -536,8 +536,8 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="HDMI &amp; EXTERNAL INPUTS" FontSize="10.5" FontWeight="Bold" Foreground="#64748B" VerticalAlignment="Center" />
-                                <TextBlock Grid.Column="1" Text="Green dot = live signal connected" FontSize="10.5" Foreground="#64748B" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="0" Text="HDMI &amp; EXTERNAL INPUTS" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Green dot = live signal connected" FontSize="10.5" Foreground="{StaticResource TextFaintBrush}" VerticalAlignment="Center" />
                             </Grid>
 
                             <ItemsControl ItemsSource="{Binding Inputs}">
@@ -555,29 +555,29 @@
                                             <Button.Template>
                                                 <ControlTemplate TargetType="Button">
                                                     <Border x:Name="InBd"
-                                                            Background="#181D29"
-                                                            BorderBrush="#2A3244"
+                                                            Background="{StaticResource CardElevatedBrush}"
+                                                            BorderBrush="{StaticResource Ink12Brush}"
                                                             BorderThickness="1"
                                                             CornerRadius="9"
                                                             Padding="12,8">
                                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                            <Ellipse x:Name="SigDot" Width="7" Height="7" Fill="#475569" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                                            <Ellipse x:Name="SigDot" Width="7" Height="7" Fill="{StaticResource Ink16Brush}" Margin="0,0,8,0" VerticalAlignment="Center" />
                                                             <StackPanel>
-                                                                <TextBlock Text="{Binding Label}" FontSize="12" FontWeight="SemiBold" Foreground="#F1F5F9" />
-                                                                <TextBlock Text="{Binding Id}" FontSize="9.5" Foreground="#64748B" />
+                                                                <TextBlock Text="{Binding Label}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                                                <TextBlock Text="{Binding Id}" FontSize="9.5" Foreground="{StaticResource TextFaintBrush}" />
                                                             </StackPanel>
                                                         </StackPanel>
                                                     </Border>
                                                     <ControlTemplate.Triggers>
                                                         <DataTrigger Binding="{Binding IsConnected}" Value="True">
-                                                            <Setter TargetName="SigDot" Property="Fill" Value="#10B981" />
+                                                            <Setter TargetName="SigDot" Property="Fill" Value="{StaticResource AccentEmeraldBrush}" />
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                                            <Setter TargetName="InBd" Property="Background" Value="#0C2E3D" />
-                                                            <Setter TargetName="InBd" Property="BorderBrush" Value="#38BDF8" />
+                                                            <Setter TargetName="InBd" Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
+                                                            <Setter TargetName="InBd" Property="BorderBrush" Value="{StaticResource AccentCyanBrightBrush}" />
                                                         </DataTrigger>
                                                         <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter TargetName="InBd" Property="BorderBrush" Value="#38BDF8" />
+                                                            <Setter TargetName="InBd" Property="BorderBrush" Value="{StaticResource AccentCyanBrightBrush}" />
                                                         </Trigger>
                                                     </ControlTemplate.Triggers>
                                                 </ControlTemplate>
@@ -593,7 +593,7 @@
                 <!-- Right Card: Virtual Magic Remote + YouTube Caster + TV Keyboard -->
                 <Border Grid.Column="2" Style="{StaticResource TvCard}">
                     <StackPanel>
-                        <TextBlock Text="VIRTUAL MAGIC REMOTE (POINTER SOCKET)" FontSize="10.5" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,10" />
+                        <TextBlock Text="VIRTUAL MAGIC REMOTE (POINTER SOCKET)" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" Margin="0,0,0,10" />
 
                         <!-- D-Pad + Side Nav Keys -->
                         <Grid Margin="0,0,0,10">
@@ -604,7 +604,7 @@
                             </Grid.ColumnDefinitions>
 
                             <!-- Tactile 3x3 D-Pad -->
-                            <Border Grid.Column="0" Background="#0C0F16" BorderBrush="#1E2534" BorderThickness="1" CornerRadius="12" Padding="8">
+                            <Border Grid.Column="0" Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource Ink08Brush}" BorderThickness="1" CornerRadius="12" Padding="8">
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
@@ -652,7 +652,7 @@
                         </WrapPanel>
 
                         <!-- Cast YouTube Video to TV -->
-                        <TextBlock Text="CAST YOUTUBE URL / VIDEO ID TO TV" FontSize="10" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,4" />
+                        <TextBlock Text="CAST YOUTUBE URL / VIDEO ID TO TV" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" Margin="0,0,0,4" />
                         <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -668,7 +668,7 @@
                         </Grid>
 
                         <!-- Type to TV Keyboard -->
-                        <TextBlock Text="PC KEYBOARD → TV SEARCH / INPUT FIELD" FontSize="10" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,4" />
+                        <TextBlock Text="PC KEYBOARD → TV SEARCH / INPUT FIELD" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" Margin="0,0,0,4" />
                         <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -687,7 +687,7 @@
                         </Grid>
 
                         <!-- Custom On-Screen Toast -->
-                        <TextBlock Text="ON-SCREEN TV TOAST BANNER" FontSize="10" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,4" />
+                        <TextBlock Text="ON-SCREEN TV TOAST BANNER" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" Margin="0,0,0,4" />
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -723,9 +723,9 @@
                                 <ColumnDefinition Width="180" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="INSTALLED TV APPS" FontSize="10.5" FontWeight="Bold" Foreground="#64748B" VerticalAlignment="Center" />
-                                <Border Background="#172030" BorderBrush="#263348" BorderThickness="1" CornerRadius="5" Padding="6,1.5" Margin="8,0,0,0">
-                                    <TextBlock Text="{Binding AppsCountBadge}" FontSize="10" Foreground="#94A3B8" />
+                                <TextBlock Text="INSTALLED TV APPS" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" VerticalAlignment="Center" />
+                                <Border Background="{StaticResource Ink08Brush}" BorderBrush="{StaticResource Ink12Brush}" BorderThickness="1" CornerRadius="5" Padding="6,1.5" Margin="8,0,0,0">
+                                    <TextBlock Text="{Binding AppsCountBadge}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
                                 </Border>
                             </StackPanel>
                             <TextBox Grid.Column="2"
@@ -754,16 +754,16 @@
                                             <Button.Template>
                                                 <ControlTemplate TargetType="Button">
                                                     <Border x:Name="AppBd"
-                                                            Background="#181D29"
-                                                            BorderBrush="#2A3244"
+                                                            Background="{StaticResource CardElevatedBrush}"
+                                                            BorderBrush="{StaticResource Ink12Brush}"
                                                             BorderThickness="1"
                                                             CornerRadius="9"
                                                             Padding="10,7"
                                                             MinWidth="118">
                                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                             <Border x:Name="AppBadge"
-                                                                    Background="#0E1726"
-                                                                    BorderBrush="#2C3E57"
+                                                                    Background="{StaticResource Ink05Brush}"
+                                                                    BorderBrush="{StaticResource Ink15Brush}"
                                                                     BorderThickness="1"
                                                                     CornerRadius="6"
                                                                     Width="26"
@@ -772,14 +772,14 @@
                                                                 <TextBlock Text="{Binding BadgeText}"
                                                                            FontSize="10"
                                                                            FontWeight="Bold"
-                                                                           Foreground="#38BDF8"
+                                                                           Foreground="{StaticResource AccentCyanBrightBrush}"
                                                                            HorizontalAlignment="Center"
                                                                            VerticalAlignment="Center" />
                                                             </Border>
                                                             <TextBlock Text="{Binding Title}"
                                                                        FontSize="12"
                                                                        FontWeight="SemiBold"
-                                                                       Foreground="#F1F5F9"
+                                                                       Foreground="{StaticResource TextPrimaryBrush}"
                                                                        VerticalAlignment="Center"
                                                                        MaxWidth="120"
                                                                        TextTrimming="CharacterEllipsis" />
@@ -787,13 +787,13 @@
                                                     </Border>
                                                     <ControlTemplate.Triggers>
                                                         <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                                            <Setter TargetName="AppBd" Property="Background" Value="#0C2E3D" />
-                                                            <Setter TargetName="AppBd" Property="BorderBrush" Value="#38BDF8" />
-                                                            <Setter TargetName="AppBadge" Property="Background" Value="#0284C7" />
+                                                            <Setter TargetName="AppBd" Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
+                                                            <Setter TargetName="AppBd" Property="BorderBrush" Value="{StaticResource AccentCyanBrightBrush}" />
+                                                            <Setter TargetName="AppBadge" Property="Background" Value="{StaticResource AccentSkyDeepBrush}" />
                                                         </DataTrigger>
                                                         <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter TargetName="AppBd" Property="Background" Value="#212839" />
-                                                            <Setter TargetName="AppBd" Property="BorderBrush" Value="#38BDF8" />
+                                                            <Setter TargetName="AppBd" Property="Background" Value="{StaticResource ControlHoverBrush}" />
+                                                            <Setter TargetName="AppBd" Property="BorderBrush" Value="{StaticResource AccentCyanBrightBrush}" />
                                                         </Trigger>
                                                     </ControlTemplate.Triggers>
                                                 </ControlTemplate>
@@ -809,17 +809,17 @@
                 <!-- Right: Denon AVR Coordination -->
                 <Border Grid.Column="2" Style="{StaticResource TvCard}">
                     <StackPanel>
-                        <TextBlock Text="DENON AVR COORDINATION" FontSize="10.5" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,10" />
-                        <CheckBox Content="Wake TV (WoL) when Denon powers ON" IsChecked="{Binding WakeWithDenon}" Foreground="#E2E8F0" Margin="0,0,0,8" />
-                        <CheckBox Content="Power off TV when Denon enters Standby" IsChecked="{Binding OffWithStandby}" Foreground="#E2E8F0" Margin="0,0,0,8" />
-                        <CheckBox Content="Switch TV audio to HDMI ARC/eARC on Denon ON" IsChecked="{Binding SwitchToArcOnDenon}" Foreground="#E2E8F0" Margin="0,0,0,8" />
-                        <CheckBox Content="Mute internal TV speakers on Denon ON" IsChecked="{Binding MuteSpeakersOnDenon}" Foreground="#E2E8F0" Margin="0,0,0,8" />
-                        <CheckBox Content="Show on-screen TV toast on Smart Scenes" IsChecked="{Binding ShowSceneToast}" Foreground="#E2E8F0" Margin="0,0,0,8" />
-                        <CheckBox Content="Turn TV screen off on Music / Listening scenes" IsChecked="{Binding ScreenOffOnMusicScene}" Foreground="#E2E8F0" Margin="0,0,0,10" />
+                        <TextBlock Text="DENON AVR COORDINATION" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" Margin="0,0,0,10" />
+                        <CheckBox Content="Wake TV (WoL) when Denon powers ON" IsChecked="{Binding WakeWithDenon}" Foreground="{StaticResource TextStrongBrush}" Margin="0,0,0,8" />
+                        <CheckBox Content="Power off TV when Denon enters Standby" IsChecked="{Binding OffWithStandby}" Foreground="{StaticResource TextStrongBrush}" Margin="0,0,0,8" />
+                        <CheckBox Content="Switch TV audio to HDMI ARC/eARC on Denon ON" IsChecked="{Binding SwitchToArcOnDenon}" Foreground="{StaticResource TextStrongBrush}" Margin="0,0,0,8" />
+                        <CheckBox Content="Mute internal TV speakers on Denon ON" IsChecked="{Binding MuteSpeakersOnDenon}" Foreground="{StaticResource TextStrongBrush}" Margin="0,0,0,8" />
+                        <CheckBox Content="Show on-screen TV toast on Smart Scenes" IsChecked="{Binding ShowSceneToast}" Foreground="{StaticResource TextStrongBrush}" Margin="0,0,0,8" />
+                        <CheckBox Content="Turn TV screen off on Music / Listening scenes" IsChecked="{Binding ScreenOffOnMusicScene}" Foreground="{StaticResource TextStrongBrush}" Margin="0,0,0,10" />
 
                         <TextBlock Text="Changes save automatically. All 24 Smart TV actions (Screen Off, eARC, HDMI 1–4, YouTube, Netflix, Plex, Play/Pause, Toasts) are also available in Smart Scenes 2.0, Global Hotkeys &amp; Couch Phone Remote!"
                                    FontSize="11"
-                                   Foreground="#94A3B8"
+                                   Foreground="{StaticResource TextMutedBrush}"
                                    TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>

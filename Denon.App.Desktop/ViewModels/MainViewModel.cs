@@ -21,9 +21,9 @@ namespace Denon.App.Desktop.ViewModels;
 
 public sealed partial class MainViewModel : ObservableObject
 {
-    private static readonly Brush OnlineBrush = CreateFrozenBrush(16, 185, 129);
-    private static readonly Brush StandbyBrush = CreateFrozenBrush(245, 158, 11);
-    private static readonly Brush OfflineBrush = CreateFrozenBrush(239, 68, 68);
+    private static Brush OnlineBrush => ThemeResources.Brush("AccentEmerald");
+    private static Brush StandbyBrush => ThemeResources.Brush("AccentAmber");
+    private static Brush OfflineBrush => ThemeResources.Brush("AccentCrimson");
 
     private readonly ReceiverController _receiverController;
     private readonly AppSettingsStore _settingsStore;
@@ -122,7 +122,7 @@ public sealed partial class MainViewModel : ObservableObject
     private bool _isRunningConsoleCommand;
     private bool _isRunningHealthCheck;
     private string _healthSummaryText = "Click 'Run Health Check' to test your receiver connection, audio readiness, and internet radio streams.";
-    private Brush _healthSummaryBrush = CreateFrozenBrush(148, 163, 184);
+    private Brush _healthSummaryBrush = ThemeResources.Brush("TextMuted");
 
     public MainViewModel(
         ReceiverController receiverController,
@@ -2002,7 +2002,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         IsRunningHealthCheck = true;
         HealthSummaryText = "Running 5-point receiver health check...";
-        HealthSummaryBrush = CreateFrozenBrush(56, 189, 248);
+        HealthSummaryBrush = ThemeResources.Brush("AccentCyanBright");
 
         var settings = _settingsStore.Current.Receiver;
         var netCheck = DiagnosticChecks[0];
@@ -2388,12 +2388,5 @@ public sealed partial class MainViewModel : ObservableObject
             .ToList();
 
         return list.Count == 0 ? [15, 28, 42, 55] : list;
-    }
-
-    private static Brush CreateFrozenBrush(byte r, byte g, byte b)
-    {
-        var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
-        brush.Freeze();
-        return brush;
     }
 }

@@ -11,10 +11,10 @@ namespace Denon.Plugin.SmartTv;
 
 public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 {
-    private static readonly SolidColorBrush LiveBrush = Freeze(Color.FromRgb(16, 185, 129));
-    private static readonly SolidColorBrush DemoBrush = Freeze(Color.FromRgb(56, 189, 248));
-    private static readonly SolidColorBrush WarnBrush = Freeze(Color.FromRgb(245, 158, 11));
-    private static readonly SolidColorBrush MutedBrush = Freeze(Color.FromRgb(100, 116, 139));
+    private static Brush LiveBrush => HostTheme.Brush("AccentEmerald");
+    private static Brush DemoBrush => HostTheme.Brush("AccentCyanBright");
+    private static Brush WarnBrush => HostTheme.Brush("AccentAmber");
+    private static Brush MutedBrush => HostTheme.Brush("TextFaint");
 
     private static readonly IReadOnlyList<LgTvInputInfo> DefaultOfflineInputs =
     [
@@ -1053,13 +1053,6 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 
     private void Raise(string prop) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
-
-    private static SolidColorBrush Freeze(Color c)
-    {
-        var b = new SolidColorBrush(c);
-        b.Freeze();
-        return b;
-    }
 
     private sealed class AsyncRelayCommand(Func<object?, Task> exec) : ICommand
     {

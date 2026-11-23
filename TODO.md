@@ -73,6 +73,20 @@ Native .NET (no Python), protocol logic ported from pyatv (MIT). See `external-p
       from SET_STATE).
 - [ ] Verify live with the user's OK: Denon automations on wake/sleep, `key`, `launch-app`, `power-on/off`.
 
+## Theming and skinning (2.0.0)
+
+Preparation done on branch `theming-prep`: every UI color is a token in `Denon.App.Desktop/Themes/Colors.Dark.xaml`
+(neutral ramp `Ink00`–`Ink16`, text levels, accent families, overlays) with brushes in `Themes/Brushes.xaml`;
+styles stay in `Themes/DenonTheme.xaml`. Code reads tokens through `ThemeResources` (app) and `HostTheme` (built-in
+plugins); the meters read `MeterPalette`. `ThemeTokenGuardTests` blocks new hex colors and unknown keys.
+
+- [ ] Decide the scope: themes only, or skins too (meter faces, layouts)?
+- [ ] Decide live switching (`DynamicResource`, ~900 references) or switch on restart (no view changes).
+- [ ] Decide user theme files (JSON tokens, validated on import) and skins from plugins.
+- [ ] Semantic aliases (Success/Warning/Danger/Info/Accent) over the hue families, so a theme can recolor states.
+- [ ] Plugin SDK theme API (tokens + `ThemeChanged`); move the Chromecast and Apple TV dashboards to it.
+- [ ] Fonts and corner radii are still literal in XAML; make them tokens if skins are in scope.
+
 ## Release / build
 
 - [ ] The installer and exe are unsigned (SmartScreen warning). Consider code signing.

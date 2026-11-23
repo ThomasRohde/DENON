@@ -22,7 +22,7 @@
                       UseAeroCaptionButtons="False" />
     </WindowChrome.WindowChrome>
 
-    <Border x:Name="RootBorder" Background="{StaticResource ChassisBgBrush}" BorderBrush="#233046" BorderThickness="1">
+    <Border x:Name="RootBorder" Background="{StaticResource ChassisBgBrush}" BorderBrush="{StaticResource Ink12Brush}" BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition x:Name="TitleBarRow" Height="42" />
@@ -31,7 +31,7 @@
             </Grid.RowDefinitions>
 
             <!-- Custom Title Bar -->
-            <Border x:Name="TitleBarBorder" Grid.Row="0" Background="#0D1017" BorderBrush="{StaticResource BorderHairlineBrush}" BorderThickness="0,0,0,1" Padding="12,0,8,0">
+            <Border x:Name="TitleBarBorder" Grid.Row="0" Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource BorderHairlineBrush}" BorderThickness="0,0,0,1" Padding="12,0,8,0">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -39,8 +39,8 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Background="#2D1218" BorderBrush="#EF4444" BorderThickness="1" CornerRadius="5" Padding="6,2" Margin="0,0,8,0">
-                            <TextBlock Text="CINEMA" FontSize="9.5" FontWeight="Bold" Foreground="#FCA5A5" />
+                        <Border Background="{StaticResource AccentCrimsonBgDeepBrush}" BorderBrush="{StaticResource AccentCrimsonBrush}" BorderThickness="1" CornerRadius="5" Padding="6,2" Margin="0,0,8,0">
+                            <TextBlock Text="CINEMA" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentCrimsonTextBrush}" />
                         </Border>
                         <TextBlock x:Name="TitleText"
                                    Text="YouTube Video Companion"
@@ -97,7 +97,7 @@
             </Border>
 
             <!-- WebView2 Video Surface -->
-            <Grid Grid.Row="1" Background="#000000">
+            <Grid Grid.Row="1" Background="{StaticResource OledBgBrush}">
                 <wv2:WebView2 x:Name="VideoWebView" DefaultBackgroundColor="Black" PreviewKeyDown="Window_PreviewKeyDown" />
                 <TextBlock x:Name="LoadingOverlay"
                            Text="Loading YouTube Cinema Player..."
@@ -108,7 +108,7 @@
             </Grid>
 
             <!-- Bottom A/V Sync & Audio Route Bar -->
-            <Border x:Name="BottomSyncBar" Grid.Row="2" Background="#0E121B" BorderBrush="{StaticResource BorderHairlineBrush}" BorderThickness="0,1,0,0" Padding="14,10">
+            <Border x:Name="BottomSyncBar" Grid.Row="2" Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource BorderHairlineBrush}" BorderThickness="0,1,0,0" Padding="14,10">
                 <DockPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="MuteVideoButton"

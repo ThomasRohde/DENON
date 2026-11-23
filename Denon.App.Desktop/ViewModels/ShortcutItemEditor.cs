@@ -8,11 +8,11 @@ namespace Denon.App.Desktop.ViewModels;
 
 public sealed class ShortcutItemEditor : ObservableObject
 {
-    private static readonly Brush OkBrush = Freeze(Color.FromRgb(16, 185, 129));
-    private static readonly Brush ConflictBrush = Freeze(Color.FromRgb(239, 68, 68));
-    private static readonly Brush WarningBrush = Freeze(Color.FromRgb(245, 158, 11));
-    private static readonly Brush RecordingBrush = Freeze(Color.FromRgb(0, 212, 255));
-    private static readonly Brush MutedBrush = Freeze(Color.FromRgb(100, 116, 139));
+    private static Brush OkBrush => ThemeResources.Brush("AccentEmerald");
+    private static Brush ConflictBrush => ThemeResources.Brush("AccentCrimson");
+    private static Brush WarningBrush => ThemeResources.Brush("AccentAmber");
+    private static Brush RecordingBrush => ThemeResources.Brush("AccentCyan");
+    private static Brush MutedBrush => ThemeResources.Brush("TextFaint");
 
     private string _gesture = string.Empty;
     private bool _isRecording;
@@ -121,11 +121,4 @@ public sealed class ShortcutItemEditor : ObservableObject
 
     public static ShortcutItemEditor FromModel(ShortcutBinding model) =>
         new(model.ActionId, model.Label, model.IsGlobal, model.Gesture);
-
-    private static Brush Freeze(Color color)
-    {
-        var brush = new SolidColorBrush(color);
-        brush.Freeze();
-        return brush;
-    }
 }

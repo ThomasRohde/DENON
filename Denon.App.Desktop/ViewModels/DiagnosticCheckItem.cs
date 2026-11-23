@@ -16,17 +16,17 @@ public enum DiagnosticCheckState
 
 public sealed class DiagnosticCheckItem : ObservableObject
 {
-    private static readonly Brush PendingBrush = CreateFrozenBrush(100, 116, 139);
-    private static readonly Brush RunningBrush = CreateFrozenBrush(56, 189, 248);
-    private static readonly Brush PassBrush = CreateFrozenBrush(16, 185, 129);
-    private static readonly Brush WarningBrush = CreateFrozenBrush(245, 158, 11);
-    private static readonly Brush FailBrush = CreateFrozenBrush(239, 68, 68);
+    private static Brush PendingBrush => ThemeResources.Brush("TextFaint");
+    private static Brush RunningBrush => ThemeResources.Brush("AccentCyanBright");
+    private static Brush PassBrush => ThemeResources.Brush("AccentEmerald");
+    private static Brush WarningBrush => ThemeResources.Brush("AccentAmber");
+    private static Brush FailBrush => ThemeResources.Brush("AccentCrimson");
 
-    private static readonly Brush PendingBg = CreateFrozenBrush(24, 28, 38);
-    private static readonly Brush RunningBg = CreateFrozenBrush(12, 46, 61);
-    private static readonly Brush PassBg = CreateFrozenBrush(12, 45, 34);
-    private static readonly Brush WarningBg = CreateFrozenBrush(54, 36, 10);
-    private static readonly Brush FailBg = CreateFrozenBrush(58, 20, 24);
+    private static Brush PendingBg => ThemeResources.Brush("CardElevated");
+    private static Brush RunningBg => ThemeResources.Brush("AccentCyanSubtleBg");
+    private static Brush PassBg => ThemeResources.Brush("AccentEmeraldSubtleBg");
+    private static Brush WarningBg => ThemeResources.Brush("AccentAmberBg");
+    private static Brush FailBg => ThemeResources.Brush("AccentCrimsonBg");
 
     private DiagnosticCheckState _state = DiagnosticCheckState.Pending;
     private string _summary;
@@ -108,12 +108,5 @@ public sealed class DiagnosticCheckItem : ObservableObject
         State = state;
         Summary = summary;
         Advice = advice;
-    }
-
-    private static Brush CreateFrozenBrush(byte r, byte g, byte b)
-    {
-        var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
-        brush.Freeze();
-        return brush;
     }
 }
