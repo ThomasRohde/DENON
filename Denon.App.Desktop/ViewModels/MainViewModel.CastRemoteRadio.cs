@@ -819,13 +819,26 @@ public sealed partial class MainViewModel
     /// <summary>
     /// Meter source for this frame, decided by what the Denon plays (see <see cref="AudioMeterSourceRouter"/>).
     /// </summary>
-    private AudioMeterSource ResolveMeterSource(bool hasPcSignal) => AudioMeterSourceRouter.Resolve(new AudioMeterInputs(
+    private AudioMeterSource ResolveMeterSource(bool hasPcSignal, bool hasAppStreamFrame = false) => AudioMeterSourceRouter.Resolve(new AudioMeterInputs(
         IsDenonAwake: IsConnected && IsPoweredOn && IsMainZoneOn,
         InputSource: InputSourceCode,
         IsHeosPlaying: IsPlaying,
         IsMuted: IsMuted,
         IsPcCasting: _pcAudioCastService is { IsCasting: true },
-        HasPcSignal: hasPcSignal));
+        HasPcSignal: hasPcSignal,
+        HasAppStreamFrame: hasAppStreamFrame));
+
+    /// <summary>
+    /// Synced frame for a YouTube / jukebox track that this app streams to the Denon (not during PC Cast,
+    /// which has its own synced path). Fills <paramref name="bands"/> when given.
+    /// </summary>
+    private bool TryGetAppStreamMeterFrame(out double left, out double right, double[]? bands = null)
+    {
+        left = 0;
+        right = 0;
+        return _pcAudioCastService is not { IsCasting: true } &&
+               _appStreamMeters.TryGetFrame(HeosSyncDelayMs, out left, out right, bands);
+    }
 
     /// <summary>Measured HEOS buffer + speaker delay (Auto-Calibrate Mic), used to line meters up with the speakers.</summary>
     private int HeosSyncDelayMs => Math.Clamp(_settingsStore.Current.Media.CinemaSyncOffsetMs, 0, 8000);
@@ -841,12 +854,19 @@ public sealed partial class MainViewModel
         _liveAudioAnalyzer?.SetVuCaptureRequested(ShowVuMeters);
 
         var analyzerFrame = _liveAudioAnalyzer?.GetLatestFrame() ?? default;
-        var source = ResolveMeterSource(analyzerFrame.IsLiveSignal);
+        var hasStreamFrame = TryGetAppStreamMeterFrame(out var streamL, out var streamR);
+        var source = ResolveMeterSource(analyzerFrame.IsLiveSignal, hasStreamFrame);
         double targetL = 0;
         double targetR = 0;
 
         switch (source)
         {
+            case AudioMeterSource.Denon when hasStreamFrame:
+                // YouTube / jukebox: the frame at the position the speakers play now.
+                targetL = streamL;
+                targetR = streamR;
+                break;
+
             case AudioMeterSource.Denon:
                 // PC Cast: the Denon plays this audio HeosSyncDelayMs later, so show the level from then.
                 var cast = _pcAudioCastService.GetDelayedMeterSample(HeosSyncDelayMs);

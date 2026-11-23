@@ -47,6 +47,9 @@ public sealed class LocalAudioRelayServer : IDisposable
 
     public event Action<string, LocalAudioTrackItem>? LocalTrackStreamCompleted;
 
+    /// <summary>The Denon started to read a local jukebox track from the start (not a seek or range read).</summary>
+    public event Action<string, DateTimeOffset>? LocalTrackPlaybackStarted;
+
     public RelayStatusSnapshot CurrentStatus => _status;
 
     public int BoundPort => _boundPort;
@@ -1050,6 +1053,18 @@ public sealed class LocalAudioRelayServer : IDisposable
         using var streamCts = CancellationTokenSource.CreateLinkedTokenSource(serverToken);
         _activeStreamTokens[token] = streamCts;
 
+        if (IsReadFromStart(request.RangeHeader))
+        {
+            try
+            {
+                LocalTrackPlaybackStarted?.Invoke(registered.Token, DateTimeOffset.UtcNow);
+            }
+            catch (Exception ex)
+            {
+                _logStore.Warning($"Local track start handler failed: {ex.Message}");
+            }
+        }
+
         try
         {
             bool completedNaturally;
@@ -1081,6 +1096,23 @@ public sealed class LocalAudioRelayServer : IDisposable
                 _activeStreamTokens.TryRemove(token, out _);
             }
         }
+    }
+
+    /// <summary>True for a plain GET or a range that starts at byte 0 (a seek or a tag read starts later).</summary>
+    public static bool IsReadFromStart(string? rangeHeader)
+    {
+        if (string.IsNullOrWhiteSpace(rangeHeader))
+        {
+            return true;
+        }
+
+        var value = rangeHeader.Trim();
+        if (value.StartsWith("bytes=", StringComparison.OrdinalIgnoreCase))
+        {
+            value = value[6..].TrimStart();
+        }
+
+        return value.StartsWith("0-", StringComparison.Ordinal);
     }
 
     private async Task<bool> StreamDirectLocalFileAsync(

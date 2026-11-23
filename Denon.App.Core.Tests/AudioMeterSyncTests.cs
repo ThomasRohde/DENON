@@ -11,8 +11,31 @@ public sealed class AudioMeterSyncTests
         bool heosPlaying = false,
         bool muted = false,
         bool pcCasting = false,
-        bool pcSignal = false) =>
-        AudioMeterSourceRouter.Resolve(new AudioMeterInputs(awake, input, heosPlaying, muted, pcCasting, pcSignal));
+        bool pcSignal = false,
+        bool appStreamFrame = false) =>
+        AudioMeterSourceRouter.Resolve(new AudioMeterInputs(awake, input, heosPlaying, muted, pcCasting, pcSignal, appStreamFrame));
+
+    [Fact]
+    public void Analyzed_youtube_or_jukebox_stream_is_real_denon_audio()
+    {
+        Assert.Equal(AudioMeterSource.Denon, Route(input: "NET", heosPlaying: true, appStreamFrame: true));
+    }
+
+    [Fact]
+    public void App_stream_frame_does_not_count_when_heos_is_paused_or_input_is_not_net()
+    {
+        // Paused: the Denon is idle; meters show the PC (or rest).
+        Assert.Equal(AudioMeterSource.Off, Route(input: "NET", heosPlaying: false, appStreamFrame: true));
+
+        // A stale frame must not show as Denon audio while the Denon is on the TV.
+        Assert.Equal(AudioMeterSource.Simulated, Route(input: "TV", heosPlaying: true, appStreamFrame: true));
+    }
+
+    [Fact]
+    public void Muted_denon_rests_during_an_analyzed_stream()
+    {
+        Assert.Equal(AudioMeterSource.Muted, Route(input: "NET", heosPlaying: true, muted: true, appStreamFrame: true));
+    }
 
     [Fact]
     public void Laptop_podcast_is_not_shown_as_denon_audio_while_denon_is_on_tv()

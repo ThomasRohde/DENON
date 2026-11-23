@@ -6,11 +6,11 @@ left open, and remove them (with a CHANGELOG entry) when they are done.
 ## VU meters & RTA (follow the Denon)
 
 Phase 1 is done in 1.15.1 (source router, DENON/SIM/MUTED/PC/IDLE badge, PC Cast meters synced to the HEOS delay).
+Phase 2 is done (unreleased): YouTube / YouTube Music and jukebox tracks are decoded by a separate FFmpeg process
+(`AppStreamMeterService`) and shown at the playback position. Verified live with YouTube Music on 2026-11-23.
 
-- [ ] **Phase 2: real, synced meters for app streams.** For the YouTube / YouTube Music relay (`/yt/`) and the local
-      FLAC jukebox (`/local/`), decode a copy of the stream (ffmpeg `f32le`, or NAudio for M4A), build a level + 31-band
-      timeline by media time, and show the frame at the playback position the app already estimates for Cinema sync
-      (`GetEstimatedPlaybackPositionSeconds(CinemaSyncOffsetMs)`). Router: `Denon` source when the Denon plays an app relay stream.
+- [ ] Verify live: phase 2 with a **local jukebox** file (only YouTube was checked), and a seek inside a jukebox
+      track (a range read does not restart the clock, so the meters may drift after a seek).
 - [ ] **Phase 3: opt-in "ROOM" mode (PC microphone)** for TV/ARC, HDMI and Chromecast audio that the app cannot tap.
       Needs AGC, a noise gate, a clear "mic on" badge and a setting (off by default).
 - [ ] **Philips Hue Music Sync** still reacts to the live PC output (`PluginHostService.PublishAudioFrame`).

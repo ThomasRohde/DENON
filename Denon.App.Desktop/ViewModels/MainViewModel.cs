@@ -11,6 +11,7 @@ using Denon.App.Core.Mcp;
 using Denon.App.Core.Models;
 using Denon.App.Core.Plugins;
 using Denon.App.Core.Services;
+using Denon.App.Core.Services.Metering;
 using Denon.App.Desktop.Infrastructure;
 using Denon.App.Desktop.Services;
 using Brush = System.Windows.Media.Brush;
@@ -33,6 +34,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly StreamProbeService _streamProbeService;
     private readonly WindowsStartupService _startupService;
     private readonly LiveAudioAnalyzerService _liveAudioAnalyzer;
+    private readonly AppStreamMeterService _appStreamMeters;
     private readonly AlbumArtPaletteService _albumArtPaletteService;
     private readonly System.Windows.Threading.Dispatcher _dispatcher;
 
@@ -142,6 +144,7 @@ public sealed partial class MainViewModel : ObservableObject
         PluginHostService pluginHostService,
         AutomationEngineService automationEngineService,
         LiveAudioAnalyzerService liveAudioAnalyzerService,
+        AppStreamMeterService appStreamMeterService,
         AlbumArtPaletteService albumArtPaletteService,
         LyricsService lyricsService,
         AcousticSyncCalibrationService calibrationService,
@@ -158,6 +161,7 @@ public sealed partial class MainViewModel : ObservableObject
         _streamProbeService = streamProbeService;
         _startupService = startupService;
         _liveAudioAnalyzer = liveAudioAnalyzerService;
+        _appStreamMeters = appStreamMeterService;
         _albumArtPaletteService = albumArtPaletteService;
         _dispatcher = System.Windows.Application.Current.Dispatcher;
 

@@ -1,4 +1,5 @@
 using Denon.App.Core.Models;
+using Denon.App.Core.Services.Metering;
 
 namespace Denon.App.Core.Services;
 
@@ -57,6 +58,9 @@ public sealed class LocalMediaJukeboxService : IDisposable
     private CancellationTokenSource? _autoAdvanceCts;
     private DateTimeOffset _sessionStartedUtc = DateTimeOffset.MinValue;
 
+    // Media-time clock for synced meters (same model as the YouTube queue clock).
+    private readonly PlaybackClock _clock = new();
+
     public LocalMediaJukeboxService(
         LocalAudioRelayServer relayServer,
         ReceiverController receiverController,
@@ -69,9 +73,31 @@ public sealed class LocalMediaJukeboxService : IDisposable
         _logStore = logStore;
 
         _relayServer.LocalTrackStreamCompleted += OnLocalTrackCompleted;
+        _relayServer.LocalTrackPlaybackStarted += OnLocalTrackPlaybackStarted;
         _receiverController.NonRelaySourceActivated += OnExternalSourceActivated;
         _stateStore.StateChanged += OnReceiverStateChanged;
     }
+
+    /// <summary>File path of the track the jukebox plays now, or null.</summary>
+    public string? CurrentTrackFilePath
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _isActive && _currentIndex >= 0 && _currentIndex < _tracks.Count ? _tracks[_currentIndex].FilePath : null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Estimated position (seconds) that the Denon speakers play now: time since the Denon started to read
+    /// the track, without pauses, minus the HEOS buffer delay.
+    /// </summary>
+    public double GetEstimatedPlaybackPositionSeconds(int heosBufferOffsetMs) =>
+        IsLocalPlaybackActive && _clock.IsStarted
+            ? _clock.GetPositionSeconds(DateTimeOffset.UtcNow, heosBufferOffsetMs)
+            : -1;
 
     public event Action<LocalJukeboxSnapshot>? JukeboxChanged;
 
@@ -403,6 +429,7 @@ public sealed class LocalMediaJukeboxService : IDisposable
             lock (_sync)
             {
                 _activeRelayToken = token;
+                _clock.Reset();
             }
 
             await _receiverController.PlayRelayStreamAsync(relayUrl, $"{track.Title} ({track.CodecBadge})", useLowVolume, unmute, cancellationToken);
@@ -413,6 +440,12 @@ public sealed class LocalMediaJukeboxService : IDisposable
                 _currentIndex = confirmedIdx >= 0 ? confirmedIdx : Math.Clamp(index, 0, Math.Max(0, _tracks.Count - 1));
                 _isActive = _tracks.Count > 0;
                 _sessionStartedUtc = DateTimeOffset.UtcNow;
+
+                // Fallback start time if the Denon has not requested the stream yet.
+                if (string.Equals(_activeRelayToken, token, StringComparison.Ordinal) && !_clock.IsStarted)
+                {
+                    _clock.Restart(DateTimeOffset.UtcNow);
+                }
             }
 
             NotifyChanged();
@@ -534,6 +567,20 @@ public sealed class LocalMediaJukeboxService : IDisposable
         }, cts.Token);
     }
 
+    private void OnLocalTrackPlaybackStarted(string token, DateTimeOffset startedAtUtc)
+    {
+        lock (_sync)
+        {
+            if (!string.Equals(_activeRelayToken, token, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            // Restart the clock at the moment the Denon starts to read real audio.
+            _clock.Restart(startedAtUtc);
+        }
+    }
+
     private void OnExternalSourceActivated()
     {
         var wasActive = false;
@@ -591,7 +638,22 @@ public sealed class LocalMediaJukeboxService : IDisposable
         string? externalTakeoverReason = null;
         lock (_sync)
         {
-            if (!_isActive || (DateTimeOffset.UtcNow - _sessionStartedUtc) < TimeSpan.FromSeconds(5))
+            if (!_isActive)
+            {
+                return;
+            }
+
+            // Keep the meter clock in step with HEOS pause/resume.
+            if (string.Equals(status.PlayState, "pause", StringComparison.OrdinalIgnoreCase))
+            {
+                _clock.Pause(DateTimeOffset.UtcNow);
+            }
+            else if (string.Equals(status.PlayState, "play", StringComparison.OrdinalIgnoreCase))
+            {
+                _clock.Resume(DateTimeOffset.UtcNow);
+            }
+
+            if ((DateTimeOffset.UtcNow - _sessionStartedUtc) < TimeSpan.FromSeconds(5))
             {
                 return;
             }
@@ -636,6 +698,7 @@ public sealed class LocalMediaJukeboxService : IDisposable
     {
         CancelPendingAutoAdvance();
         _relayServer.LocalTrackStreamCompleted -= OnLocalTrackCompleted;
+        _relayServer.LocalTrackPlaybackStarted -= OnLocalTrackPlaybackStarted;
         _receiverController.NonRelaySourceActivated -= OnExternalSourceActivated;
         _stateStore.StateChanged -= OnReceiverStateChanged;
     }

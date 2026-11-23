@@ -6,7 +6,10 @@ public enum AudioMeterSource
     /// <summary>Nothing plays. Meters rest.</summary>
     Off,
 
-    /// <summary>Real audio that this app streams to the Denon (PC Cast), delayed by the HEOS buffer so it is in sync.</summary>
+    /// <summary>
+    /// Real audio that this app streams to the Denon (PC Cast, YouTube / YouTube Music, local jukebox),
+    /// lined up with the speakers by the measured HEOS delay.
+    /// </summary>
     Denon,
 
     /// <summary>The Denon plays a source the app cannot hear (TV/ARC, HDMI, Spotify…). Volume-scaled simulation.</summary>
@@ -26,7 +29,8 @@ public readonly record struct AudioMeterInputs(
     bool IsHeosPlaying,
     bool IsMuted,
     bool IsPcCasting,
-    bool HasPcSignal);
+    bool HasPcSignal,
+    bool HasAppStreamFrame = false);
 
 /// <summary>
 /// Picks the meter source from what the <b>Denon</b> plays, not from what the PC plays.
@@ -50,7 +54,10 @@ public static class AudioMeterSourceRouter
                     return AudioMeterSource.Muted;
                 }
 
-                return isNet && inputs.IsPcCasting ? AudioMeterSource.Denon : AudioMeterSource.Simulated;
+                // DENON: the app streams this audio (PC Cast), or it streams a YouTube / jukebox track that is
+                // analyzed at the current playback position. Anything else on the Denon is simulated.
+                var isAppStream = inputs.IsPcCasting || (inputs.IsHeosPlaying && inputs.HasAppStreamFrame);
+                return isNet && isAppStream ? AudioMeterSource.Denon : AudioMeterSource.Simulated;
             }
         }
 

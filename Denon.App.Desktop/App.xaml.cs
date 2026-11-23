@@ -6,6 +6,7 @@ using Denon.App.Core.Infrastructure;
 using Denon.App.Core.Mcp;
 using Denon.App.Core.Plugins;
 using Denon.App.Core.Services;
+using Denon.App.Core.Services.Metering;
 using Denon.App.Desktop.Services;
 using Denon.App.Desktop.ViewModels;
 using Denon.App.PluginSdk;
@@ -89,6 +90,7 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<LocalAudioRelayServer>();
             builder.Services.AddSingleton<YouTubeQueueService>();
             builder.Services.AddSingleton<LocalMediaJukeboxService>();
+            builder.Services.AddSingleton<AppStreamMeterService>();
             builder.Services.AddSingleton<RadioBrowserService>();
             builder.Services.AddSingleton<RemoteWebApiHandler>();
             builder.Services.AddSingleton<PcAudioCastService>();

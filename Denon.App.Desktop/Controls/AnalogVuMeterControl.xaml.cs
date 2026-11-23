@@ -80,7 +80,7 @@ public partial class AnalogVuMeterControl : UserControl
             };
             ModeBadgeText.ToolTip = source switch
             {
-                AudioMeterSource.Denon => "Real audio this app streams to the Denon, delayed by the measured HEOS delay (in sync with the speakers).",
+                AudioMeterSource.Denon => "Real audio this app streams to the Denon (PC Cast, YouTube, jukebox), lined up with the speakers by the measured HEOS delay.",
                 AudioMeterSource.Simulated => "The Denon plays a source the app cannot hear (TV, HDMI, Spotify…). Simulated from the Denon volume.",
                 AudioMeterSource.Muted => "The Denon is muted.",
                 AudioMeterSource.Pc => "The Denon is off or idle. Showing this PC's own audio output, not the Denon.",

@@ -161,10 +161,15 @@ public sealed partial class MainViewModel
         }
 
         var hasPcSignal = _liveAudioAnalyzer?.GetLatestFrame().IsLiveSignal ?? false;
-        var source = ResolveMeterSource(hasPcSignal);
+        var hasStreamFrame = TryGetAppStreamMeterFrame(out _, out _, bandsBuffer);
+        var source = ResolveMeterSource(hasPcSignal, hasStreamFrame);
 
         switch (source)
         {
+            case AudioMeterSource.Denon when hasStreamFrame:
+                // YouTube / jukebox: bandsBuffer already holds the frame the speakers play now.
+                return AudioMeterSource.Denon;
+
             case AudioMeterSource.Denon:
                 // The FFT reads the Windows default output. It matches the cast only when the cast captures that device.
                 if (_pcAudioCastService.IsCastingDefaultDevice &&

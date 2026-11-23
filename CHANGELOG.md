@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- **Real, synced meters for YouTube, YouTube Music and the jukebox (meter phase 2)**: When the app streams a YouTube track or a local jukebox file to the Denon, the VU meters and the 31-band RTA now show that track's real audio (badge **DENON**, RTA "DENON • SYNCED FFT") instead of the simulation. A separate FFmpeg process decodes a copy of the same source in the background (a 4-minute track takes a few seconds; the stream to the Denon does not change), and the meters show the frame at the position the speakers play now (playback clock minus the measured Cinema sync delay). Pause stops the meters; resume continues in sync. Without FFmpeg, before the analysis reaches the current position, or after 90 minutes of one track, the meters use the simulation. Verified live with YouTube Music tracks.
+- The jukebox has a playback clock for this (starts when the Denon reads the file from the start, stops on pause), like the YouTube queue.
+
+### Changed
+- The live PC analyzer and the app-stream analyzer share one level/FFT/band implementation (`AudioMeterMath`), so DENON and PC meters look the same.
+
 ## [1.17.0] - 2026-11-23
 
 ### Changed

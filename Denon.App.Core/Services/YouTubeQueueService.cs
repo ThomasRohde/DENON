@@ -107,6 +107,18 @@ public sealed class YouTubeQueueService : IDisposable
         }
     }
 
+    /// <summary>Video id of the track the queue plays now, or null (cheap; no snapshot copy).</summary>
+    public string? CurrentVideoId
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _isActive && _currentIndex >= 0 && _currentIndex < _queue.Count ? _queue[_currentIndex].VideoId : null;
+            }
+        }
+    }
+
     public double GetEstimatedPlaybackPositionSeconds(int heosBufferOffsetMs = 1800)
     {
         lock (_sync)

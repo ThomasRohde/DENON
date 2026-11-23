@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Denon.App.Core.Plugins;
 using Denon.App.Core.Services;
+using Denon.App.Core.Services.Metering;
 using Denon.App.PluginSdk;
 using Microsoft.Extensions.Hosting;
 using NAudio.CoreAudioApi;
@@ -16,8 +17,7 @@ namespace Denon.App.Desktop.Services;
 /// </summary>
 public sealed class LiveAudioAnalyzerService : BackgroundService
 {
-    private const int FftSize = 512;
-    private const int FftBits = 9; // 2^9 = 512
+    private const int FftSize = AudioMeterMath.FftSize;
 
     private readonly PluginHostService _pluginHost;
     private readonly AppLogStore _logStore;
@@ -267,7 +267,7 @@ public sealed class LiveAudioAnalyzerService : BackgroundService
             readIdx = (readIdx + 1) & (FftSize - 1);
         }
 
-        ComputeInPlaceFft(_fftReal, _fftImag);
+        AudioMeterMath.ComputeInPlaceFft(_fftReal, _fftImag);
 
         // Aggregate FFT magnitudes into Bass (20-180 Hz), Mid (180-2000 Hz), Treble (2000-16000 Hz)
         var hzPerBin = (double)sampleRate / FftSize;
@@ -279,7 +279,7 @@ public sealed class LiveAudioAnalyzerService : BackgroundService
         for (var bin = 1; bin < halfBins; bin++)
         {
             var freq = bin * hzPerBin;
-            var mag = Math.Sqrt((_fftReal[bin] * _fftReal[bin]) + (_fftImag[bin] * _fftImag[bin])) / (FftSize * 0.25);
+            var mag = AudioMeterMath.Magnitude(_fftReal, _fftImag, bin);
 
             if (freq >= 20 && freq < 180)
             {
@@ -307,30 +307,9 @@ public sealed class LiveAudioAnalyzerService : BackgroundService
         var mid = Math.Clamp(Math.Pow(midRaw * 5.2, 0.75), 0.0, 1.0);
         var treble = Math.Clamp(Math.Pow(trebleRaw * 9.0, 0.78), 0.0, 1.0);
 
-        // Compute 31 logarithmically spaced ISO frequency bands (25 Hz -> 16 kHz)
+        // Compute 31 logarithmically spaced ISO frequency bands (25 Hz -> 16 kHz), same math as the app-stream meters
         Span<double> bands31 = stackalloc double[31];
-        const double minFreq = 25.0;
-        const double maxFreq = 16000.0;
-        var ratio = Math.Pow(maxFreq / minFreq, 1.0 / 31.0);
-
-        for (var b = 0; b < 31; b++)
-        {
-            var fLow = minFreq * Math.Pow(ratio, b);
-            var fHigh = fLow * ratio;
-            var binLow = Math.Clamp((int)Math.Floor(fLow / hzPerBin), 1, halfBins - 1);
-            var binHigh = Math.Clamp((int)Math.Ceiling(fHigh / hzPerBin), binLow, halfBins - 1);
-
-            double peak = 0;
-            for (var bin = binLow; bin <= binHigh; bin++)
-            {
-                var mag = Math.Sqrt((_fftReal[bin] * _fftReal[bin]) + (_fftImag[bin] * _fftImag[bin])) / (FftSize * 0.25);
-                if (mag > peak) peak = mag;
-            }
-
-            // Gentle pink-noise tilt (+boost in mids/highs) so flat music looks balanced across all 31 bars
-            var tilt = 2.8 + (b * 0.34);
-            bands31[b] = Math.Clamp(Math.Pow(peak * tilt, 0.70), 0.0, 1.0);
-        }
+        AudioMeterMath.ComputeBands31(_fftReal, _fftImag, sampleRate, bands31);
 
         lock (_frameLock)
         {
@@ -396,72 +375,5 @@ public sealed class LiveAudioAnalyzerService : BackgroundService
         _pluginHost.PublishAudioFrame(in frame);
     }
 
-    private static double ToNormalizedLevel(double peak, double rms)
-    {
-        var blended = (peak * 0.58) + (rms * 0.42);
-        if (blended <= 0.0006)
-        {
-            return 0;
-        }
-
-        var db = 20.0 * Math.Log10(blended);
-        return Math.Clamp((db + 40.0) / 40.0, 0.0, 1.0);
-    }
-
-    /// <summary>
-    /// Standard iterative Radix-2 Cooley-Tukey FFT (allocation-free).
-    /// </summary>
-    private static void ComputeInPlaceFft(double[] real, double[] imag)
-    {
-        var n = real.Length;
-
-        // Bit-reversal permutation
-        var j = 0;
-        for (var i = 0; i < n; i++)
-        {
-            if (i < j)
-            {
-                (real[i], real[j]) = (real[j], real[i]);
-                (imag[i], imag[j]) = (imag[j], imag[i]);
-            }
-
-            var bit = n >> 1;
-            while (bit > 0 && (j & bit) != 0)
-            {
-                j ^= bit;
-                bit >>= 1;
-            }
-
-            j |= bit;
-        }
-
-        // Butterfly stages
-        for (var s = 1; s <= FftBits; s++)
-        {
-            var m = 1 << s;
-            var halfM = m >> 1;
-            var angleStep = -2.0 * Math.PI / m;
-
-            for (var k = 0; k < n; k += m)
-            {
-                for (var idx = 0; idx < halfM; idx++)
-                {
-                    var angle = angleStep * idx;
-                    var wr = Math.Cos(angle);
-                    var wi = Math.Sin(angle);
-
-                    var even = k + idx;
-                    var odd = even + halfM;
-
-                    var tr = (wr * real[odd]) - (wi * imag[odd]);
-                    var ti = (wr * imag[odd]) + (wi * real[odd]);
-
-                    real[odd] = real[even] - tr;
-                    imag[odd] = imag[even] - ti;
-                    real[even] += tr;
-                    imag[even] += ti;
-                }
-            }
-        }
-    }
+    private static double ToNormalizedLevel(double peak, double rms) => AudioMeterMath.ToNormalizedLevel(peak, rms);
 }
