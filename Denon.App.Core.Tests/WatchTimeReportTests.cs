@@ -41,6 +41,18 @@ public sealed class WatchTimeReportTests
     }
 
     [Fact]
+    public void Paused_cast_from_older_versions_is_capped_at_watched_time()
+    {
+        // 1.15.0 log: DR TV paused 10 min, exclusiveSec not yet capped.
+        var events = new[]
+        {
+            Ended(Now.AddHours(-1), "chromecast", new { kind = "cast", title = "Smagen af Italien", app = "DR TV", durationSec = 600, watchedSec = 0, exclusiveSec = 600 }),
+        };
+
+        Assert.Equal(0, WatchTimeReport.Build(events, Now, days: 1).TotalSeconds);
+    }
+
+    [Fact]
     public void Legacy_events_count_duration_and_are_reported()
     {
         var events = new[]

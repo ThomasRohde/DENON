@@ -61,6 +61,12 @@ public static class WatchTimeReport
                 legacy++;
             }
 
+            // Paused time is not watching. Casts logged by 1.15.0-1.15.1 did not cap exclusiveSec yet.
+            if (GetInt(data, "watchedSec") is { } watched)
+            {
+                seconds = Math.Min(seconds, watched);
+            }
+
             var start = end.AddSeconds(-duration);
             if (DateOnly.FromDateTime(start.LocalDateTime.Date) < fromDate || seconds <= 0)
             {
