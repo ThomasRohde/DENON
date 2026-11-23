@@ -6,49 +6,14 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="HaBoolToVis" />
 
-        <Style x:Key="HaCard" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource CardBgBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderHairlineBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="14" />
-            <Setter Property="Padding" Value="16" />
-        </Style>
-
-        <Style x:Key="HaBtn" TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource ControlBgBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderSpecBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
+        <Style x:Key="HaBtn" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
             <Setter Property="Padding" Value="11,6" />
             <Setter Property="FontSize" Value="12" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Ink11Brush}" />
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Ink15Brush}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
         </Style>
 
-        <Style x:Key="HaPrimaryBtn" TargetType="Button" BasedOn="{StaticResource HaBtn}">
-            <Setter Property="Background" Value="{StaticResource AccentEmeraldDeepBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource AccentEmeraldBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Style x:Key="HaPrimaryBtn" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Padding" Value="11,6" />
+            <Setter Property="FontSize" Value="12" />
         </Style>
 
         <Style x:Key="HaInput" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
@@ -67,7 +32,7 @@
         <StackPanel Margin="0,0,4,16">
 
             <!-- ======================== CONNECTION & TELEMETRY CARD ======================== -->
-            <Border Style="{StaticResource HaCard}" Margin="0,0,0,14">
+            <Border Style="{StaticResource SurfaceCard}" Margin="0,0,0,14">
                 <StackPanel>
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
@@ -120,10 +85,6 @@
                                     <TextBlock Text="LONG-LIVED ACCESS TOKEN" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,4" />
                                     <PasswordBox x:Name="TokenPasswordBox"
                                                  PasswordChanged="TokenPasswordBox_PasswordChanged"
-                                                 Background="{StaticResource Ink03Brush}"
-                                                 Foreground="{StaticResource TextPrimaryBrush}"
-                                                 BorderBrush="{StaticResource Ink11Brush}"
-                                                 BorderThickness="1"
                                                  Padding="10,7"
                                                  FontSize="12"
                                                  FontFamily="Cascadia Mono, Consolas"
@@ -156,7 +117,7 @@
             </Border>
 
             <!-- ======================== ENTITIES & CONTROLS CARD ======================== -->
-            <Border Style="{StaticResource HaCard}">
+            <Border Style="{StaticResource SurfaceCard}">
                 <StackPanel>
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>

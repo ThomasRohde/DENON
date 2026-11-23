@@ -171,11 +171,9 @@ internal sealed class ChromecastDashboardView : UserControl
     {
         Width = width,
         Margin = new Thickness(0, 0, 6, 6),
-        Padding = new Thickness(4, 3, 4, 3),
-        Background = InsetBrush,
-        Foreground = TextBrush,
-        BorderBrush = BorderLineBrush,
-        CaretBrush = TextBrush,
+        Padding = new Thickness(8, 6, 8, 6), // same height as the app's drop-down boxes next to it
+        FontSize = 12,
+        HorizontalAlignment = HorizontalAlignment.Left,
         ToolTip = tooltip,
         VerticalContentAlignment = VerticalAlignment.Center,
     };
@@ -187,16 +185,8 @@ internal sealed class ChromecastDashboardView : UserControl
             IsEditable = true,
             Width = 140,
             Margin = new Thickness(0, 0, 6, 6),
-            Background = InsetBrush,
-            Foreground = TextBrush,
-            BorderBrush = BorderLineBrush,
             ToolTip = "Empty = no change. You can also type a code.",
         };
-        if (DarkComboStyle.Value is { } style)
-        {
-            combo.Style = style;
-        }
-
         foreach (var item in items)
         {
             combo.Items.Add(item);
@@ -205,104 +195,6 @@ internal sealed class ChromecastDashboardView : UserControl
         combo.Text = value;
         return combo;
     }
-
-    // The host has no ComboBox theme, so the default control is white. This dark template is
-    // parsed once from a XAML string to keep the plugin free of .xaml files.
-    private static readonly Lazy<Style?> DarkComboStyle = new(() =>
-    {
-        var inset = HostTheme.Hex("Ink05");
-        var text = HostTheme.Hex("TextStrong");
-        var line = HostTheme.Hex("Ink12");
-        var hover = HostTheme.Hex("Ink10");
-        var focus = HostTheme.Hex("AccentCyanBright");
-        var muted = HostTheme.Hex("TextMuted");
-        var card = HostTheme.Hex("Ink06");
-        var xaml = $$$"""
-            <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" TargetType="ComboBox">
-              <Setter Property="Background" Value="{{{inset}}}" />
-              <Setter Property="Foreground" Value="{{{text}}}" />
-              <Setter Property="BorderBrush" Value="{{{line}}}" />
-              <Setter Property="ItemContainerStyle">
-                <Setter.Value>
-                  <Style TargetType="ComboBoxItem">
-                    <Setter Property="Foreground" Value="{{{text}}}" />
-                    <Setter Property="MinHeight" Value="22" />
-                    <Setter Property="Template">
-                      <Setter.Value>
-                        <ControlTemplate TargetType="ComboBoxItem">
-                          <Border x:Name="Bd" Background="Transparent" Padding="8,3">
-                            <ContentPresenter />
-                          </Border>
-                          <ControlTemplate.Triggers>
-                            <Trigger Property="IsHighlighted" Value="True">
-                              <Setter TargetName="Bd" Property="Background" Value="{{{hover}}}" />
-                            </Trigger>
-                          </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                      </Setter.Value>
-                    </Setter>
-                  </Style>
-                </Setter.Value>
-              </Setter>
-              <Setter Property="Template">
-                <Setter.Value>
-                  <ControlTemplate TargetType="ComboBox">
-                    <Grid>
-                      <ToggleButton Focusable="False" ClickMode="Press"
-                                    IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
-                        <ToggleButton.Template>
-                          <ControlTemplate TargetType="ToggleButton">
-                            <Border x:Name="Bd" Background="{{{inset}}}" BorderBrush="{{{line}}}" BorderThickness="1" CornerRadius="4">
-                              <Path HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0"
-                                    Data="M 0 0 L 4 4 L 8 0" Stroke="{{{muted}}}" StrokeThickness="1.5" />
-                            </Border>
-                            <ControlTemplate.Triggers>
-                              <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{{{focus}}}" />
-                              </Trigger>
-                            </ControlTemplate.Triggers>
-                          </ControlTemplate>
-                        </ToggleButton.Template>
-                      </ToggleButton>
-                      <ContentPresenter x:Name="ContentSite" IsHitTestVisible="False" Margin="8,3,24,3" VerticalAlignment="Center"
-                                        Content="{TemplateBinding SelectionBoxItem}" />
-                      <TextBox x:Name="PART_EditableTextBox" Visibility="Hidden" Margin="4,2,22,2" VerticalAlignment="Center"
-                               Background="Transparent" BorderThickness="0" Foreground="{{{text}}}" CaretBrush="{{{text}}}"
-                               IsReadOnly="{TemplateBinding IsReadOnly}" />
-                      <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True" Focusable="False"
-                             IsOpen="{TemplateBinding IsDropDownOpen}" PopupAnimation="Slide">
-                        <Border Background="{{{card}}}" BorderBrush="{{{line}}}" BorderThickness="1" CornerRadius="4"
-                                MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                          <ScrollViewer>
-                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
-                          </ScrollViewer>
-                        </Border>
-                      </Popup>
-                    </Grid>
-                    <ControlTemplate.Triggers>
-                      <Trigger Property="IsEditable" Value="True">
-                        <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible" />
-                        <Setter TargetName="ContentSite" Property="Visibility" Value="Hidden" />
-                      </Trigger>
-                      <Trigger Property="IsEnabled" Value="False">
-                        <Setter Property="Opacity" Value="0.5" />
-                      </Trigger>
-                    </ControlTemplate.Triggers>
-                  </ControlTemplate>
-                </Setter.Value>
-              </Setter>
-            </Style>
-            """;
-        try
-        {
-            return (Style)System.Windows.Markup.XamlReader.Parse(xaml);
-        }
-        catch
-        {
-            return null; // Fall back to the default control.
-        }
-    });
 
     private static T Freeze<T>(T freezable) where T : Freezable
     {

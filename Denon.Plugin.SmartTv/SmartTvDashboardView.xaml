@@ -5,13 +5,6 @@
              FontFamily="Segoe UI Variable Display, Segoe UI">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="TvBoolToVis" />
-        <Style x:Key="TvCard" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource CardBgBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderHairlineBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="14" />
-            <Setter Property="Padding" Value="16" />
-        </Style>
 
         <Style x:Key="TelemetryTile" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource SidebarBgBrush}" />
@@ -21,44 +14,14 @@
             <Setter Property="Padding" Value="10,8" />
         </Style>
 
-        <Style x:Key="TvBtn" TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource ControlBgBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderSpecBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
+        <Style x:Key="TvBtn" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
             <Setter Property="Padding" Value="11,6.5" />
             <Setter Property="FontSize" Value="12" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Ink11Brush}" />
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Ink15Brush}" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Ink08Brush}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
         </Style>
 
-        <Style x:Key="TvPrimaryBtn" TargetType="Button" BasedOn="{StaticResource TvBtn}">
-            <Setter Property="Background" Value="{StaticResource AccentSkyDeepBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrightBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Style x:Key="TvPrimaryBtn" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Padding" Value="11,6.5" />
+            <Setter Property="FontSize" Value="12" />
         </Style>
 
         <Style x:Key="TvOledBtn" TargetType="Button" BasedOn="{StaticResource TvBtn}">
@@ -67,10 +30,9 @@
             <Setter Property="Foreground" Value="{StaticResource AccentBlueTextSoftBrush}" />
         </Style>
 
-        <Style x:Key="TvDangerBtn" TargetType="Button" BasedOn="{StaticResource TvBtn}">
-            <Setter Property="Background" Value="{StaticResource AccentCrimsonBgDeepBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource AccentCrimsonBorderBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource AccentCrimsonTextBrush}" />
+        <Style x:Key="TvDangerBtn" TargetType="Button" BasedOn="{StaticResource DangerButton}">
+            <Setter Property="Padding" Value="11,6.5" />
+            <Setter Property="FontSize" Value="12" />
         </Style>
 
         <Style x:Key="DPadBtn" TargetType="Button" BasedOn="{StaticResource TvBtn}">
@@ -135,7 +97,7 @@
         <StackPanel Margin="0,0,4,16">
 
             <!-- ======================== CARD 1: CONNECTION & LIVE TELEMETRY ======================== -->
-            <Border Style="{StaticResource TvCard}" Margin="0,0,0,14">
+            <Border Style="{StaticResource SurfaceCard}" Margin="0,0,0,14">
                 <StackPanel>
                     <Grid Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
@@ -266,7 +228,7 @@
             </Border>
 
             <!-- ======================== CARD 2: LIVE TV SCREEN PREVIEW & VIRTUAL TRACKPAD ======================== -->
-            <Border Style="{StaticResource TvCard}" Margin="0,0,0,14">
+            <Border Style="{StaticResource SurfaceCard}" Margin="0,0,0,14">
                 <StackPanel>
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
@@ -484,7 +446,7 @@
                 <!-- Left Stack: Power/OLED/Audio + HDMI Inputs -->
                 <StackPanel Grid.Column="0">
                     <!-- Power, OLED & Audio Output Card -->
-                    <Border Style="{StaticResource TvCard}" Margin="0,0,0,14">
+                    <Border Style="{StaticResource SurfaceCard}" Margin="0,0,0,14">
                         <StackPanel>
                             <TextBlock Text="POWER &amp; DISPLAY" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" Margin="0,0,0,9" />
                             <WrapPanel Margin="0,0,0,10">
@@ -529,7 +491,7 @@
                     </Border>
 
                     <!-- Dynamic HDMI Inputs Card -->
-                    <Border Style="{StaticResource TvCard}">
+                    <Border Style="{StaticResource SurfaceCard}">
                         <StackPanel>
                             <Grid Margin="0,0,0,10">
                                 <Grid.ColumnDefinitions>
@@ -591,7 +553,7 @@
                 </StackPanel>
 
                 <!-- Right Card: Virtual Magic Remote + YouTube Caster + TV Keyboard -->
-                <Border Grid.Column="2" Style="{StaticResource TvCard}">
+                <Border Grid.Column="2" Style="{StaticResource SurfaceCard}">
                     <StackPanel>
                         <TextBlock Text="VIRTUAL MAGIC REMOTE (POINTER SOCKET)" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" Margin="0,0,0,10" />
 
@@ -714,7 +676,7 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Left: Dynamic Installed Apps Launcher -->
-                <Border Grid.Column="0" Style="{StaticResource TvCard}">
+                <Border Grid.Column="0" Style="{StaticResource SurfaceCard}">
                     <StackPanel>
                         <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
@@ -807,7 +769,7 @@
                 </Border>
 
                 <!-- Right: Denon AVR Coordination -->
-                <Border Grid.Column="2" Style="{StaticResource TvCard}">
+                <Border Grid.Column="2" Style="{StaticResource SurfaceCard}">
                     <StackPanel>
                         <TextBlock Text="DENON AVR COORDINATION" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource TextFaintBrush}" Margin="0,0,0,10" />
                         <CheckBox Content="Wake TV (WoL) when Denon powers ON" IsChecked="{Binding WakeWithDenon}" Foreground="{StaticResource TextStrongBrush}" Margin="0,0,0,8" />
