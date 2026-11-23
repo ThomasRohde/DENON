@@ -1002,6 +1002,23 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                     ("availableStreams", "array"),
                     ("stats", "object"),
                     ("events", "array"))),
+            Tool("get_watch_time",
+                "Watch and listen time per day, kind, app and title from media sessions, WITHOUT double counting: " +
+                "one viewing (Chromecast program + LG TV HDMI input + Denon TV Audio) counts once, and paused cast time " +
+                "does not count. Use this instead of summing raw session events from get_activity_history.",
+                ObjSchema(
+                    ("days", "integer", "Number of days including today (1-90, default: 7)", false),
+                    ("top", "integer", "Number of apps and titles to list (1-50, default: 10)", false)),
+                title: "Get Watch & Listen Time",
+                readOnly: true, idempotent: true,
+                outputSchema: OutputObjSchema(
+                    ("days", "integer"),
+                    ("totalSeconds", "integer"),
+                    ("totalText", "string"),
+                    ("byDay", "array"),
+                    ("byKind", "array"),
+                    ("byApp", "array"),
+                    ("topTitles", "array"))),
             Tool("restore_previous_state",
                 "1-click Undo: restore the Denon AVR state captured before the most recent AI / atmosphere / scene mutation.",
                 EmptySchema(),
@@ -1448,6 +1465,16 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                     tracks = res.Tracks.Select(t => new { id = t.VideoId, title = t.Title, author = t.Author, duration = t.Duration?.ToString(@"m\:ss") ?? "LIVE", url = t.WatchUrl }),
                 });
             }
+            case "get_watch_time":
+            {
+                var days = Math.Clamp(GetInt(args, "days") ?? 7, 1, 90);
+                var top = Math.Clamp(GetInt(args, "top") ?? 10, 1, 50);
+                var now = DateTimeOffset.Now;
+                var since = new DateTimeOffset(now.LocalDateTime.Date.AddDays(-(days - 1)), now.Offset).AddHours(-12);
+                var events = _telemetry.ReadEventsSince(EventTelemetryLog.StreamMedia, since, "session.ended");
+                return BuildToolJson(WatchTimeReport.Build(events, now, days, top));
+            }
+
             case "get_activity_history":
             {
                 var stream = GetString(args, "stream");

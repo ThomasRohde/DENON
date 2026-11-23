@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Built-in plugins have typed MCP tools**: Philips Hue, LG webOS TV and Home Assistant declare their action parameters and hints (SDK 1.16). For example `plugin_philips_hue_hue_movie_dim` takes `roomId`, `plugin_smart_tv_tv_youtube` takes `contentId`, `plugin_smart_tv_tv_toast` takes `message`, and `hue.refresh` / `ha.refresh` are read-only (allowed in the Observer tier). Permission gates are unchanged (no built-in declares `IsDestructive = true`).
 
 ### Added
+- **MCP tool `get_watch_time`** (read-only, also in the Observer tier): watch and listen time per day, kind, app and title from `session.ended` events, without double counting (`exclusiveSec`; events from before 1.15.0 fall back to `durationSec` and are counted as `legacySessions`). Reads whole event files (`EventTelemetryLog.ReadEventsSince`), not only the newest 500 events.
 - **`ha.trigger_entity` is now listed** as a Home Assistant action, so MCP clients and Smart Scenes can trigger a scene, script or switch by `entityId` (required).
 
 ## [1.16.0] - 2026-11-23

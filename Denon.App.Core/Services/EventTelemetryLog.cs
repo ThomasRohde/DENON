@@ -357,6 +357,64 @@ public sealed class EventTelemetryLog : IAsyncDisposable
             .ToList();
     }
 
+    /// <summary>
+    /// Reads every event of one stream since <paramref name="since"/> (whole files, not only the tail), oldest first.
+    /// Optional filter on the event name. Used for reports such as watch time per day.
+    /// </summary>
+    public IReadOnlyList<JsonElement> ReadEventsSince(string stream, DateTimeOffset since, string? eventName = null)
+    {
+        var cleanStream = NormalizeStreamName(stream);
+        var results = new List<(DateTimeOffset Ts, JsonElement Element)>();
+
+        foreach (var file in GetCandidateFiles(cleanStream))
+        {
+            try
+            {
+                if (File.GetLastWriteTimeUtc(file) < since.UtcDateTime)
+                {
+                    continue; // Nothing new in this file since the cutoff.
+                }
+
+                using var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var reader = new StreamReader(fs, Encoding.UTF8);
+                while (reader.ReadLine() is { } line)
+                {
+                    if (string.IsNullOrWhiteSpace(line) ||
+                        (eventName is not null && !line.Contains(eventName, StringComparison.Ordinal)))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(line);
+                        var root = doc.RootElement;
+                        if (root.ValueKind != JsonValueKind.Object ||
+                            (eventName is not null && !(root.TryGetProperty("event", out var evEl) && evEl.GetString() == eventName)) ||
+                            !root.TryGetProperty("ts", out var tsEl) ||
+                            !DateTimeOffset.TryParse(tsEl.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var ts) ||
+                            ts < since)
+                        {
+                            continue;
+                        }
+
+                        results.Add((ts, root.Clone()));
+                    }
+                    catch (JsonException)
+                    {
+                        // Skip a partially written line.
+                    }
+                }
+            }
+            catch (IOException)
+            {
+                // Skip a file that is locked or removed.
+            }
+        }
+
+        return results.OrderBy(static r => r.Ts).Select(static r => r.Element).ToList();
+    }
+
     public void PruneOldFiles()
     {
         var cfg = _settingsStore.Current.Telemetry;
