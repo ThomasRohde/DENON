@@ -51,6 +51,7 @@ Auto-detect receiver IP & model name, configure LAN relay / FFmpeg / Cinema A/V 
 
 - **Extensible Plugin System & Official SDK (`Denon.App.PluginSdk` 1.15)**: Host built-in plugins and drop-in external `.NET 10` plugin `.dll` assemblies (`%LocalAppData%\DenonDesktop\plugins\external\`) via isolated `AssemblyLoadContext`, complete with per-plugin JSON storage, AVR event broadcasting, callable actions, and a 60 Hz zero-allocation FFT Audio-Reactive & Album-Art Palette API. **SDK 1.15** adds a **Receiver Control API** (`IPluginReceiverControl`: power, input, sound mode, volume, mute, Smart Scenes), granted only to plugins that declare `PluginCapabilities.ReceiverControl` and logged per plugin. **SDK 1.16** lets actions declare their parameters and read-only/destructive hints, so every plugin action becomes a typed MCP tool (`plugin_<id>_<action>`) that returns the plugin's JSON and images. **SDK 1.17** adds `IPluginContext.IsAppShuttingDown`. SDK changes are additive and the SDK assembly version is pinned, so a plugin built against a newer SDK still loads on an older app (it should handle `MissingMethodException` for members the older app lacks).
 - **Chromecast & Google Cast Plugin (external, separate download)**: The first standalone drop-in plugin. Finds Cast devices by mDNS, shows live now-playing, controls media and volume over Cast v2, and drives the Denon when an app starts or stops (power on, Smart Scene, input, sound mode, idle power-off). It logs *what* you cast (app, title, watched time) to the habit event log. See [`external-plugins/Denon.Plugin.Chromecast`](external-plugins/Denon.Plugin.Chromecast/README.md).
+- **Apple TV Plugin (external, separate download)**: Native .NET, no Python. Finds Apple TVs on the LAN, pairs once with the PIN the TV shows, and shows live what plays (app, title, series/episode, play state) over the encrypted AirPlay remote-control channel. Play/pause, remote buttons, apps and power over Companion. The now-playing hero shows the Apple TV program (from app 1.20). It logs watch sessions and drives the Denon when the Apple TV wakes or sleeps. It never opens the media channel while the Apple TV sleeps, so it does not wake it. See [`external-plugins/Denon.Plugin.AppleTv`](external-plugins/Denon.Plugin.AppleTv/README.md).
 - **Habit-Ready Event Telemetry**: Structured NDJSON event logs per domain (`media`, `avr`, `tv`, `lighting`, `control`) in `%LocalAppData%\DenonDesktop\logs\events\`. Watch and listen sessions (`session.started` / `session.ended`) from the AVR, the LG TV and plugins share one schema. Parallel sessions of one viewing (Cast → TV HDMI → Denon TV Audio) are marked with `coveredSec` / `exclusiveSec` / `coveredBy`, so summing `exclusiveSec` gives real time with no double counting.
 - **Built-In MCP Server (`http://127.0.0.1:18926/mcp`)**: Spec-compliant Streamable HTTP MCP server with Bearer auth, Room Graph resources, habit summaries, event queries, watch time without double counting (`get_watch_time`), and auto-bridged plugin actions. Copy the client config from **MCP & Room Brain** into Claude Desktop, Cursor, VS Code or other MCP clients.
 - **3 Official Built-In Plugins**:
@@ -102,6 +103,7 @@ Download from the [**Releases**](../../releases/latest) page (no .NET runtime in
 - **Windows Installer (Unsigned):** **`DenonDesktop-Setup-win-x64.exe`** — installs cleanly per-user with Start Menu & optional Desktop/Startup shortcuts and Add/Remove Programs uninstaller. *(Because this open-source build is unsigned, Windows SmartScreen may show a prompt — click **More info → Run anyway**.)*
 - **Portable Single-File Executable:** **`Denon.App.Desktop-win-x64.exe`** — run directly from any folder with zero installation.
 - **Chromecast plugin (optional, own release):** download **`Denon.Plugin.Chromecast-<version>.zip`** from the latest [`chromecast-v*` release](../../releases?q=chromecast&expanded=true), unzip it to `%LocalAppData%\DenonDesktop\plugins\external\Chromecast\`, and restart Denon Desktop. Plugin 0.2.0+ needs Denon Desktop 1.16 or later (0.1.x works with 1.15); 0.3.0 works best with 1.17.
+- **Apple TV plugin (optional, own release):** download **`Denon.Plugin.AppleTv-<version>.zip`** from the latest [`appletv-v*` release](../../releases?q=appletv&expanded=true), unzip it to `%LocalAppData%\DenonDesktop\plugins\external\AppleTv\`, and restart Denon Desktop. Then open **Plugins → Apple TV**, press **Discover now** and **Pair**. Needs Denon Desktop 1.16 or later; the hero shows the Apple TV from 1.20.
 
 1. Launch Denon Desktop — on first launch, it automatically scans your LAN and connects to your Denon/Marantz receiver.
 2. To use **YouTube Cast**, **PC Audio Cast**, **Local FLAC Jukebox**, or the **Couch Phone Remote**, click **Allow Firewall** in the **YouTube & Music** or **Cast & Remote** tab once to open Private-LAN TCP port `18925`.
@@ -124,11 +126,14 @@ pwsh -File .\build-release.ps1
 
 # Build and install the external Chromecast plugin from source
 pwsh -File .\external-plugins\Denon.Plugin.Chromecast\install.ps1
+# Build and install the external Apple TV plugin from source
+pwsh -File .\external-plugins\Denon.Plugin.AppleTv\install.ps1
 ```
 
 ### Releases
 - Push a `vX.Y.Z` tag to build and publish the app (installer, portable exe, checksums). Release notes come from the matching `CHANGELOG.md` section.
 - Push a `chromecast-vX.Y.Z` tag to build and publish the Chromecast plugin as its own release (zip + checksum).
+- Push an `appletv-vX.Y.Z` tag to build, test and publish the Apple TV plugin as its own release (zip + checksum).
 
 ---
 
@@ -142,6 +147,7 @@ pwsh -File .\external-plugins\Denon.Plugin.Chromecast\install.ps1
 | **`Denon.Plugin.SmartTv`** | Official LG webOS Smart TV + Wake-on-LAN plugin: SSAP WebSocket (`:3000`) pairing, power, HDMI input & app switching, on-screen toast notifications, and AVR scene coordination. |
 | **`Denon.Plugin.HomeAssistant`** | Official Home Assistant REST & Webhook plugin: trigger HA scenes/scripts/switches and publish live `sensor.denon_desktop_receiver` telemetry. |
 | **`external-plugins/Denon.Plugin.Chromecast`** | Standalone external Chromecast / Google Cast plugin (not in the solution, released separately): Cast v2 over TLS `:8009`, mDNS discovery, habit watch sessions, per-device Denon automations. Uses the SDK compile-only. |
+| **`external-plugins/Denon.Plugin.AppleTv`** | Standalone external Apple TV plugin (own solution `Denon.Plugin.AppleTv.slnx`, released separately): DNS-SD discovery, HAP pairing (SRP-6a, Ed25519, X25519, ChaCha20-Poly1305), Companion link, AirPlay 2 MRP now playing, habit watch sessions, Denon automations. Protocols ported from pyatv (MIT). |
 | **`Denon.App.Core.Tests`** | xUnit tests for core services and review regressions, including event telemetry and session overlap. |
 | **`Denon.App.Desktop`** | Custom-chromed Obsidian Hi-Fi WPF UI, dual-channel VSync `AnalogVuMeterControl` + 31-band `SpectrumAnalyzerControl`, 512-point Radix-2 FFT `LiveAudioAnalyzerService`, `AlbumArtPaletteService`, 1-click `AcousticSyncCalibrationService`, `NAudio` WASAPI loopback PC audio caster, `QRCoder` Phone Remote QR generator, `WebView2` Cinema Companion window, Win32 Global Hotkey engine, and Windows startup integration. |
 

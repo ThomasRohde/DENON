@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-11-23
+
+### Added
+- **Apple TV in the now-playing hero**: With the new Apple TV plugin (released separately as `appletv-v0.1.0`), the hero shows what the Apple TV plays ("TVA: Skoler i hele landet ramt af bombetrusler", detail "Apple TV • DRTV • Stuen (2) • Media Player", state Playing/Paused). This works when the Apple TV is on an HDMI input of the TV (TV Audio, same rules as a cast) and when it is plugged straight into the receiver (for example Media Player); an input with its own track metadata (Bluetooth, USB) still wins. The play/pause button and the Space hotkey control the Apple TV. A playing Chromecast or Apple TV wins over a paused one. Reads the Apple TV plugin status (0.1.0+).
+- **Apple TV watch time counts once**: Watch sessions with `kind: "appletv"` follow the cast rules in the overlap tracker (they cover the TV's HDMI input and the receiver input), and `get_watch_time` lists them by app.
+
+### Changed
+- The hero asks a plugin for artwork once per program for the Apple TV (it has no artwork yet); the Chromecast still retries every 15 s.
+
 ## [1.19.0] - 2026-11-23
 
 ### Changed

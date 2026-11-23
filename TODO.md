@@ -67,7 +67,6 @@ Native .NET (no Python), protocol logic ported from pyatv (MIT). See `external-p
       now playing in the dashboard and the hero (the Apple TV is on Denon input MPLAY), MRP play/pause (DRTV
       on-demand pauses; DRTV live answers "command failed"), watch sessions, `app_shutdown` on app exit, sleep
       detected and the now-playing link closed, no wake in 3.5 min of Companion polling while asleep.
-- [ ] Release the plugin (`appletv-v0.1.0`) and the app 1.20.0 (hero + `appletv` overlap counting).
 - [ ] Power button on the remote: the program ends ~30 s before tvOS reports Asleep, so the session ends with
       `app_closed`, not `standby`. Consider a short grace period before the end reason is chosen.
 - [ ] Hide or grey out the hero's pause button when the app does not support pause (read `supportedCommands`
