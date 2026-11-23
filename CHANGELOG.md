@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-11-23
+
 ### Removed
 - **Compatibility with older plugins and hosts (Plugin SDK 2.0.0)**: The SDK version is no longer pinned at 1.16.0.0; plugins and the app must use the same SDK. `IPluginContext.ReceiverControl` and `IsAppShuttingDown` are plain members (no defaults for older hosts), and `PluginActionDescriptor.Parameters` is a list that is empty by default. MCP no longer shows a generic fallback schema for actions without declared parameters.
 
