@@ -81,30 +81,40 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
 
     public IReadOnlyList<PluginActionDescriptor> GetActions() =>
     [
-        new("tv.power_on", "TV Wake-on-LAN (Power On)", "Send multi-interface Wake-on-LAN magic packets to power on the LG TV.", "Power"),
-        new("tv.power_off", "TV Power Off", "Put the LG webOS TV into standby.", "Power"),
-        new("tv.screen_off", "Screen Off (Audio Only)", "Blank the TV screen while keeping HDMI eARC / music audio playing.", "Display"),
-        new("tv.screen_on", "Screen On", "Wake the TV screen back on from Audio-Only Screen Off mode.", "Display"),
-        new("tv.audio_earc", "TV Audio → HDMI ARC / eARC", "Switch LG TV audio output to HDMI ARC / eARC (Denon AVR).", "Audio"),
-        new("tv.audio_speakers", "TV Audio → Internal Speakers", "Switch LG TV audio output to internal TV speakers.", "Audio"),
-        new("tv.audio_optical", "TV Audio → Optical Out", "Switch LG TV audio output to Digital Optical.", "Audio"),
-        new("tv.audio_bluetooth", "TV Audio → Bluetooth", "Switch LG TV audio output to Bluetooth device.", "Audio"),
-        new("tv.mute", "TV Mute Audio", "Mute internal TV speakers (great when using Denon AVR).", "Audio"),
-        new("tv.unmute", "TV Unmute Audio", "Unmute TV speakers.", "Audio"),
-        new("tv.hdmi1", "TV → HDMI 1", "Switch TV input to HDMI 1.", "Inputs"),
-        new("tv.hdmi2", "TV → HDMI 2 (eARC)", "Switch TV input to HDMI 2.", "Inputs"),
-        new("tv.hdmi3", "TV → HDMI 3", "Switch TV input to HDMI 3.", "Inputs"),
-        new("tv.hdmi4", "TV → HDMI 4", "Switch TV input to HDMI 4.", "Inputs"),
-        new("tv.livetv", "TV → Live TV", "Switch back to Live TV tuner.", "Inputs"),
-        new("tv.youtube", "TV → Launch YouTube", "Open YouTube app on the Smart TV (or cast a video via 'contentId').", "Apps"),
-        new("tv.netflix", "TV → Launch Netflix", "Open Netflix app on the Smart TV.", "Apps"),
-        new("tv.plex", "TV → Launch Plex", "Open Plex app on the Smart TV.", "Apps"),
-        new("tv.spotify", "TV → Launch Spotify", "Open Spotify app on the Smart TV.", "Apps"),
-        new("tv.disney", "TV → Launch Disney+", "Open Disney+ app on the Smart TV.", "Apps"),
-        new("tv.close_app", "TV Close Current App", "Close the currently active foreground app on the TV.", "Apps"),
-        new("tv.play", "TV Media Play", "Send Play transport command to the TV.", "Remote"),
-        new("tv.pause", "TV Media Pause", "Send Pause transport command to the TV.", "Remote"),
-        new("tv.toast", "TV Test Toast Alert", "Display a Denon Desktop notification banner on the TV screen.", "OSD"),
+        // Parameters and hints (SDK 1.16) give MCP clients a typed schema. Destructive stays unset (null) where the
+        // host's id guess already applies (power_off, close_app), so permission tiers do not change.
+        new("tv.power_on", "TV Wake-on-LAN (Power On)", "Send multi-interface Wake-on-LAN magic packets to power on the LG TV.", "Power") { Parameters = [], IsDestructive = false },
+        new("tv.power_off", "TV Power Off", "Put the LG webOS TV into standby.", "Power") { Parameters = [] },
+        new("tv.screen_off", "Screen Off (Audio Only)", "Blank the TV screen while keeping HDMI eARC / music audio playing.", "Display") { Parameters = [], IsDestructive = false },
+        new("tv.screen_on", "Screen On", "Wake the TV screen back on from Audio-Only Screen Off mode.", "Display") { Parameters = [], IsDestructive = false },
+        new("tv.audio_earc", "TV Audio → HDMI ARC / eARC", "Switch LG TV audio output to HDMI ARC / eARC (Denon AVR).", "Audio") { Parameters = [], IsDestructive = false },
+        new("tv.audio_speakers", "TV Audio → Internal Speakers", "Switch LG TV audio output to internal TV speakers.", "Audio") { Parameters = [], IsDestructive = false },
+        new("tv.audio_optical", "TV Audio → Optical Out", "Switch LG TV audio output to Digital Optical.", "Audio") { Parameters = [], IsDestructive = false },
+        new("tv.audio_bluetooth", "TV Audio → Bluetooth", "Switch LG TV audio output to Bluetooth device.", "Audio") { Parameters = [], IsDestructive = false },
+        new("tv.mute", "TV Mute Audio", "Mute internal TV speakers (great when using Denon AVR).", "Audio") { Parameters = [], IsDestructive = false },
+        new("tv.unmute", "TV Unmute Audio", "Unmute TV speakers.", "Audio") { Parameters = [], IsDestructive = false },
+        new("tv.hdmi1", "TV → HDMI 1", "Switch TV input to HDMI 1.", "Inputs") { Parameters = [], IsDestructive = false },
+        new("tv.hdmi2", "TV → HDMI 2 (eARC)", "Switch TV input to HDMI 2.", "Inputs") { Parameters = [], IsDestructive = false },
+        new("tv.hdmi3", "TV → HDMI 3", "Switch TV input to HDMI 3.", "Inputs") { Parameters = [], IsDestructive = false },
+        new("tv.hdmi4", "TV → HDMI 4", "Switch TV input to HDMI 4.", "Inputs") { Parameters = [], IsDestructive = false },
+        new("tv.livetv", "TV → Live TV", "Switch back to Live TV tuner.", "Inputs") { Parameters = [], IsDestructive = false },
+        new("tv.youtube", "TV → Launch YouTube", "Open YouTube app on the Smart TV (or cast a video via 'contentId').", "Apps")
+        {
+            Parameters = [new("contentId", "string", "Optional YouTube video URL or id to play. Without it, YouTube opens.")],
+            IsDestructive = false,
+        },
+        new("tv.netflix", "TV → Launch Netflix", "Open Netflix app on the Smart TV.", "Apps") { Parameters = [], IsDestructive = false },
+        new("tv.plex", "TV → Launch Plex", "Open Plex app on the Smart TV.", "Apps") { Parameters = [], IsDestructive = false },
+        new("tv.spotify", "TV → Launch Spotify", "Open Spotify app on the Smart TV.", "Apps") { Parameters = [], IsDestructive = false },
+        new("tv.disney", "TV → Launch Disney+", "Open Disney+ app on the Smart TV.", "Apps") { Parameters = [], IsDestructive = false },
+        new("tv.close_app", "TV Close Current App", "Close the currently active foreground app on the TV.", "Apps") { Parameters = [] },
+        new("tv.play", "TV Media Play", "Send Play transport command to the TV.", "Remote") { Parameters = [], IsDestructive = false },
+        new("tv.pause", "TV Media Pause", "Send Pause transport command to the TV.", "Remote") { Parameters = [], IsDestructive = false },
+        new("tv.toast", "TV Test Toast Alert", "Display a Denon Desktop notification banner on the TV screen.", "OSD")
+        {
+            Parameters = [new("message", "string", "Text for the banner. Default: a Denon Desktop test message.")],
+            IsDestructive = false,
+        },
     ];
 
     public async Task<PluginActionResult> ExecuteActionAsync(

@@ -123,9 +123,18 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
 
     public IReadOnlyList<PluginActionDescriptor> GetActions() =>
     [
-        new("ha.sync_sensor", "Push Denon Status to HA", "Update sensor.denon_desktop_receiver in Home Assistant right now.", "Telemetry"),
-        new("ha.fire_webhook", "Fire Configured Webhook", "Send a JSON event payload to your configured Home Assistant webhook.", "Webhook"),
-        new("ha.refresh", "Refresh HA Entities", "Reload scenes, scripts, and switches from Home Assistant.", "System"),
+        // Parameters and hints (SDK 1.16) give MCP clients a typed schema.
+        new("ha.sync_sensor", "Push Denon Status to HA", "Update sensor.denon_desktop_receiver in Home Assistant right now.", "Telemetry")
+            { Parameters = [], IsDestructive = false },
+        new("ha.fire_webhook", "Fire Configured Webhook", "Send a JSON event payload to your configured Home Assistant webhook.", "Webhook")
+            { Parameters = [], IsDestructive = false },
+        new("ha.refresh", "Refresh HA Entities", "Reload scenes, scripts, and switches from Home Assistant.", "System")
+            { Parameters = [], IsReadOnly = true },
+        new("ha.trigger_entity", "Trigger HA Entity", "Activate a Home Assistant scene, run a script, or toggle a switch.", "Entities")
+        {
+            Parameters = [new("entityId", "string", "Entity id, for example scene.movie_time, script.close_theater_curtains or switch.subwoofer_smart_plug.", Required: true)],
+            IsDestructive = false,
+        },
     ];
 
     public async Task<PluginActionResult> ExecuteActionAsync(

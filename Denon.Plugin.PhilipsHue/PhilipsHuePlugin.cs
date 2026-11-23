@@ -125,19 +125,46 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
         };
     }
 
+    private static readonly PluginActionParameter[] RoomOnly =
+    [
+        new("roomId", "string", "Hue room/group id. Default: the automation target room set in the Hue dashboard."),
+    ];
+
     public IReadOnlyList<PluginActionDescriptor> GetActions() =>
     [
-        new("hue.all_on", "All Hue Lights On", "Turn on every light on the paired Philips Hue Bridge.", "Master"),
-        new("hue.all_off", "All Hue Lights Off", "Turn off every light on the paired Philips Hue Bridge.", "Master"),
-        new("hue.movie_dim", "Cinema Dim (15%)", "Dim the target room to warm 15% cinema ambience.", "Ambience"),
-        new("hue.candlelight", "Late Night Candlelight", "Set the target room to soft 24% candlelight glow.", "Ambience"),
-        new("hue.hifi_cyan", "Hi-Fi Cyan Glow", "Set the target room to signature Denon cyan ambience.", "Ambience"),
-        new("hue.daylight", "Full Daylight (100%)", "Set the target room to crisp 100% daylight.", "Ambience"),
-        new("hue.music_sync_on", "Start Hue Music Sync", "Enable real-time FFT beat-reactive Hue lighting.", "Music Sync"),
-        new("hue.music_sync_off", "Stop Hue Music Sync", "Disable real-time FFT beat-reactive Hue lighting.", "Music Sync"),
-        new("hue.music_sync_toggle", "Toggle Hue Music Sync", "Toggle real-time beat-reactive Hue lighting on or off.", "Music Sync"),
-        new("hue.set_color", "Set Custom Hue Color / Warmth", "Set any custom hex color (#RRGGBB), Kelvin warmth (2000-6500K), and brightness % on a room or all lights.", "Ambience"),
-        new("hue.refresh", "Sync Bridge State", "Refresh rooms, lights, and scenes from the Hue Bridge.", "System"),
+        // Parameters and hints (SDK 1.16) give MCP clients a typed schema. Destructive stays unset (null) where the
+        // host's id guess already applies, so permission tiers do not change.
+        new("hue.all_on", "All Hue Lights On", "Turn on every light on the paired Philips Hue Bridge.", "Master")
+            { Parameters = [], IsDestructive = false },
+        new("hue.all_off", "All Hue Lights Off", "Turn off every light on the paired Philips Hue Bridge.", "Master")
+            { Parameters = [] },
+        new("hue.movie_dim", "Cinema Dim (15%)", "Dim the target room to warm 15% cinema ambience.", "Ambience")
+            { Parameters = RoomOnly, IsDestructive = false },
+        new("hue.candlelight", "Late Night Candlelight", "Set the target room to soft 24% candlelight glow.", "Ambience")
+            { Parameters = RoomOnly, IsDestructive = false },
+        new("hue.hifi_cyan", "Hi-Fi Cyan Glow", "Set the target room to signature Denon cyan ambience.", "Ambience")
+            { Parameters = RoomOnly, IsDestructive = false },
+        new("hue.daylight", "Full Daylight (100%)", "Set the target room to crisp 100% daylight.", "Ambience")
+            { Parameters = RoomOnly, IsDestructive = false },
+        new("hue.music_sync_on", "Start Hue Music Sync", "Enable real-time FFT beat-reactive Hue lighting.", "Music Sync")
+            { Parameters = [], IsDestructive = false },
+        new("hue.music_sync_off", "Stop Hue Music Sync", "Disable real-time FFT beat-reactive Hue lighting.", "Music Sync")
+            { Parameters = [], IsDestructive = false },
+        new("hue.music_sync_toggle", "Toggle Hue Music Sync", "Toggle real-time beat-reactive Hue lighting on or off.", "Music Sync")
+            { Parameters = [], IsDestructive = false },
+        new("hue.set_color", "Set Custom Hue Color / Warmth", "Set any custom hex color (#RRGGBB), Kelvin warmth (2000-6500K), and brightness % on a room or all lights.", "Ambience")
+        {
+            Parameters =
+            [
+                new("hex", "string", "Color as #RRGGBB. Takes priority over kelvin."),
+                new("kelvin", "integer", "White temperature 2000-6500 K (used when hex is not given)."),
+                new("brightness", "integer", "Brightness 1-100 %."),
+                new("room", "string", "Room name or id, or \"all\". Default: the automation target room."),
+            ],
+            IsDestructive = false,
+        },
+        new("hue.refresh", "Sync Bridge State", "Refresh rooms, lights, and scenes from the Hue Bridge.", "System")
+            { Parameters = [], IsReadOnly = true },
     ];
 
     public async Task<PluginActionResult> ExecuteActionAsync(

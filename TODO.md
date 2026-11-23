@@ -34,9 +34,11 @@ Phase 1 is done in 1.15.1 (source router, DENON/SIM/MUTED/PC/IDLE badge, PC Cast
 
 The bridge returns JSON + images and uses declared parameters/hints since app 1.16.0 / SDK 1.16 (Chromecast plugin 0.2.0 uses it).
 
-- [ ] **Built-in plugins** (Hue, LG TV, Home Assistant) still use the generic legacy schema and id-based hints.
-      Declare their `Parameters`, `IsReadOnly` and `IsDestructive` (for example `tv.button` → `button`,
-      `ha.trigger_entity` → `entityId`, `hue.refresh` read-only, `tv.power_off` destructive).
+- [ ] The **Smart Scene editor** cannot set action parameters. A scene step for an action with a required
+      parameter (for example `ha.trigger_entity` → `entityId`) fails with "Missing 'entityId' parameter". Add a
+      parameter editor driven by `PluginActionDescriptor.Parameters`.
+- [ ] LG TV actions `tv.button`, `tv.launch_app`, `tv.type_text`, `tv.open_url` are implemented but not listed in
+      `GetActions` (the curated `tv_computer` MCP tool covers them). Decide if they should be listed.
 
 ## Chromecast plugin
 
