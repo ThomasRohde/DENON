@@ -32,7 +32,8 @@ system reads them without changes.
 | `automation.*` | The plugin changed the receiver | `steps` |
 
 Rules:
-- **One session per program.** A new title closes the old session (`reason: "switched"`).
+- **One session per program.** A new title closes the old session (`reason: "switched"`). A session that stays
+  paused for 10 minutes ends (`reason: "paused"`); playing again starts a new session.
   If the title arrives a moment after the app starts, the open session gets the title.
 - **`watchedSec` counts only PLAYING/BUFFERING time.** `durationSec` is wall-clock time, so a long pause shows as a gap.
 - `avgVolume` is the Denon volume during the session. `receiverInput` lets you join a Cast session to the

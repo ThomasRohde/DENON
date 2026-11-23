@@ -2,6 +2,11 @@
 
 Released separately from Denon Desktop with tags `chromecast-vX.Y.Z`.
 
+## [Unreleased]
+
+### Changed
+- **Long pauses end the session**: A cast session that stays paused for 10 minutes ends with `reason: "paused"`. When the program plays again, a new session starts (after 15 s of play). Before, a whole evening of pause and resume was one long session.
+
 ## [0.2.0] - 2026-11-23
 
 Needs **Denon Desktop 1.16.0** or later (Plugin SDK 1.16). Use 0.1.1 with Denon Desktop 1.15.x.

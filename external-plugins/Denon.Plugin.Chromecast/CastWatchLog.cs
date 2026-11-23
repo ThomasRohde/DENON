@@ -21,6 +21,9 @@ internal sealed class CastWatchLog
 {
     public const int DwellSeconds = 15;
 
+    /// <summary>A session that stays paused this long ends (<c>reason: "paused"</c>); playing again starts a new one.</summary>
+    public static readonly TimeSpan PauseTimeout = TimeSpan.FromMinutes(10);
+
     private readonly object _gate = new();
     private readonly Dictionary<string, DeviceSlot> _slots = new(StringComparer.OrdinalIgnoreCase);
     private readonly Action<string, Dictionary<string, object?>> _record;
@@ -109,6 +112,16 @@ internal sealed class CastWatchLog
                     var data = Payload(slot, pending);
                     data["dwellConfirmedSec"] = (int)Math.Round((now - pending.StartedUtc).TotalSeconds); // Real seconds since start.
                     _record("session.started", data);
+                }
+
+                // Paused for a long time: end the session. If the program plays again, a new session starts
+                // (its dwell begins at the next PLAYING), so one evening of pause/resume does not become one huge session.
+                if (slot.Active is { } paused && !slot.IsPlaying && now - slot.LastPlayingUtc >= PauseTimeout)
+                {
+                    var program = paused.Candidate;
+                    EndSession(slot, now, "paused");
+                    slot.Pending = program with { StartedUtc = now, WatchedSec = 0 };
+                    continue;
                 }
 
                 if (slot.Active is not null)
@@ -289,6 +302,9 @@ internal sealed class CastWatchLog
 
         public bool IsPlaying => PlayerState is "PLAYING" or "BUFFERING";
 
+        /// <summary>Last time the player was PLAYING/BUFFERING (set by <see cref="Accumulate"/>).</summary>
+        public DateTimeOffset LastPlayingUtc { get; private set; }
+
         public Candidate? Pending { get; set; }
 
         public ActiveSession? Active { get; set; }
@@ -313,6 +329,11 @@ internal sealed class CastWatchLog
                 {
                     AppRun.WatchedSec += seconds;
                 }
+            }
+
+            if (IsPlaying)
+            {
+                LastPlayingUtc = now;
             }
 
             _lastTick = now;
