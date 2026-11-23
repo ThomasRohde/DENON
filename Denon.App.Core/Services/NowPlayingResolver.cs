@@ -17,15 +17,25 @@ public sealed record SmartTvNowShowing(
     string Showing,
     bool IsScreenOff);
 
-/// <summary>What a Chromecast plays, from the Chromecast plugin's status text.</summary>
+/// <summary>
+/// What a streamer plays, from its plugin's status text: a Chromecast ("chromecast" plugin) or an
+/// Apple TV ("apple-tv" plugin). <see cref="PluginId"/> is the plugin that takes play/pause and artwork requests.
+/// </summary>
 public sealed record CastNowPlaying(
     string DeviceName,
     string App,
     string? Title,
-    bool IsPlaying);
+    bool IsPlaying,
+    string PluginId = NowPlayingResolver.ChromecastPluginId)
+{
+    public bool IsAppleTv => PluginId == NowPlayingResolver.AppleTvPluginId;
+}
 
 public static class NowPlayingResolver
 {
+    public const string ChromecastPluginId = "chromecast";
+    public const string AppleTvPluginId = "apple-tv";
+
     public static ResolvedNowPlaying Resolve(
         ReceiverStatus status,
         string? activeStationName,
@@ -60,12 +70,13 @@ public static class NowPlayingResolver
             {
                 var tvInfo = TryExtractSmartTvNowShowing(plugins);
 
-                // A Chromecast plays and the TV shows an HDMI input (or there is no TV plugin to ask):
-                // show the cast program, not "DVD Player (HDMI 1)". Live TV and TV apps still win.
-                if (TryExtractCastNowPlaying(plugins) is { } cast &&
+                // A Chromecast or Apple TV plays and the TV shows an HDMI input (or there is no TV plugin to ask):
+                // show its program, not "DVD Player (HDMI 1)". Live TV and TV apps still win.
+                if (TryExtractStreamerNowPlaying(plugins) is { } cast &&
                     (tvInfo is null ? cast.IsPlaying : tvInfo.Showing.Contains("HDMI", StringComparison.OrdinalIgnoreCase)))
                 {
-                    var castDetail = new List<string> { cast.Title is null ? "Cast" : $"Cast • {cast.App}", cast.DeviceName };
+                    var kindLabel = cast.IsAppleTv ? "Apple TV" : "Cast";
+                    var castDetail = new List<string> { cast.Title is null ? kindLabel : $"{kindLabel} • {cast.App}", cast.DeviceName };
                     if (tvInfo is not null)
                     {
                         castDetail.Add($"TV {tvInfo.Showing}");
@@ -80,7 +91,7 @@ public static class NowPlayingResolver
                         Title: cast.Title ?? cast.App,
                         Detail: string.Join(" • ", castDetail),
                         ImageUrl: string.Empty,
-                        PlayStateLabel: cast.IsPlaying ? "Casting" : "Paused",
+                        PlayStateLabel: cast.IsPlaying ? (cast.IsAppleTv ? "Playing" : "Casting") : "Paused",
                         IsExternalLiveInput: true,
                         Cast: cast);
                 }
@@ -112,8 +123,28 @@ public static class NowPlayingResolver
                 }
             }
 
+            // An Apple TV plugged straight into the receiver (for example "Media Player"): show its program
+            // unless the input carries its own track metadata (Bluetooth / USB).
+            var hasInputMetadata = isPlayingOrPaused && status.NowPlaying.HasRealMetadata;
+            if (!IsTvAudioInput(status.InputSource) && !hasInputMetadata && TryExtractAppleTvNowPlaying(plugins) is { } appleTv)
+            {
+                var atvDetail = new List<string> { appleTv.Title is null ? "Apple TV" : $"Apple TV • {appleTv.App}", appleTv.DeviceName, friendlyInput };
+                if (soundMode != "—")
+                {
+                    atvDetail.Add(soundMode);
+                }
+
+                return new ResolvedNowPlaying(
+                    Title: appleTv.Title ?? appleTv.App,
+                    Detail: string.Join(" • ", atvDetail),
+                    ImageUrl: string.Empty,
+                    PlayStateLabel: appleTv.IsPlaying ? "Playing" : "Paused",
+                    IsExternalLiveInput: true,
+                    Cast: appleTv);
+            }
+
             // Bluetooth / USB / external AVR inputs that still carry live HEOS/AVRCP track metadata
-            if (isPlayingOrPaused && status.NowPlaying.HasRealMetadata)
+            if (hasInputMetadata)
             {
                 var extTitle = FirstNonEmpty(status.NowPlaying.Song, status.NowPlaying.Station, friendlyInput);
                 var extDetail = BuildMetadataDetail(status.NowPlaying, activeStationName: null, serviceLabel: friendlyInput, fallback: $"External Input • {soundMode}");
@@ -274,23 +305,44 @@ public static class NowPlayingResolver
     /// Reads the Chromecast plugin status: "CASTING • &lt;device&gt; • &lt;app&gt;[ • &lt;title&gt;]" or "CAST PAUSED • …".
     /// Null when the plugin is missing, stopped, or nothing is cast.
     /// </summary>
-    public static CastNowPlaying? TryExtractCastNowPlaying(IReadOnlyList<PluginRecordSnapshot>? plugins)
+    public static CastNowPlaying? TryExtractCastNowPlaying(IReadOnlyList<PluginRecordSnapshot>? plugins) =>
+        TryParseStreamerStatus(plugins, ChromecastPluginId, "CASTING", "CAST PAUSED");
+
+    /// <summary>
+    /// Reads the Apple TV plugin status: "APPLE TV • &lt;device&gt; • &lt;app&gt;[ • &lt;title&gt;]" or "APPLE TV PAUSED • …".
+    /// Null when the plugin is missing, stopped, or the Apple TV shows nothing.
+    /// </summary>
+    public static CastNowPlaying? TryExtractAppleTvNowPlaying(IReadOnlyList<PluginRecordSnapshot>? plugins) =>
+        TryParseStreamerStatus(plugins, AppleTvPluginId, "APPLE TV", "APPLE TV PAUSED");
+
+    /// <summary>The Chromecast or Apple TV program for the hero: one that plays wins over a paused one; Chromecast first on a tie.</summary>
+    public static CastNowPlaying? TryExtractStreamerNowPlaying(IReadOnlyList<PluginRecordSnapshot>? plugins)
     {
-        var cast = plugins?.FirstOrDefault(static p =>
-            p.Id.Equals("chromecast", StringComparison.OrdinalIgnoreCase) && p.IsEnabled && p.IsStarted);
-        if (cast is null || string.IsNullOrWhiteSpace(cast.StatusText))
+        var cast = TryExtractCastNowPlaying(plugins);
+        var appleTv = TryExtractAppleTvNowPlaying(plugins);
+        return cast is { IsPlaying: true } ? cast
+            : appleTv is { IsPlaying: true } ? appleTv
+            : cast ?? appleTv;
+    }
+
+    private static CastNowPlaying? TryParseStreamerStatus(
+        IReadOnlyList<PluginRecordSnapshot>? plugins, string pluginId, string playingTag, string pausedTag)
+    {
+        var plugin = plugins?.FirstOrDefault(p =>
+            p.Id.Equals(pluginId, StringComparison.OrdinalIgnoreCase) && p.IsEnabled && p.IsStarted);
+        if (plugin is null || string.IsNullOrWhiteSpace(plugin.StatusText))
         {
             return null;
         }
 
-        var parts = cast.StatusText.Split(" • ", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 3 || parts[0] is not ("CASTING" or "CAST PAUSED"))
+        var parts = plugin.StatusText.Split(" • ", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 3 || (parts[0] != playingTag && parts[0] != pausedTag))
         {
             return null;
         }
 
         var title = parts.Length > 3 ? string.Join(" • ", parts.Skip(3)) : null;
-        return new CastNowPlaying(parts[1], parts[2], string.IsNullOrWhiteSpace(title) ? null : title, parts[0] == "CASTING");
+        return new CastNowPlaying(parts[1], parts[2], string.IsNullOrWhiteSpace(title) ? null : title, parts[0] == playingTag, pluginId);
     }
 
     /// <summary>

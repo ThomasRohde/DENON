@@ -3,13 +3,11 @@ using Denon.App.Core.Services;
 namespace Denon.App.Desktop.ViewModels;
 
 /// <summary>
-/// Now-playing hero while it shows a Chromecast program (TV Audio + TV on HDMI): cast artwork and a
-/// play/pause button that controls the Chromecast instead of HEOS.
+/// Now-playing hero while it shows a Chromecast or Apple TV program (TV Audio + TV on HDMI): its artwork and a
+/// play/pause button that controls that streamer (through its plugin) instead of HEOS.
 /// </summary>
 public sealed partial class MainViewModel
 {
-    private const string ChromecastPluginId = "chromecast";
-
     private CastNowPlaying? _heroCast;
     private string? _castArtKey;
     private string _castArtUrl = string.Empty;
@@ -37,7 +35,7 @@ public sealed partial class MainViewModel
             return resolved;
         }
 
-        var key = $"{cast.DeviceName}|{cast.App}|{cast.Title}";
+        var key = $"{cast.PluginId}|{cast.DeviceName}|{cast.App}|{cast.Title}";
         var isNewProgram = !string.Equals(key, _castArtKey, StringComparison.Ordinal);
         if (isNewProgram)
         {
@@ -45,22 +43,24 @@ public sealed partial class MainViewModel
             _castArtUrl = string.Empty;
         }
 
-        // Fetch on a new program; retry a missing artwork at most every 15 s (it can arrive after the title).
-        if (isNewProgram || (_castArtUrl.Length == 0 && DateTimeOffset.UtcNow - _castArtFetchedUtc > TimeSpan.FromSeconds(15)))
+        // Fetch on a new program; for a Chromecast retry a missing artwork at most every 15 s (it can arrive after
+        // the title). The Apple TV plugin has artwork only when the app sends an artwork URL: ask once per program.
+        if (isNewProgram ||
+            (!cast.IsAppleTv && _castArtUrl.Length == 0 && DateTimeOffset.UtcNow - _castArtFetchedUtc > TimeSpan.FromSeconds(15)))
         {
             _castArtFetchedUtc = DateTimeOffset.UtcNow;
-            _ = FetchCastArtworkAsync(key, cast.DeviceName);
+            _ = FetchCastArtworkAsync(key, cast.PluginId, cast.DeviceName);
         }
 
         return _castArtUrl.Length > 0 ? resolved with { ImageUrl = _castArtUrl } : resolved;
     }
 
-    private async Task FetchCastArtworkAsync(string key, string deviceName)
+    private async Task FetchCastArtworkAsync(string key, string pluginId, string deviceName)
     {
         try
         {
             var result = await _pluginHost.ExecuteActionAsync(
-                ChromecastPluginId,
+                pluginId,
                 "now-playing",
                 new Dictionary<string, string> { ["device"] = deviceName, ["includeImage"] = "false" });
 
@@ -90,14 +90,14 @@ public sealed partial class MainViewModel
         }
     }
 
-    /// <summary>Play/pause for the Chromecast the hero shows (explicit play or pause, from the known state).</summary>
+    /// <summary>Play/pause for the Chromecast or Apple TV the hero shows (explicit play or pause, from the known state).</summary>
     private async Task PlayPauseCastAsync(CastNowPlaying cast)
     {
         var action = cast.IsPlaying ? "pause" : "play";
         try
         {
             var result = await _pluginHost.ExecuteActionAsync(
-                ChromecastPluginId,
+                cast.PluginId,
                 action,
                 new Dictionary<string, string> { ["device"] = cast.DeviceName });
 

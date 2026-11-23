@@ -134,6 +134,10 @@ internal sealed class CompanionClient : IAsyncDisposable
         await RequestAsync("_hidC", new() { ["_hBtS"] = 2, ["_hidC"] = (int)command }, cancellationToken);
     }
 
+    /// <summary>Media control (pyatv MediaControlCommand): 1 Play, 2 Pause, 3 Next, 4 Previous.</summary>
+    public Task MediaControlAsync(int command, CancellationToken cancellationToken) =>
+        RequestAsync("_mcc", new() { ["_mcc"] = command }, cancellationToken);
+
     /// <summary>Registers for events (for example "_iMC" media control or "TVSystemStatus").</summary>
     public Task SubscribeAsync(string eventName, CancellationToken cancellationToken) =>
         SendEventAsync("_interest", new() { ["_regEvents"] = new List<object?> { eventName } }, cancellationToken);

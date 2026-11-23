@@ -143,4 +143,37 @@ public sealed class MediaSessionOverlapTrackerTests
         var data = new Dictionary<string, object?> { ["castDevice"] = "Stuen 2", ["playerState"] = "PLAYING" };
         Assert.Same(data, tracker.Annotate("chromecast", "cast.playback_changed", data, T0));
     }
+    [Fact]
+    public void Apple_tv_through_tv_hdmi_and_denon_arc_counts_once()
+    {
+        var tracker = new MediaSessionOverlapTracker();
+        var tv = Started("tv_app", "Apple TV (HDMI 2)");
+        var avr = Started("avr_input", "TV Audio", ("input", "TV"));
+        var atv = Started("appletv", "Min ven, Putin", ("appleTvDevice", "Stue"), ("receiverInput", "TV"));
+
+        tracker.Annotate("lg-tv", "session.started", tv, T0.AddSeconds(15));
+        tracker.Annotate("avr", "session.started", avr, T0.AddSeconds(15));
+        tracker.Annotate("apple-tv", "session.started", atv, T0.AddMinutes(10).AddSeconds(15));
+        var atvEnd = tracker.Annotate("apple-tv", "session.ended", Ended(atv, 1800), T0.AddMinutes(40));
+        var tvEnd = tracker.Annotate("lg-tv", "session.ended", Ended(tv, 3600), T0.AddMinutes(60));
+        var avrEnd = tracker.Annotate("avr", "session.ended", Ended(avr, 3600), T0.AddMinutes(60));
+
+        Assert.Equal(1800, Int(atvEnd, "exclusiveSec"));
+        Assert.Equal(1800, Int(tvEnd, "coveredSec"));
+        Assert.Contains("appletv:Stue", (IEnumerable<string>)tvEnd!["coveredBy"]!);
+        Assert.Equal(3600, Int(atvEnd, "exclusiveSec") + Int(tvEnd, "exclusiveSec") + Int(avrEnd, "exclusiveSec"));
+    }
+
+    [Fact]
+    public void Live_tv_covers_an_apple_tv_that_plays_unseen()
+    {
+        var tracker = new MediaSessionOverlapTracker();
+        var atv = Started("appletv", "Show", ("appleTvDevice", "Stue"));
+        tracker.Annotate("apple-tv", "session.started", atv, T0.AddSeconds(15));
+        tracker.Annotate("lg-tv", "session.started", Started("tv_channel", "DR1"), T0.AddMinutes(5).AddSeconds(15));
+        var end = tracker.Annotate("apple-tv", "session.ended", Ended(atv, 900), T0.AddMinutes(15));
+
+        Assert.Equal(600, Int(end, "coveredSec"));
+        Assert.Equal(300, Int(end, "exclusiveSec"));
+    }
 }

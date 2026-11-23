@@ -139,4 +139,70 @@ public sealed class CastNowPlayingTests
     {
         Assert.Null(NowPlayingResolver.TryExtractCastNowPlaying([Plugin("chromecast", status)]));
     }
+    [Fact]
+    public void Apple_tv_program_replaces_the_tv_hdmi_input_in_the_hero()
+    {
+        var resolved = NowPlayingResolver.Resolve(OnTvAudio(), null,
+        [
+            Plugin("smart-tv", "LIVE • 55UR73006LA • Apple TV (HDMI 2)"),
+            Plugin("apple-tv", "APPLE TV • Stue • DRTV • Min ven, Putin"),
+        ]);
+
+        Assert.Equal("Min ven, Putin", resolved.Title);
+        Assert.StartsWith("Apple TV • DRTV", resolved.Detail);
+        Assert.Contains("Stue", resolved.Detail);
+        Assert.Equal("Playing", resolved.PlayStateLabel);
+
+        // Play/pause and artwork go to the Apple TV plugin.
+        Assert.NotNull(resolved.Cast);
+        Assert.True(resolved.Cast!.IsAppleTv);
+        Assert.Equal("apple-tv", resolved.Cast.PluginId);
+    }
+
+    [Fact]
+    public void Apple_tv_on_a_direct_receiver_input_is_shown_in_the_hero()
+    {
+        var onMediaPlayer = OnTvAudio() with { InputSource = "MPLAY", SoundMode = "STEREO" };
+        var resolved = NowPlayingResolver.Resolve(onMediaPlayer, null,
+            [Plugin("apple-tv", "APPLE TV PAUSED • Stue • DRTV • TVA")]);
+
+        Assert.Equal("TVA", resolved.Title);
+        Assert.StartsWith("Apple TV • DRTV • Stue", resolved.Detail);
+        Assert.Equal("Paused", resolved.PlayStateLabel);
+        Assert.True(resolved.Cast!.IsAppleTv);
+
+        // Without an Apple TV program the input shows as before.
+        Assert.Null(NowPlayingResolver.Resolve(onMediaPlayer, null, [Plugin("apple-tv", "1 Apple TV connected (awake).")]).Cast);
+    }
+
+    [Fact]
+    public void A_playing_streamer_wins_over_a_paused_one()
+    {
+        IReadOnlyList<PluginRecordSnapshot> pausedCast =
+        [
+            Plugin("chromecast", "CAST PAUSED • Stuen 2 • DR TV • Smagen af Italien"),
+            Plugin("apple-tv", "APPLE TV • Stue • Netflix • Wednesday"),
+        ];
+        Assert.Equal("apple-tv", NowPlayingResolver.TryExtractStreamerNowPlaying(pausedCast)!.PluginId);
+
+        IReadOnlyList<PluginRecordSnapshot> bothPaused =
+        [
+            Plugin("chromecast", "CAST PAUSED • Stuen 2 • DR TV"),
+            Plugin("apple-tv", "APPLE TV PAUSED • Stue • Netflix"),
+        ];
+        Assert.Equal("chromecast", NowPlayingResolver.TryExtractStreamerNowPlaying(bothPaused)!.PluginId);
+
+        var pausedAppleTv = NowPlayingResolver.TryExtractAppleTvNowPlaying([Plugin("apple-tv", "APPLE TV PAUSED • Stue • Netflix")]);
+        Assert.False(pausedAppleTv!.IsPlaying);
+        Assert.Null(pausedAppleTv.Title);
+    }
+
+    [Theory]
+    [InlineData("1 Apple TV connected (asleep).")]
+    [InlineData("Cannot reach 1 Apple TV(s).")]
+    [InlineData("CASTING • Stue • Netflix")]
+    public void Other_status_texts_are_not_an_apple_tv_program(string status)
+    {
+        Assert.Null(NowPlayingResolver.TryExtractAppleTvNowPlaying([Plugin("apple-tv", status)]));
+    }
 }

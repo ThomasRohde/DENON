@@ -1,14 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Standalone external plugin for Apple TV (work in progress, milestone 0: discovery).
+    Standalone external plugin for Apple TV. Released separately with appletv-vX.Y.Z tags (release-appletv-plugin.yml).
     It is NOT part of DenonDesktop.slnx and is NOT shipped with the app. Build with Denon.Plugin.AppleTv.slnx.
     Protocol logic is ported from pyatv (MIT, https://github.com/postlund/pyatv); see THIRD-PARTY-NOTICES.md.
     The SDK reference is compile-only: the host shares its own Denon.App.PluginSdk.dll at run time.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
-    <Version>0.0.1</Version>
+    <Version>0.1.0</Version>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>

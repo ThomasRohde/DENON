@@ -48,7 +48,7 @@ The bridge returns JSON + images and uses declared parameters/hints since app 1.
       Check if play/pause commands work for Netflix.
 - [ ] Extend `CastAppNames` with more app ids as they show up in the logs (for example TV 2 Play, Prime Video).
 
-## Apple TV plugin (local branch `appletv-plugin`, push only if milestone 3 succeeds)
+## Apple TV plugin
 
 Native .NET (no Python), protocol logic ported from pyatv (MIT). See `external-plugins/Denon.Plugin.AppleTv/README.md`.
 
@@ -63,7 +63,16 @@ Native .NET (no Python), protocol logic ported from pyatv (MIT). See `external-p
       stops. 34 tests (plist cross-checked with Python, real DRTV message sequence).
 - [ ] Milestone 2 rest: artwork (PLAYBACK_QUEUE_REQUEST), test more apps (Netflix, TV 2 Play, YouTube) for titles
       and series/episode fields, and a long-running session (reconnect after the Apple TV sleeps).
-- [ ] Milestone 3: full plugin and standalone release (`appletv-v*` tag).
+- [x] Milestone 3: full plugin — **success** (2026-11-23). Live with the dev build: pairing from the dashboard,
+      now playing in the dashboard and the hero (the Apple TV is on Denon input MPLAY), MRP play/pause (DRTV
+      on-demand pauses; DRTV live answers "command failed"), watch sessions, `app_shutdown` on app exit, sleep
+      detected and the now-playing link closed, no wake in 3.5 min of Companion polling while asleep.
+- [ ] Release the plugin (`appletv-v0.1.0`) and the app 1.20.0 (hero + `appletv` overlap counting).
+- [ ] Power button on the remote: the program ends ~30 s before tvOS reports Asleep, so the session ends with
+      `app_closed`, not `standby`. Consider a short grace period before the end reason is chosen.
+- [ ] Hide or grey out the hero's pause button when the app does not support pause (read `supportedCommands`
+      from SET_STATE).
+- [ ] Verify live with the user's OK: Denon automations on wake/sleep, `key`, `launch-app`, `power-on/off`.
 
 ## Release / build
 

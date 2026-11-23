@@ -86,6 +86,32 @@ internal sealed class MrpClient : IAsyncDisposable
         await SendAndReceiveAsync(MrpMessages.GetKeyboardSession, cancellationToken);
     }
 
+    /// <summary>
+    /// Sends a remote command to the app that plays and waits for SEND_COMMAND_RESULT. Throws when the
+    /// Apple TV reports an error (sendError, field 1) or the app refuses it (handlerReturnStatus, field 2).
+    /// </summary>
+    public async Task SendCommandAsync(MrpCommand command, CancellationToken cancellationToken)
+    {
+        var reply = await SendAndReceiveAsync(id => MrpMessages.SendCommand(id, command), cancellationToken);
+        var result = reply.Message(MrpExtension.SendCommandResult);
+        var sendError = result?.Uint(1) ?? 0;
+        var handlerStatus = result?.Uint(2) ?? 0;
+        if (sendError != 0 || handlerStatus != 0)
+        {
+            throw new CompanionProtocolException(
+                $"The app refused {command}{StatusHint(handlerStatus)} (status {sendError}/{handlerStatus}).");
+        }
+    }
+
+    private static string StatusHint(ulong status) => status switch
+    {
+        1 => ": no such content",
+        2 => " for this program (live programs often cannot pause)",
+        10 => ": nothing plays",
+        20 => ": device not found",
+        _ => string.Empty,
+    };
+
     public async Task<ProtoReader> SendAndReceiveAsync(Func<string, byte[]> build, CancellationToken cancellationToken, TimeSpan? timeout = null)
     {
         var identifier = Guid.NewGuid().ToString().ToUpperInvariant();

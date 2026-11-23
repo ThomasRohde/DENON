@@ -3,7 +3,7 @@ namespace Denon.App.Core.Services;
 /// <summary>
 /// Stops double counting of watch time on the <c>media</c> stream.
 ///
-/// One viewing can produce several parallel sessions: a Chromecast program (kind "cast"),
+/// One viewing can produce several parallel sessions: a Chromecast or Apple TV program (kind "cast" or "appletv"),
 /// the LG TV on the HDMI input it is plugged into (kind "tv_app"), and the Denon on "TV Audio"
 /// via ARC (kind "avr_input"). Each <c>session.ended</c> gets:
 /// <list type="bullet">
@@ -12,6 +12,7 @@ namespace Denon.App.Core.Services;
 /// <item><c>exclusiveSec</c>: <c>durationSec - coveredSec</c>. Summing exclusiveSec gives real time.</item>
 /// </list>
 /// Covering rules (more specific covers less specific):
+/// (Apple TV sessions follow the same rules as cast sessions.)
 /// cast → tv_app on an HDMI input; cast → avr_input "TV" (ARC) or the cast's own receiver input;
 /// tv_app/tv_channel → avr_input "TV" (ARC); tv_channel or a non-HDMI tv_app → cast (the TV shows something
 /// else, so the cast plays unseen). Sessions with <c>watchedSec</c> (cast) cap exclusiveSec at watchedSec:
@@ -41,7 +42,7 @@ public sealed class MediaSessionOverlapTracker
             return data;
         }
 
-        var key = $"{device}|{GetString(data, "castDevice")}";
+        var key = $"{device}|{GetString(data, "castDevice")}{GetString(data, "appleTvDevice")}";
         lock (_sync)
         {
             if (eventName == "session.started")
@@ -104,7 +105,7 @@ public sealed class MediaSessionOverlapTracker
             return false;
         }
 
-        if (coverer.Kind == "cast")
+        if (IsStreamer(coverer.Kind))
         {
             return (target.Kind == "tv_app" && target.Title.Contains("HDMI", StringComparison.OrdinalIgnoreCase)) ||
                    (target.Kind == "avr_input" && (IsTvInput(target.Input) ||
@@ -116,11 +117,14 @@ public sealed class MediaSessionOverlapTracker
             // The TV shows live TV or its own app, not the HDMI input: the cast plays unseen in the background.
             var tvShowsOtherSource = coverer.Kind == "tv_channel" || !coverer.Title.Contains("HDMI", StringComparison.OrdinalIgnoreCase);
             return (target.Kind == "avr_input" && IsTvInput(target.Input)) ||
-                   (target.Kind == "cast" && tvShowsOtherSource);
+                   (IsStreamer(target.Kind) && tvShowsOtherSource);
         }
 
         return false;
     }
+
+    /// <summary>A box on an HDMI input of the TV or receiver: Chromecast ("cast") or Apple TV ("appletv").</summary>
+    private static bool IsStreamer(string kind) => kind is "cast" or "appletv";
 
     private static bool IsTvInput(string input) => string.Equals(input, "TV", StringComparison.OrdinalIgnoreCase);
 
@@ -179,10 +183,10 @@ public sealed class MediaSessionOverlapTracker
     {
         public static SessionInterval From(string device, string kind, IReadOnlyDictionary<string, object?> data, DateTimeOffset start, DateTimeOffset? end)
         {
-            // Cast sessions carry the Denon input as receiverInput; Denon sessions carry it as input.
-            var input = kind == "cast" ? GetString(data, "receiverInput") : GetString(data, "input");
-            var castDevice = GetString(data, "castDevice");
-            var label = kind == "cast" && castDevice.Length > 0 ? $"cast:{castDevice}" : $"{kind}:{device}";
+            // Cast and Apple TV sessions carry the Denon input as receiverInput; Denon sessions carry it as input.
+            var input = IsStreamer(kind) ? GetString(data, "receiverInput") : GetString(data, "input");
+            var streamer = kind == "appletv" ? GetString(data, "appleTvDevice") : GetString(data, "castDevice");
+            var label = IsStreamer(kind) && streamer.Length > 0 ? $"{kind}:{streamer}" : $"{kind}:{device}";
             return new SessionInterval(label, kind, GetString(data, "title"), input, start, end);
         }
     }

@@ -24,6 +24,8 @@ internal static class MrpType
 /// <summary>Extension field numbers on ProtocolMessage for the inner messages.</summary>
 internal static class MrpExtension
 {
+    public const int SendCommand = 6;
+    public const int SendCommandResult = 7;
     public const int SetState = 9;
     public const int DeviceInfo = 20;
     public const int ClientUpdatesConfig = 21;
@@ -31,6 +33,17 @@ internal static class MrpExtension
     public const int SetNowPlayingClient = 50;
     public const int SetNowPlayingPlayer = 51;
     public const int UpdateContentItem = 60;
+}
+
+/// <summary>Remote commands (pyatv: CommandInfo.proto Command).</summary>
+internal enum MrpCommand
+{
+    Play = 1,
+    Pause = 2,
+    TogglePlayPause = 3,
+    Stop = 4,
+    NextTrack = 5,
+    PreviousTrack = 6,
 }
 
 /// <summary>Playback state (pyatv: Common.proto PlaybackState).</summary>
@@ -99,6 +112,10 @@ internal static class MrpMessages
             .Bool(5, true)));
 
     public static byte[] GetKeyboardSession(string identifier) => Create(MrpType.GetKeyboardSession, identifier);
+
+    /// <summary>SEND_COMMAND (pyatv: messages.command): SendCommandMessage { command = 1 }.</summary>
+    public static byte[] SendCommand(string identifier, MrpCommand command) =>
+        Create(MrpType.SendCommand, identifier, (MrpExtension.SendCommand, new ProtoWriter().Uint(1, (ulong)command)));
 
     public static byte[] Heartbeat(string identifier) => Create(MrpType.GenericMessage, identifier);
 }

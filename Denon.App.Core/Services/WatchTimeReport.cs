@@ -111,6 +111,7 @@ public static class WatchTimeReport
     private static string AppLabel(string kind, JsonElement data, string title) => kind switch
     {
         "cast" => GetString(data, "app") ?? GetString(data, "source") ?? "Cast",
+        "appletv" => GetString(data, "app") ?? GetString(data, "source") ?? "Apple TV",
         "tv_channel" => "Live TV",
         "tv_app" => title.Length > 0 ? title : "TV app",
         "avr_input" => title.Length > 0 ? title : GetString(data, "input") ?? "Receiver input",
