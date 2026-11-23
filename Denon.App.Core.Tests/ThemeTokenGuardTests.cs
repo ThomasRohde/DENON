@@ -119,7 +119,7 @@ public sealed partial class ThemeTokenGuardTests
             {
                 "Brush" => !brushes.Contains(r.Token + "Brush"),
                 "Style" => !styles.Contains(r.Token),
-                "Font" => !typography.Contains(r.Token),
+                "Font" or "FontSize" or "Radius" => !typography.Contains(r.Token),
                 _ => !colors.Contains(r.Token + "Color"),
             })
             .Select(r => $"{r.File}: {r.Kind}(\"{r.Token}\")")
@@ -193,7 +193,7 @@ public sealed partial class ThemeTokenGuardTests
     [GeneratedRegex(@"\{(?:Static|Dynamic)Resource\s+([A-Za-z_][\w.]*)\s*\}")]
     private static partial Regex ResourceReference();
 
-    [GeneratedRegex("""(?:ThemeResources|HostTheme)\.(Brush|Color|DrawingColor|Hex|Style|Font)\("(\w+)"\)""")]
+    [GeneratedRegex("""(?:ThemeResources|HostTheme)\.(Brush|Color|DrawingColor|Hex|Style|Font|FontSize|Radius)\("(\w+)"\)""")]
     private static partial Regex TokenRead();
 
     [GeneratedRegex(@"<SolidColorBrush[^>]*x:Key=""(\w+Brush)""[^>]*Color=""\{StaticResource (\w+Color)\}""")]

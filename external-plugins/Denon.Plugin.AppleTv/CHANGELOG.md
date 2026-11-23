@@ -10,7 +10,7 @@ Needs Plugin SDK 2.0 (the next Denon Desktop release); older Denon Desktop versi
 - The fallbacks for older Denon Desktop versions (missing `IsAppShuttingDown` or receiver control).
 
 ### Changed
-- **Follows the Denon Desktop theme**: The dashboard reads its colors from the app's theme tokens (cards, text levels, borders, status colors, the dark combo box) and uses the app's own styles for buttons (`PrimaryButton`, `SecondaryButton`), checkboxes and the automation expander (`DarkExpanderStyle`), so it looks like the rest of the app and follows future themes.
+- **Follows the Denon Desktop theme**: The dashboard reads its colors from the app's theme tokens (cards, text levels, borders, status colors, the dark combo box) and uses the app's own styles for buttons (`PrimaryButton`, `SecondaryButton`), checkboxes and the automation expander (`DarkExpanderStyle`), and the app's type and corner-radius scale, so it looks like the rest of the app and follows future themes.
 
 ## [0.1.0] - 2026-11-23
 

@@ -55,7 +55,7 @@ internal sealed class ChromecastDashboardView : UserControl
 
         var header = new DockPanel { LastChildFill = true };
         var title = new StackPanel();
-        title.Children.Add(new TextBlock { Text = "Google Cast devices", FontSize = 18, FontWeight = FontWeights.SemiBold, Foreground = TitleBrush });
+        title.Children.Add(new TextBlock { Text = "Google Cast devices", FontSize = HostTheme.FontSize("FontSize11"), FontWeight = FontWeights.SemiBold, Foreground = TitleBrush });
         title.Children.Add(new TextBlock
         {
             Text = "Found by mDNS. Each device can drive the Denon when an app starts or stops.",
@@ -172,7 +172,7 @@ internal sealed class ChromecastDashboardView : UserControl
         Width = width,
         Margin = new Thickness(0, 0, 6, 6),
         Padding = new Thickness(8, 6, 8, 6), // same height as the app's drop-down boxes next to it
-        FontSize = 12,
+        FontSize = HostTheme.FontSize("FontSize06"),
         HorizontalAlignment = HorizontalAlignment.Left,
         ToolTip = tooltip,
         VerticalContentAlignment = VerticalAlignment.Center,
@@ -209,7 +209,7 @@ internal sealed class ChromecastDashboardView : UserControl
         private readonly Ellipse _dot = new() { Width = 9, Height = 9, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
         private readonly TextBlock _connection = new() { Foreground = DimBrush };
         private readonly TextBlock _app = new() { Foreground = AccentBrush, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 0) };
-        private readonly TextBlock _title = new() { Foreground = TextBrush, FontSize = 15, TextTrimming = TextTrimming.CharacterEllipsis };
+        private readonly TextBlock _title = new() { Foreground = TextBrush, FontSize = HostTheme.FontSize("FontSize10"), TextTrimming = TextTrimming.CharacterEllipsis };
         private readonly TextBlock _subtitle = new() { Foreground = MutedBrush, TextTrimming = TextTrimming.CharacterEllipsis };
         private readonly TextBlock _volume = new() { Foreground = DimBrush, Margin = new Thickness(0, 4, 0, 0) };
         private readonly Image _art = new() { Width = 96, Height = 96, Stretch = Stretch.UniformToFill };
@@ -229,7 +229,7 @@ internal sealed class ChromecastDashboardView : UserControl
             {
                 Width = 96,
                 Height = 96,
-                CornerRadius = new CornerRadius(8),
+                CornerRadius = HostTheme.Radius("Radius03"),
                 Background = InsetBrush,
                 ClipToBounds = true,
                 Margin = new Thickness(0, 0, 14, 0),
@@ -241,7 +241,7 @@ internal sealed class ChromecastDashboardView : UserControl
                         new TextBlock
                         {
                             Text = "No artwork",
-                            FontSize = 10.5,
+                            FontSize = HostTheme.FontSize("FontSize03"),
                             Foreground = DimBrush,
                             HorizontalAlignment = HorizontalAlignment.Center,
                             VerticalAlignment = VerticalAlignment.Center,
@@ -256,7 +256,7 @@ internal sealed class ChromecastDashboardView : UserControl
             Grid.SetColumn(info, 1);
             var nameRow = new StackPanel { Orientation = Orientation.Horizontal };
             nameRow.Children.Add(_dot);
-            nameRow.Children.Add(new TextBlock { Text = config.Name, FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = TitleBrush });
+            nameRow.Children.Add(new TextBlock { Text = config.Name, FontSize = HostTheme.FontSize("FontSize10"), FontWeight = FontWeights.SemiBold, Foreground = TitleBrush });
             info.Children.Add(nameRow);
             info.Children.Add(new TextBlock
             {
@@ -285,7 +285,7 @@ internal sealed class ChromecastDashboardView : UserControl
                 Background = CardBrush,
                 BorderBrush = BorderLineBrush,
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(10),
+                CornerRadius = HostTheme.Radius("Radius04"),
                 Padding = new Thickness(14),
                 Margin = new Thickness(0, 0, 0, 10),
                 Child = grid,
@@ -420,7 +420,7 @@ internal sealed class ChromecastDashboardView : UserControl
         private static StackPanel Labeled(string label, FrameworkElement control)
         {
             var panel = new StackPanel { Margin = new Thickness(0, 0, 8, 0) };
-            panel.Children.Add(new TextBlock { Text = label, Foreground = DimBrush, FontSize = 11, Margin = new Thickness(0, 0, 0, 2) });
+            panel.Children.Add(new TextBlock { Text = label, Foreground = DimBrush, FontSize = HostTheme.FontSize("FontSize04"), Margin = new Thickness(0, 0, 0, 2) });
             panel.Children.Add(control);
             return panel;
         }
