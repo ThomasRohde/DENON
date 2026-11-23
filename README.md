@@ -101,7 +101,7 @@ Denon Desktop combines the **HEOS CLI Protocol (TCP `:1255`)** for streaming, me
 Download from the [**Releases**](../../releases/latest) page (no .NET runtime installation required):
 - **Windows Installer (Unsigned):** **`DenonDesktop-Setup-win-x64.exe`** — installs cleanly per-user with Start Menu & optional Desktop/Startup shortcuts and Add/Remove Programs uninstaller. *(Because this open-source build is unsigned, Windows SmartScreen may show a prompt — click **More info → Run anyway**.)*
 - **Portable Single-File Executable:** **`Denon.App.Desktop-win-x64.exe`** — run directly from any folder with zero installation.
-- **Chromecast plugin (optional, own release):** download **`Denon.Plugin.Chromecast-<version>.zip`** from the latest [`chromecast-v*` release](../../releases?q=chromecast&expanded=true), unzip it to `%LocalAppData%\DenonDesktop\plugins\external\Chromecast\`, and restart Denon Desktop. Plugin 0.2.0+ needs Denon Desktop 1.16 or later (0.1.x works with 1.15).
+- **Chromecast plugin (optional, own release):** download **`Denon.Plugin.Chromecast-<version>.zip`** from the latest [`chromecast-v*` release](../../releases?q=chromecast&expanded=true), unzip it to `%LocalAppData%\DenonDesktop\plugins\external\Chromecast\`, and restart Denon Desktop. Plugin 0.2.0+ needs Denon Desktop 1.16 or later (0.1.x works with 1.15); 0.3.0 works best with 1.17.
 
 1. Launch Denon Desktop — on first launch, it automatically scans your LAN and connects to your Denon/Marantz receiver.
 2. To use **YouTube Cast**, **PC Audio Cast**, **Local FLAC Jukebox**, or the **Couch Phone Remote**, click **Allow Firewall** in the **YouTube & Music** or **Cast & Remote** tab once to open Private-LAN TCP port `18925`.

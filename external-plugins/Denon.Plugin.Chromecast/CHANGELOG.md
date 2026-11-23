@@ -2,7 +2,9 @@
 
 Released separately from Denon Desktop with tags `chromecast-vX.Y.Z`.
 
-## [Unreleased]
+## [0.3.0] - 2026-11-23
+
+Works with Denon Desktop **1.16.0** or later. With **1.17.0** sessions also end with `app_shutdown` on app exit, and the now-playing hero shows the cast program.
 
 ### Changed
 - **Status shows what plays**: While a device has an app, the plugin status (Plugins card, and Denon Desktop's now-playing hero from app 1.17) is `CASTING • <device> • <app> • <title>` or `CAST PAUSED • …` instead of "1 Cast device(s) connected.".

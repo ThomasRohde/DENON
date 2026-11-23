@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-11-23
+
 ### Changed
 - **Now-playing hero during a cast**: When the Denon is on TV Audio and the LG TV shows an HDMI input, the hero now shows the cast program ("Spionhvalen: Undercover i Arktis", detail "Cast • DR TV • Stuen 2 • TV DVD Player (HDMI 1)", state Casting/Paused) instead of "DVD Player (HDMI 1)". Live TV and TV apps still win. Without the LG TV plugin, only a playing cast is shown. Reads the Chromecast plugin status (0.3.0+).
 
