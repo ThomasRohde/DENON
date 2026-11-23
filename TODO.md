@@ -54,8 +54,10 @@ Native .NET (no Python), protocol logic ported from pyatv (MIT). See `external-p
 
 - [x] Milestone 0: discovery. Found "Stuen (2)", Apple TV 4K (1st gen), tvOS 26.6.1: Companion :49153, AirPlay :7000,
       no `_mediaremotetv` (now playing must use the AirPlay tunnel).
-- [ ] Milestone 1: HAP pairing (PIN on the TV; needs the user) + Companion: power, keys, apps. Add BouncyCastle for
-      SRP-6a / Ed25519 / X25519.
+- [x] Milestone 1: HAP pairing + Companion. Paired live on 2026-11-23 (first try, M6 signature verified); power
+      state, app list (43 apps) and events work. 27 tests incl. an encrypted loopback session.
+- [ ] Milestone 1 rest: verify live the commands that change the TV (`key`, `power on/off`, `launch`); needs the
+      user's OK each time.
 - [ ] Milestone 2: MRP now playing over AirPlay 2 — go/no-go. Risk: tvOS 26 behavior is not confirmed.
 - [ ] Milestone 3: full plugin and standalone release (`appletv-v*` tag).
 

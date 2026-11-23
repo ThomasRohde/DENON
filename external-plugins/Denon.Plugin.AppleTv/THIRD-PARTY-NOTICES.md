@@ -28,3 +28,14 @@ based on the open-source Python library pyatv: https://github.com/postlund/pyatv
     SOFTWARE.
 
 Before release, check the copyright line against pyatv's current LICENSE file.
+
+## srptools (reference only)
+
+The SRP byte encoding in `Protocol/Hap/SrpClient.cs` was matched against the Python library srptools
+(BSD-3-Clause, https://github.com/idlesign/srptools), which pyatv uses. No srptools code is included.
+
+## BouncyCastle.Cryptography
+
+Ed25519, X25519 and the RFC 5054 SRP group come from the NuGet package BouncyCastle.Cryptography (MIT,
+https://www.bouncycastle.org/csharp/licence.html). Its DLL ships with the plugin; include its license in the
+release zip.

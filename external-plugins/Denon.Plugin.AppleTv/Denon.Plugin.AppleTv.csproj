@@ -26,6 +26,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Ed25519, X25519 and the RFC 5054 SRP groups (MIT). ChaCha20-Poly1305 and HKDF come from .NET itself. -->
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.5.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- WPF projects leave System.IO out of the implicit usings. -->
+    <Using Include="System.IO" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Denon.Plugin.AppleTv.Tests" />
     <InternalsVisibleTo Include="atvprobe" />
   </ItemGroup>
