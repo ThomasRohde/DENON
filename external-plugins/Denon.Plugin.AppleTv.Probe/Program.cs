@@ -12,6 +12,8 @@ using Denon.Plugin.AppleTv.Protocol.Hap;
 //   atvprobe status   --host IP          power state (pair-verify + encrypted session)
 //   atvprobe apps     --host IP          launchable apps
 //   atvprobe watch    --host IP [--seconds N]   print events
+//   atvprobe nowplaying --host IP [--seconds N] now playing over the AirPlay MRP tunnel
+//   atvprobe airplay-pair --host IP [--pin-file PATH]   separate AirPlay pairing (shows a PIN)
 // Pairing (the Apple TV shows a PIN):
 //   atvprobe pair     --host IP [--name NAME] [--pin-file PATH]
 // Changes the Apple TV (ask the owner first):
@@ -61,6 +63,10 @@ try
                 await Task.Delay(TimeSpan.FromSeconds(seconds), ct);
                 return 0;
             });
+        case "nowplaying":
+            return await NowPlayingAsync(RequireHost(host), seconds);
+        case "airplay-pair":
+            return await AirPlayPairAsync(RequireHost(host), Option("--name") ?? "Denon Desktop", Option("--pin-file"));
         case "key":
             var keyName = argList.ElementAtOrDefault(1) ?? "";
             if (!Enum.TryParse<HidCommand>(keyName, ignoreCase: true, out var key) || keyName.StartsWith("--", StringComparison.Ordinal))
@@ -212,6 +218,147 @@ static async Task<int> PairAsync(string host, string name, string? pinFile)
     return 0;
 }
 
+static async Task<int> NowPlayingAsync(string host, double seconds)
+{
+    var entry = ProbeStore.Load(host) ?? throw new HapPairingException($"No pairing for {host}. Run: atvprobe pair --host {host}");
+    var port = await ServicePortAsync(host, AppleServiceTypes.AirPlay, 7000);
+    var useAirPlayCredentials = entry.AirPlayCredentials is not null;
+    var credentials = HapCredentials.Parse(entry.AirPlayCredentials ?? entry.Credentials);
+    Console.WriteLine($"Opening the AirPlay remote-control tunnel to {host}:{port} with the {(useAirPlayCredentials ? "AirPlay" : "Companion")} pairing ...");
+
+    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(seconds + 30));
+    Denon.Plugin.AppleTv.Protocol.Mrp.MrpClient client;
+    try
+    {
+        client = await Denon.Plugin.AppleTv.Protocol.Mrp.MrpClient.ConnectAsync(host, port, credentials, entry.Identity, cts.Token,
+            Environment.GetCommandLineArgs().Contains("--dump") ? m => Console.WriteLine($"    {DateTime.Now:HH:mm:ss.f} raw {Dump(m)}") : null);
+    }
+    catch (Exception ex) when (!useAirPlayCredentials && ex is HapPairingException or Denon.Plugin.AppleTv.Protocol.AirPlay.AirPlayHttpException)
+    {
+        Console.Error.WriteLine($"The Apple TV did not accept the Companion pairing on AirPlay: {ex.Message}");
+        Console.Error.WriteLine($"AirPlay needs its own pairing: atvprobe airplay-pair --host {host}");
+        return 6;
+    }
+
+    await using (client)
+    {
+        var info = client.DeviceInfo;
+        Console.WriteLine($"MRP tunnel open. Device: {info?.String(2)} ({info?.String(39) ?? info?.String(3)}, build {info?.String(4)}).");
+
+        client.NowPlayingChanged += now => Console.WriteLine($"{DateTime.Now:HH:mm:ss} {Format(now)}");
+
+        client.Closed += ex => Console.WriteLine($"{DateTime.Now:HH:mm:ss} SESSION CLOSED: {ex?.GetType().Name}: {ex?.Message}");
+        Console.WriteLine($"Now: {Format(client.NowPlaying.Current)}");
+        Console.WriteLine($"Watching for {seconds:0} s ...");
+        await Task.Delay(TimeSpan.FromSeconds(seconds), cts.Token);
+        Console.WriteLine($"Final: {Format(client.NowPlaying.Current)}");
+        Console.WriteLine($"MRP message types seen: {string.Join(", ", client.SeenTypes)}");
+    }
+
+    return 0;
+
+    static string Path(Denon.Plugin.AppleTv.Protocol.ProtoReader? p) =>
+        p is null ? "-" : $"{p.Message(2)?.String(2) ?? "?"}/{p.Message(3)?.String(1) ?? "?"}";
+
+    static string Dump(Denon.Plugin.AppleTv.Protocol.ProtoReader m)
+    {
+        var type = (int)(m.Uint(1) ?? 0);
+        switch (type)
+        {
+            case 4:
+                var s = m.Message(9);
+                if (s is null) return "SET_STATE (empty)";
+                var q = s.Message(3);
+                var item = q?.Messages(2).FirstOrDefault();
+                var md = item?.Message(2);
+                var info = s.Message(1);
+                return $"SET_STATE path={Path(s.Message(9))} state={s.Uint(6)?.ToString() ?? "-"} ts={s.Double(11)?.ToString("0.0") ?? "-"} " +
+                       $"info[title={info?.String(9) ?? "-"} rate={info?.Float(5)?.ToString() ?? "-"} el={info?.Double(4)?.ToString("0") ?? "-"} dur={info?.Double(3)?.ToString("0") ?? "-"}] " +
+                       $"queue[loc={q?.Int(1)?.ToString() ?? "-"} n={q?.Messages(2).Count() ?? 0} id={item?.String(1) ?? "-"} title={md?.String(1) ?? "-"} rate={md?.Float(39)?.ToString() ?? "-"} el={md?.Double(35)?.ToString("0") ?? "-"} dur={md?.Double(14)?.ToString("0") ?? "-"} playing={md?.Bool(27)?.ToString() ?? "-"}] cmds={(s.Has(2) ? "yes" : "-")}";
+            case 46:
+                var c = m.Message(50)?.Message(1);
+                return $"SET_NOW_PLAYING_CLIENT {c?.String(2)} \"{c?.String(7)}\"";
+            case 47:
+                return $"SET_NOW_PLAYING_PLAYER {Path(m.Message(51)?.Message(1))}";
+            case 56:
+                var u = m.Message(60);
+                var ui = u?.Messages(1).FirstOrDefault();
+                var um = ui?.Message(2);
+                return $"UPDATE_CONTENT_ITEM path={Path(u?.Message(2))} id={ui?.String(1) ?? "-"} title={um?.String(1) ?? "-"} rate={um?.Float(39)?.ToString() ?? "-"} el={um?.Double(35)?.ToString("0") ?? "-"} dur={um?.Double(14)?.ToString("0") ?? "-"}";
+            default:
+                return $"type {type}";
+        }
+    }
+
+    static string Format(Denon.Plugin.AppleTv.Protocol.Mrp.NowPlayingSnapshot n) =>
+        n.AppBundleId is null && n.Title is null
+            ? "nothing reported yet"
+            : $"[{n.State}] {n.AppName} ({n.AppBundleId}) — {n.Title ?? "(no title)"}" +
+              (n.SeriesName is not null && n.SeriesName != n.Title ? $" / {n.SeriesName}" : "") +
+              (n.Season is not null ? $" S{n.Season}E{n.Episode}" : "") +
+              (n.Artist is not null ? $" · {n.Artist}" : "") +
+              (n.DurationSeconds is { } d ? $" · {TimeSpan.FromSeconds(n.ElapsedSeconds ?? 0):h\\:mm\\:ss}/{TimeSpan.FromSeconds(d):h\\:mm\\:ss}" : "") +
+              (n.ArtworkAvailable ? " · artwork" : "");
+}
+
+static async Task<int> AirPlayPairAsync(string host, string name, string? pinFile)
+{
+    var entry = ProbeStore.Load(host) ?? throw new HapPairingException($"Pair Companion first: atvprobe pair --host {host}");
+    var port = await ServicePortAsync(host, AppleServiceTypes.AirPlay, 7000);
+    Console.WriteLine($"AirPlay pairing with {host}:{port} as \"{name}\". The Apple TV now shows a PIN ...");
+    using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+    await using var connection = await Denon.Plugin.AppleTv.Protocol.AirPlay.AirPlayConnection.ConnectAsync(host, port, cts.Token);
+    var setup = await Denon.Plugin.AppleTv.Protocol.AirPlay.AirPlayAuth.StartPairingAsync(connection, name, cts.Token);
+
+    var pin = await ReadPinAsync(pinFile, cts.Token);
+    if (pin is null)
+    {
+        return 2;
+    }
+
+    var credentials = await Denon.Plugin.AppleTv.Protocol.AirPlay.AirPlayAuth.FinishPairingAsync(connection, setup, pin, cts.Token);
+    ProbeStore.Save(host, entry with { AirPlayCredentials = credentials.ToString() });
+    Console.WriteLine($"AirPlay paired. {credentials.ToSafeString()}. Signature (M6): {(setup.AccessorySignatureVerified == true ? "verified" : "NOT verified")}");
+    return 0;
+}
+
+static async Task<string?> ReadPinAsync(string? pinFile, CancellationToken ct)
+{
+    string? pin;
+    if (pinFile is not null)
+    {
+        Console.WriteLine($"Waiting for the PIN in {pinFile} ...");
+        while (!File.Exists(pinFile))
+        {
+            await Task.Delay(500, ct);
+        }
+
+        await Task.Delay(200, ct);
+        pin = (await File.ReadAllTextAsync(pinFile, ct)).Trim();
+        File.Delete(pinFile);
+    }
+    else
+    {
+        Console.Write("PIN shown on the Apple TV: ");
+        pin = Console.ReadLine()?.Trim();
+    }
+
+    if (string.IsNullOrWhiteSpace(pin) || !pin.All(char.IsDigit))
+    {
+        Console.Error.WriteLine("No valid PIN given; pairing cancelled.");
+        return null;
+    }
+
+    return pin;
+}
+
+static async Task<int> ServicePortAsync(string host, string serviceType, int fallback)
+{
+    var devices = await AppleDeviceDiscovery.DiscoverAsync(TimeSpan.FromSeconds(2), [IPAddress.Parse(host)], CancellationToken.None);
+    var port = devices.FirstOrDefault(d => d.Address.ToString() == host)?.Service(serviceType)?.Port ?? 0;
+    return port > 0 ? port : fallback;
+}
+
 static async Task<int> WithClientAsync(string host, Func<CompanionClient, CancellationToken, Task<int>> action)
 {
     var entry = ProbeStore.Load(host) ?? throw new HapPairingException($"No pairing for {host}. Run: atvprobe pair --host {host}");
@@ -236,7 +383,7 @@ internal static class ProbeStore
     public static string FilePath { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DenonDesktop", "appletv-probe", "pairings.json");
 
-    public sealed record Entry(string Credentials, CompanionIdentity Identity, int Port, DateTimeOffset PairedAt);
+    public sealed record Entry(string Credentials, CompanionIdentity Identity, int Port, DateTimeOffset PairedAt, string? AirPlayCredentials = null);
 
     public static Entry? Load(string host) => ReadAll().GetValueOrDefault(host);
 

@@ -58,7 +58,11 @@ Native .NET (no Python), protocol logic ported from pyatv (MIT). See `external-p
       state, app list (43 apps) and events work. 27 tests incl. an encrypted loopback session.
 - [ ] Milestone 1 rest: verify live the commands that change the TV (`key`, `power on/off`, `launch`); needs the
       user's OK each time.
-- [ ] Milestone 2: MRP now playing over AirPlay 2 — go/no-go. Risk: tvOS 26 behavior is not confirmed.
+- [x] Milestone 2: MRP now playing over AirPlay 2 — **GO** (2026-11-23). Works with the Companion pairing (no
+      second PIN). Live: DRTV app, program titles and Playing/idle, pushed within ~1 s when the stream starts or
+      stops. 34 tests (plist cross-checked with Python, real DRTV message sequence).
+- [ ] Milestone 2 rest: artwork (PLAYBACK_QUEUE_REQUEST), test more apps (Netflix, TV 2 Play, YouTube) for titles
+      and series/episode fields, and a long-running session (reconnect after the Apple TV sleeps).
 - [ ] Milestone 3: full plugin and standalone release (`appletv-v*` tag).
 
 ## Release / build
