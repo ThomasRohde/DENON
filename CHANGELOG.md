@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Removed
+- **Compatibility with older plugins and hosts (Plugin SDK 2.0.0)**: The SDK version is no longer pinned at 1.16.0.0; plugins and the app must use the same SDK. `IPluginContext.ReceiverControl` and `IsAppShuttingDown` are plain members (no defaults for older hosts), and `PluginActionDescriptor.Parameters` is a list that is empty by default. MCP no longer shows a generic fallback schema for actions without declared parameters.
+
 ### Changed
 - **Theme tokens (preparation for themes in 2.0)**: Every color the app draws now comes from one theme file (`Themes/Colors.Dark.xaml`): a neutral ramp, text levels, accent families and overlays, with brushes in `Themes/Brushes.xaml`. About 640 hand-picked colors in the app and the built-in Hue, Smart TV and Home Assistant views became about 80 tokens; near-identical shades were merged (mean color difference ΔE 0.8, below what the eye sees). Status colors in code (health, diagnostics, shortcuts, logs, tray menu) and the meter materials (`MeterPalette`) follow too. The look is unchanged (screenshots compared pixel by pixel). New tests block new hard-coded colors and unknown resource keys.
 

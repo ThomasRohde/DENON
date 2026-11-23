@@ -1504,7 +1504,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         }
 
         // Auto-bridged plugin tools. Read-only actions run in every tier (also Observer); others need
-        // SafeControl; power_off and actions a plugin declares destructive (SDK 1.16) need FullOrchestration.
+        // SafeControl; power_off and actions a plugin declares destructive need FullOrchestration.
         if (toolName.StartsWith("plugin_", StringComparison.OrdinalIgnoreCase))
         {
             foreach (var plugin in _pluginHost.GetPlugins().Where(p => p.IsEnabled))

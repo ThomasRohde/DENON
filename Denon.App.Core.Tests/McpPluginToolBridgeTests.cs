@@ -42,23 +42,21 @@ public sealed class McpPluginToolBridgeTests
     }
 
     [Fact]
-    public void Older_plugins_keep_the_legacy_generic_schema()
+    public void An_action_without_declared_parameters_takes_none()
     {
         var schema = ToJson(McpPluginToolBridge.BuildInputSchema(new PluginActionDescriptor("tv.toast", "Toast", "Shows a toast.")));
-        var props = schema.GetProperty("properties");
 
-        Assert.True(props.TryGetProperty("message", out _));
-        Assert.True(props.TryGetProperty("button", out _));
+        Assert.Empty(schema.GetProperty("properties").EnumerateObject());
         Assert.False(schema.TryGetProperty("required", out _));
     }
 
     [Theory]
     [InlineData("now-playing", true, null, true, false)]      // declared read-only
     [InlineData("quit-app", null, true, false, true)]         // declared destructive
-    [InlineData("hue.refresh", null, null, true, false)]      // legacy guess: *.refresh
-    [InlineData("tv.power_off", null, null, false, true)]     // legacy guess: power_off
+    [InlineData("hue.refresh", null, null, true, false)]      // guess from the id: *.refresh
+    [InlineData("tv.power_off", null, null, false, true)]     // guess from the id: power_off
     [InlineData("tv.power_off", null, false, false, false)]   // declaration wins over the guess
-    public void Hints_use_declarations_then_legacy_guesses(string id, bool? readOnly, bool? destructive, bool expectReadOnly, bool expectDestructive)
+    public void Hints_use_declarations_then_guesses_from_the_id(string id, bool? readOnly, bool? destructive, bool expectReadOnly, bool expectDestructive)
     {
         var action = new PluginActionDescriptor(id, id, id) { IsReadOnly = readOnly, IsDestructive = destructive };
         var hints = McpPluginToolBridge.ResolveHints(action);

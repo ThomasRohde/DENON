@@ -30,7 +30,6 @@ public sealed class WatchTimeReportTests
         var report = WatchTimeReport.Build(events, Now, days: 7);
 
         Assert.Equal(1700 + 600 + 300, report.TotalSeconds);
-        Assert.Equal(0, report.LegacySessions);
         Assert.Equal("DR TV", report.ByApp[0].Key);
         Assert.Equal(1700, report.ByApp[0].Seconds);
         Assert.Contains(report.ByApp, e => e.Key == "Live TV" && e.Seconds == 600);
@@ -41,19 +40,7 @@ public sealed class WatchTimeReportTests
     }
 
     [Fact]
-    public void Paused_cast_from_older_versions_is_capped_at_watched_time()
-    {
-        // 1.15.0 log: DR TV paused 10 min, exclusiveSec not yet capped.
-        var events = new[]
-        {
-            Ended(Now.AddHours(-1), "chromecast", new { kind = "cast", title = "Smagen af Italien", app = "DR TV", durationSec = 600, watchedSec = 0, exclusiveSec = 600 }),
-        };
-
-        Assert.Equal(0, WatchTimeReport.Build(events, Now, days: 1).TotalSeconds);
-    }
-
-    [Fact]
-    public void Legacy_events_count_duration_and_are_reported()
+    public void Sessions_without_exclusive_time_are_skipped()
     {
         var events = new[]
         {
@@ -62,9 +49,8 @@ public sealed class WatchTimeReportTests
 
         var report = WatchTimeReport.Build(events, Now, days: 1);
 
-        Assert.Equal(240, report.TotalSeconds);
-        Assert.Equal(1, report.LegacySessions);
-        Assert.Equal("Spotify", report.ByApp[0].Key);
+        Assert.Equal(0, report.TotalSeconds);
+        Assert.Equal(0, report.Sessions);
     }
 
     [Fact]

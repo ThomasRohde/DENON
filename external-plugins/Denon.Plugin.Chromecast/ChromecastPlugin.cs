@@ -2,7 +2,6 @@ using System.IO;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http;
-using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Denon.App.PluginSdk;
 using Denon.Plugin.Chromecast.Cast;
@@ -56,14 +55,12 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
 
     internal event Action<string, CastDeviceState>? DeviceStateChanged;
 
-    internal bool HasReceiverControl => _receiverControl is not null;
-
     internal bool AutomationsEnabled => _config.AutomationsEnabled;
 
     public async Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default)
     {
         _context = context;
-        _receiverControl = TryGetReceiverControl(context);
+        _receiverControl = context.ReceiverControl;
         _config = await context.Storage.LoadConfigAsync(static () => new ChromecastConfig(), cancellationToken);
         _config.Devices ??= [];
         _watchLog = new CastWatchLog((name, data) => RecordRaw(name, data, "external"));
@@ -144,7 +141,7 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
         _lifetime?.Dispose();
     }
 
-    // Parameters and hints (SDK 1.16) give MCP clients a real input schema and safety hints.
+    // Parameters and hints give MCP clients a real input schema and safety hints.
     private static readonly PluginActionParameter DeviceParam = new(
         "device",
         "string",
@@ -153,22 +150,8 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
 
     private static readonly PluginActionParameter[] DeviceOnly = [DeviceParam];
 
-    /// <summary>"app_shutdown" when Denon Desktop exits (SDK 1.17+), else "plugin_stopped". Works on 1.16 hosts too.</summary>
-    private string StopReason()
-    {
-        try
-        {
-            return _context is not null && ReadAppShuttingDown(_context) ? "app_shutdown" : "plugin_stopped";
-        }
-        catch (MissingMethodException)
-        {
-            return "plugin_stopped"; // Host SDK 1.16: no IsAppShuttingDown.
-        }
-    }
-
-    // Separate, non-inlined method: on a 1.16 host the JIT fails here (MissingMethodException), not in StopAsync.
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static bool ReadAppShuttingDown(IPluginContext context) => context.IsAppShuttingDown;
+    /// <summary>"app_shutdown" when Denon Desktop exits, else "plugin_stopped" (the plugin was stopped or disabled).</summary>
+    private string StopReason() => _context?.IsAppShuttingDown == true ? "app_shutdown" : "plugin_stopped";
 
     public IReadOnlyList<PluginActionDescriptor> GetActions() =>
     [
@@ -541,23 +524,6 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
     }
 
     // ----- internals -----
-
-    /// <summary>Kept in its own method so an older host without the member fails here, not in InitializeAsync.</summary>
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static IPluginReceiverControl? ReadReceiverControl(IPluginContext context) => context.ReceiverControl;
-
-    private IPluginReceiverControl? TryGetReceiverControl(IPluginContext context)
-    {
-        try
-        {
-            return ReadReceiverControl(context);
-        }
-        catch (Exception ex) when (ex is MissingMethodException or TypeLoadException)
-        {
-            context.Logger.Warning("This Denon Desktop version has no receiver-control API. Automations are off.");
-            return null;
-        }
-    }
 
     private void StartClient(CastDeviceConfig config)
     {

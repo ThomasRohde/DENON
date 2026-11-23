@@ -38,7 +38,7 @@ Rules:
 - **`watchedSec` counts only PLAYING/BUFFERING time.** `durationSec` is wall-clock time, so a long pause shows as a gap.
 - `avgVolume` is the Denon volume during the session. `receiverInput` lets you join a Cast session to the
   AVR's HDMI session for the same time span.
-- **No double counting.** Denon Desktop 1.15+ adds `coveredSec`, `exclusiveSec` and `coveredBy` to every
+- **No double counting.** Denon Desktop adds `coveredSec`, `exclusiveSec` and `coveredBy` to every
   `session.ended` on the `media` stream. While you cast, the LG TV session on the HDMI input and the Denon
   "TV Audio" session get `coveredBy: ["cast:<device>"]` for that time. Sum `exclusiveSec` (not `durationSec`)
   to get real watching time; use the cast session's `title`/`source` to see *what* was watched.
@@ -57,7 +57,7 @@ Use these in Smart Scenes, hotkeys, the phone remote or MCP. The `device` parame
 the plugin picks the device that plays, then the device with an active app, then the only device.
 
 **MCP:** each action is the tool `plugin_chromecast_<action>` (for example `plugin_chromecast_now_playing`).
-Since 0.2.0 (SDK 1.16) the tools show their real parameters and safety hints: `now-playing` and `list-devices`
+The tools show their real parameters and safety hints: `now-playing` and `list-devices`
 are read-only (allowed in the Observer tier); `stop` and `quit-app` are destructive (need FullOrchestration).
 `now-playing` returns the artwork as an image and the device state as structured JSON.
 
@@ -73,9 +73,7 @@ are read-only (allowed in the Observer tier); `stop` and `quit-app` are destruct
 
 ## Requirements
 
-- Plugin **0.2.0+** needs Denon Desktop **1.16** or later (Plugin SDK 1.16: action parameters and hints for MCP).
-  Plugin 0.1.x needs Denon Desktop 1.15 (SDK 1.15 adds `IPluginReceiverControl`; the plugin declares
-  `PluginCapabilities.ReceiverControl` to get it). An older host cannot load a newer plugin.
+- The Denon Desktop release that matches this plugin release (same Plugin SDK).
 - The PC and the Cast devices must be on the same LAN. Windows Firewall must allow inbound UDP
   for Denon Desktop, or mDNS answers do not arrive. "Add by IP" works without mDNS.
 

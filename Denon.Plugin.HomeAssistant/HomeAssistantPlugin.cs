@@ -123,7 +123,7 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
 
     public IReadOnlyList<PluginActionDescriptor> GetActions() =>
     [
-        // Parameters and hints (SDK 1.16) give MCP clients a typed schema.
+        // Parameters and hints give MCP clients a typed schema.
         new("ha.sync_sensor", "Push Denon Status to HA", "Update sensor.denon_desktop_receiver in Home Assistant right now.", "Telemetry")
             { Parameters = [], IsDestructive = false },
         new("ha.fire_webhook", "Fire Configured Webhook", "Send a JSON event payload to your configured Home Assistant webhook.", "Webhook")

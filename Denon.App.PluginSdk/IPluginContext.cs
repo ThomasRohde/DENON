@@ -52,18 +52,16 @@ public interface IPluginContext
 
     /// <summary>
     /// Receiver command channel. It is null when the plugin manifest does not declare
-    /// <see cref="PluginCapabilities.ReceiverControl"/>, or when the host does not support it.
+    /// <see cref="PluginCapabilities.ReceiverControl"/>.
     /// </summary>
-    IPluginReceiverControl? ReceiverControl => null;
+    IPluginReceiverControl? ReceiverControl { get; }
 
     /// <summary>
-    /// SDK 1.17: true while the host app is exiting (user exit, Windows logoff/shutdown, installer upgrade), so
+    /// True while the host app is exiting (user exit, Windows logoff/shutdown, installer upgrade), so
     /// <see cref="IDenonPlugin.StopAsync"/> can tell an app exit from the plugin being stopped or disabled
-    /// (for example to end sessions with <c>reason: "app_shutdown"</c>). False on hosts older than 1.17.
-    /// A plugin built against 1.17 that must also run on 1.16 should call this inside a try/catch
-    /// (<see cref="MissingMethodException"/>), in a separate non-inlined method.
+    /// (for example to end sessions with <c>reason: "app_shutdown"</c>).
     /// </summary>
-    bool IsAppShuttingDown => false;
+    bool IsAppShuttingDown { get; }
 
     /// <summary>
     /// Creates an HttpClient suitable for communicating with external or local LAN hardware bridges.

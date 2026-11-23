@@ -5,8 +5,8 @@ namespace Denon.App.Core.Mcp;
 
 /// <summary>
 /// Turns plugin actions into MCP tools (<c>plugin_&lt;id&gt;_&lt;action&gt;</c>): input schema, safety hints and
-/// tool results. Plugins on SDK 1.16+ describe their parameters and hints; older plugins keep the legacy
-/// generic schema and id-based guesses.
+/// tool results from the parameters and hints each action declares. Hints a plugin leaves unset are guessed
+/// from the action id.
 /// </summary>
 public static class McpPluginToolBridge
 {
@@ -32,30 +32,20 @@ public static class McpPluginToolBridge
         return (readOnly, destructive, idempotent);
     }
 
-    /// <summary>Input schema: the declared parameters, or the legacy generic fields for older plugins.</summary>
+    /// <summary>Input schema from the declared parameters.</summary>
     public static object BuildInputSchema(PluginActionDescriptor action)
     {
         var props = new Dictionary<string, object>();
         var required = new List<string>();
 
-        if (action.Parameters is { } parameters) // Declared (SDK 1.16+), also when empty.
+        foreach (var p in action.Parameters.Where(p => !string.IsNullOrWhiteSpace(p.Name)))
         {
-            foreach (var p in parameters.Where(p => !string.IsNullOrWhiteSpace(p.Name)))
+            var type = AllowedTypes.Contains(p.Type, StringComparer.OrdinalIgnoreCase) ? p.Type.ToLowerInvariant() : "string";
+            props[p.Name] = new { type, description = p.Description };
+            if (p.Required)
             {
-                var type = AllowedTypes.Contains(p.Type, StringComparer.OrdinalIgnoreCase) ? p.Type.ToLowerInvariant() : "string";
-                props[p.Name] = new { type, description = p.Description };
-                if (p.Required)
-                {
-                    required.Add(p.Name);
-                }
+                required.Add(p.Name);
             }
-        }
-        else
-        {
-            props["message"] = new { type = "string", description = "Optional text/toast message parameter (if supported by this action)" };
-            props["contentId"] = new { type = "string", description = "Optional YouTube video URL/ID (for tv.youtube)" };
-            props["entityId"] = new { type = "string", description = "Optional Home Assistant entity ID (for ha.trigger_entity)" };
-            props["button"] = new { type = "string", description = "Optional LG remote button name (e.g. HOME, BACK, ENTER)" };
         }
 
         return required.Count > 0

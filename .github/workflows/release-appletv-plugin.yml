@@ -97,7 +97,7 @@ jobs:
             '2. Unzip it to `%LocalAppData%\DenonDesktop\plugins\external\AppleTv\` (close Denon Desktop first when you update).',
             '3. Start Denon Desktop, open **Plugins → Apple TV**, press **Discover now**, then **Pair** and type the PIN the TV shows.',
             '',
-            'Needs Denon Desktop **1.16.0 or later**; the now-playing hero shows the Apple TV program from **1.20.0**. This is a separate release; the app itself is released with `v*` tags.',
+            'Use it with the matching Denon Desktop release. This is a separate release; the app itself is released with `v*` tags.',
             '',
             '### SHA-256 Checksum',
             "${fence}text",

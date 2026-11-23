@@ -37,7 +37,7 @@ To remove the pairing on the Apple TV too: Settings › Remotes and Devices › 
 
 ### Status line
 
-`APPLE TV • <device> • <app>[ • <title>]` or `APPLE TV PAUSED • …` while an app shows a program. Denon Desktop 1.20
+`APPLE TV • <device> • <app>[ • <title>]` or `APPLE TV PAUSED • …` while an app shows a program. Denon Desktop
 reads this line for the now-playing hero. Keep the format stable.
 
 ### Watch sessions

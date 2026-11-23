@@ -84,7 +84,8 @@ plugins); the meters read `MeterPalette`. `ThemeTokenGuardTests` blocks new hex 
 - [ ] Decide live switching (`DynamicResource`, ~900 references) or switch on restart (no view changes).
 - [ ] Decide user theme files (JSON tokens, validated on import) and skins from plugins.
 - [ ] Semantic aliases (Success/Warning/Danger/Info/Accent) over the hue families, so a theme can recolor states.
-- [ ] Plugin SDK theme API (tokens + `ThemeChanged`); move the Chromecast and Apple TV dashboards to it.
+- [ ] Plugin SDK theme API (tokens + `ThemeChanged`). Until then the Chromecast and Apple TV dashboards read the
+      host tokens by name through their own `HostTheme`.
 - [ ] Fonts and corner radii are still literal in XAML; make them tokens if skins are in scope.
 
 ## Release / build

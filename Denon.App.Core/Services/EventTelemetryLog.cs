@@ -666,7 +666,7 @@ public sealed class EventTelemetryLog : IAsyncDisposable
 
     private static string StripDateSuffix(string baseName)
     {
-        // Matches -yyyy-MM-dd or legacy -yyyy-MM at end of filename
+        // Matches -yyyy-MM-dd at the end of the file name
         if (baseName.Length > 11 &&
             baseName[^11] == '-' && baseName[^6] == '-' && baseName[^3] == '-' &&
             int.TryParse(baseName[^10..^6], out _) &&
@@ -674,14 +674,6 @@ public sealed class EventTelemetryLog : IAsyncDisposable
             int.TryParse(baseName[^2..], out _))
         {
             return baseName[..^11];
-        }
-
-        if (baseName.Length > 8 &&
-            baseName[^8] == '-' && baseName[^3] == '-' &&
-            int.TryParse(baseName[^7..^3], out _) &&
-            int.TryParse(baseName[^2..], out _))
-        {
-            return baseName[..^8];
         }
 
         return baseName;

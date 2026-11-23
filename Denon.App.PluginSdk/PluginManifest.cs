@@ -42,14 +42,13 @@ public sealed record PluginActionDescriptor(
     string Description,
     string Category = "General")
 {
-    // SDK 1.16: optional metadata as init-only properties, so plugins built against 1.15 still load
-    // (the constructor is unchanged). The host uses it for the MCP tool schema and safety hints.
+    // The host uses this metadata for the MCP tool schema and safety hints.
 
     /// <summary>
     /// Parameters the action reads from its parameter dictionary. Shown as the MCP input schema.
-    /// Null: not declared (the host shows a generic legacy schema). Empty: the action takes no parameters.
+    /// Empty (the default): the action takes no parameters.
     /// </summary>
-    public IReadOnlyList<PluginActionParameter>? Parameters { get; init; }
+    public IReadOnlyList<PluginActionParameter> Parameters { get; init; } = [];
 
     /// <summary>
     /// True: the action only reads state (allowed in the MCP "Observer" tier). Null: the host guesses from the id.

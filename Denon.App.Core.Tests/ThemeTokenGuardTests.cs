@@ -10,7 +10,10 @@ namespace Denon.App.Core.Tests;
 public sealed partial class ThemeTokenGuardTests
 {
     private static readonly string[] SourceDirs =
-        ["Denon.App.Desktop", "Denon.Plugin.HomeAssistant", "Denon.Plugin.PhilipsHue", "Denon.Plugin.SmartTv"];
+    [
+        "Denon.App.Desktop", "Denon.Plugin.HomeAssistant", "Denon.Plugin.PhilipsHue", "Denon.Plugin.SmartTv",
+        "external-plugins/Denon.Plugin.Chromecast", "external-plugins/Denon.Plugin.AppleTv",
+    ];
 
     /// <summary>
     /// C# files that may hold literal colors, and why. Content colors are data, not theme: a theme must not change
@@ -31,6 +34,8 @@ public sealed partial class ThemeTokenGuardTests
         ["Denon.Plugin.PhilipsHue/PhilipsHuePlugin.cs"] = "light colors sent to Hue lamps, plugin identity color",
         ["Denon.Plugin.PhilipsHue/Models/HueModels.cs"] = "mood preset light colors and light color conversion",
         ["Denon.Plugin.PhilipsHue/ViewModels/HueDashboardViewModel.cs"] = "light and album-art preview colors (content)",
+        ["external-plugins/Denon.Plugin.Chromecast/ChromecastPlugin.cs"] = "plugin identity color in the manifest",
+        ["external-plugins/Denon.Plugin.AppleTv/AppleTvPlugin.cs"] = "plugin identity color in the manifest",
     };
 
     private static readonly string Root = FindRepoRoot();
@@ -82,10 +87,16 @@ public sealed partial class ThemeTokenGuardTests
         var themes = Path.Combine(Root, "Denon.App.Desktop", "Themes");
         var brushes = XKey().Matches(File.ReadAllText(Path.Combine(themes, "Brushes.xaml"))).Select(m => m.Groups[1].Value).ToHashSet();
         var colors = XKey().Matches(File.ReadAllText(Path.Combine(themes, "Colors.Dark.xaml"))).Select(m => m.Groups[1].Value).ToHashSet();
+        var styles = XKey().Matches(File.ReadAllText(Path.Combine(themes, "DenonTheme.xaml"))).Select(m => m.Groups[1].Value).ToHashSet();
 
         var missing = CodeFiles()
             .SelectMany(f => TokenRead().Matches(File.ReadAllText(f)).Select(m => (File: Rel(f), Kind: m.Groups[1].Value, Token: m.Groups[2].Value)))
-            .Where(r => r.Kind == "Brush" ? !brushes.Contains(r.Token + "Brush") : !colors.Contains(r.Token + "Color"))
+            .Where(r => r.Kind switch
+            {
+                "Brush" => !brushes.Contains(r.Token + "Brush"),
+                "Style" => !styles.Contains(r.Token),
+                _ => !colors.Contains(r.Token + "Color"),
+            })
             .Select(r => $"{r.File}: {r.Kind}(\"{r.Token}\")")
             .ToList();
 
@@ -149,7 +160,7 @@ public sealed partial class ThemeTokenGuardTests
     [GeneratedRegex(@"\{(?:Static|Dynamic)Resource\s+([A-Za-z_][\w.]*)\s*\}")]
     private static partial Regex ResourceReference();
 
-    [GeneratedRegex("""(?:ThemeResources|HostTheme)\.(Brush|Color|DrawingColor)\("(\w+)"\)""")]
+    [GeneratedRegex("""(?:ThemeResources|HostTheme)\.(Brush|Color|DrawingColor|Hex|Style)\("(\w+)"\)""")]
     private static partial Regex TokenRead();
 
     [GeneratedRegex(@"<SolidColorBrush[^>]*x:Key=""(\w+Brush)""[^>]*Color=""\{StaticResource (\w+Color)\}""")]

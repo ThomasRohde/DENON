@@ -2,6 +2,16 @@
 
 Released separately from Denon Desktop with tags `chromecast-vX.Y.Z`.
 
+## [Unreleased]
+
+Needs Plugin SDK 2.0 (the next Denon Desktop release); older Denon Desktop versions cannot load it.
+
+### Removed
+- The fallbacks for older Denon Desktop versions (missing `IsAppShuttingDown` or receiver control).
+
+### Changed
+- **Follows the Denon Desktop theme**: The dashboard reads its colors from the app's theme tokens (cards, text levels, borders, status colors, the dark combo box) and uses the app's own styles for buttons (`PrimaryButton`, `SecondaryButton`), checkboxes and the automation expander (`DarkExpanderStyle`), so it looks like the rest of the app and follows future themes.
+
 ## [0.3.0] - 2026-11-23
 
 Works with Denon Desktop **1.16.0** or later. With **1.17.0** sessions also end with `app_shutdown` on app exit, and the now-playing hero shows the cast program.

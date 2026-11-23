@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Net;
-using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Denon.App.PluginSdk;
 using Denon.Plugin.AppleTv.Discovery;
@@ -60,14 +59,12 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
 
     internal event Action<string, AppleTvDeviceState>? DeviceStateChanged;
 
-    internal bool HasReceiverControl => _receiverControl is not null;
-
     internal bool AutomationsEnabled => _config.AutomationsEnabled;
 
     public async Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default)
     {
         _context = context;
-        _receiverControl = TryGetReceiverControl(context);
+        _receiverControl = context.ReceiverControl;
         _config = await context.Storage.LoadConfigAsync(static () => new AppleTvConfig(), cancellationToken);
         _config.Devices ??= [];
         _watchLog = new AppleTvWatchLog((name, data) => RecordRaw(name, data, "external"));
@@ -96,7 +93,7 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
-        _watchLog?.EndAll(DateTimeOffset.UtcNow, StopReason());
+        _watchLog?.EndAll(DateTimeOffset.UtcNow, _context?.IsAppShuttingDown == true ? "app_shutdown" : "plugin_stopped");
         _lifetime?.Cancel();
         foreach (var timer in _sleepTimers.Values)
         {
@@ -1012,37 +1009,4 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
         imageUrl = state.NowPlaying.ArtworkUrl, // read by the host's now-playing hero
         error = state.Error,
     };
-
-    // ---------------------------------------------------------------- host compatibility (as the Chromecast plugin)
-
-    private string StopReason()
-    {
-        try
-        {
-            return _context is not null && ReadAppShuttingDown(_context) ? "app_shutdown" : "plugin_stopped";
-        }
-        catch (MissingMethodException)
-        {
-            return "plugin_stopped";
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static bool ReadAppShuttingDown(IPluginContext context) => context.IsAppShuttingDown;
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static IPluginReceiverControl? ReadReceiverControl(IPluginContext context) => context.ReceiverControl;
-
-    private static IPluginReceiverControl? TryGetReceiverControl(IPluginContext context)
-    {
-        try
-        {
-            return ReadReceiverControl(context);
-        }
-        catch (Exception ex) when (ex is MissingMethodException or TypeLoadException)
-        {
-            context.Logger.Warning("This Denon Desktop version has no receiver-control API. Automations are off.");
-            return null;
-        }
-    }
 }

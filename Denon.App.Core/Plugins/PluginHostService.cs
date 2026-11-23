@@ -846,9 +846,7 @@ public sealed class PluginHostService : IAsyncDisposable
             // IDenonPlugin / WPF types match across the boundary.
             if (string.Equals(assemblyName.Name, "Denon.App.PluginSdk", StringComparison.OrdinalIgnoreCase))
             {
-                // Return the host's SDK explicitly (not null → default binder). A custom context only checks the
-                // simple name, so a plugin built against a newer SDK still binds to this host's SDK; members the
-                // host lacks fail later with MissingMethodException, which a plugin can handle.
+                // Return the host's SDK explicitly, so the plugin and the host share one copy of the SDK types.
                 return typeof(IDenonPlugin).Assembly;
             }
 

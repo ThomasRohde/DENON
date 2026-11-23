@@ -13,17 +13,17 @@ namespace Denon.Plugin.AppleTv;
 /// </summary>
 internal sealed class AppleTvDashboardView : UserControl
 {
-    private static readonly Brush CardBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x18, 0x1D, 0x29)));
-    private static readonly Brush InsetBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x0E, 0x17, 0x26)));
-    private static readonly Brush BorderLineBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x2A, 0x32, 0x44)));
-    private static readonly Brush TextBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xE2, 0xE8, 0xF0)));
-    private static readonly Brush TitleBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9)));
-    private static readonly Brush MutedBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x94, 0xA3, 0xB8)));
-    private static readonly Brush DimBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B)));
-    private static readonly Brush AccentBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xD4, 0xD4, 0xD8)));
-    private static readonly Brush WarnBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xF5, 0x9E, 0x0B)));
-    private static readonly Brush OkBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x34, 0xD3, 0x99)));
-    private static readonly Brush ErrorBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xF8, 0x71, 0x71)));
+    private static readonly Brush CardBrush = HostTheme.Brush("CardElevated");
+    private static readonly Brush InsetBrush = HostTheme.Brush("Ink05");
+    private static readonly Brush BorderLineBrush = HostTheme.Brush("Ink12");
+    private static readonly Brush TextBrush = HostTheme.Brush("TextStrong");
+    private static readonly Brush TitleBrush = HostTheme.Brush("TextPrimary");
+    private static readonly Brush MutedBrush = HostTheme.Brush("TextMuted");
+    private static readonly Brush DimBrush = HostTheme.Brush("TextFaint");
+    private static readonly Brush AccentBrush = HostTheme.Brush("TextSoft");
+    private static readonly Brush WarnBrush = HostTheme.Brush("AccentAmber");
+    private static readonly Brush OkBrush = HostTheme.Brush("AccentEmeraldBright");
+    private static readonly Brush ErrorBrush = HostTheme.Brush("AccentCrimsonBright");
 
     private static readonly string[] InputCodes = ["", "TV", "BD", "GAME", "MPLAY", "SAT/CBL", "AUX1", "NET"];
     private static readonly string[] SoundModeCodes = ["", "AUTO", "MOVIE", "MUSIC", "STEREO", "DIRECT", "PURE DIRECT", "MCH STEREO"];
@@ -56,9 +56,7 @@ internal sealed class AppleTvDashboardView : UserControl
         root.Children.Add(new TextBlock { Text = "Apple TV", FontSize = 18, FontWeight = FontWeights.SemiBold, Foreground = TitleBrush });
         root.Children.Add(new TextBlock
         {
-            Text = _plugin.HasReceiverControl
-                ? "Found by DNS-SD. Pair once with the PIN the TV shows. Each Apple TV can drive the Denon when it wakes or sleeps."
-                : "Found by DNS-SD. Automations are off: this Denon Desktop version has no receiver-control API.",
+            Text = "Found by DNS-SD. Pair once with the PIN the TV shows. Each Apple TV can drive the Denon when it wakes or sleeps.",
             Foreground = DimBrush,
             TextWrapping = TextWrapping.Wrap,
         });
@@ -79,7 +77,6 @@ internal sealed class AppleTvDashboardView : UserControl
             Foreground = TextBrush,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(12, 0, 0, 6),
-            IsEnabled = _plugin.HasReceiverControl,
         };
         automations.Click += async (_, _) => await RunAsync("Saving…", async () =>
         {
@@ -147,72 +144,14 @@ internal sealed class AppleTvDashboardView : UserControl
         }
     }
 
-    private static Button MakeButton(string text, bool primary = false)
+    /// <summary>A button in the app's own style: <c>PrimaryButton</c> or <c>SecondaryButton</c> from the host theme.</summary>
+    private static Button MakeButton(string text, bool primary = false) => new()
     {
-        var button = new Button
-        {
-            Content = text,
-            Padding = new Thickness(12, 5, 12, 5),
-            Margin = new Thickness(0, 0, 6, 6),
-            Background = primary ? PrimaryBrush : InsetBrush,
-            Foreground = primary ? Brushes.White : TextBrush,
-            BorderBrush = primary ? PrimaryBrush : BorderLineBrush,
-            FontWeight = primary ? FontWeights.SemiBold : FontWeights.Normal,
-            Cursor = System.Windows.Input.Cursors.Hand,
-        };
-        if (DarkButtonStyle.Value is { } style)
-        {
-            button.Style = style;
-        }
-
-        return button;
-    }
-
-    private static readonly Brush PrimaryBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x0A, 0x84, 0xFF)));
-
-    // The default Windows button template draws its own light chrome (hover, focus, disabled) over these colors,
-    // which made the primary button unreadable. This template keeps the plugin's colors in every state.
-    private static readonly Lazy<Style?> DarkButtonStyle = new(() =>
-    {
-        const string xaml = """
-            <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" TargetType="Button">
-              <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-              <Setter Property="Template">
-                <Setter.Value>
-                  <ControlTemplate TargetType="Button">
-                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="1" CornerRadius="6" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
-                      <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True" />
-                    </Border>
-                    <ControlTemplate.Triggers>
-                      <Trigger Property="IsMouseOver" Value="True">
-                        <Setter TargetName="Bd" Property="BorderBrush" Value="#38BDF8" />
-                      </Trigger>
-                      <Trigger Property="IsKeyboardFocused" Value="True">
-                        <Setter TargetName="Bd" Property="BorderBrush" Value="#38BDF8" />
-                      </Trigger>
-                      <Trigger Property="IsPressed" Value="True">
-                        <Setter TargetName="Bd" Property="Opacity" Value="0.75" />
-                      </Trigger>
-                      <Trigger Property="IsEnabled" Value="False">
-                        <Setter TargetName="Bd" Property="Opacity" Value="0.45" />
-                      </Trigger>
-                    </ControlTemplate.Triggers>
-                  </ControlTemplate>
-                </Setter.Value>
-              </Setter>
-            </Style>
-            """;
-        try
-        {
-            return (Style)System.Windows.Markup.XamlReader.Parse(xaml);
-        }
-        catch
-        {
-            return null; // Fall back to the default control.
-        }
-    });
+        Content = text,
+        Margin = new Thickness(0, 0, 6, 6),
+        Style = HostTheme.Style(primary ? "PrimaryButton" : "SecondaryButton"),
+        Cursor = System.Windows.Input.Cursors.Hand,
+    };
 
     private static TextBox MakeTextBox(double width, string tooltip) => new()
     {
@@ -256,16 +195,23 @@ internal sealed class AppleTvDashboardView : UserControl
     // The host has no ComboBox theme, so the default control is white (same template as the Chromecast plugin).
     private static readonly Lazy<Style?> DarkComboStyle = new(() =>
     {
-        const string xaml = """
+        var inset = HostTheme.Hex("Ink05");
+        var text = HostTheme.Hex("TextStrong");
+        var line = HostTheme.Hex("Ink12");
+        var hover = HostTheme.Hex("Ink10");
+        var focus = HostTheme.Hex("AccentCyanBright");
+        var muted = HostTheme.Hex("TextMuted");
+        var card = HostTheme.Hex("Ink06");
+        var xaml = $$$"""
             <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" TargetType="ComboBox">
-              <Setter Property="Background" Value="#0E1726" />
-              <Setter Property="Foreground" Value="#E2E8F0" />
-              <Setter Property="BorderBrush" Value="#2A3244" />
+              <Setter Property="Background" Value="{{{inset}}}" />
+              <Setter Property="Foreground" Value="{{{text}}}" />
+              <Setter Property="BorderBrush" Value="{{{line}}}" />
               <Setter Property="ItemContainerStyle">
                 <Setter.Value>
                   <Style TargetType="ComboBoxItem">
-                    <Setter Property="Foreground" Value="#E2E8F0" />
+                    <Setter Property="Foreground" Value="{{{text}}}" />
                     <Setter Property="MinHeight" Value="22" />
                     <Setter Property="Template">
                       <Setter.Value>
@@ -275,7 +221,7 @@ internal sealed class AppleTvDashboardView : UserControl
                           </Border>
                           <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
-                              <Setter TargetName="Bd" Property="Background" Value="#242A3A" />
+                              <Setter TargetName="Bd" Property="Background" Value="{{{hover}}}" />
                             </Trigger>
                           </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -292,13 +238,13 @@ internal sealed class AppleTvDashboardView : UserControl
                                     IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
                         <ToggleButton.Template>
                           <ControlTemplate TargetType="ToggleButton">
-                            <Border x:Name="Bd" Background="#0E1726" BorderBrush="#2A3244" BorderThickness="1" CornerRadius="4">
+                            <Border x:Name="Bd" Background="{{{inset}}}" BorderBrush="{{{line}}}" BorderThickness="1" CornerRadius="4">
                               <Path HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0"
-                                    Data="M 0 0 L 4 4 L 8 0" Stroke="#94A3B8" StrokeThickness="1.5" />
+                                    Data="M 0 0 L 4 4 L 8 0" Stroke="{{{muted}}}" StrokeThickness="1.5" />
                             </Border>
                             <ControlTemplate.Triggers>
                               <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="#38BDF8" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{{{focus}}}" />
                               </Trigger>
                             </ControlTemplate.Triggers>
                           </ControlTemplate>
@@ -307,11 +253,11 @@ internal sealed class AppleTvDashboardView : UserControl
                       <ContentPresenter x:Name="ContentSite" IsHitTestVisible="False" Margin="8,3,24,3" VerticalAlignment="Center"
                                         Content="{TemplateBinding SelectionBoxItem}" />
                       <TextBox x:Name="PART_EditableTextBox" Visibility="Hidden" Margin="4,2,22,2" VerticalAlignment="Center"
-                               Background="Transparent" BorderThickness="0" Foreground="#E2E8F0" CaretBrush="#E2E8F0"
+                               Background="Transparent" BorderThickness="0" Foreground="{{{text}}}" CaretBrush="{{{text}}}"
                                IsReadOnly="{TemplateBinding IsReadOnly}" />
                       <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True" Focusable="False"
                              IsOpen="{TemplateBinding IsDropDownOpen}" PopupAnimation="Slide">
-                        <Border Background="#181D29" BorderBrush="#2A3244" BorderThickness="1" CornerRadius="4"
+                        <Border Background="{{{card}}}" BorderBrush="{{{line}}}" BorderThickness="1" CornerRadius="4"
                                 MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
                           <ScrollViewer>
                             <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
@@ -578,6 +524,7 @@ internal sealed class AppleTvDashboardView : UserControl
 
             return new Expander
             {
+                Style = HostTheme.Style("DarkExpanderStyle"),
                 Header = new TextBlock { Text = "Settings and Denon automation", Foreground = MutedBrush },
                 Content = panel,
                 Margin = new Thickness(0, 4, 0, 0),

@@ -6,8 +6,8 @@ namespace Denon.App.Core.Services;
 /// <summary>
 /// Watch and listen time from <c>session.ended</c> events on the <c>media</c> stream, without double counting.
 /// Each session counts its <c>exclusiveSec</c> (time not covered by a more specific parallel session, and for casts
-/// not more than the play time). Events written before 1.15.0 have no exclusiveSec; they count durationSec and are
-/// reported as <c>legacySessions</c>. A session counts on the local day it started. Open sessions are not counted.
+/// not more than the play time). Sessions without exclusiveSec are skipped. A session counts on the local day it
+/// started. Open sessions are not counted.
 /// </summary>
 public static class WatchTimeReport
 {
@@ -22,7 +22,6 @@ public static class WatchTimeReport
         int TotalSeconds,
         string TotalText,
         int Sessions,
-        int LegacySessions,
         IReadOnlyList<DayEntry> ByDay,
         IReadOnlyList<Entry> ByKind,
         IReadOnlyList<Entry> ByApp,
@@ -37,7 +36,6 @@ public static class WatchTimeReport
         top = Math.Clamp(top, 1, 50);
         var fromDate = DateOnly.FromDateTime(now.LocalDateTime.Date).AddDays(-(days - 1));
 
-        var legacy = 0;
         var sessions = new List<Session>();
         foreach (var ev in events)
         {
@@ -49,23 +47,12 @@ public static class WatchTimeReport
                 continue;
             }
 
-            var duration = GetInt(data, "durationSec") ?? 0;
-            int seconds;
-            if (GetInt(data, "exclusiveSec") is { } exclusive)
+            if (GetInt(data, "exclusiveSec") is not { } seconds)
             {
-                seconds = exclusive;
-            }
-            else
-            {
-                seconds = duration;
-                legacy++;
+                continue;
             }
 
-            // Paused time is not watching. Casts logged by 1.15.0-1.15.1 did not cap exclusiveSec yet.
-            if (GetInt(data, "watchedSec") is { } watched)
-            {
-                seconds = Math.Min(seconds, watched);
-            }
+            var duration = GetInt(data, "durationSec") ?? 0;
 
             var start = end.AddSeconds(-duration);
             if (DateOnly.FromDateTime(start.LocalDateTime.Date) < fromDate || seconds <= 0)
@@ -96,15 +83,13 @@ public static class WatchTimeReport
             TotalSeconds: total,
             TotalText: FormatDuration(total),
             Sessions: sessions.Count,
-            LegacySessions: legacy,
             ByDay: byDay,
             ByKind: Group(sessions, s => s.Kind, s => null, int.MaxValue),
             ByApp: Group(sessions, s => s.App, s => s.Kind, top),
             TopTitles: Group(sessions.Where(s => s.Title.Length > 0 && !s.Title.Equals(s.App, StringComparison.OrdinalIgnoreCase)),
                 s => s.Title, s => s.App, top),
             Note: "Seconds are exclusiveSec (no double counting of parallel cast/TV/receiver sessions; paused cast time " +
-                  "excluded). Sessions count on the day they started; open sessions are not included. " +
-                  "legacySessions were logged before 1.15.0 and count their full durationSec.");
+                  "excluded). Sessions count on the day they started; open sessions are not included.");
     }
 
     /// <summary>"what was used": the cast app, the TV app or channel, the receiver input or the HEOS source.</summary>

@@ -88,7 +88,7 @@ jobs:
             '2. Unzip it to `%LocalAppData%\DenonDesktop\plugins\external\Chromecast\` (close Denon Desktop first when you update).',
             '3. Start Denon Desktop and open **Plugins → Chromecast & Google Cast**.',
             '',
-            'Needs Denon Desktop **1.15.0 or later**. This is a separate release; the app itself is released with `v*` tags.',
+            'Use it with the matching Denon Desktop release. This is a separate release; the app itself is released with `v*` tags.',
             '',
             '### SHA-256 Checksum',
             "${fence}text",

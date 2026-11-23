@@ -2,15 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Version>1.17.0</Version>
-    <!--
-      AssemblyVersion is pinned: .NET refuses to bind a plugin that references a HIGHER SDK assembly version than
-      the host has. Keep it at 1.16.0.0 while SDK changes are additive (new members with defaults), so plugins
-      built against a newer SDK still load on older hosts and handle missing members (MissingMethodException).
-      Raise it only for a breaking SDK change. Hosts from 1.17 also return their own SDK for any version.
-    -->
-    <AssemblyVersion>1.16.0.0</AssemblyVersion>
-    <FileVersion>1.17.0.0</FileVersion>
+    <Version>2.0.0</Version>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>Official Plugin SDK for Denon Desktop extensions.</Description>

@@ -244,10 +244,9 @@ public sealed partial class MainViewModel
 
     public bool HasSelectedPluginActions => SelectedPluginActions.Count > 0;
 
-    /// <summary>"SDK v1.17" from the SDK file version (the assembly version is pinned for plugin compatibility).</summary>
-    public string PluginSdkBadgeText { get; } = "SDK v" + (Version.TryParse(
-        System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyFileVersionAttribute>(typeof(IDenonPlugin).Assembly)?.Version,
-        out var sdkVersion) ? sdkVersion.ToString(2) : "?");
+    /// <summary>"SDK v2.0" from the SDK assembly version.</summary>
+    public string PluginSdkBadgeText { get; } =
+        "SDK v" + (typeof(IDenonPlugin).Assembly.GetName().Version?.ToString(2) ?? "?");
 
     public string PluginsStatusText
     {

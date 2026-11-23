@@ -81,7 +81,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
 
     public IReadOnlyList<PluginActionDescriptor> GetActions() =>
     [
-        // Parameters and hints (SDK 1.16) give MCP clients a typed schema. Destructive stays unset (null) where the
+        // Parameters and hints give MCP clients a typed schema. Destructive stays unset (null) where the
         // host's id guess already applies (power_off, close_app), so permission tiers do not change.
         new("tv.power_on", "TV Wake-on-LAN (Power On)", "Send multi-interface Wake-on-LAN magic packets to power on the LG TV.", "Power") { Parameters = [], IsDestructive = false },
         new("tv.power_off", "TV Power Off", "Put the LG webOS TV into standby.", "Power") { Parameters = [] },

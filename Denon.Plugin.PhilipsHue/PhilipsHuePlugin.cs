@@ -132,7 +132,7 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
 
     public IReadOnlyList<PluginActionDescriptor> GetActions() =>
     [
-        // Parameters and hints (SDK 1.16) give MCP clients a typed schema. Destructive stays unset (null) where the
+        // Parameters and hints give MCP clients a typed schema. Destructive stays unset (null) where the
         // host's id guess already applies, so permission tiers do not change.
         new("hue.all_on", "All Hue Lights On", "Turn on every light on the paired Philips Hue Bridge.", "Master")
             { Parameters = [], IsDestructive = false },
