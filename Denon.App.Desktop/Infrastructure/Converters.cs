@@ -52,6 +52,18 @@ public sealed class EqualityConverter : IValueConverter
         value is true ? parameter ?? System.Windows.Data.Binding.DoNothing : System.Windows.Data.Binding.DoNothing;
 }
 
+/// <summary>Visible when the value equals the parameter (case-insensitive), else collapsed. Used for page and sub-tab switching.</summary>
+public sealed class EqualityToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        string.Equals(value?.ToString(), parameter?.ToString(), StringComparison.OrdinalIgnoreCase)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 public sealed class LogLevelToBrushConverter : IValueConverter
 {
     private static Brush InfoBrush => ThemeResources.Brush("AccentCyanBright");

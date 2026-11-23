@@ -571,152 +571,52 @@
                 <Grid Grid.Column="1" Background="{StaticResource ChassisBgBrush}">
 
                     <!-- ==================== VIEW 1: CONTROL DECK ==================== -->
-                    <Grid Margin="20,16">
-                        <Grid.Style>
-                            <Style TargetType="Grid">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ActiveSection}" Value="Control">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Grid.Style>
+                    <Grid Margin="20,16" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Control}">
                         <views:ControlDeckView x:Name="ControlDeckPage" />
                     </Grid>
 
                     <!-- ==================== VIEW 1B: YOUTUBE & MUSIC ==================== -->
-                    <Grid Margin="20,16">
-                        <Grid.Style>
-                            <Style TargetType="Grid">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ActiveSection}" Value="YouTube">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Grid.Style>
+                    <Grid Margin="20,16" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=YouTube}">
                         <views:YouTubeMusicView />
                     </Grid>
 
                     <!-- ==================== VIEW 1C: SCENES & ACOUSTICS ==================== -->
-                    <Grid Margin="20,16">
-                        <Grid.Style>
-                            <Style TargetType="Grid">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ActiveSection}" Value="Acoustics">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Grid.Style>
+                    <Grid Margin="20,16" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Acoustics}">
                         <views:ScenesAcousticsView />
                     </Grid>
 
                     <!-- ==================== VIEW 1D: CAST & REMOTE ==================== -->
-                    <Grid Margin="20,16">
-                        <Grid.Style>
-                            <Style TargetType="Grid">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ActiveSection}" Value="CastRemote">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Grid.Style>
+                    <Grid Margin="20,16" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=CastRemote}">
                         <views:CastRemoteView />
                     </Grid>
 
                     <!-- ==================== VIEW 2: STATIONS & STREAMS ==================== -->
-                    <Grid Margin="20,16">
-                        <Grid.Style>
-                            <Style TargetType="Grid">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ActiveSection}" Value="Stations">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Grid.Style>
+                    <Grid Margin="20,16" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Stations}">
                         <views:StationsStreamsView />
                     </Grid>
 
                     <!-- ==================== VIEW 3: SETTINGS ==================== -->
-                    <Grid Margin="20,16">
-                        <Grid.Style>
-                            <Style TargetType="Grid">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ActiveSection}" Value="Settings">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Grid.Style>
+                    <Grid Margin="20,16" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Settings}">
                         <views:SettingsView />
                     </Grid>
 
                     <!-- ==================== VIEW 4: HEALTH & SUPPORT ==================== -->
-                    <Grid Margin="20,16">
-                        <Grid.Style>
-                            <Style TargetType="Grid">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ActiveSection}" Value="Diagnostics">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Grid.Style>
+                    <Grid Margin="20,16" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Diagnostics}">
                         <views:HealthSupportView />
                     </Grid>
 
                     <!-- ==================== VIEW 8: PLUGINS & EXTENSIONS ==================== -->
-                    <Grid Margin="20,14">
-                        <Grid.Style>
-                            <Style TargetType="Grid">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ActiveSection}" Value="Plugins">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Grid.Style>
+                    <Grid Margin="20,14" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Plugins}">
                         <views:PluginsView />
                     </Grid>
 
                     <!-- ==================== VIEW 9: HELP & INTERACTIVE GUIDE ==================== -->
-                    <Grid Margin="20,14">
-                        <Grid.Style>
-                            <Style TargetType="Grid">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ActiveSection}" Value="Help">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Grid.Style>
+                    <Grid Margin="20,14" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Help}">
                         <views:HelpGuideView />
                     </Grid>
 
                     <!-- ==================== VIEW 10: STREAMABLE HTTP MCP SERVER & ROOM BRAIN ==================== -->
-                    <Grid Margin="20,14">
-                        <Grid.Style>
-                            <Style TargetType="Grid">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ActiveSection}" Value="Mcp">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Grid.Style>
+                    <Grid Margin="20,14" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Mcp}">
                         <views:McpIntelligenceView />
                     </Grid>
                 </Grid>

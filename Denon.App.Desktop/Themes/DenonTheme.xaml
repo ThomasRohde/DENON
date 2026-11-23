@@ -6,6 +6,7 @@
     <infra:BoolToVisibilityConverter x:Key="BoolToVis" />
     <infra:StringToVisibilityConverter x:Key="StringToVis" />
     <infra:EqualityConverter x:Key="EqualityConverter" />
+    <infra:EqualityToVisibilityConverter x:Key="EqualityToVis" />
     <infra:LogLevelToBrushConverter x:Key="LogLevelToBrush" />
     <infra:NullableBoolToBrushConverter x:Key="NullableBoolToBrush" />
     <infra:SafeImageSourceConverter x:Key="SafeImageSource" />
@@ -384,27 +385,38 @@
         </Setter>
     </Style>
 
+    <!-- Chips that light up while infra:Chip.IsActive is true (selected input, mode, filter, sub-tab, ...) -->
+    <Style x:Key="ChipButton" TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+        <Style.Triggers>
+            <Trigger Property="infra:Chip.IsActive" Value="True">
+                <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Same, lit green for an "on" state (power active, Dynamic EQ on) -->
+    <Style x:Key="SuccessChipButton" TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
+        <Style.Triggers>
+            <Trigger Property="infra:Chip.IsActive" Value="True">
+                <Setter Property="Background" Value="{StaticResource AccentEmeraldSubtleBgBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource AccentEmeraldBrush}" />
+                <Setter Property="Foreground" Value="{StaticResource AccentEmeraldBrush}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Animated equalizer bar in the now-playing hero -->
+    <Style x:Key="EqBarStyle" TargetType="Border">
+        <Setter Property="Width" Value="3.5" />
+        <Setter Property="CornerRadius" Value="2" />
+        <Setter Property="VerticalAlignment" Value="Bottom" />
+        <Setter Property="Background" Value="{StaticResource AccentCyanBrush}" />
+        <Setter Property="Margin" Value="1.5,0" />
+    </Style>
+
     <!-- Sleek Toggle Switch (CheckBox) -->
-        <!-- Reusable Hardware Chip with Active State Trigger -->
-        <Style x:Key="ActiveAwareChipStyle" TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsActive}" Value="True">
-                    <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
-                    <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
-                    <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <!-- Animated Equalizer Bar Style -->
-        <Style x:Key="EqBarStyle" TargetType="Border">
-            <Setter Property="Width" Value="3.5" />
-            <Setter Property="CornerRadius" Value="2" />
-            <Setter Property="VerticalAlignment" Value="Bottom" />
-            <Setter Property="Background" Value="{StaticResource AccentCyanBrush}" />
-            <Setter Property="Margin" Value="1.5,0" />
-        </Style>
-
     <Style x:Key="ToggleSwitchStyle" TargetType="CheckBox">
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
         <Setter Property="FontSize" Value="13" />

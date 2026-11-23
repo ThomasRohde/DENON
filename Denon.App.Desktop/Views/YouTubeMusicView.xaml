@@ -2,6 +2,7 @@
 <UserControl x:Class="Denon.App.Desktop.Views.YouTubeMusicView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:infra="clr-namespace:Denon.App.Desktop.Infrastructure"
              xmlns:controls="clr-namespace:Denon.App.Desktop.Controls">
     <Grid>
         <Grid.RowDefinitions>
@@ -74,54 +75,24 @@
                                 CommandParameter="Music"
                                 Padding="11,5"
                                 FontSize="11.5"
-                                Margin="0,0,6,0">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding YouTubeSearchModeName}" Value="Music">
-                                            <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
-                                            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
-                                            <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                                Margin="0,0,6,0"
+                                Style="{StaticResource ChipButton}"
+                                infra:Chip.IsActive="{Binding YouTubeSearchModeName, Converter={StaticResource EqualityConverter}, ConverterParameter=Music}" />
                         <Button Content="Videos"
                                 Command="{Binding SetYouTubeSearchModeCommand}"
                                 CommandParameter="Videos"
                                 Padding="11,5"
                                 FontSize="11.5"
-                                Margin="0,0,6,0">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding YouTubeSearchModeName}" Value="Videos">
-                                            <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
-                                            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
-                                            <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                                Margin="0,0,6,0"
+                                Style="{StaticResource ChipButton}"
+                                infra:Chip.IsActive="{Binding YouTubeSearchModeName, Converter={StaticResource EqualityConverter}, ConverterParameter=Videos}" />
                         <Button Content="Playlists"
                                 Command="{Binding SetYouTubeSearchModeCommand}"
                                 CommandParameter="Playlists"
                                 Padding="11,5"
-                                FontSize="11.5">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding YouTubeSearchModeName}" Value="Playlists">
-                                            <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
-                                            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
-                                            <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                                FontSize="11.5"
+                                Style="{StaticResource ChipButton}"
+                                infra:Chip.IsActive="{Binding YouTubeSearchModeName, Converter={StaticResource EqualityConverter}, ConverterParameter=Playlists}" />
                     </StackPanel>
 
                     <TextBlock Grid.Column="1"
@@ -320,19 +291,9 @@
                                 Command="{Binding ToggleYouTubeShuffleCommand}"
                                 Padding="9,5"
                                 FontSize="11"
-                                Margin="0,0,6,6">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource HardwareChipButton}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsYouTubeShuffleEnabled}" Value="True">
-                                            <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
-                                            <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
-                                            <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                                Margin="0,0,6,6"
+                                Style="{StaticResource ChipButton}"
+                                infra:Chip.IsActive="{Binding IsYouTubeShuffleEnabled}" />
                         <Button Content="{Binding YouTubeRepeatLabel}"
                                 Command="{Binding CycleYouTubeRepeatCommand}"
                                 Style="{StaticResource HardwareChipButton}"

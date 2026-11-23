@@ -90,7 +90,8 @@ plugins); the meters read `MeterPalette`. `ThemeTokenGuardTests` blocks new hex 
       title bar, sidebar and page wrappers.
 - [x] Built-in plugins (Hue, Smart TV, Home Assistant): use the app's card and button styles (sizes stay local).
 - [x] App styles for ComboBox, ListBox and PasswordBox; the external plugins dropped their own ComboBox template.
-- [ ] One style for the "selected chip" pattern (23 inline copies) and normal page switching (14 inline styles).
+- [x] One chip style (`ChipButton`/`SuccessChipButton` + `infra:Chip.IsActive`) instead of 23 inline copies; page and
+      sub-tab switching via the `EqualityToVis` converter instead of 14 inline styles. Zone 2 keeps its own style.
 - [ ] Typography tokens (583 literal font sizes in 21 values; 2 font families) and corner-radius tokens (172 in 14 values).
 - [ ] Icons: move the 22 inline icon geometries to one `Icons.xaml`.
 
