@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="../Denon.App.PluginSdk/Denon.App.PluginSdk.csproj" />
+  <Project Path="Denon.Plugin.AppleTv/Denon.Plugin.AppleTv.csproj" />
+  <Project Path="Denon.Plugin.AppleTv.Tests/Denon.Plugin.AppleTv.Tests.csproj" />
+  <Project Path="Denon.Plugin.AppleTv.Probe/Denon.Plugin.AppleTv.Probe.csproj" />
+</Solution>

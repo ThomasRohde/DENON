@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Standalone external plugin for Apple TV (work in progress, milestone 0: discovery).
+    It is NOT part of DenonDesktop.slnx and is NOT shipped with the app. Build with Denon.Plugin.AppleTv.slnx.
+    Protocol logic is ported from pyatv (MIT, https://github.com/postlund/pyatv); see THIRD-PARTY-NOTICES.md.
+    The SDK reference is compile-only: the host shares its own Denon.App.PluginSdk.dll at run time.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Version>0.0.1</Version>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <RootNamespace>Denon.Plugin.AppleTv</RootNamespace>
+    <Description>Apple TV plugin for Denon Desktop: discovery, pairing, now playing, remote control and receiver automations (native .NET, no Python).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Denon.App.PluginSdk\Denon.App.PluginSdk.csproj">
+      <Private>false</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Denon.Plugin.AppleTv.Tests" />
+    <InternalsVisibleTo Include="atvprobe" />
+  </ItemGroup>
+
+</Project>

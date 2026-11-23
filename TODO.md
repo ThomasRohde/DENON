@@ -48,6 +48,17 @@ The bridge returns JSON + images and uses declared parameters/hints since app 1.
       Check if play/pause commands work for Netflix.
 - [ ] Extend `CastAppNames` with more app ids as they show up in the logs (for example TV 2 Play, Prime Video).
 
+## Apple TV plugin (local branch `appletv-plugin`, push only if milestone 3 succeeds)
+
+Native .NET (no Python), protocol logic ported from pyatv (MIT). See `external-plugins/Denon.Plugin.AppleTv/README.md`.
+
+- [x] Milestone 0: discovery. Found "Stuen (2)", Apple TV 4K (1st gen), tvOS 26.6.1: Companion :49153, AirPlay :7000,
+      no `_mediaremotetv` (now playing must use the AirPlay tunnel).
+- [ ] Milestone 1: HAP pairing (PIN on the TV; needs the user) + Companion: power, keys, apps. Add BouncyCastle for
+      SRP-6a / Ed25519 / X25519.
+- [ ] Milestone 2: MRP now playing over AirPlay 2 — go/no-go. Risk: tvOS 26 behavior is not confirmed.
+- [ ] Milestone 3: full plugin and standalone release (`appletv-v*` tag).
+
 ## Release / build
 
 - [ ] The installer and exe are unsigned (SmartScreen warning). Consider code signing.
