@@ -311,7 +311,7 @@
 
                                         <Border Grid.Column="0" Width="36" Height="36" CornerRadius="{StaticResource Radius03}" Background="{StaticResource Ink05Brush}" BorderBrush="{StaticResource Ink12Brush}" BorderThickness="1" ClipToBounds="True">
                                             <Grid>
-                                                <Path Data="M20,6H8.3L16.56,2.59L15.81,0.74L3.24,5.96C2.5,6.27 2,7 2,7.8V20A2,2 0 0,0 4,22H20A2,2 0 0,0 22,20V8A2,2 0 0,0 20,6M7,20A3,3 0 0,1 4,17A3,3 0 0,1 7,14A3,3 0 0,1 10,17A3,3 0 0,1 7,20M20,12H18V10H16V12H4V8H20V12Z"
+                                                <Path Data="{StaticResource IconRadio}"
                                                       Fill="{StaticResource AccentBlueSubtleBgBrush}"
                                                       Width="16"
                                                       Height="16"

@@ -64,6 +64,17 @@ public sealed partial class ThemeTokenGuardTests
     }
 
     [Fact]
+    public void Xaml_icons_come_from_the_icon_set()
+    {
+        var offenders = XamlFiles()
+            .Where(f => Path.GetFileName(f) != "Icons.xaml")
+            .SelectMany(f => Lines(f).Where(l => XamlInlineGeometry().IsMatch(l.Text)).Select(l => $"{Rel(f)}:{l.Number}: {l.Text.Trim()}"))
+            .ToList();
+
+        Assert.True(offenders.Count == 0, "Add the icon to Themes/Icons.xaml and use {StaticResource IconName}:\n" + string.Join("\n", offenders));
+    }
+
+    [Fact]
     public void Code_has_no_literal_colors_outside_the_allowed_content_files()
     {
         var offenders = CodeFiles()
@@ -164,6 +175,10 @@ public sealed partial class ThemeTokenGuardTests
     // FontSize="11", CornerRadius="8" (a single value; "4,0,0,4" stays allowed), FontFamily="Segoe UI", and the same as setters.
     [GeneratedRegex("""(\b(FontSize|CornerRadius)="\d+(\.\d+)?"|\bFontFamily="[^"{]+"|Property="(FontSize|CornerRadius)" Value="\d+(\.\d+)?"|Property="FontFamily" Value="[^"{]+")""")]
     private static partial Regex XamlTypographyLiteral();
+
+    // Path markup data written into a view, for example Data="M8,5 L19,12 ...".
+    [GeneratedRegex("""\bData="\s*[MmFf]""")]
+    private static partial Regex XamlInlineGeometry();
 
     [GeneratedRegex("\"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?\"")]
     private static partial Regex CodeHexColor();

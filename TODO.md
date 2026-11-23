@@ -95,7 +95,7 @@ plugins); the meters read `MeterPalette`. `ThemeTokenGuardTests` blocks new hex 
 - [x] Typography and shape tokens in `Themes/Typography.xaml`: type scale `FontSize00`–`FontSize14`, radius scale
       `Radius00`–`Radius09`, fonts `DisplayFont`/`UiFont`/`MonoFont` (610 sizes, 175 radii, 64 font names replaced).
 - [ ] Code-built UI still has literal sizes: the meters' drawn text and the Chromecast/Apple TV dashboards.
-- [ ] Icons: move the 22 inline icon geometries to one `Icons.xaml`.
+- [x] Icon set in `Themes/Icons.xaml`: 21 named geometries (sidebar, title bar, transport, chevrons, tick), 25 uses.
 
 ## Release / build
 

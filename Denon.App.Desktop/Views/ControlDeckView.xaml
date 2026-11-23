@@ -191,7 +191,7 @@
                                 Style="{StaticResource TransportCircleButton}"
                                 ToolTip="Previous Track"
                                 Margin="0,0,8,0">
-                            <Path Data="M6,6H8V18H6M9.5,12L18,18V6"
+                            <Path Data="{StaticResource IconPrevious}"
                                   Fill="{StaticResource TextPrimaryBrush}"
                                   Width="14"
                                   Height="14"
@@ -204,7 +204,7 @@
                                 Margin="0,0,8,0">
                             <Grid>
                                 <!-- Play Icon -->
-                                <Path Data="M8,5.14V19.14L19,12.14L8,5.14Z"
+                                <Path Data="{StaticResource IconPlay}"
                                       Fill="{StaticResource AccentCyanInkBrush}"
                                       Width="20"
                                       Height="20"
@@ -212,7 +212,7 @@
                                       Stretch="Uniform"
                                       Visibility="{Binding IsTransportPlaying, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
                                 <!-- Pause Icon -->
-                                <Path Data="M14,19H18V5H14M6,19H10V5H6V19Z"
+                                <Path Data="{StaticResource IconPause}"
                                       Fill="{StaticResource AccentCyanInkBrush}"
                                       Width="18"
                                       Height="18"
@@ -231,7 +231,7 @@
                         <Button Command="{Binding NextTrackCommand}"
                                 Style="{StaticResource TransportCircleButton}"
                                 ToolTip="Next Track">
-                            <Path Data="M16,18H18V6H16M6,18L14.5,12L6,6V18Z"
+                            <Path Data="{StaticResource IconNext}"
                                   Fill="{StaticResource TextPrimaryBrush}"
                                   Width="14"
                                   Height="14"

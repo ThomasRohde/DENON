@@ -4,10 +4,11 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Order matters: colors (the theme), brushes built from them, typography and shape tokens, then styles. -->
+                <!-- Order matters: colors (the theme), brushes built from them, typography and shape tokens, icons, then styles. -->
                 <ResourceDictionary Source="Themes/Colors.Dark.xaml" />
                 <ResourceDictionary Source="Themes/Brushes.xaml" />
                 <ResourceDictionary Source="Themes/Typography.xaml" />
+                <ResourceDictionary Source="Themes/Icons.xaml" />
                 <ResourceDictionary Source="Themes/DenonTheme.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>

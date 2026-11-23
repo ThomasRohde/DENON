@@ -624,7 +624,7 @@
                                 Margin="0,1,10,0"
                                 VerticalAlignment="Top">
                             <Path x:Name="CheckMark"
-                                  Data="M2,6.5 L5.5,10 L12,2.5"
+                                  Data="{StaticResource IconCheck}"
                                   Width="10"
                                   Height="10"
                                   Stretch="Uniform"
@@ -820,7 +820,7 @@
                         <Path HorizontalAlignment="Right"
                               VerticalAlignment="Center"
                               Margin="0,0,11,0"
-                              Data="M 0 0 L 4 4 L 8 0"
+                              Data="{StaticResource IconChevronDown}"
                               Stroke="{StaticResource TextMutedBrush}"
                               StrokeThickness="1.5"
                               IsHitTestVisible="False" />
@@ -1041,7 +1041,7 @@
                                                 </Grid.ColumnDefinitions>
                                                 <Path x:Name="Chevron"
                                                       Grid.Column="0"
-                                                      Data="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"
+                                                      Data="{StaticResource IconChevronRight}"
                                                       Fill="{StaticResource TextMutedBrush}"
                                                       Width="12"
                                                       Height="12"

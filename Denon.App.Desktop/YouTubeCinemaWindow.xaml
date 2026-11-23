@@ -86,7 +86,7 @@
                                 FontSize="{StaticResource FontSize04}"
                                 Margin="0,0,8,0" />
                         <Button Click="CloseButton_Click" Style="{StaticResource TitleBarCloseButton}" ToolTip="Close Cinema Window">
-                            <Path Data="M1,1 L9,9 M9,1 L1,9"
+                            <Path Data="{StaticResource IconClose}"
                                   Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                   StrokeThickness="1.5"
                                   Width="10"
