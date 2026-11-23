@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.15.1] - 2026-11-23
+
+### Added
+- **`TODO.md`**: Open work in one place (meter phases 2–3, habit telemetry, Chromecast plugin, release).
+
 ### Changed
 - **VU meters & 31-band RTA follow the Denon, not the PC**: A new source router picks the meter signal from what the receiver plays. A badge shows the source: **DENON** (real PC Cast audio, delayed by the measured HEOS delay `CinemaSyncOffsetMs` so it is in sync with the speakers), **SIM** (the Denon plays TV/HDMI/HEOS audio the app cannot hear; simulated from the Denon volume and fading out below volume 15), **MUTED**, **PC** (the Denon is off or idle; the PC's own output, labelled "PC AUDIO (NOT DENON)" on the RTA) and **IDLE**. A podcast on the laptop no longer shows as Denon audio.
 
