@@ -5,6 +5,7 @@ Released separately from Denon Desktop with tags `chromecast-vX.Y.Z`.
 ## [Unreleased]
 
 ### Changed
+- **Status shows what plays**: While a device has an app, the plugin status (Plugins card, and Denon Desktop's now-playing hero from app 1.17) is `CASTING • <device> • <app> • <title>` or `CAST PAUSED • …` instead of "1 Cast device(s) connected.".
 - **Sessions end with `reason: "app_shutdown"` when Denon Desktop exits** (app 1.17+, SDK `IsAppShuttingDown`), and with `plugin_stopped` only when the plugin itself is stopped or disabled. On app 1.16 the plugin still loads and falls back to `plugin_stopped`.
 - **Long pauses end the session**: A cast session that stays paused for 10 minutes ends with `reason: "paused"`. When the program plays again, a new session starts (after 15 s of play). Before, a whole evening of pause and resume was one long session.
 

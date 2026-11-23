@@ -16,6 +16,13 @@ public sealed record SmartTvNowShowing(
     string Showing,
     bool IsScreenOff);
 
+/// <summary>What a Chromecast plays, from the Chromecast plugin's status text.</summary>
+public sealed record CastNowPlaying(
+    string DeviceName,
+    string App,
+    string? Title,
+    bool IsPlaying);
+
 public static class NowPlayingResolver
 {
     public static ResolvedNowPlaying Resolve(
@@ -51,6 +58,31 @@ public static class NowPlayingResolver
             if (IsTvAudioInput(status.InputSource))
             {
                 var tvInfo = TryExtractSmartTvNowShowing(plugins);
+
+                // A Chromecast plays and the TV shows an HDMI input (or there is no TV plugin to ask):
+                // show the cast program, not "DVD Player (HDMI 1)". Live TV and TV apps still win.
+                if (TryExtractCastNowPlaying(plugins) is { } cast &&
+                    (tvInfo is null ? cast.IsPlaying : tvInfo.Showing.Contains("HDMI", StringComparison.OrdinalIgnoreCase)))
+                {
+                    var castDetail = new List<string> { cast.Title is null ? "Cast" : $"Cast • {cast.App}", cast.DeviceName };
+                    if (tvInfo is not null)
+                    {
+                        castDetail.Add($"TV {tvInfo.Showing}");
+                    }
+
+                    if (soundMode != "—")
+                    {
+                        castDetail.Add(soundMode);
+                    }
+
+                    return new ResolvedNowPlaying(
+                        Title: cast.Title ?? cast.App,
+                        Detail: string.Join(" • ", castDetail),
+                        ImageUrl: string.Empty,
+                        PlayStateLabel: cast.IsPlaying ? "Casting" : "Paused",
+                        IsExternalLiveInput: true);
+                }
+
                 if (tvInfo is not null)
                 {
                     var detailParts = new List<string> { "TV Audio" };
@@ -235,6 +267,29 @@ public static class NowPlayingResolver
         }
 
         return new SmartTvNowShowing(model, showing, isScreenOff);
+    }
+
+    /// <summary>
+    /// Reads the Chromecast plugin status: "CASTING • &lt;device&gt; • &lt;app&gt;[ • &lt;title&gt;]" or "CAST PAUSED • …".
+    /// Null when the plugin is missing, stopped, or nothing is cast.
+    /// </summary>
+    public static CastNowPlaying? TryExtractCastNowPlaying(IReadOnlyList<PluginRecordSnapshot>? plugins)
+    {
+        var cast = plugins?.FirstOrDefault(static p =>
+            p.Id.Equals("chromecast", StringComparison.OrdinalIgnoreCase) && p.IsEnabled && p.IsStarted);
+        if (cast is null || string.IsNullOrWhiteSpace(cast.StatusText))
+        {
+            return null;
+        }
+
+        var parts = cast.StatusText.Split(" • ", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 3 || parts[0] is not ("CASTING" or "CAST PAUSED"))
+        {
+            return null;
+        }
+
+        var title = parts.Length > 3 ? string.Join(" • ", parts.Skip(3)) : null;
+        return new CastNowPlaying(parts[1], parts[2], string.IsNullOrWhiteSpace(title) ? null : title, parts[0] == "CASTING");
     }
 
     private static string BuildMetadataDetail(

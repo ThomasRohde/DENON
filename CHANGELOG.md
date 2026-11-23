@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+- **Now-playing hero during a cast**: When the Denon is on TV Audio and the LG TV shows an HDMI input, the hero now shows the cast program ("Spionhvalen: Undercover i Arktis", detail "Cast • DR TV • Stuen 2 • TV DVD Player (HDMI 1)", state Casting/Paused) instead of "DVD Player (HDMI 1)". Live TV and TV apps still win. Without the LG TV plugin, only a playing cast is shown. Reads the Chromecast plugin status (0.3.0+).
+
 ### Fixed
 - **Plugins built against a newer SDK did not load on an older app** ("Unable to load one or more of the requested types"): .NET refuses a plugin that references a higher SDK assembly version. The SDK `AssemblyVersion` is now pinned at 1.16.0.0 for additive changes (the file version carries the real SDK version), and the host binds every plugin to its own SDK regardless of version. Verified: a plugin built against SDK 1.17 loads and stops cleanly on the 1.16.0 app.
 - **Plugins view badge** showed "SDK v1.15"; it now reads the SDK file version ("SDK v1.17").

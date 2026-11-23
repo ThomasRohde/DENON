@@ -704,6 +704,13 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
         {
             RecordEvent("cast.playback_changed", config, current, origin: "external");
         }
+
+        // The status text carries "what plays" for the plugin card and the host's now-playing hero.
+        if (previous.HasActiveApp != current.HasActiveApp || previous.AppName != current.AppName ||
+            previous.Title != current.Title || previous.IsPlaying != current.IsPlaying)
+        {
+            ReportAggregateStatus();
+        }
     }
 
     private async Task OnSessionStartedAsync(CastDeviceConfig config, CastDeviceState state)
@@ -996,6 +1003,21 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
         }
     }
 
+    internal static string FormatCastStatus(string deviceName, CastDeviceState state)
+    {
+        static string Clean(string? s) => (s ?? string.Empty).Replace(" • ", " - ").Trim();
+
+        var app = Clean(state.AppName);
+        var title = Clean(state.Title);
+        var parts = new List<string> { state.IsPlaying ? "CASTING" : "CAST PAUSED", Clean(deviceName), app.Length > 0 ? app : "Cast app" };
+        if (title.Length > 0 && !title.Equals(app, StringComparison.OrdinalIgnoreCase))
+        {
+            parts.Add(title);
+        }
+
+        return string.Join(" • ", parts);
+    }
+
     private void ReportAggregateStatus()
     {
         if (_context is null)
@@ -1006,6 +1028,19 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
         var views = GetDeviceViews();
         var enabled = views.Count(v => v.Config.Enabled);
         var connected = views.Count(v => v.State.Connection == CastConnectionState.Connected);
+
+        // Something plays (or is paused): report it. Format read by the host (NowPlayingResolver), keep it stable:
+        // "CASTING • <device> • <app>[ • <title>]" or "CAST PAUSED • <device> • <app>[ • <title>]".
+        var active = views
+            .Where(v => v.Config.Enabled && v.State.HasActiveApp)
+            .OrderByDescending(v => v.State.IsPlaying)
+            .FirstOrDefault();
+        if (active.Config is not null)
+        {
+            _context.ReportStatus(FormatCastStatus(active.Config.Name, active.State), PluginHealthState.Connected);
+            return;
+        }
+
         if (enabled == 0)
         {
             _context.ReportStatus("No Cast devices yet. Waiting for discovery.", PluginHealthState.Idle);
