@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-11-23
+
+### Added
+- **Plugin SDK 1.15 — Receiver Control API**: New `IPluginReceiverControl` (power, input, sound mode, volume, mute, Smart Scenes) exposed as `IPluginContext.ReceiverControl`. The host grants it only to plugins that declare the new `PluginCapabilities.ReceiverControl` flag and logs every command with the plugin id. The member has a default `null` implementation, so existing plugins are not affected.
+- **First standalone external plugin — Chromecast & Google Cast** (`external-plugins/Denon.Plugin.Chromecast`): mDNS discovery, live now-playing, Cast v2 media and volume control, `media` telemetry events, and per-device Denon automations (power on, Smart Scene, input, sound mode on session start; idle power-off; pause when the receiver powers off). Writes habit-ready `session.started`/`session.ended` watch sessions (`kind: "cast"`, per program, 15 s dwell, `watchedSec` excludes pauses) plus `cast.app_ended` summaries on the `media` stream. Not part of the app solution; install with `install.ps1`.
+
+### Fixed
+- **Plugins view**: The plugin card now always shows the version (a long name no longer pushes it out), and the header badge shows `SDK v1.15`.
+- **Chromecast dashboard**: Dark-themed drop-downs (the host has no ComboBox theme) and a "No artwork" placeholder.
+- **Local release build**: `release-out/` is now ignored by git.
+
 ## [1.14.0] - 2026-11-22
 
 ### Changed

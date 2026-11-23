@@ -11,6 +11,9 @@ public enum PluginCapabilities
     LocalNetwork = 1 << 4,
     AudioReactive = 1 << 5,
     AlbumArtSync = 1 << 6,
+
+    /// <summary>The plugin may send commands to the receiver through <see cref="IPluginContext.ReceiverControl"/>.</summary>
+    ReceiverControl = 1 << 7,
 }
 
 public enum PluginHealthState

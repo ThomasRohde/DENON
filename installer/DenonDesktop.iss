@@ -1,9 +1,9 @@
 ; Denon Desktop — Unsigned Windows x64 Installer (Inno Setup 6)
 ; Build in CI or locally via:
-;   iscc /DMyAppVersion=1.14.0 /DMySourceExe=..\release-out\Denon.App.Desktop-win-x64.exe /DMyOutputDir=..\release-out .\installer\DenonDesktop.iss
+;   iscc /DMyAppVersion=1.15.0 /DMySourceExe=..\release-out\Denon.App.Desktop-win-x64.exe /DMyOutputDir=..\release-out .\installer\DenonDesktop.iss
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.14.0"
+  #define MyAppVersion "1.15.0"
 #endif
 
 #ifndef MySourceExe

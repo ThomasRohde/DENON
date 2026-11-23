@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Standalone external plugin. It is NOT part of DenonDesktop.slnx and is NOT shipped with the app.
+    Build it, then copy the output folder to %LocalAppData%\DenonDesktop\plugins\external\Chromecast\.
+    The SDK reference is compile-only: the host shares its own Denon.App.PluginSdk.dll at run time.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Version>0.1.0</Version>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <RootNamespace>Denon.Plugin.Chromecast</RootNamespace>
+    <Description>Google Cast / Chromecast plugin for Denon Desktop: discovery, now playing, media control and receiver automations.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Denon.App.PluginSdk\Denon.App.PluginSdk.csproj">
+      <Private>false</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
+  </ItemGroup>
+
+</Project>

@@ -482,3 +482,6 @@ $RECYCLE.BIN/
 *.swp
 *.exe
 AppRelease/
+
+# Local release build output (build-release.ps1)
+release-out/

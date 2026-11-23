@@ -51,6 +51,12 @@ public interface IPluginContext
     IPluginReceiverBridge Receiver { get; }
 
     /// <summary>
+    /// Receiver command channel. It is null when the plugin manifest does not declare
+    /// <see cref="PluginCapabilities.ReceiverControl"/>, or when the host does not support it.
+    /// </summary>
+    IPluginReceiverControl? ReceiverControl => null;
+
+    /// <summary>
     /// Creates an HttpClient suitable for communicating with external or local LAN hardware bridges.
     /// When <paramref name="allowLocalSelfSignedTls"/> is true, self-signed TLS certificates on RFC1918
     /// private LAN addresses (such as Philips Hue Bridges) are permitted.

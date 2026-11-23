@@ -549,6 +549,9 @@ public sealed class PluginHostService : IAsyncDisposable
             new PluginLoggerImpl(manifest.Id, _logStore),
             new PluginStorageImpl(AppDataPaths.GetPluginDataDirectory(manifest.Id)),
             new PluginReceiverBridgeImpl(_stateStore),
+            manifest.Capabilities.HasFlag(PluginCapabilities.ReceiverControl)
+                ? new PluginReceiverControlImpl(manifest.Id, _receiverController, _stateStore, _logStore)
+                : null,
             new PluginEventLoggerImpl(manifest.Id, _telemetry),
             (statusText, health) =>
             {
@@ -927,6 +930,84 @@ public sealed class PluginHostService : IAsyncDisposable
         public PluginReceiverSnapshot CurrentSnapshot => MapSnapshot(stateStore.Snapshot);
     }
 
+    /// <summary>
+    /// Receiver command channel for plugins that declare <see cref="PluginCapabilities.ReceiverControl"/>.
+    /// Every command is logged with the plugin id.
+    /// </summary>
+    private sealed class PluginReceiverControlImpl(
+        string pluginId,
+        ReceiverController controller,
+        ReceiverStateStore stateStore,
+        AppLogStore logStore) : IPluginReceiverControl
+    {
+        public Task<PluginReceiverSnapshot> SetPowerAsync(bool powerOn, CancellationToken cancellationToken = default) =>
+            RunAsync($"power {(powerOn ? "on" : "off")}", ct => controller.SetPowerAsync(powerOn, ct), cancellationToken);
+
+        public Task<PluginReceiverSnapshot> SetInputSourceAsync(string sourceCode, CancellationToken cancellationToken = default)
+        {
+            var code = RequireCode(sourceCode, nameof(sourceCode));
+            return RunAsync($"input {code}", ct => controller.SetInputSourceAsync(code, ct), cancellationToken);
+        }
+
+        public Task<PluginReceiverSnapshot> SetSoundModeAsync(string modeCode, CancellationToken cancellationToken = default)
+        {
+            var code = RequireCode(modeCode, nameof(modeCode));
+            return RunAsync($"sound mode {code}", ct => controller.SetSoundModeAsync(code, ct), cancellationToken);
+        }
+
+        public Task<PluginReceiverSnapshot> SetVolumeAsync(int level, CancellationToken cancellationToken = default)
+        {
+            var clamped = Math.Clamp(level, 0, 98);
+            return RunAsync($"volume {clamped}", ct => controller.SetVolumeAsync(clamped, ct), cancellationToken);
+        }
+
+        public Task<PluginReceiverSnapshot> SetMuteAsync(bool isMuted, CancellationToken cancellationToken = default) =>
+            RunAsync($"mute {(isMuted ? "on" : "off")}", ct => controller.SetMuteAsync(isMuted, ct), cancellationToken);
+
+        public IReadOnlyList<PluginSceneInfo> GetScenes() =>
+            controller.GetScenes().Select(s => new PluginSceneInfo(s.Id, s.Name, s.Description)).ToList();
+
+        public Task<PluginReceiverSnapshot> RunSceneAsync(string sceneIdOrName, CancellationToken cancellationToken = default)
+        {
+            var key = (sceneIdOrName ?? string.Empty).Trim();
+            var scenes = controller.GetScenes();
+            var scene = scenes.FirstOrDefault(s => string.Equals(s.Id, key, StringComparison.OrdinalIgnoreCase))
+                        ?? scenes.FirstOrDefault(s => string.Equals(s.Name, key, StringComparison.OrdinalIgnoreCase))
+                        ?? throw new ArgumentException($"No Smart Scene matches '{key}'.", nameof(sceneIdOrName));
+            return RunAsync($"scene '{scene.Name}'", ct => controller.ApplySceneAsync(scene, ct), cancellationToken);
+        }
+
+        private async Task<PluginReceiverSnapshot> RunAsync(
+            string description,
+            Func<CancellationToken, Task<ReceiverStatus>> command,
+            CancellationToken cancellationToken)
+        {
+            logStore.Info($"[Plugin:{pluginId}] Receiver command: {description}");
+            try
+            {
+                await command(cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logStore.Warning($"[Plugin:{pluginId}] Receiver command '{description}' failed: {ex.Message}");
+                throw;
+            }
+
+            return MapSnapshot(stateStore.Snapshot);
+        }
+
+        private static string RequireCode(string value, string paramName)
+        {
+            var code = (value ?? string.Empty).Trim().ToUpperInvariant();
+            if (code.Length is 0 or > 16 || code.Any(c => char.IsControl(c)))
+            {
+                throw new ArgumentException("Code must be 1–16 printable characters.", paramName);
+            }
+
+            return code;
+        }
+    }
+
     private sealed class PluginEventLoggerImpl(string pluginId, EventTelemetryLog telemetry) : IPluginEventLogger
     {
         public void RecordEvent(
@@ -966,6 +1047,7 @@ public sealed class PluginHostService : IAsyncDisposable
         IPluginLogger logger,
         IPluginStorage storage,
         IPluginReceiverBridge receiver,
+        IPluginReceiverControl? receiverControl,
         IPluginEventLogger events,
         Action<string, PluginHealthState> reportStatus) : IPluginContext
     {
@@ -976,6 +1058,8 @@ public sealed class PluginHostService : IAsyncDisposable
         public IPluginStorage Storage { get; } = storage;
 
         public IPluginReceiverBridge Receiver { get; } = receiver;
+
+        public IPluginReceiverControl? ReceiverControl { get; } = receiverControl;
 
         public IPluginEventLogger Events { get; } = events;
 
