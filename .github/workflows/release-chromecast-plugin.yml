@@ -1,0 +1,108 @@
+name: Release Chromecast Plugin
+
+# Standalone release of the external Chromecast plugin, separate from the app (tags v*).
+# Push a tag chromecast-vX.Y.Z that matches <Version> in Denon.Plugin.Chromecast.csproj.
+on:
+  push:
+    tags:
+      - 'chromecast-v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    env:
+      PLUGIN_DIR: external-plugins/Denon.Plugin.Chromecast
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Read and check version
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$csproj = Get-Content "$env:PLUGIN_DIR/Denon.Plugin.Chromecast.csproj"
+          $version = ($csproj.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1).Trim()
+          $ref = "${{ github.ref_name }}"
+          if ($ref -like 'chromecast-v*') {
+            $tagVersion = $ref.Substring('chromecast-v'.Length)
+            if ($tagVersion -ne $version) {
+              throw "Tag $ref does not match <Version>$version</Version> in Denon.Plugin.Chromecast.csproj."
+            }
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Publish plugin
+        shell: pwsh
+        run: |
+          dotnet publish "$env:PLUGIN_DIR/Denon.Plugin.Chromecast.csproj" -c Release -o .\plugin-out\Chromecast --nologo
+          if ($LASTEXITCODE -ne 0) { throw "Publish failed." }
+          if (Test-Path .\plugin-out\Chromecast\Denon.App.PluginSdk.dll) {
+            throw "The SDK must not ship with the plugin (the host provides it)."
+          }
+          Copy-Item "$env:PLUGIN_DIR/README.md", "$env:PLUGIN_DIR/CHANGELOG.md", .\LICENSE .\plugin-out\Chromecast\
+          Get-ChildItem .\plugin-out\Chromecast | Format-Table Name, Length -AutoSize
+
+      - name: Package zip and checksum
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          New-Item -ItemType Directory -Force .\release-out | Out-Null
+          $zipName = "Denon.Plugin.Chromecast-$version.zip"
+          Compress-Archive -Path .\plugin-out\Chromecast\* -DestinationPath ".\release-out\$zipName" -Force
+          $hash = (Get-FileHash ".\release-out\$zipName" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $zipName" | Set-Content .\release-out\SHA256SUMS.txt -Encoding ascii
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Denon.Plugin.Chromecast-${{ steps.version.outputs.version }}
+          path: release-out/*
+
+      - name: Release notes from plugin CHANGELOG.md
+        if: startsWith(github.ref, 'refs/tags/chromecast-v')
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $changelog = Get-Content "$env:PLUGIN_DIR/CHANGELOG.md" -Raw
+          $pattern = "(?ms)^##\s+\[$([regex]::Escape($version))\][^\r\n]*\r?\n(.*?)(?=^##\s+\[|\z)"
+          $match = [regex]::Match($changelog, $pattern)
+          $body = if ($match.Success) { $match.Groups[1].Value.Trim() } else { "Chromecast plugin $version." }
+          $sha = (Get-Content .\release-out\SHA256SUMS.txt -Raw).Trim()
+          $fence = '```'
+          @(
+            $body,
+            '',
+            '---',
+            '',
+            '### Install',
+            "1. Download ``Denon.Plugin.Chromecast-$version.zip``.",
+            '2. Unzip it to `%LocalAppData%\DenonDesktop\plugins\external\Chromecast\` (close Denon Desktop first when you update).',
+            '3. Start Denon Desktop and open **Plugins → Chromecast & Google Cast**.',
+            '',
+            'Needs Denon Desktop **1.15.0 or later**. This is a separate release; the app itself is released with `v*` tags.',
+            '',
+            '### SHA-256 Checksum',
+            "${fence}text",
+            $sha,
+            $fence
+          ) -join "`n" | Set-Content .\release-out\RELEASE_NOTES.md -Encoding utf8
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/chromecast-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Chromecast Plugin v${{ steps.version.outputs.version }}
+          body_path: release-out/RELEASE_NOTES.md
+          make_latest: false
+          files: |
+            release-out/Denon.Plugin.Chromecast-${{ steps.version.outputs.version }}.zip
+            release-out/SHA256SUMS.txt

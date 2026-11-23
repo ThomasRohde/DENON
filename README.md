@@ -49,7 +49,10 @@ Auto-detect receiver IP & model name, configure LAN relay / FFmpeg / Cinema A/V 
 
 ## Key Features
 
-- **Extensible Plugin System & Official SDK (`Denon.App.PluginSdk`)**: Host built-in plugins and drop-in external `.NET 10` plugin `.dll` assemblies (`%LocalAppData%\DenonDesktop\plugins\external\`) via isolated `AssemblyLoadContext`, complete with per-plugin JSON storage, AVR event broadcasting, callable actions, and a 60 Hz zero-allocation FFT Audio-Reactive & Album-Art Palette API.
+- **Extensible Plugin System & Official SDK (`Denon.App.PluginSdk` 1.15)**: Host built-in plugins and drop-in external `.NET 10` plugin `.dll` assemblies (`%LocalAppData%\DenonDesktop\plugins\external\`) via isolated `AssemblyLoadContext`, complete with per-plugin JSON storage, AVR event broadcasting, callable actions, and a 60 Hz zero-allocation FFT Audio-Reactive & Album-Art Palette API. **SDK 1.15** adds a **Receiver Control API** (`IPluginReceiverControl`: power, input, sound mode, volume, mute, Smart Scenes), granted only to plugins that declare `PluginCapabilities.ReceiverControl` and logged per plugin.
+- **Chromecast & Google Cast Plugin (external, separate download)**: The first standalone drop-in plugin. Finds Cast devices by mDNS, shows live now-playing, controls media and volume over Cast v2, and drives the Denon when an app starts or stops (power on, Smart Scene, input, sound mode, idle power-off). It logs *what* you cast (app, title, watched time) to the habit event log. See [`external-plugins/Denon.Plugin.Chromecast`](external-plugins/Denon.Plugin.Chromecast/README.md).
+- **Habit-Ready Event Telemetry**: Structured NDJSON event logs per domain (`media`, `avr`, `tv`, `lighting`, `control`) in `%LocalAppData%\DenonDesktop\logs\events\`. Watch and listen sessions (`session.started` / `session.ended`) from the AVR, the LG TV and plugins share one schema. Parallel sessions of one viewing (Cast → TV HDMI → Denon TV Audio) are marked with `coveredSec` / `exclusiveSec` / `coveredBy`, so summing `exclusiveSec` gives real time with no double counting.
+- **Built-In MCP Server (`http://127.0.0.1:18926/mcp`)**: Spec-compliant Streamable HTTP MCP server with Bearer auth, Room Graph resources, habit summaries, event queries, and auto-bridged plugin actions. Copy the client config from **MCP & Room Brain** into Claude Desktop, Cursor, VS Code or other MCP clients.
 - **3 Official Built-In Plugins**:
   - **Philips Hue Smart Lighting & 50 Hz Entertainment DTLS Sync** (`Denon.Plugin.PhilipsHue`): Auto-discovers Bridges (Cloud + offline LAN SSDP), guided 30-second Link-Button HTTPS pairing with Entertainment `clientkey`, Rooms/Zones/Lights/Scenes, **4-Mode Real-Time FFT Music Sync** (*Bass Pulse*, *Spectrum Split*, *Album-Art Ambient*, *Cinema Subtle*) over **50 Hz Hue Entertainment API v2 DTLS/UDP (`:2100`)** with automatic LAN REST fallback, and Denon AVR automations.
   - **Smart TV Control — LG webOS + Wake-on-LAN** (`Denon.Plugin.SmartTv`): SSAP WebSocket (`:3000`) pairing, Wake-on-LAN Power On, Power Off, HDMI 1/2/3 & app launching, TV mute, and on-screen toast alerts when Smart Scenes fire.
@@ -98,6 +101,7 @@ Denon Desktop combines the **HEOS CLI Protocol (TCP `:1255`)** for streaming, me
 Download from the [**Releases**](../../releases/latest) page (no .NET runtime installation required):
 - **Windows Installer (Unsigned):** **`DenonDesktop-Setup-win-x64.exe`** — installs cleanly per-user with Start Menu & optional Desktop/Startup shortcuts and Add/Remove Programs uninstaller. *(Because this open-source build is unsigned, Windows SmartScreen may show a prompt — click **More info → Run anyway**.)*
 - **Portable Single-File Executable:** **`Denon.App.Desktop-win-x64.exe`** — run directly from any folder with zero installation.
+- **Chromecast plugin (optional, own release):** download **`Denon.Plugin.Chromecast-<version>.zip`** from the latest [`chromecast-v*` release](../../releases?q=chromecast&expanded=true), unzip it to `%LocalAppData%\DenonDesktop\plugins\external\Chromecast\`, and restart Denon Desktop. Needs Denon Desktop 1.15 or later.
 
 1. Launch Denon Desktop — on first launch, it automatically scans your LAN and connects to your Denon/Marantz receiver.
 2. To use **YouTube Cast**, **PC Audio Cast**, **Local FLAC Jukebox**, or the **Couch Phone Remote**, click **Allow Firewall** in the **YouTube & Music** or **Cast & Remote** tab once to open Private-LAN TCP port `18925`.
@@ -108,12 +112,23 @@ Download from the [**Releases**](../../releases/latest) page (no .NET runtime in
 # Build entire solution
 dotnet build .\DenonDesktop.slnx
 
+# Run the xUnit test suite
+dotnet test .\DenonDesktop.slnx -c Release
+
 # Run from source (opens window immediately)
 dotnet run --project .\Denon.App.Desktop\Denon.App.Desktop.csproj -- --show
 
-# Publish self-contained single-file Windows x64 executable
-dotnet publish .\Denon.App.Desktop\Denon.App.Desktop.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o .\Denon.App.Desktop\AppRelease
+# Local release build, same steps as CI: tests -> single-file exe -> Inno Setup installer -> SHA256SUMS
+# (needs Inno Setup 6: winget install JRSoftware.InnoSetup). Output: .\release-out\
+pwsh -File .\build-release.ps1
+
+# Build and install the external Chromecast plugin from source
+pwsh -File .\external-plugins\Denon.Plugin.Chromecast\install.ps1
 ```
+
+### Releases
+- Push a `vX.Y.Z` tag to build and publish the app (installer, portable exe, checksums). Release notes come from the matching `CHANGELOG.md` section.
+- Push a `chromecast-vX.Y.Z` tag to build and publish the Chromecast plugin as its own release (zip + checksum).
 
 ---
 
@@ -126,11 +141,15 @@ dotnet publish .\Denon.App.Desktop\Denon.App.Desktop.csproj -c Release -r win-x6
 | **`Denon.Plugin.PhilipsHue`** | Official Philips Hue plugin (compiled strictly against `Denon.App.PluginSdk`): Bridge discovery & pairing, CLIP v1/v2 Rooms/Lights/Scenes/Entertainment Area client, **50 Hz DTLS/UDP (`:2100`) Entertainment streaming**, 4-Mode Real-Time FFT Music Sync, Album-Art Ambient sync, Demo Simulator, and Obsidian WPF dashboard. |
 | **`Denon.Plugin.SmartTv`** | Official LG webOS Smart TV + Wake-on-LAN plugin: SSAP WebSocket (`:3000`) pairing, power, HDMI input & app switching, on-screen toast notifications, and AVR scene coordination. |
 | **`Denon.Plugin.HomeAssistant`** | Official Home Assistant REST & Webhook plugin: trigger HA scenes/scripts/switches and publish live `sensor.denon_desktop_receiver` telemetry. |
+| **`external-plugins/Denon.Plugin.Chromecast`** | Standalone external Chromecast / Google Cast plugin (not in the solution, released separately): Cast v2 over TLS `:8009`, mDNS discovery, habit watch sessions, per-device Denon automations. Uses the SDK compile-only. |
+| **`Denon.App.Core.Tests`** | xUnit tests for core services and review regressions, including event telemetry and session overlap. |
 | **`Denon.App.Desktop`** | Custom-chromed Obsidian Hi-Fi WPF UI, dual-channel VSync `AnalogVuMeterControl` + 31-band `SpectrumAnalyzerControl`, 512-point Radix-2 FFT `LiveAudioAnalyzerService`, `AlbumArtPaletteService`, 1-click `AcousticSyncCalibrationService`, `NAudio` WASAPI loopback PC audio caster, `QRCoder` Phone Remote QR generator, `WebView2` Cinema Companion window, Win32 Global Hotkey engine, and Windows startup integration. |
 
 ### Local Data & Persistence
 - **Settings:** `%LocalAppData%\DenonDesktop\settings.json` (JSON export/import supported in Settings)
 - **Logs:** `%LocalAppData%\DenonDesktop\logs\app.log`
+- **Event telemetry (habits):** `%LocalAppData%\DenonDesktop\logs\events\<stream>-<date>.jsonl`, plus `room-habits.json`
+- **External plugins:** `%LocalAppData%\DenonDesktop\plugins\external\` (one folder per plugin; per-plugin data in `plugins\data\`)
 - **WebView2 Cache:** `%LocalAppData%\DenonDesktop\webview2\`
 
 ### Keyboard Shortcuts (Customizable in Settings)

@@ -72,14 +72,26 @@ the plugin picks the device that plays, then the device with an active app, then
 - The PC and the Cast devices must be on the same LAN. Windows Firewall must allow inbound UDP
   for Denon Desktop, or mDNS answers do not arrive. "Add by IP" works without mDNS.
 
-## Build and install
+## Install
+
+**From a release (no SDK needed):** the plugin has its own GitHub releases, tagged `chromecast-vX.Y.Z`.
+
+1. Download `Denon.Plugin.Chromecast-<version>.zip` from the latest `chromecast-v*` release.
+2. Unzip it to `%LocalAppData%\DenonDesktop\plugins\external\Chromecast\`.
+3. Restart Denon Desktop, then open **Plugins → Chromecast & Google Cast**.
+
+**From source:**
 
 ```powershell
 pwsh ./external-plugins/Denon.Plugin.Chromecast/install.ps1
 ```
 
 The script publishes the plugin and copies it to
-`%LocalAppData%\DenonDesktop\plugins\external\Chromecast\`.
+`%LocalAppData%\DenonDesktop\plugins\external\Chromecast\`. Close Denon Desktop first when you update
+the plugin, because the loaded DLL is in use.
+
+**Release a new version:** set `<Version>` in `Denon.Plugin.Chromecast.csproj`, then push a tag
+`chromecast-v<same version>`. The `release-chromecast-plugin.yml` workflow builds the zip and publishes the release.
 The SDK reference is compile-only (`Private=false`, `ExcludeAssets=runtime`), so the plugin uses the host's
 `Denon.App.PluginSdk.dll`.
 
@@ -103,5 +115,8 @@ The SDK reference is compile-only (`Private=false`, `ExcludeAssets=runtime`), so
 | `Cast/CastChannel.cs` | TLS connection, framing, heartbeat, request/response |
 | `Cast/CastDeviceClient.cs` | One device: reconnect, receiver and media status, commands |
 | `Cast/MdnsCastDiscovery.cs` | Minimal mDNS browser (PTR, SRV, TXT, A) |
+| `Cast/CastAppNames.cs` | Clean app names by Cast app id (for example DR TV) |
+| `CastWatchLog.cs` | Habit watch sessions (`session.started` / `session.ended`, `cast.app_ended`) |
+| `ChromecastConfig.cs` | Per-device settings and automation config |
 | `ChromecastPlugin.cs` | `IDenonPlugin`: actions, events, automations, config |
 | `ChromecastDashboardView.cs` | Dashboard UI, built in code (no XAML) |
