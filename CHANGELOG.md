@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-11-23
+
 ### Changed
 - **New VU meters**: A backlit stereo pair of glass-fronted analog dials (amber L, cyan R). The needle follows the true VU law (deflection proportional to amplitude, −20…+3 VU, 0 VU = −7.2 dBFS, a touch past +3 against the pin), over a printed scale with a red zone and an inner 0–100 % scale. The lamp brightens with the program; tapered needle with glow and shadow, pivot hood, glass sheen and vignette. Each dial shows its channel, a live dBFS readout with 1.5 s peak hold (about 12 Hz, readable), a PEAK lamp (+1 VU) and the source print (DENON · SYNCED / SIM / PC / MUTED / IDLE). The face widens to fill the window, so wide windows show no dead margins. Drawn as a few visuals; a frame only turns two needles.
 - **New spectrum (RTA)**: A segmented LED display: bars snap to whole LED segments (crisp at any DPI), colored by height (deep blue → cyan → ice → amber → red), over dim unlit segments, with peak caps that hold 0.45 s and then fall with gravity, a blurred bloom layer, a glass-floor reflection and a source pill. Frequency labels now sit at the true band centers (before they were evenly spaced, so most were in the wrong place).
