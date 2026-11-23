@@ -2,9 +2,9 @@
 
 Released separately from Denon Desktop with tags `appletv-vX.Y.Z`.
 
-## [Unreleased]
+## [0.2.0] - 2026-11-23
 
-Needs Plugin SDK 2.0 (the next Denon Desktop release); older Denon Desktop versions cannot load it.
+Needs Denon Desktop **1.21.0** or later (Plugin SDK 2.0).
 
 ### Removed
 - The fallbacks for older Denon Desktop versions (missing `IsAppShuttingDown` or receiver control).
