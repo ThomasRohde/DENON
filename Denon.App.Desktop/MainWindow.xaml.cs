@@ -53,13 +53,13 @@ public partial class MainWindow : Window
         if (_viewModel.ShowAnalogVu)
         {
             var (left, right, source) = _viewModel.StepVuMeterFrame(dt);
-            HeroVuMeter.SetLevelsImmediate(left, right, source);
+            ControlDeckPage.HeroVuMeter.SetLevelsImmediate(left, right, source);
         }
 
         if (_viewModel.ShowRtaSpectrum)
         {
             var rtaSource = _viewModel.StepSpectrumFrame(_spectrumBandsBuffer, dt);
-            HeroSpectrumAnalyzer.SetBandsImmediate(_spectrumBandsBuffer, dt, rtaSource);
+            ControlDeckPage.HeroSpectrumAnalyzer.SetBandsImmediate(_spectrumBandsBuffer, dt, rtaSource);
         }
     }
 
@@ -97,72 +97,6 @@ public partial class MainWindow : Window
             : WindowState.Maximized;
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
-
-    private void VolumeSlider_DragStarted(object sender, DragStartedEventArgs e) =>
-        _viewModel.BeginVolumeDrag();
-
-    private void VolumeSlider_DragCompleted(object sender, DragCompletedEventArgs e) =>
-        _viewModel.EndVolumeDrag();
-
-    private void VolumeCard_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
-    {
-        var delta = e.Delta > 0 ? 2 : -2;
-        _viewModel.AdjustVolumeByWheel(delta);
-        e.Handled = true;
-    }
-
-    private void ConsoleInput_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter && _viewModel.SendConsoleCommand.CanExecute(null))
-        {
-            _viewModel.SendConsoleCommand.Execute(null);
-            e.Handled = true;
-        }
-    }
-
-    private void YouTubeSearchInput_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter && _viewModel.SearchYouTubeCommand.CanExecute(null))
-        {
-            _viewModel.SearchYouTubeCommand.Execute(null);
-            e.Handled = true;
-        }
-    }
-
-    private void RadioBrowserSearch_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter && _viewModel.SearchRadioBrowserCommand.CanExecute(null))
-        {
-            _viewModel.SearchRadioBrowserCommand.Execute(null);
-            e.Handled = true;
-        }
-    }
-
-    private void LocalDropZone_DragOver(object sender, System.Windows.DragEventArgs e)
-    {
-        if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
-        {
-            e.Effects = System.Windows.DragDropEffects.Copy;
-        }
-        else
-        {
-            e.Effects = System.Windows.DragDropEffects.None;
-        }
-
-        e.Handled = true;
-    }
-
-    private void LocalDropZone_Drop(object sender, System.Windows.DragEventArgs e)
-    {
-        if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop) &&
-            e.Data.GetData(System.Windows.DataFormats.FileDrop) is string[] paths &&
-            paths.Length > 0)
-        {
-            _viewModel.HandleDroppedLocalPaths(paths);
-        }
-
-        e.Handled = true;
-    }
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {

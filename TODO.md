@@ -86,7 +86,13 @@ plugins); the meters read `MeterPalette`. `ThemeTokenGuardTests` blocks new hex 
 - [ ] Semantic aliases (Success/Warning/Danger/Info/Accent) over the hue families, so a theme can recolor states.
 - [ ] Plugin SDK theme API (tokens + `ThemeChanged`). Until then the Chromecast and Apple TV dashboards read the
       host tokens by name through their own `HostTheme`.
-- [ ] Fonts and corner radii are still literal in XAML; make them tokens if skins are in scope.
+- [x] Split `MainWindow.xaml` (4,500 lines) into one view per page (`Views/*View.xaml`); the window keeps the
+      title bar, sidebar and page wrappers.
+- [ ] Built-in plugins (Hue, Smart TV, Home Assistant): use the app's styles instead of their 24 local copies.
+- [ ] App styles for ComboBox, ListBox, ToggleButton and PasswordBox; then drop the plugins' own ComboBox template.
+- [ ] One style for the "selected chip" pattern (23 inline copies) and normal page switching (14 inline styles).
+- [ ] Typography tokens (583 literal font sizes in 21 values; 2 font families) and corner-radius tokens (172 in 14 values).
+- [ ] Icons: move the 22 inline icon geometries to one `Icons.xaml`.
 
 ## Release / build
 
