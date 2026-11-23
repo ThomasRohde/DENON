@@ -20,11 +20,10 @@ Phase 1 is done in 1.15.1 (source router, DENON/SIM/MUTED/PC/IDLE badge, PC Cast
 
 ## Habit telemetry
 
-- [ ] Verify live: a cast session ends with `reason: "app_shutdown"` when the app exits during a cast (SDK 1.17
-      `IsAppShuttingDown`; not checked live because no cast was playing).
 - [ ] Events written before 1.15.0 have no `coveredSec` / `exclusiveSec`. Readers must fall back to `durationSec`.
-- [ ] **Check visually**: the now-playing hero during a cast (title, "Cast • app • device • TV HDMI" detail,
-      Casting/Paused). Built and unit-tested on 2026-11-23 with the screen locked. The hero has no cast artwork yet.
+- [ ] The now-playing hero during a cast has no cast artwork yet, and its transport button shows ▶ while the cast
+      plays (the buttons follow HEOS, not the cast). Decide if the hero should show cast artwork and cast play/pause.
+      (Hero text and the `app_shutdown` end reason were checked live on 2026-11-23 with a Netflix cast.)
 
 ## MCP: plugin tools
 
