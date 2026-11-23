@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using Denon.App.Desktop.Services;
 using Color = System.Windows.Media.Color;
 using Rectangle = System.Windows.Shapes.Rectangle;
 
@@ -18,6 +19,7 @@ public partial class SpectrumAnalyzerControl : System.Windows.Controls.UserContr
     private readonly LinearGradientBrush _barBrush;
     private readonly SolidColorBrush _peakBrush;
     private bool _barsBuilt;
+    private AudioMeterSource? _lastSource;
 
     public SpectrumAnalyzerControl()
     {
@@ -38,7 +40,7 @@ public partial class SpectrumAnalyzerControl : System.Windows.Controls.UserContr
         _peakBrush.Freeze();
     }
 
-    public void SetBandsImmediate(double[] bands, double deltaSeconds, bool isLiveSignal, bool isSimulatedPlaying)
+    public void SetBandsImmediate(double[] bands, double deltaSeconds, AudioMeterSource source)
     {
         if (!_barsBuilt)
         {
@@ -52,11 +54,11 @@ public partial class SpectrumAnalyzerControl : System.Windows.Controls.UserContr
             return;
         }
 
-        SignalModeLabel.Text = isLiveSignal
-            ? "PC LOOPBACK FFT"
-            : isSimulatedPlaying
-                ? "SIMULATED (VOL)"
-                : "STANDBY";
+        if (_lastSource != source)
+        {
+            _lastSource = source;
+            SignalModeLabel.Text = AudioMeterSourceRouter.RtaLabel(source);
+        }
 
         var dt = Math.Clamp(deltaSeconds, 0.001, 0.08);
         var attack = 1.0 - Math.Exp(-dt / 0.012);

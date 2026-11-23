@@ -39,6 +39,7 @@ public sealed class LiveAudioAnalyzerService : BackgroundService
     private readonly object _frameLock = new();
     private readonly double[] _spectrum31 = new double[31];
     private PluginAudioFrame _latestFrame;
+    private readonly AudioFrameHistory _history = new(capacity: 1024); // ~10 s at 60-100 Hz; HEOS delay is at most 8 s
     private volatile bool _vuCaptureRequested;
 
     public LiveAudioAnalyzerService(PluginHostService pluginHost, AppLogStore logStore)
@@ -68,6 +69,13 @@ public sealed class LiveAudioAnalyzerService : BackgroundService
             return _latestFrame;
         }
     }
+
+    /// <summary>
+    /// The frame from <paramref name="delayMs"/> ago (levels + 31 bands). Used to show PC-cast audio in sync
+    /// with the Denon speakers, which play it after the HEOS buffer.
+    /// </summary>
+    public bool TryGetDelayedFrame(int delayMs, out double left, out double right, double[]? bandsDestination = null) =>
+        _history.TryGetAt(Environment.TickCount64 - Math.Max(0, delayMs), out left, out right, bandsDestination);
 
     public bool CopySpectrumBands(double[] destination)
     {
@@ -382,6 +390,7 @@ public sealed class LiveAudioAnalyzerService : BackgroundService
         lock (_frameLock)
         {
             _latestFrame = frame;
+            _history.Add(frame.TimestampMs, frame.LeftLevel, frame.RightLevel, frame.IsLiveSignal, _spectrum31);
         }
 
         _pluginHost.PublishAudioFrame(in frame);

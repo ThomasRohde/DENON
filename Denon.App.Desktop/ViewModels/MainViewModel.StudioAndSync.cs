@@ -153,35 +153,64 @@ public sealed partial class MainViewModel
         _lyricsSyncTimer.Start();
     }
 
-    public (bool IsLive, bool IsSimulated) StepSpectrumFrame(double[] bandsBuffer, double deltaSeconds)
+    public AudioMeterSource StepSpectrumFrame(double[] bandsBuffer, double deltaSeconds)
     {
         if (bandsBuffer.Length < 31)
         {
-            return (false, false);
+            return AudioMeterSource.Off;
         }
 
-        if (_liveAudioAnalyzer is not null && _liveAudioAnalyzer.CopySpectrumBands(bandsBuffer))
+        var hasPcSignal = _liveAudioAnalyzer?.GetLatestFrame().IsLiveSignal ?? false;
+        var source = ResolveMeterSource(hasPcSignal);
+
+        switch (source)
         {
-            return (true, false);
-        }
+            case AudioMeterSource.Denon:
+                // The FFT reads the Windows default output. It matches the cast only when the cast captures that device.
+                if (_pcAudioCastService.IsCastingDefaultDevice &&
+                    _liveAudioAnalyzer is not null &&
+                    _liveAudioAnalyzer.TryGetDelayedFrame(HeosSyncDelayMs, out _, out _, bandsBuffer))
+                {
+                    return AudioMeterSource.Denon;
+                }
 
-        if (IsActiveAndPlaying)
+                if (_pcAudioCastService.IsCastingDefaultDevice)
+                {
+                    Array.Clear(bandsBuffer, 0, 31); // Synced silence (pause in the cast).
+                    return AudioMeterSource.Denon;
+                }
+
+                FillSimulatedSpectrum(bandsBuffer, deltaSeconds);
+                return AudioMeterSource.Simulated;
+
+            case AudioMeterSource.Pc when _liveAudioAnalyzer is not null && _liveAudioAnalyzer.CopySpectrumBands(bandsBuffer):
+                return AudioMeterSource.Pc;
+
+            case AudioMeterSource.Simulated:
+                FillSimulatedSpectrum(bandsBuffer, deltaSeconds);
+                return AudioMeterSource.Simulated;
+
+            case AudioMeterSource.Muted:
+                Array.Clear(bandsBuffer, 0, 31);
+                return AudioMeterSource.Muted;
+
+            default:
+                Array.Clear(bandsBuffer, 0, 31);
+                return AudioMeterSource.Off;
+        }
+    }
+
+    private void FillSimulatedSpectrum(double[] bandsBuffer, double deltaSeconds)
+    {
+        _rtaSimPhase += Math.Clamp(deltaSeconds, 0.001, 0.08) * 6.0;
+        var volScale = AudioMeterSourceRouter.SimulationScale(LiveVolume, floor: 0.28, span: 0.65);
+        for (var i = 0; i < 31; i++)
         {
-            _rtaSimPhase += Math.Clamp(deltaSeconds, 0.001, 0.08) * 6.0;
-            var volScale = Math.Clamp(0.28 + (LiveVolume / 98.0) * 0.65, 0.25, 0.92);
-            for (var i = 0; i < 31; i++)
-            {
-                var rolloff = 1.0 - (i / 48.0);
-                var wave = 0.44 + (0.28 * Math.Sin((_rtaSimPhase * (1.1 + i * 0.08)) + (i * 0.45)))
-                                + (0.20 * Math.Cos((_rtaSimPhase * 2.3) - (i * 0.27)));
-                bandsBuffer[i] = Math.Clamp(wave * rolloff * volScale, 0.04, 0.95);
-            }
-
-            return (false, true);
+            var rolloff = 1.0 - (i / 48.0);
+            var wave = 0.44 + (0.28 * Math.Sin((_rtaSimPhase * (1.1 + i * 0.08)) + (i * 0.45)))
+                            + (0.20 * Math.Cos((_rtaSimPhase * 2.3) - (i * 0.27)));
+            bandsBuffer[i] = Math.Clamp(wave * rolloff * volScale, 0.0, 0.95);
         }
-
-        Array.Clear(bandsBuffer, 0, 31);
-        return (false, false);
     }
 
     private int _lyricsRequestSeq;

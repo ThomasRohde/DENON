@@ -52,14 +52,14 @@ public partial class MainWindow : Window
 
         if (_viewModel.ShowAnalogVu)
         {
-            var (left, right, isLive) = _viewModel.StepVuMeterFrame(dt);
-            HeroVuMeter.SetLevelsImmediate(left, right, isLive);
+            var (left, right, source) = _viewModel.StepVuMeterFrame(dt);
+            HeroVuMeter.SetLevelsImmediate(left, right, source);
         }
 
         if (_viewModel.ShowRtaSpectrum)
         {
-            var (isLiveRta, isSimRta) = _viewModel.StepSpectrumFrame(_spectrumBandsBuffer, dt);
-            HeroSpectrumAnalyzer.SetBandsImmediate(_spectrumBandsBuffer, dt, isLiveRta, isSimRta);
+            var rtaSource = _viewModel.StepSpectrumFrame(_spectrumBandsBuffer, dt);
+            HeroSpectrumAnalyzer.SetBandsImmediate(_spectrumBandsBuffer, dt, rtaSource);
         }
     }
 

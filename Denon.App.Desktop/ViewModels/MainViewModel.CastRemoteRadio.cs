@@ -92,6 +92,7 @@ public sealed partial class MainViewModel
     private double _vuLeftLevel;
     private double _vuRightLevel;
     private bool _isVuLiveSignal;
+    private AudioMeterSource _vuSource;
     private double _simPhase;
     private bool _freezeVuForScreenshots;
 
@@ -815,48 +816,61 @@ public sealed partial class MainViewModel
     /// Computes the next VU needle position on DWM VSync (60-144 Hz) with sub-10ms attack ballistics
     /// and zero WPF PropertyChanged/binding allocations per frame.
     /// </summary>
-    public (double Left, double Right, bool IsLive) StepVuMeterFrame(double deltaSeconds)
+    /// <summary>
+    /// Meter source for this frame, decided by what the Denon plays (see <see cref="AudioMeterSourceRouter"/>).
+    /// </summary>
+    private AudioMeterSource ResolveMeterSource(bool hasPcSignal) => AudioMeterSourceRouter.Resolve(new AudioMeterInputs(
+        IsDenonAwake: IsConnected && IsPoweredOn && IsMainZoneOn,
+        InputSource: InputSourceCode,
+        IsHeosPlaying: IsPlaying,
+        IsMuted: IsMuted,
+        IsPcCasting: _pcAudioCastService is { IsCasting: true },
+        HasPcSignal: hasPcSignal));
+
+    /// <summary>Measured HEOS buffer + speaker delay (Auto-Calibrate Mic), used to line meters up with the speakers.</summary>
+    private int HeosSyncDelayMs => Math.Clamp(_settingsStore.Current.Media.CinemaSyncOffsetMs, 0, 8000);
+
+    public (double Left, double Right, AudioMeterSource Source) StepVuMeterFrame(double deltaSeconds)
     {
         if (_freezeVuForScreenshots)
         {
-            return (_vuLeftLevel, _vuRightLevel, _isVuLiveSignal);
+            return (_vuLeftLevel, _vuRightLevel, _vuSource);
         }
 
         var dt = Math.Clamp(deltaSeconds, 0.001, 0.08);
         _liveAudioAnalyzer?.SetVuCaptureRequested(ShowVuMeters);
 
-        var live = _pcAudioCastService.GetLatestMeterSample();
-        var analyzerFrame = !live.IsLiveSignal && _liveAudioAnalyzer is not null
-            ? _liveAudioAnalyzer.GetLatestFrame()
-            : default;
+        var analyzerFrame = _liveAudioAnalyzer?.GetLatestFrame() ?? default;
+        var source = ResolveMeterSource(analyzerFrame.IsLiveSignal);
+        double targetL = 0;
+        double targetR = 0;
 
-        var hasLiveSignal = live.IsLiveSignal || analyzerFrame.IsLiveSignal;
-        double targetL;
-        double targetR;
+        switch (source)
+        {
+            case AudioMeterSource.Denon:
+                // PC Cast: the Denon plays this audio HeosSyncDelayMs later, so show the level from then.
+                var cast = _pcAudioCastService.GetDelayedMeterSample(HeosSyncDelayMs);
+                if (cast.IsLiveSignal)
+                {
+                    targetL = cast.Left;
+                    targetR = cast.Right;
+                }
 
-        if (live.IsLiveSignal)
-        {
-            targetL = live.Left;
-            targetR = live.Right;
-        }
-        else if (analyzerFrame.IsLiveSignal)
-        {
-            targetL = analyzerFrame.LeftLevel;
-            targetR = analyzerFrame.RightLevel;
-        }
-        else if (IsActiveAndPlaying)
-        {
-            _simPhase += dt * 7.2;
-            var volScale = Math.Clamp(0.30 + (LiveVolume / 98.0) * 0.66, 0.28, 0.94);
-            var grooveL = 0.50 + (0.28 * Math.Sin(_simPhase * 1.4)) + (0.17 * Math.Sin(_simPhase * 3.9)) + (0.09 * Math.Cos(_simPhase * 6.7));
-            var grooveR = 0.48 + (0.27 * Math.Sin((_simPhase * 1.4) + 0.52)) + (0.18 * Math.Cos(_simPhase * 3.3)) + (0.09 * Math.Sin(_simPhase * 5.9));
-            targetL = Math.Clamp(grooveL * volScale, 0.05, 0.95);
-            targetR = Math.Clamp(grooveR * volScale, 0.05, 0.95);
-        }
-        else
-        {
-            targetL = 0;
-            targetR = 0;
+                break;
+
+            case AudioMeterSource.Pc:
+                targetL = analyzerFrame.LeftLevel;
+                targetR = analyzerFrame.RightLevel;
+                break;
+
+            case AudioMeterSource.Simulated:
+                _simPhase += dt * 7.2;
+                var volScale = AudioMeterSourceRouter.SimulationScale(LiveVolume, floor: 0.30, span: 0.66);
+                var grooveL = 0.50 + (0.28 * Math.Sin(_simPhase * 1.4)) + (0.17 * Math.Sin(_simPhase * 3.9)) + (0.09 * Math.Cos(_simPhase * 6.7));
+                var grooveR = 0.48 + (0.27 * Math.Sin((_simPhase * 1.4) + 0.52)) + (0.18 * Math.Cos(_simPhase * 3.3)) + (0.09 * Math.Sin(_simPhase * 5.9));
+                targetL = Math.Clamp(grooveL * volScale, 0.0, 0.95);
+                targetR = Math.Clamp(grooveR * volScale, 0.0, 0.95);
+                break;
         }
 
         // Frame-rate independent exponential ballistics: ultra-fast 8ms attack, crisp 85ms decay
@@ -869,8 +883,9 @@ public sealed partial class MainViewModel
         if (_vuLeftLevel < 0.003) _vuLeftLevel = 0;
         if (_vuRightLevel < 0.003) _vuRightLevel = 0;
 
-        _isVuLiveSignal = hasLiveSignal;
-        return (_vuLeftLevel, _vuRightLevel, _isVuLiveSignal);
+        _vuSource = source;
+        _isVuLiveSignal = source is AudioMeterSource.Denon or AudioMeterSource.Pc;
+        return (_vuLeftLevel, _vuRightLevel, _vuSource);
     }
 
     public void LoadShowcaseStateForScreenshots()
@@ -913,6 +928,7 @@ public sealed partial class MainViewModel
 
         _hasLoadedAcousticsOnce = true;
         _freezeVuForScreenshots = true;
+        _vuSource = AudioMeterSource.Denon;
 
         IsLivePushConnected = true;
         ShowVuMeters = true;

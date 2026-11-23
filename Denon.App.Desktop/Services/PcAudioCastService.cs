@@ -29,6 +29,7 @@ public sealed class PcAudioCastService : IDisposable
     private double _liveLeft;
     private double _liveRight;
     private long _liveSampleTick;
+    private readonly AudioFrameHistory _meterHistory = new(capacity: 1024);
 
     public PcAudioCastService(
         LocalAudioRelayServer relayServer,
@@ -50,6 +51,15 @@ public sealed class PcAudioCastService : IDisposable
     public event Action<AudioMeterSample>? AudioMeterUpdated;
 
     public bool IsCasting => _isCasting;
+
+    /// <summary>True when the cast captures the Windows default output (the same device the FFT analyzer reads).</summary>
+    public bool IsCastingDefaultDevice => _isCasting && string.IsNullOrWhiteSpace(_selectedDeviceId);
+
+    /// <summary>The cast meter level from <paramref name="delayMs"/> ago: what the Denon plays now, after the HEOS buffer.</summary>
+    public AudioMeterSample GetDelayedMeterSample(int delayMs) =>
+        _meterHistory.TryGetAt(Environment.TickCount64 - Math.Max(0, delayMs), out var left, out var right)
+            ? new AudioMeterSample(left, right, IsLiveSignal: true)
+            : new AudioMeterSample(0, 0, false);
 
     public AudioMeterSample GetLatestMeterSample()
     {
@@ -515,6 +525,7 @@ public sealed class PcAudioCastService : IDisposable
 
     private void PublishMeter(double left, double right, bool isLive)
     {
+        _meterHistory.Add(Environment.TickCount64, left, right, isLive);
         Volatile.Write(ref _liveLeft, left);
         Volatile.Write(ref _liveRight, right);
         Volatile.Write(ref _liveSampleTick, isLive ? Environment.TickCount64 : 0);

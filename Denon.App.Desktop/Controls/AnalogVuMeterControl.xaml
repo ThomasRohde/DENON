@@ -149,7 +149,7 @@
                         <TextBlock Canvas.Left="124" Canvas.Top="50" Text="VU" FontSize="16" FontWeight="Bold" Foreground="#00D4FF" Opacity="0.88" />
                         <TextBlock Canvas.Left="121" Canvas.Top="70" Text="dB" FontSize="9" FontWeight="SemiBold" FontFamily="Cascadia Mono, Consolas" Foreground="#64748B" />
                         <TextBlock Canvas.Left="12" Canvas.Top="8" Text="RIGHT CH" FontSize="9.5" FontWeight="Bold" Foreground="#64748B" />
-                        <TextBlock x:Name="ModeBadgeText" Canvas.Left="184" Canvas.Top="8" Text="SYNC" FontSize="9" FontWeight="Bold" Foreground="#10B981" />
+                        <TextBlock x:Name="ModeBadgeText" Canvas.Left="64" Canvas.Top="9" Text="IDLE" FontSize="8.5" FontWeight="Bold" Foreground="#64748B" />
 
                         <StackPanel Canvas.Left="224" Canvas.Top="8" Orientation="Horizontal">
                             <TextBlock Text="PEAK" FontSize="8.5" FontWeight="Bold" Foreground="#64748B" Margin="0,0,5,0" VerticalAlignment="Center" />

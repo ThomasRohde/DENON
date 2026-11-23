@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using Denon.App.Desktop.Services;
 using Brush = System.Windows.Media.Brush;
 using Color = System.Windows.Media.Color;
 using UserControl = System.Windows.Controls.UserControl;
@@ -31,7 +32,10 @@ public partial class AnalogVuMeterControl : UserControl
 
     private long _peakHoldLeftUntil;
     private long _peakHoldRightUntil;
-    private bool _lastModeWasLive;
+    private static readonly Brush DenonBadgeBrush = Freeze(Color.FromRgb(16, 185, 129));
+    private static readonly Brush PcBadgeBrush = Freeze(Color.FromRgb(245, 158, 11));
+    private static readonly Brush IdleBadgeBrush = Freeze(Color.FromRgb(100, 116, 139));
+    private AudioMeterSource? _lastSource;
 
     public AnalogVuMeterControl()
     {
@@ -42,7 +46,7 @@ public partial class AnalogVuMeterControl : UserControl
     /// Ultra-low-latency direct transform update invoked on DWM VSync (CompositionTarget.Rendering),
     /// bypassing WPF DependencyProperty and binding allocation overhead completely.
     /// </summary>
-    public void SetLevelsImmediate(double leftLevel, double rightLevel, bool isLiveSignal)
+    public void SetLevelsImmediate(double leftLevel, double rightLevel, AudioMeterSource source)
     {
         var left = Math.Clamp(leftLevel, 0.0, 1.0);
         var right = Math.Clamp(rightLevel, 0.0, 1.0);
@@ -64,10 +68,24 @@ public partial class AnalogVuMeterControl : UserControl
         PeakLedLeft.Fill = now <= _peakHoldLeftUntil ? PeakOnBrush : PeakOffBrush;
         PeakLedRight.Fill = now <= _peakHoldRightUntil ? PeakOnBrush : PeakOffBrush;
 
-        if (_lastModeWasLive != isLiveSignal)
+        if (_lastSource != source)
         {
-            _lastModeWasLive = isLiveSignal;
-            ModeBadgeText.Text = isLiveSignal ? "LIVE" : "SYNC";
+            _lastSource = source;
+            ModeBadgeText.Text = AudioMeterSourceRouter.BadgeText(source);
+            ModeBadgeText.Foreground = source switch
+            {
+                AudioMeterSource.Denon => DenonBadgeBrush,
+                AudioMeterSource.Pc => PcBadgeBrush,
+                _ => IdleBadgeBrush,
+            };
+            ModeBadgeText.ToolTip = source switch
+            {
+                AudioMeterSource.Denon => "Real audio this app streams to the Denon, delayed by the measured HEOS delay (in sync with the speakers).",
+                AudioMeterSource.Simulated => "The Denon plays a source the app cannot hear (TV, HDMI, Spotify…). Simulated from the Denon volume.",
+                AudioMeterSource.Muted => "The Denon is muted.",
+                AudioMeterSource.Pc => "The Denon is off or idle. Showing this PC's own audio output, not the Denon.",
+                _ => "Nothing plays.",
+            };
         }
     }
 
@@ -101,7 +119,8 @@ public partial class AnalogVuMeterControl : UserControl
     {
         if (d is AnalogVuMeterControl control)
         {
-            control.ModeBadgeText.Text = control.IsLiveSignal ? "LIVE" : "SYNC";
+            // The per-frame source (SetLevelsImmediate) owns the badge; force a repaint on the next frame.
+            control._lastSource = null;
         }
     }
 
