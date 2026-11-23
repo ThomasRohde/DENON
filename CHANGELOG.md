@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.15.2] - 2026-11-23
+
+### Fixed
+- **Paused or unseen casts no longer count as watching**: Live TV, or a TV app that is not on an HDMI input, now covers a cast session (the TV shows something else, so the Chromecast plays unseen). Sessions that report `watchedSec` (cast) never get more `exclusiveSec` than `watchedSec`. Before, a DR TV program paused behind live DR1 for 10 minutes counted as 10 extra minutes.
+
 ## [1.15.1] - 2026-11-23
 
 ### Added

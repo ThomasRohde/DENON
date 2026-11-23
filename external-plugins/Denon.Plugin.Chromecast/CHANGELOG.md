@@ -2,6 +2,13 @@
 
 Released separately from Denon Desktop with tags `chromecast-vX.Y.Z`.
 
+## [0.1.1] - 2026-11-23
+
+### Fixed
+- **No session for a program that never plays**: The 15 s dwell now starts at the first PLAYING/BUFFERING. A program that opens paused (or stays paused) no longer logs a 10-minute session with `watchedSec: 0`.
+- **Netflix and similar apps**: A media title that is only the app name ("Netflix") now gives `hasTitle: false`. Netflix does not share the program title over Cast.
+- **Plugin version** is now read from `<Version>` in the `.csproj` (the manifest said 0.1.0 by hand).
+
 ## [0.1.0] - 2026-11-23
 
 First release. Needs **Denon Desktop 1.15.0** or later (Plugin SDK 1.15, Receiver Control API).

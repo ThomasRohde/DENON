@@ -104,8 +104,9 @@ The SDK reference is compile-only (`Private=false`, `ExcludeAssets=runtime`), so
 ## Limits (version 0.1)
 
 - Speaker groups (`Google Cast Group`) are skipped.
-- Apps that do not use the default media namespace (for example Netflix) show the app name only, with no title,
-  and do not accept play or pause.
+- Netflix shares only its own name as the media title, so a Netflix session is per app run, not per episode
+  (`hasTitle: false`). Its play state is reported, so `watchedSec` is correct.
+- A program counts as a session only after it has played for 15 s; a program that stays paused is not logged.
 
 ## Code map
 

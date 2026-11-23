@@ -82,6 +82,14 @@ internal sealed class CastWatchLog
             {
                 slot.Accumulate(now);
 
+                // A program that has not played yet (opened paused, or still loading) is not watching:
+                // the dwell starts at the first PLAYING/BUFFERING, not when the app shows the title.
+                if (slot.Active is null && slot.Pending is { WatchedSec: <= 0 } notStarted && !slot.IsPlaying)
+                {
+                    slot.Pending = notStarted with { StartedUtc = now };
+                    continue;
+                }
+
                 if (slot.Active is null && slot.Pending is { } pending &&
                     (now - pending.StartedUtc).TotalSeconds >= DwellSeconds)
                 {
@@ -219,17 +227,29 @@ internal sealed class CastWatchLog
         return data;
     }
 
-    private static Candidate BuildCandidate(CastDeviceState state, PluginReceiverSnapshot receiver, DateTimeOffset now) => new(
-        AppKey: $"{state.AppId}|{state.SessionId}",
-        AppName: state.AppName ?? "Unknown app",
-        AppId: state.AppId,
-        StartedUtc: now,
-        ReceiverInput: receiver.IsPoweredOn ? receiver.InputSource : null,
-        ReceiverSoundMode: receiver.IsPoweredOn ? receiver.SoundMode : null)
+    private static Candidate BuildCandidate(CastDeviceState state, PluginReceiverSnapshot receiver, DateTimeOffset now)
     {
-        Title = string.IsNullOrWhiteSpace(state.Title) ? null : state.Title.Trim(),
-        Subtitle = string.IsNullOrWhiteSpace(state.Subtitle) ? null : state.Subtitle.Trim(),
-    };
+        var appName = state.AppName ?? "Unknown app";
+        var title = string.IsNullOrWhiteSpace(state.Title) ? null : state.Title.Trim();
+
+        // Some apps (Netflix) report only their own name as the media title: that is not a program title.
+        if (title is not null && title.Equals(appName, StringComparison.OrdinalIgnoreCase))
+        {
+            title = null;
+        }
+
+        return new Candidate(
+            AppKey: $"{state.AppId}|{state.SessionId}",
+            AppName: appName,
+            AppId: state.AppId,
+            StartedUtc: now,
+            ReceiverInput: receiver.IsPoweredOn ? receiver.InputSource : null,
+            ReceiverSoundMode: receiver.IsPoweredOn ? receiver.SoundMode : null)
+        {
+            Title = title,
+            Subtitle = string.IsNullOrWhiteSpace(state.Subtitle) ? null : state.Subtitle.Trim(),
+        };
+    }
 
     private static string EndReason(CastDeviceState state) =>
         state.Connection == CastConnectionState.Connected ? "app_closed" : "disconnected";
@@ -266,6 +286,8 @@ internal sealed class CastWatchLog
         public string DeviceModel { get; set; } = string.Empty;
 
         public string PlayerState { get; set; } = string.Empty;
+
+        public bool IsPlaying => PlayerState is "PLAYING" or "BUFFERING";
 
         public Candidate? Pending { get; set; }
 

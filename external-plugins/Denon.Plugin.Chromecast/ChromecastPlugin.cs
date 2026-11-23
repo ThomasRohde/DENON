@@ -37,7 +37,7 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
     public PluginManifest Manifest { get; } = new(
         Id: "chromecast",
         Name: "Chromecast & Google Cast",
-        Version: "0.1.0",
+        Version: typeof(ChromecastPlugin).Assembly.GetName().Version?.ToString(3) ?? "0.0.0", // From <Version> in the .csproj.
         Author: "Thomas Klok Rohde",
         Description: "Finds Chromecast and Google Cast devices on the LAN (mDNS), shows what they play, " +
                      "controls playback and volume over Cast v2 (TLS :8009), and drives the Denon receiver " +

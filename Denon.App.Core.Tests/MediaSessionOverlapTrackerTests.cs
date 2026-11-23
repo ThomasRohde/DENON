@@ -74,6 +74,40 @@ public sealed class MediaSessionOverlapTrackerTests
     }
 
     [Fact]
+    public void Paused_cast_behind_live_tv_is_not_counted_twice()
+    {
+        // Live log 2026-11-23: DR TV paused on the Chromecast for 10 min while the TV showed live DR1.
+        var tracker = new MediaSessionOverlapTracker();
+        var tv = Started("tv_channel", "Live TV (Ch 1 • DR1)");
+        var cast = Started("cast", "Smagen af Italien", ("castDevice", "Stuen 2"), ("receiverInput", "TV"));
+        tracker.Annotate("lg-tv", "session.started", tv, T0.AddSeconds(15));
+        tracker.Annotate("chromecast", "session.started", cast, T0.AddSeconds(15));
+
+        var castEndData = Ended(cast, 600);
+        castEndData["watchedSec"] = 0;
+        var castEnd = tracker.Annotate("chromecast", "session.ended", castEndData, T0.AddMinutes(10));
+        var tvEnd = tracker.Annotate("lg-tv", "session.ended", Ended(tv, 600), T0.AddMinutes(10));
+
+        Assert.Equal(0, Int(castEnd, "exclusiveSec"));
+        Assert.Contains("tv_channel:lg-tv", (IEnumerable<string>)castEnd!["coveredBy"]!);
+        Assert.Equal(600, Int(tvEnd, "exclusiveSec"));
+    }
+
+    [Fact]
+    public void Cast_exclusive_time_is_capped_at_watched_time()
+    {
+        var tracker = new MediaSessionOverlapTracker();
+        var cast = Started("cast", "Show", ("castDevice", "Stuen 2"));
+        tracker.Annotate("chromecast", "session.started", cast, T0.AddSeconds(15));
+        var data = Ended(cast, 900);
+        data["watchedSec"] = 600; // 5 min paused
+        var end = tracker.Annotate("chromecast", "session.ended", data, T0.AddMinutes(15));
+
+        Assert.Equal(0, Int(end, "coveredSec"));
+        Assert.Equal(600, Int(end, "exclusiveSec"));
+    }
+
+    [Fact]
     public void Heos_music_on_net_is_not_covered_by_tv()
     {
         var tracker = new MediaSessionOverlapTracker();

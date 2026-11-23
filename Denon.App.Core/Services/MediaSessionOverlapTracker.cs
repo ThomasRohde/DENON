@@ -13,7 +13,9 @@ namespace Denon.App.Core.Services;
 /// </list>
 /// Covering rules (more specific covers less specific):
 /// cast → tv_app on an HDMI input; cast → avr_input "TV" (ARC) or the cast's own receiver input;
-/// tv_app/tv_channel → avr_input "TV" (ARC).
+/// tv_app/tv_channel → avr_input "TV" (ARC); tv_channel or a non-HDMI tv_app → cast (the TV shows something
+/// else, so the cast plays unseen). Sessions with <c>watchedSec</c> (cast) cap exclusiveSec at watchedSec:
+/// paused time is not watching.
 /// </summary>
 public sealed class MediaSessionOverlapTracker
 {
@@ -61,10 +63,18 @@ public sealed class MediaSessionOverlapTracker
             var covered = UnionSeconds(coverers.Select(c => (Start: Max(c.Start, self.Start), End: Min(c.End ?? now, self.End!.Value))));
             var coveredSec = (int)Math.Round(Math.Min(covered, durationSec));
 
+            var exclusiveSec = Math.Max(0, Math.Round(durationSec) - coveredSec);
+
+            // Paused time is not watching: a session that reports play time (cast) never has more exclusive time.
+            if (GetNumber(data, "watchedSec") is { } watchedSec)
+            {
+                exclusiveSec = Math.Min(exclusiveSec, Math.Max(0, Math.Round(watchedSec)));
+            }
+
             var result = new Dictionary<string, object?>(data, StringComparer.OrdinalIgnoreCase)
             {
                 ["coveredSec"] = coveredSec,
-                ["exclusiveSec"] = (int)Math.Max(0, Math.Round(durationSec) - coveredSec),
+                ["exclusiveSec"] = (int)exclusiveSec,
             };
             if (coveredSec > 0)
             {
@@ -103,7 +113,10 @@ public sealed class MediaSessionOverlapTracker
 
         if (coverer.Kind is "tv_app" or "tv_channel")
         {
-            return target.Kind == "avr_input" && IsTvInput(target.Input);
+            // The TV shows live TV or its own app, not the HDMI input: the cast plays unseen in the background.
+            var tvShowsOtherSource = coverer.Kind == "tv_channel" || !coverer.Title.Contains("HDMI", StringComparison.OrdinalIgnoreCase);
+            return (target.Kind == "avr_input" && IsTvInput(target.Input)) ||
+                   (target.Kind == "cast" && tvShowsOtherSource);
         }
 
         return false;
