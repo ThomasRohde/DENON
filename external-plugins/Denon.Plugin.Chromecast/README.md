@@ -55,6 +55,11 @@ Example:
 Use these in Smart Scenes, hotkeys, the phone remote or MCP. The `device` parameter is optional:
 the plugin picks the device that plays, then the device with an active app, then the only device.
 
+**MCP:** each action is the tool `plugin_chromecast_<action>` (for example `plugin_chromecast_now_playing`).
+Since 0.2.0 (SDK 1.16) the tools show their real parameters and safety hints: `now-playing` and `list-devices`
+are read-only (allowed in the Observer tier); `stop` and `quit-app` are destructive (need FullOrchestration).
+`now-playing` returns the artwork as an image and the device state as structured JSON.
+
 | Action | Parameters |
 |---|---|
 | `list-devices`, `discover` | – |
@@ -67,8 +72,9 @@ the plugin picks the device that plays, then the device with an active app, then
 
 ## Requirements
 
-- Denon Desktop with **Plugin SDK 1.15** or later. That SDK adds `IPluginReceiverControl`.
-  The plugin declares `PluginCapabilities.ReceiverControl` to get it. An older host cannot load this plugin.
+- Plugin **0.2.0+** needs Denon Desktop **1.16** or later (Plugin SDK 1.16: action parameters and hints for MCP).
+  Plugin 0.1.x needs Denon Desktop 1.15 (SDK 1.15 adds `IPluginReceiverControl`; the plugin declares
+  `PluginCapabilities.ReceiverControl` to get it). An older host cannot load a newer plugin.
 - The PC and the Cast devices must be on the same LAN. Windows Firewall must allow inbound UDP
   for Denon Desktop, or mDNS answers do not arrive. "Add by IP" works without mDNS.
 

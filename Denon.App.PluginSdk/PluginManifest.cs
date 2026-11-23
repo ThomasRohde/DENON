@@ -40,7 +40,39 @@ public sealed record PluginActionDescriptor(
     string ActionId,
     string DisplayName,
     string Description,
-    string Category = "General");
+    string Category = "General")
+{
+    // SDK 1.16: optional metadata as init-only properties, so plugins built against 1.15 still load
+    // (the constructor is unchanged). The host uses it for the MCP tool schema and safety hints.
+
+    /// <summary>
+    /// Parameters the action reads from its parameter dictionary. Shown as the MCP input schema.
+    /// Null: not declared (the host shows a generic legacy schema). Empty: the action takes no parameters.
+    /// </summary>
+    public IReadOnlyList<PluginActionParameter>? Parameters { get; init; }
+
+    /// <summary>
+    /// True: the action only reads state (allowed in the MCP "Observer" tier). Null: the host guesses from the id.
+    /// </summary>
+    public bool? IsReadOnly { get; init; }
+
+    /// <summary>
+    /// True: the action can stop, close or switch something off (MCP clients should confirm first; the host
+    /// requires the "FullOrchestration" tier). Null: the host guesses from the id.
+    /// </summary>
+    public bool? IsDestructive { get; init; }
+}
+
+/// <summary>One action parameter. Values arrive as strings in the action's parameter dictionary.</summary>
+/// <param name="Name">Parameter key, for example <c>device</c>.</param>
+/// <param name="Type">JSON schema type for MCP clients: <c>string</c>, <c>integer</c>, <c>number</c> or <c>boolean</c>.</param>
+/// <param name="Description">What the value means; shown to MCP clients.</param>
+/// <param name="Required">True when the action fails without it.</param>
+public sealed record PluginActionParameter(
+    string Name,
+    string Type,
+    string Description,
+    bool Required = false);
 
 public sealed record PluginActionResult(
     bool Success,

@@ -2,6 +2,14 @@
 
 Released separately from Denon Desktop with tags `chromecast-vX.Y.Z`.
 
+## [0.2.0] - 2026-11-23
+
+Needs **Denon Desktop 1.16.0** or later (Plugin SDK 1.16). Use 0.1.1 with Denon Desktop 1.15.x.
+
+### Added
+- **MCP-ready actions**: Every action declares its parameters (`device`, `level`, `host`, `name`, `includeImage`) and safety hints. MCP clients now see the real input schema; `now-playing` and `list-devices` are read-only (allowed in the Observer tier), `stop` and `quit-app` are destructive (need FullOrchestration).
+- With Denon Desktop 1.16, `plugin_chromecast_now_playing` returns the artwork image and the device state as structured JSON over MCP.
+
 ## [0.1.1] - 2026-11-23
 
 ### Fixed

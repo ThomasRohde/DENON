@@ -144,23 +144,51 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
         _lifetime?.Dispose();
     }
 
+    // Parameters and hints (SDK 1.16) give MCP clients a real input schema and safety hints.
+    private static readonly PluginActionParameter DeviceParam = new(
+        "device",
+        "string",
+        "Cast device name, id or IP (for example \"Stuen 2\"). Optional: default is the device that plays, " +
+        "then the device with an active app, then the only device.");
+
+    private static readonly PluginActionParameter[] DeviceOnly = [DeviceParam];
+
     public IReadOnlyList<PluginActionDescriptor> GetActions() =>
     [
-        new("list-devices", "List Cast devices", "Returns all known Cast devices and their live state as JSON.", "Cast"),
-        new("discover", "Discover Cast devices", "Runs mDNS discovery now and adds new devices.", "Cast"),
-        new("add-device", "Add Cast device by IP", "Adds a device by LAN address. Parameters: host, name (optional).", "Cast"),
-        new("now-playing", "Now playing", "App, title, artist and artwork. Parameter: device (optional).", "Cast"),
-        new("play", "Play", "Resumes playback. Parameter: device (optional).", "Playback"),
-        new("pause", "Pause", "Pauses playback. Parameter: device (optional).", "Playback"),
-        new("toggle-play", "Play / Pause", "Toggles playback. Parameter: device (optional).", "Playback"),
-        new("stop", "Stop media", "Stops the media session. Parameter: device (optional).", "Playback"),
-        new("quit-app", "Quit app", "Closes the running Cast app. Parameter: device (optional).", "Playback"),
-        new("pause-all", "Pause all Cast devices", "Pauses every Cast device that plays.", "Playback"),
-        new("set-volume", "Set Cast volume", "Parameters: level (0-100), device (optional).", "Volume"),
-        new("volume-up", "Cast volume up", "Raises the volume by 5. Parameter: device (optional).", "Volume"),
-        new("volume-down", "Cast volume down", "Lowers the volume by 5. Parameter: device (optional).", "Volume"),
-        new("mute", "Mute Cast device", "Parameter: device (optional).", "Volume"),
-        new("unmute", "Unmute Cast device", "Parameter: device (optional).", "Volume"),
+        new("list-devices", "List Cast devices", "Returns all known Cast devices and their live state as JSON.", "Cast")
+            { Parameters = [], IsReadOnly = true },
+        new("discover", "Discover Cast devices", "Runs mDNS discovery now and adds new devices.", "Cast")
+            { Parameters = [], IsReadOnly = false, IsDestructive = false },
+        new("add-device", "Add Cast device by IP", "Adds a device by LAN address.", "Cast")
+        {
+            Parameters =
+            [
+                new("host", "string", "Private LAN IPv4 address of the Cast device, for example 192.168.1.20.", Required: true),
+                new("name", "string", "Display name. Optional: default is the name the device reports."),
+            ],
+            IsDestructive = false,
+        },
+        new("now-playing", "Now playing", "App, title, artist, player state, volume and artwork (image) of a Cast device.", "Cast")
+        {
+            Parameters = [DeviceParam, new("includeImage", "boolean", "Return the artwork as an image. Default true.")],
+            IsReadOnly = true,
+        },
+        new("play", "Play", "Resumes playback.", "Playback") { Parameters = DeviceOnly, IsDestructive = false },
+        new("pause", "Pause", "Pauses playback.", "Playback") { Parameters = DeviceOnly, IsDestructive = false },
+        new("toggle-play", "Play / Pause", "Toggles playback.", "Playback") { Parameters = DeviceOnly, IsDestructive = false },
+        new("stop", "Stop media", "Stops the media session (the program closes; it cannot be resumed).", "Playback")
+            { Parameters = DeviceOnly, IsDestructive = true },
+        new("quit-app", "Quit app", "Closes the running Cast app.", "Playback") { Parameters = DeviceOnly, IsDestructive = true },
+        new("pause-all", "Pause all Cast devices", "Pauses every Cast device that plays.", "Playback") { Parameters = [], IsDestructive = false },
+        new("set-volume", "Set Cast volume", "Sets the Cast device volume.", "Volume")
+        {
+            Parameters = [new("level", "integer", "Volume 0-100.", Required: true), DeviceParam],
+            IsDestructive = false,
+        },
+        new("volume-up", "Cast volume up", "Raises the volume by 5.", "Volume") { Parameters = DeviceOnly, IsDestructive = false },
+        new("volume-down", "Cast volume down", "Lowers the volume by 5.", "Volume") { Parameters = DeviceOnly, IsDestructive = false },
+        new("mute", "Mute Cast device", "Mutes the Cast device.", "Volume") { Parameters = DeviceOnly, IsDestructive = false },
+        new("unmute", "Unmute Cast device", "Unmutes the Cast device.", "Volume") { Parameters = DeviceOnly, IsDestructive = false },
     ];
 
     public async Task<PluginActionResult> ExecuteActionAsync(

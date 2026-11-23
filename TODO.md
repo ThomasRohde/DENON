@@ -30,6 +30,14 @@ Phase 1 is done in 1.15.1 (source router, DENON/SIM/MUTED/PC/IDLE badge, PC Cast
 - [ ] A cast that stays paused for hours stays one open session (`exclusiveSec` is capped at `watchedSec`, so the
       totals are right). Option: end it with `reason: "paused"` after N minutes.
 
+## MCP: plugin tools
+
+The bridge returns JSON + images and uses declared parameters/hints since app 1.16.0 / SDK 1.16 (Chromecast plugin 0.2.0 uses it).
+
+- [ ] **Built-in plugins** (Hue, LG TV, Home Assistant) still use the generic legacy schema and id-based hints.
+      Declare their `Parameters`, `IsReadOnly` and `IsDestructive` (for example `tv.button` → `button`,
+      `ha.trigger_entity` → `entityId`, `hue.refresh` read-only, `tv.power_off` destructive).
+
 ## Chromecast plugin
 
 - [ ] Only one Cast device (Stuen 2, 192.168.1.20) is online. The second device the user expects was not found by

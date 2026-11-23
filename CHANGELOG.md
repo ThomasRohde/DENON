@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-11-23
+
+### Added
+- **Plugin SDK 1.16 — action metadata for MCP**: `PluginActionDescriptor` gets init-only `Parameters` (`PluginActionParameter`: name, JSON type, description, required), `IsReadOnly` and `IsDestructive`. The constructor is unchanged, so plugins built against 1.15 still load. `Parameters = null` means "not declared"; an empty list means "no parameters".
+
+### Fixed
+- **MCP plugin tools return their data**: Auto-bridged tools (`plugin_<id>_<action>`) now return the plugin's JSON (pretty text + `structuredContent` for objects) and image (for example Chromecast artwork) instead of only the message text, and set `isError` on failure. New `McpPluginToolBridge` with xUnit tests.
+- **MCP plugin tool schemas and hints**: Tools use the declared parameters as their input schema (older plugins keep the generic `message`/`contentId`/`entityId`/`button` schema) and the declared read-only/destructive hints (older plugins keep the id-based guesses).
+- **Read-only plugin tools work in the Observer tier**; actions a plugin declares destructive need FullOrchestration (as `power_off` already did).
+
 ## [1.15.2] - 2026-11-23
 
 ### Fixed

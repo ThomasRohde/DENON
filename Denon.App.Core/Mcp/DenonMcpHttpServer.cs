@@ -1250,22 +1250,12 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                 }
 
                 var toolName = BuildPluginToolName(plugin.Id, action.ActionId);
-                var isReadOnly = action.ActionId.EndsWith(".refresh", StringComparison.OrdinalIgnoreCase);
-                var isDestructive = action.ActionId.Contains("power_off", StringComparison.OrdinalIgnoreCase) ||
-                                    action.ActionId.Contains("all_off", StringComparison.OrdinalIgnoreCase) ||
-                                    action.ActionId.Contains("close_app", StringComparison.OrdinalIgnoreCase);
-                var isIdempotent = !action.ActionId.Contains("toggle", StringComparison.OrdinalIgnoreCase) &&
-                                   !action.ActionId.Contains("toast", StringComparison.OrdinalIgnoreCase) &&
-                                   !action.ActionId.Contains("webhook", StringComparison.OrdinalIgnoreCase);
+                var (isReadOnly, isDestructive, isIdempotent) = McpPluginToolBridge.ResolveHints(action);
 
                 tools.Add(Tool(
                     toolName,
                     $"[{plugin.Name}] {action.DisplayName}: {action.Description}",
-                    ObjSchema(
-                        ("message", "string", "Optional text/toast message parameter (if supported by this action)", false),
-                        ("contentId", "string", "Optional YouTube video URL/ID (for tv.youtube)", false),
-                        ("entityId", "string", "Optional Home Assistant entity ID (for ha.trigger_entity)", false),
-                        ("button", "string", "Optional LG remote button name (e.g. HOME, BACK, ENTER)", false)),
+                    McpPluginToolBridge.BuildInputSchema(action),
                     title: $"{plugin.Name}: {action.DisplayName}",
                     readOnly: isReadOnly,
                     destructive: isDestructive,
@@ -1484,6 +1474,51 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
 
             case "tv_computer":
                 return await ExecuteTvComputerToolAsync(args, cfg, ct);
+        }
+
+        // Auto-bridged plugin tools. Read-only actions run in every tier (also Observer); others need
+        // SafeControl; power_off and actions a plugin declares destructive (SDK 1.16) need FullOrchestration.
+        if (toolName.StartsWith("plugin_", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var plugin in _pluginHost.GetPlugins().Where(p => p.IsEnabled))
+            {
+                foreach (var action in plugin.Actions)
+                {
+                    if (!BuildPluginToolName(plugin.Id, action.ActionId).Equals(toolName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var (isReadOnly, _, _) = McpPluginToolBridge.ResolveHints(action);
+                    var needsFullOrchestration = action.IsDestructive == true ||
+                                                 action.ActionId.Contains("power_off", StringComparison.OrdinalIgnoreCase);
+                    if (!isReadOnly)
+                    {
+                        if (cfg.PermissionTier == McpPermissionTier.Observer)
+                        {
+                            throw new UnauthorizedAccessException($"MCP Permission Tier is 'Observer' (read-only). Change to SafeControl or FullOrchestration in Denon Desktop Settings to run '{toolName}'.");
+                        }
+
+                        if (needsFullOrchestration && cfg.PermissionTier < McpPermissionTier.FullOrchestration)
+                        {
+                            throw new UnauthorizedAccessException($"Running '{action.ActionId}' requires 'FullOrchestration' permission tier.");
+                        }
+
+                        _telemetry.MarkOrigin("avr", "mcp_agent", "mcp.tool", new Dictionary<string, object?> { ["tool"] = toolName });
+                        _telemetry.MarkOrigin("tv", "mcp_agent");
+                        _telemetry.MarkOrigin("lighting", "mcp_agent");
+                    }
+
+                    var dict = ExtractStringParameters(args);
+                    var result = await _pluginHost.ExecuteActionAsync(plugin.Id, action.ActionId, dict.Count > 0 ? dict : null, ct);
+                    if (!isReadOnly)
+                    {
+                        _intelligence.RecordPluginActionUsed(plugin.Id, action.ActionId);
+                    }
+
+                    return McpPluginToolBridge.BuildResult(result);
+                }
+            }
         }
 
         // Everything below mutates live devices or settings -> block in Observer mode!
@@ -1716,29 +1751,6 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
             case "create_automation_rule":
                 EnsureFullOrchestration(cfg, toolName);
                 return await ExecuteCreateAutomationRuleAsync(args, ct);
-        }
-
-        // Check dynamically auto-bridged plugin tools!
-        foreach (var plugin in _pluginHost.GetPlugins().Where(p => p.IsEnabled))
-        {
-            foreach (var action in plugin.Actions)
-            {
-                if (!BuildPluginToolName(plugin.Id, action.ActionId).Equals(toolName, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                if (action.ActionId.Contains("power_off", StringComparison.OrdinalIgnoreCase) &&
-                    cfg.PermissionTier < McpPermissionTier.FullOrchestration)
-                {
-                    throw new UnauthorizedAccessException($"Running '{action.ActionId}' requires 'FullOrchestration' permission tier.");
-                }
-
-                var dict = ExtractStringParameters(args);
-                var result = await _pluginHost.ExecuteActionAsync(plugin.Id, action.ActionId, dict.Count > 0 ? dict : null, ct);
-                _intelligence.RecordPluginActionUsed(plugin.Id, action.ActionId);
-                return result.Success ? BuildToolText(result.Message) : BuildToolError(result.Message);
-            }
         }
 
         throw new McpInvalidParamsException($"Unknown MCP tool '{toolName}'.");
