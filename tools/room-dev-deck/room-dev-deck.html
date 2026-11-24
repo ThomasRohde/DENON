@@ -1,0 +1,1809 @@
+<title>Room Dev Deck</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<script type="application/json" id="claude-artifacts-manifest">{"permissions": ["full-access", "notifications", "menu-bar"]}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #e4e5e2; --panel: #f3f3f0; --panel-2: #ebece8; --sunk: #dcddd9;
+  --ink: #1d2125; --muted: #5a6068; --faint: #8a9097; --line: #c6c8c3; --line-2: #d6d7d3;
+  --accent: #1d5ca3; --accent-ink: #ffffff; --accent-soft: rgba(29, 92, 163, .12);
+  --warn: #a96400; --warn-soft: rgba(169, 100, 0, .13); --err: #b02a1e; --err-soft: rgba(176, 42, 30, .12);
+  --ok: #2c7548; --ok-soft: rgba(44, 117, 72, .12);
+  --l-app: #6b7178; --l-receiver: #1d5ca3; --l-lg-tv: #8a3a86; --l-apple-tv: #44515e; --l-chromecast: #bf5617;
+  --l-homepod: #23857a; --l-lights: #9a7b10; --l-control: #6b7178; --l-other: #6b7178;
+  --off: rgba(29, 33, 37, .07);
+  --ui: "Barlow Semi Condensed", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", Consolas, ui-monospace, monospace;
+  --gutter-l: max(16px, env(safe-area-inset-left)); --gutter-r: max(16px, env(safe-area-inset-right));
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17191c; --panel: #202327; --panel-2: #1b1e21; --sunk: #141619;
+    --ink: #e6e7e3; --muted: #9ba1a8; --faint: #6f757c; --line: #353a40; --line-2: #2b2f34;
+    --accent: #72a9e6; --accent-ink: #0d1a29; --accent-soft: rgba(114, 169, 230, .16);
+    --warn: #e3a33f; --warn-soft: rgba(227, 163, 63, .16); --err: #f0776b; --err-soft: rgba(240, 119, 107, .15);
+    --ok: #6cc28c; --ok-soft: rgba(108, 194, 140, .14);
+    --l-app: #8c939a; --l-receiver: #72a9e6; --l-lg-tv: #c98ac5; --l-apple-tv: #a7b4c1; --l-chromecast: #ee935a;
+    --l-homepod: #5cc4b6; --l-lights: #d9b847; --l-control: #8c939a; --l-other: #8c939a;
+    --off: rgba(255, 255, 255, .045);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17191c; --panel: #202327; --panel-2: #1b1e21; --sunk: #141619;
+  --ink: #e6e7e3; --muted: #9ba1a8; --faint: #6f757c; --line: #353a40; --line-2: #2b2f34;
+  --accent: #72a9e6; --accent-ink: #0d1a29; --accent-soft: rgba(114, 169, 230, .16);
+  --warn: #e3a33f; --warn-soft: rgba(227, 163, 63, .16); --err: #f0776b; --err-soft: rgba(240, 119, 107, .15);
+  --ok: #6cc28c; --ok-soft: rgba(108, 194, 140, .14);
+  --l-app: #8c939a; --l-receiver: #72a9e6; --l-lg-tv: #c98ac5; --l-apple-tv: #a7b4c1; --l-chromecast: #ee935a;
+  --l-homepod: #5cc4b6; --l-lights: #d9b847; --l-control: #8c939a; --l-other: #8c939a;
+  --off: rgba(255, 255, 255, .045);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.4 var(--ui); -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hidden { display: none !important; }
+
+/* ---------- top bar ---------- */
+.top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 10px var(--gutter-r) 10px var(--gutter-l); background: var(--panel); border-bottom: 1px solid var(--line);
+  app-region: drag; }
+.top > * { app-region: no-drag; }
+.brand { display: flex; align-items: baseline; gap: 8px; app-region: drag; }
+.brand b { font-weight: 700; font-size: 19px; letter-spacing: .01em; }
+.brand span { color: var(--muted); font-size: 14px; }
+.modes { display: flex; gap: 2px; padding: 3px; background: var(--sunk); border-radius: 9px; }
+.modes button { border: 0; background: none; padding: 5px 14px; border-radius: 7px; cursor: pointer; font-weight: 600;
+  color: var(--muted); font-size: 15px; }
+.modes button[aria-selected="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 0 var(--line); }
+.modes button kbd { font: 11px var(--mono); color: var(--faint); margin-left: 6px; }
+.leds { margin-left: auto; display: flex; gap: 14px; align-items: center; font-size: 13px; color: var(--muted); }
+.led { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.led i { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); box-shadow: 0 0 0 2px var(--sunk); }
+.led[data-s="ok"] i { background: var(--ok); } .led[data-s="warn"] i { background: var(--warn); }
+.led[data-s="err"] i { background: var(--err); }
+
+/* ---------- shared ---------- */
+main { padding: 14px var(--gutter-r) 28px var(--gutter-l); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.card > header { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line-2); flex-wrap: wrap; }
+.card > header h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.card > header .sub { color: var(--muted); font-size: 13px; }
+.card > header .grow { flex: 1; }
+.pad { padding: 12px; }
+.btn { border: 1px solid var(--line); background: var(--panel-2); border-radius: 7px; padding: 4px 11px; cursor: pointer;
+  font-weight: 500; white-space: nowrap; }
+.btn:hover { border-color: var(--faint); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.danger { background: var(--warn); color: #fff; border-color: var(--warn); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.small { padding: 2px 8px; font-size: 13px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.seg button { border: 0; border-right: 1px solid var(--line); background: var(--panel-2); padding: 3px 10px; cursor: pointer; font-size: 14px; }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.muted { color: var(--muted); } .faint { color: var(--faint); }
+.empty { color: var(--muted); padding: 18px 12px; }
+.mono { font-family: var(--mono); font-size: 12.5px; }
+input[type="search"], input[type="text"], input[type="number"], select, textarea {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px; padding: 4px 8px; min-width: 0; }
+textarea { font: 12.5px/1.45 var(--mono); width: 100%; resize: vertical; }
+.chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 99px; padding: 1px 9px;
+  font-size: 13px; background: var(--panel-2); cursor: pointer; user-select: none; }
+.chip[aria-pressed="false"] { opacity: .5; }
+.chip i { width: 8px; height: 8px; border-radius: 2px; }
+.chip .n { color: var(--faint); font-size: 12px; }
+.chip.x { cursor: default; background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.chip.x button { border: 0; background: none; color: inherit; cursor: pointer; padding: 0 0 0 2px; font-size: 14px; line-height: 1; }
+.sev { width: 9px; height: 9px; border-radius: 2px; flex: none; margin-top: 5px; background: var(--faint); }
+.sev.error { background: var(--err); } .sev.warn { background: var(--warn); } .sev.info { background: var(--accent); }
+.kv { display: grid; grid-template-columns: minmax(90px, max-content) 1fr; gap: 3px 12px; font-size: 14px; margin: 0; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; overflow-wrap: anywhere; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+pre.out { margin: 0; padding: 10px 12px; font: 12.5px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere;
+  background: var(--sunk); border-radius: 0 0 10px 10px; max-height: 60vh; overflow: auto; }
+.j-k { color: var(--accent); } .j-s { color: var(--ok); } .j-n { color: var(--l-chromecast); } .j-b { color: var(--l-lg-tv); }
+
+/* ---------- gate ---------- */
+.gate { max-width: 760px; margin: 6vh auto; padding: 0 var(--gutter-r) 0 var(--gutter-l); }
+.gate h1 { font-size: 34px; line-height: 1.1; margin: 0 0 10px; font-weight: 700; }
+.gate p { color: var(--muted); font-size: 17px; max-width: 62ch; }
+.gate ul { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin: 22px 0; }
+.gate li { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.gate li b { display: block; font-size: 17px; margin-bottom: 2px; }
+.gate li span { color: var(--muted); font-size: 14px; }
+.gate .act { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 18px; }
+.gate .note { font-size: 14px; color: var(--muted); }
+
+/* ---------- room ---------- */
+.room-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.day { display: inline-flex; align-items: center; gap: 4px; }
+.day select { font-weight: 600; }
+.tl { position: relative; padding: 4px 0 6px; overflow: hidden; }
+.tl svg { display: block; width: 100%; user-select: none; touch-action: pan-y; }
+.tl .lane-name { font: 600 13px var(--ui); fill: var(--ink); }
+.tl .lane-sub { font: 12px var(--ui); fill: var(--muted); }
+.tl .axis text { font: 11.5px var(--mono); fill: var(--faint); }
+.tl .grid { stroke: var(--line-2); stroke-width: 1; }
+.tl .lane-sep { stroke: var(--line-2); }
+.tl .bar { cursor: pointer; }
+.tl .bar rect { stroke-width: 1.5; }
+.tl .bar text { font: 600 11.5px var(--ui); fill: #fff; pointer-events: none; }
+.tl .bar.sel rect { stroke: var(--ink); stroke-width: 2; }
+.tl .bar.live rect { animation: pulse 2.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .62; } }
+@media (prefers-reduced-motion: reduce) { .tl .bar.live rect { animation: none; } }
+.tl .now { stroke: var(--err); stroke-width: 1.5; }
+.tl .brush { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1; }
+.tl .cursor { stroke: var(--ink); stroke-dasharray: 3 3; }
+.tip { position: absolute; pointer-events: none; z-index: 5; background: var(--ink); color: var(--panel); border-radius: 7px;
+  padding: 6px 9px; font-size: 13px; max-width: 320px; line-height: 1.35; box-shadow: 0 4px 16px rgba(0,0,0,.18); }
+.tip b { display: block; font-size: 14px; }
+.room-grid { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 12px; margin-top: 12px; align-items: start; }
+.room-left { display: grid; gap: 12px; min-width: 0; }
+.sel-title { font-size: 20px; font-weight: 600; line-height: 1.2; margin: 0 0 2px; overflow-wrap: anywhere; }
+.checks { list-style: none; margin: 0; padding: 4px 0; max-height: 46vh; overflow: auto; }
+.checks li { display: flex; gap: 9px; padding: 7px 12px; cursor: pointer; border-top: 1px solid var(--line-2); }
+.checks li:first-child { border-top: 0; }
+.checks li:hover { background: var(--panel-2); }
+.checks li b { font-weight: 600; display: block; }
+.checks li span { color: var(--muted); font-size: 13.5px; }
+.checks li time { margin-left: auto; font: 12px var(--mono); color: var(--faint); white-space: nowrap; padding-left: 8px; }
+.feed-tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line-2); }
+.feed-tools input[type="search"] { flex: 1 1 160px; }
+.feed { height: 58vh; min-height: 260px; overflow: auto; font-size: 14px; }
+.feed .more { display: block; margin: 6px auto; }
+.fi { display: grid; grid-template-columns: 62px 74px 1fr; gap: 8px; padding: 3px 12px; border-left: 3px solid transparent; cursor: pointer; }
+.fi:hover { background: var(--panel-2); }
+.fi time { font: 12px/1.75 var(--mono); color: var(--faint); }
+.fi .src { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.6; }
+.fi .src i { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 5px; vertical-align: 1px; }
+.fi .txt { overflow-wrap: anywhere; min-width: 0; }
+.fi.log .txt { font: 12.5px/1.55 var(--mono); }
+.fi.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+.fi.error { border-left-color: var(--err); background: var(--err-soft); }
+.fi.dim .txt { color: var(--muted); }
+.fi .raw { grid-column: 2 / -1; font: 12px/1.5 var(--mono); white-space: pre-wrap; color: var(--muted); background: var(--sunk);
+  border-radius: 6px; padding: 6px 8px; margin: 2px 0 4px; overflow-wrap: anywhere; }
+.jump { position: sticky; bottom: 8px; float: right; margin-right: 12px; }
+
+/* ---------- mcp ---------- */
+.mcp-grid { display: grid; grid-template-columns: minmax(250px, 330px) 1fr; gap: 12px; align-items: start; }
+.tools { max-height: 72vh; overflow: auto; padding-bottom: 6px; }
+.tools h3 { margin: 0; padding: 8px 12px 4px; font-size: 13px; font-weight: 600; color: var(--muted); position: sticky; top: 0; background: var(--panel); }
+.tools button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 4px 12px; cursor: pointer; font: 13px var(--mono); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tools button:hover { background: var(--panel-2); }
+.tools button[aria-current="true"] { background: var(--accent-soft); color: var(--accent); }
+.tools button::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 7px; vertical-align: 1px; background: var(--ok); }
+.tools button.rw::before { background: var(--warn); }
+.tool-name { font: 600 17px var(--mono); margin: 0; overflow-wrap: anywhere; }
+.tool-desc { color: var(--muted); margin: 6px 0 12px; white-space: pre-wrap; }
+.argform { display: grid; gap: 10px; }
+.argform label { display: grid; gap: 3px; font-size: 14px; }
+.argform label small { color: var(--muted); font-size: 12.5px; }
+.argform label b { font: 600 13px var(--mono); }
+.confirm { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--warn-soft); border: 1px solid var(--warn);
+  border-radius: 8px; padding: 8px 10px; margin-top: 10px; }
+.result-head { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line-2); flex-wrap: wrap; }
+.result-head .ok { color: var(--ok); font-weight: 600; } .result-head .bad { color: var(--err); font-weight: 600; }
+.hist { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow: auto; }
+.hist li { display: flex; gap: 8px; padding: 4px 12px; font-size: 13px; cursor: pointer; border-top: 1px solid var(--line-2); }
+.hist li:hover { background: var(--panel-2); }
+.hist li code { font: 12.5px var(--mono); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.result img { max-width: 100%; border-radius: 6px; display: block; margin: 8px 12px; }
+
+/* ---------- lan ---------- */
+.lan-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.dev h2 { font-size: 16px; }
+.dev .kind { font-size: 13px; color: var(--muted); }
+.ports { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 8px; }
+.port { font: 12px var(--mono); border-radius: 5px; padding: 1px 6px; background: var(--sunk); color: var(--muted); }
+.port[data-s="open"] { background: var(--ok-soft); color: var(--ok); }
+.port[data-s="closed"] { background: var(--err-soft); color: var(--err); }
+.console { margin-top: 12px; }
+.console pre.out { min-height: 160px; max-height: 50vh; }
+
+/* ---------- release ---------- */
+.rel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; align-items: start; }
+table.t { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.t th { text-align: left; font-weight: 600; color: var(--muted); font-size: 13px; padding: 6px 12px; border-bottom: 1px solid var(--line-2); }
+table.t td { padding: 6px 12px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+table.t tr:last-child td { border-bottom: 0; }
+.tag { font-size: 12.5px; border-radius: 5px; padding: 1px 6px; white-space: nowrap; }
+.tag.ok { background: var(--ok-soft); color: var(--ok); } .tag.warn { background: var(--warn-soft); color: var(--warn); }
+.tag.err { background: var(--err-soft); color: var(--err); } .tag.info { background: var(--accent-soft); color: var(--accent); }
+.runs { list-style: none; margin: 0; padding: 0; }
+.runs li { display: grid; grid-template-columns: 12px 1fr auto; gap: 9px; padding: 7px 12px; border-top: 1px solid var(--line-2); }
+.runs li:first-child { border-top: 0; }
+.runs li a { color: inherit; text-decoration: none; font-weight: 500; }
+.runs li a:hover { text-decoration: underline; }
+.runs .dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; background: var(--faint); }
+.runs .dot.success { background: var(--ok); } .runs .dot.failure, .runs .dot.cancelled { background: var(--err); }
+.runs .dot.running { background: var(--warn); animation: pulse 1.4s infinite; }
+.lines { margin: 0; padding: 8px 12px 10px 28px; font-size: 14px; }
+.lines li { margin: 2px 0; }
+.files { font: 12.5px/1.6 var(--mono); padding: 8px 12px; margin: 0; white-space: pre-wrap; max-height: 220px; overflow: auto; }
+
+/* ---------- ask drawer ---------- */
+.drawer { position: fixed; z-index: 40; top: 0; right: 0; bottom: 0; width: min(520px, 100vw); background: var(--panel);
+  border-left: 1px solid var(--line); box-shadow: -10px 0 30px rgba(0,0,0,.14); display: flex; flex-direction: column;
+  padding-right: env(safe-area-inset-right); }
+.drawer header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line-2); }
+.drawer header h2 { margin: 0; font-size: 18px; flex: 1; }
+.drawer .ctx { padding: 10px 14px; font-size: 14px; color: var(--muted); border-bottom: 1px solid var(--line-2); }
+.drawer .q { padding: 10px 14px; display: grid; gap: 8px; border-bottom: 1px solid var(--line-2); }
+.drawer .q textarea { font: 14px/1.4 var(--ui); min-height: 64px; }
+.answer { flex: 1; overflow: auto; padding: 12px 16px 24px; font-size: 15.5px; line-height: 1.5; }
+.answer p { margin: 0 0 10px; } .answer ul { margin: 0 0 10px; padding-left: 20px; } .answer li { margin: 3px 0; }
+.answer code { font: 13px var(--mono); background: var(--sunk); border-radius: 4px; padding: 0 4px; }
+.answer h4 { margin: 12px 0 6px; font-size: 15.5px; }
+.toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 50; background: var(--ink); color: var(--panel);
+  padding: 8px 14px; border-radius: 8px; font-size: 14px; max-width: calc(100vw - 32px); }
+
+@media (max-width: 900px) {
+  .room-grid, .mcp-grid { grid-template-columns: 1fr; }
+  .feed { height: 50vh; }
+  .leds { margin-left: 0; width: 100%; }
+}
+@media (max-width: 520px) {
+  .modes button { padding: 5px 9px; } .modes button kbd { display: none; }
+  .fi { grid-template-columns: 54px 1fr; } .fi .src { display: none; } .fi .raw { grid-column: 1 / -1; }
+  .rel-grid { grid-template-columns: 1fr; }
+}
+</style>
+
+<div id="gate" class="gate hidden"></div>
+
+<div id="app" class="hidden">
+  <div class="top">
+    <div class="brand"><b>Room Dev Deck</b><span>for Denon Desktop</span></div>
+    <div class="modes" role="tablist" aria-label="Mode">
+      <button role="tab" data-mode="room" aria-selected="true">Room<kbd>1</kbd></button>
+      <button role="tab" data-mode="mcp" aria-selected="false">MCP<kbd>2</kbd></button>
+      <button role="tab" data-mode="lan" aria-selected="false">LAN<kbd>3</kbd></button>
+      <button role="tab" data-mode="release" aria-selected="false">Release<kbd>4</kbd></button>
+    </div>
+    <div class="leds">
+      <span class="led" id="led-app" title="Is Denon Desktop running?"><i></i><span>App</span></span>
+      <span class="led" id="led-logs" title="When the logs last changed"><i></i><span>Logs</span></span>
+      <span class="led" id="led-mcp" title="The app's MCP server"><i></i><span>MCP</span></span>
+      <button class="btn small hidden" id="perm-btn">Turn on tray icon and alerts</button>
+    </div>
+  </div>
+
+  <main>
+    <!-- ROOM -->
+    <section id="mode-room">
+      <div class="room-bar">
+        <span class="day">
+          <button class="btn small" id="day-prev" aria-label="Previous day">‹</button>
+          <select id="day-pick" aria-label="Day"></select>
+          <button class="btn small" id="day-next" aria-label="Next day">›</button>
+        </span>
+        <span class="seg" id="zoom-seg">
+          <button data-z="day" aria-pressed="false">Day</button>
+          <button data-z="fit" aria-pressed="true">Fit</button>
+          <button data-z="6h" aria-pressed="false">Last 6 h</button>
+          <button data-z="1h" aria-pressed="false">Last hour</button>
+        </span>
+        <span class="muted" id="room-stat"></span>
+        <span style="flex:1"></span>
+        <button class="btn ask-btn" id="ask-day">Ask Claude about this view</button>
+      </div>
+      <div class="card">
+        <div class="tl" id="tl"></div>
+      </div>
+      <div class="room-grid">
+        <div class="room-left">
+          <div class="card" id="sel-card">
+            <header><h2>Selection</h2><span class="grow"></span><button class="btn small hidden" id="sel-clear">Clear</button></header>
+            <div class="pad" id="sel-body"></div>
+          </div>
+          <div class="card">
+            <header><h2>Checks</h2><span class="sub" id="checks-sum"></span></header>
+            <ul class="checks" id="checks"></ul>
+          </div>
+        </div>
+        <div class="card">
+          <header><h2>Feed</h2><span class="sub" id="feed-sum"></span><span class="grow"></span>
+            <label class="row muted" style="font-size:14px"><input type="checkbox" id="f-warn"> Warnings and errors only</label>
+          </header>
+          <div class="feed-tools" id="feed-tools">
+            <span id="f-srcs" class="row"></span>
+            <select id="f-who" aria-label="Plugin or device"><option value="">All plugins and devices</option></select>
+            <input type="search" id="f-q" placeholder="Search the feed  ( / )" aria-label="Search the feed">
+            <span id="f-range"></span>
+          </div>
+          <div class="feed" id="feed"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MCP -->
+    <section id="mode-mcp" class="hidden">
+      <div class="room-bar">
+        <span id="mcp-stat" class="muted">Not connected yet.</span>
+        <span style="flex:1"></span>
+        <button class="btn" id="mcp-refresh">Reload tools</button>
+      </div>
+      <div class="mcp-grid">
+        <div class="card">
+          <header><input type="search" id="mcp-q" placeholder="Find a tool" aria-label="Find a tool" style="flex:1"></header>
+          <div class="tools" id="tools"></div>
+        </div>
+        <div style="display:grid;gap:12px;min-width:0">
+          <div class="card" id="tool-card"><div class="empty">Pick a tool on the left. Tools that only read run with one click. Tools that change the room ask first.</div></div>
+          <div class="card">
+            <header><h2>History</h2><span class="sub">This computer only. Click a row to load its arguments.</span></header>
+            <ul class="hist" id="hist"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LAN -->
+    <section id="mode-lan" class="hidden">
+      <div class="room-bar">
+        <button class="btn primary" id="lan-check">Check links</button>
+        <span class="muted" id="lan-stat"></span>
+        <span style="flex:1"></span>
+        <button class="btn" id="lan-discover">Discover Apple devices</button>
+        <button class="btn" id="lan-roomstate">Room state (MCP)</button>
+        <button class="btn" id="lan-doctor">Room Doctor (MCP)</button>
+      </div>
+      <p class="muted" style="margin:0 0 10px;font-size:14px">Read-only probes. The receiver's Telnet port 23 is not checked: it takes one client at a time, and the app holds it.</p>
+      <div class="lan-grid" id="lan-devs"></div>
+      <div class="card console">
+        <header><h2>Console</h2><span class="sub mono" id="con-cmd"></span><span class="grow"></span>
+          <span id="con-state" class="muted"></span>
+          <button class="btn small" id="con-stop" disabled>Stop</button>
+          <button class="btn small" id="con-ask">Ask Claude</button>
+          <button class="btn small" id="con-clear">Clear</button></header>
+        <pre class="out" id="con-out"></pre>
+      </div>
+    </section>
+
+    <!-- RELEASE -->
+    <section id="mode-release" class="hidden">
+      <div class="room-bar">
+        <label class="row">Repository <input type="text" id="repo" style="width:min(420px,60vw)" aria-label="Repository folder"></label>
+        <button class="btn" id="rel-refresh">Refresh</button>
+        <span class="muted" id="rel-stat"></span>
+      </div>
+      <div class="rel-grid">
+        <div class="card"><header><h2>Versions</h2><span class="sub">Project files against the newest tags</span></header><div id="rel-versions"></div></div>
+        <div class="card"><header><h2>GitHub Actions</h2><span class="sub" id="runs-sub"></span><span class="grow"></span><button class="btn small" id="runs-refresh">Refresh</button></header><ul class="runs" id="runs"></ul></div>
+        <div class="card"><header><h2>Working tree</h2><span class="sub" id="git-sub"></span></header><div id="rel-git"></div></div>
+        <div class="card"><header><h2>Unreleased in CHANGELOG</h2></header><div id="rel-unrel"></div></div>
+        <div class="card"><header><h2>Check a release</h2><span class="sub">Download the assets and compare SHA-256</span></header><div id="rel-verify" class="pad"></div></div>
+        <div class="card"><header><h2>Open in TODO.md</h2><span class="sub" id="todo-sub"></span></header><div id="rel-todo"></div></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<aside id="ask" class="drawer hidden" aria-label="Ask Claude">
+  <header><h2>Ask Claude</h2><button class="btn small" id="ask-close">Close</button></header>
+  <div class="ctx" id="ask-ctx"></div>
+  <div class="q">
+    <textarea id="ask-q" aria-label="Question"></textarea>
+    <div class="row"><button class="btn primary" id="ask-go">Ask</button><button class="btn" id="ask-stop" disabled>Stop</button>
+      <span class="faint" style="font-size:13px">Sends these log lines to Claude on your account.</span></div>
+  </div>
+  <div class="answer" id="ask-out"></div>
+</aside>
+
+<script type="module">
+// =====================================================================
+// Utilities
+// =====================================================================
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+function el(tag, props, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") n.className = v;
+    else if (k === "text") n.textContent = v;
+    else if (k === "style") n.style.cssText = v;
+    else if (k.startsWith("on") && typeof v === "function") n.addEventListener(k.slice(2), v);
+    else n.setAttribute(k, v === true ? "" : String(v));
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) n.append(c.nodeType ? c : String(c));
+  return n;
+}
+const SVGNS = "http://www.w3.org/2000/svg";
+function sv(tag, attrs, ...kids) {
+  const n = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) if (v != null) n.setAttribute(k, String(v));
+  for (const c of kids.flat()) if (c != null) n.append(c.nodeType ? c : document.createTextNode(String(c)));
+  return n;
+}
+const pad2 = (n) => String(n).padStart(2, "0");
+const hhmm = (t) => { const d = new Date(t); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); };
+const hhmmss = (t) => hhmm(t) + ":" + pad2(new Date(t).getSeconds());
+function fmtDur(sec) {
+  sec = Math.max(0, Math.round(+sec || 0));
+  if (sec < 60) return sec + " s";
+  const m = Math.round(sec / 60);
+  if (m < 60) return m + " min";
+  return Math.floor(m / 60) + " h " + pad2(m % 60) + " min";
+}
+function ago(t) {
+  const s = Math.round((Date.now() - t) / 1000);
+  if (s < 5) return "just now"; if (s < 60) return s + " s ago";
+  if (s < 3600) return Math.round(s / 60) + " min ago";
+  return Math.round(s / 3600) + " h ago";
+}
+const dateKey = (d) => d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+const dayStart = (key) => { const [y, m, d] = key.split("-").map(Number); return new Date(y, m - 1, d).getTime(); };
+const shiftDay = (key, n) => { const d = new Date(dayStart(key)); d.setDate(d.getDate() + n); return dateKey(d); };
+const dayLabel = (key) => new Date(dayStart(key)).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("rdd." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("rdd." + k, JSON.stringify(v)); } catch { /* per-viewer convenience only */ } },
+};
+const psq = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+const errText = (e) => (e && (e.message || e.code)) || String(e);
+let toastTimer;
+function toast(msg) {
+  let t = $(".toast"); if (!t) { t = el("div", { class: "toast", role: "status" }); document.body.append(t); }
+  t.textContent = msg; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), 3600);
+}
+function jsonHtml(value) {
+  // Pretty JSON with colour. Every value is escaped before it becomes markup.
+  const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const txt = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  return esc(txt).replace(/(&quot;(?:[^&]|&(?!quot;))*?&quot;)(\s*:)?|\b(true|false|null)\b|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
+    (m, str, colon, lit, num) => str ? (colon ? `<span class="j-k">${str}</span>${colon}` : `<span class="j-s">${str}</span>`)
+      : lit ? `<span class="j-b">${lit}</span>` : `<span class="j-n">${num}</span>`);
+}
+
+// =====================================================================
+// Platform: the desktop API (or a local test shim), files, commands
+// =====================================================================
+const P = { desktop: null, fs: null, sample: null, env: {}, appRunning: null, perms: {} };
+async function sh(cmd, opts = {}) { return P.desktop.childProcess.exec(cmd, { timeout: 60000, ...opts }); }
+let tmpN = 0;
+const tmpFile = (ext) => `${P.env.TEMP}\\room-dev-deck-${Date.now().toString(36)}-${tmpN++}.${ext}`;
+async function ps(script, timeout = 60000) {
+  const f = tmpFile("ps1");
+  await P.fs.writeFile(f, "\uFEFF[Console]::OutputEncoding = [Text.Encoding]::UTF8\n$ProgressPreference = 'SilentlyContinue'\n" + script, "utf8");
+  try { return await sh(`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${f}"`, { timeout }); }
+  finally { P.fs.rm(f, { force: true }).catch(() => {}); }
+}
+async function readText(path) {
+  try { return (await P.fs.readFile(path, "utf8")).replace(/^\uFEFF/, ""); }
+  catch (e) {
+    if (!String(e.message).startsWith("EFBIG")) throw e;
+    const r = await ps(`Get-Content -LiteralPath ${psq(path)} -Tail 6000 -Encoding UTF8`);
+    return r.stdout;
+  }
+}
+async function readJson(path) { try { return JSON.parse(await readText(path)); } catch { return null; } }
+async function checkAppRunning() {
+  try {
+    const r = await sh('tasklist /FI "IMAGENAME eq Denon.App.Desktop.exe" /NH /FO CSV', { timeout: 15000 });
+    P.appRunning = /Denon\.App\.Desktop\.exe/i.test(r.stdout);
+  } catch { P.appRunning = null; }
+  setLed("led-app", P.appRunning == null ? "" : P.appRunning ? "ok" : "warn", P.appRunning ? "App running" : P.appRunning === false ? "App not running" : "App");
+}
+function setLed(id, s, label) {
+  const n = document.getElementById(id); n.dataset.s = s || ""; if (label) n.querySelector("span").textContent = label;
+}
+
+// =====================================================================
+// Room: data
+// =====================================================================
+const STREAMS = ["media", "avr", "tv", "lighting", "control"];
+const LANE_META = {
+  app: { name: "App log", color: "--l-app" }, receiver: { name: "Receiver", color: "--l-receiver" },
+  "lg-tv": { name: "LG TV", color: "--l-lg-tv" }, "apple-tv": { name: "Apple TV", color: "--l-apple-tv" },
+  chromecast: { name: "Chromecast", color: "--l-chromecast" }, homepod: { name: "HomePod", color: "--l-homepod" },
+  lights: { name: "Hue lights", color: "--l-lights" }, control: { name: "Actions", color: "--l-control" },
+  other: { name: "Other", color: "--l-other" },
+};
+const LANE_ORDER = ["app", "receiver", "lg-tv", "apple-tv", "chromecast", "homepod", "lights", "control", "other"];
+const SRC_META = {
+  log: { name: "App log", color: "--l-app" }, media: { name: "Media", color: "--l-homepod" }, avr: { name: "Receiver", color: "--l-receiver" },
+  tv: { name: "TV", color: "--l-lg-tv" }, lighting: { name: "Lights", color: "--l-lights" }, control: { name: "Actions", color: "--l-control" },
+};
+const D = {
+  logsDir: "", evDir: "", day: null, days: [], events: [], media: [], log: [], logDay: [], appStarts: [],
+  sessions: [], findings: [], items: [], sig: "", loadedAt: 0, followToday: true, logCount: -1,
+};
+const streamerOf = (x) => x.homepodDevice || x.castDevice || x.appleTvDevice || "";
+function laneOf(e) {
+  const d = e.device, x = e.data || {};
+  if (e.stream === "control") return "control";
+  if (e.stream === "lighting") return "lights";
+  if (e.stream === "avr" || d === "avr") return "receiver";
+  if (d === "lg-tv" || d === "smart-tv" || e.stream === "tv") return "lg-tv";
+  if (d === "apple-tv") return "apple-tv|" + (x.appleTvDevice || "");
+  if (d === "chromecast") return "chromecast|" + (x.castDevice || "");
+  if (d === "homepod") return "homepod|" + (x.homepodDevice || "");
+  if (e.stream === "lighting") return "lights";
+  if (e.stream === "control") return "control";
+  return "other|" + d;
+}
+const laneBase = (id) => id.split("|")[0];
+const laneSub = (id) => id.split("|")[1] || "";
+const laneLabel = (id) => (LANE_META[laneBase(id)]?.name || id) + (laneSub(id) ? " · " + laneSub(id) : "");
+
+function parseEventLines(text) {
+  const out = [];
+  for (const line of text.split(/\r?\n/)) {
+    const s = line.replace(/^\uFEFF/, "").trim();
+    if (!s) continue;
+    try { const e = JSON.parse(s); e.t = Date.parse(e.ts); e.data = e.data || {}; if (!isNaN(e.t)) out.push(e); } catch { /* skip a torn line */ }
+  }
+  return out;
+}
+const LOG_RE = /^(\d{4}-\d\d-\d\d) (\d\d:\d\d:\d\d) \[(\w+)\] (.*)$/;
+function parseLog(text) {
+  const out = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/^\uFEFF/, "");
+    const m = LOG_RE.exec(line);
+    if (m) {
+      let msg = m[4], plugin = "";
+      const pm = /^\[Plugin:([^\]]+)\]\s*/.exec(msg);
+      if (pm) { plugin = pm[1]; msg = msg.slice(pm[0].length); }
+      const lvl = m[3].toLowerCase();
+      out.push({ t: new Date(`${m[1]}T${m[2]}`).getTime(), level: lvl === "warning" ? "warn" : lvl === "error" ? "error" : "info", plugin, msg, line });
+    } else if (line.trim() && out.length) {
+      out[out.length - 1].msg += "\n" + line; out[out.length - 1].line += "\n" + line;
+    }
+  }
+  return out;
+}
+function findAppStarts(log) {
+  // A run starts at its first "Loaded plugin" line; "Denon Desktop started." follows a second later.
+  // A clean stop writes "Application shutting down" first; without it the app was killed or crashed.
+  const starts = [];
+  let sawShutdown = false;
+  for (let i = 0; i < log.length; i++) {
+    const e = log[i];
+    if (e.msg.startsWith("Application shutting down")) { sawShutdown = true; continue; }
+    if (!e.msg.startsWith("Loaded plugin")) continue;
+    const prev = log[i - 1];
+    if (!prev || !prev.msg.startsWith("Loaded plugin") || e.t - prev.t > 8000) {
+      const lastBefore = [...log.slice(Math.max(0, i - 40), i)].reverse().find((x) => !x.msg.startsWith("Loaded plugin"));
+      starts.push({ t: e.t, stopT: lastBefore ? lastBefore.t : null, clean: !prev || sawShutdown });
+      sawShutdown = false;
+    }
+  }
+  return starts;
+}
+const nearRestart = (t) => D.appStarts.some((s) => t >= (s.stopT ?? s.t) - 30000 && t <= s.t + 90000);
+
+async function listDays() {
+  const set = new Set([dateKey(new Date())]);
+  try {
+    for (const ent of await P.fs.readdir(D.evDir)) {
+      const m = /^[a-z]+-(\d{4}-\d\d-\d\d)\.jsonl$/.exec(ent.name);
+      if (m) set.add(m[1]);
+    }
+  } catch { /* no events folder yet */ }
+  return [...set].sort().reverse();
+}
+async function readStream(stream, day) {
+  try { return parseEventLines(await P.fs.readFile(`${D.evDir}\\${stream}-${day}.jsonl`, "utf8")); }
+  catch (e) { if (String(e.message).startsWith("ENOENT")) return []; throw e; }
+}
+async function filesSignature(day) {
+  const parts = [];
+  for (const p of [`${D.logsDir}\\app.log`, ...STREAMS.map((s) => `${D.evDir}\\${s}-${day}.jsonl`)]) {
+    try { const st = await P.fs.stat(p); parts.push(st.size + ":" + st.mtimeMs); } catch { parts.push("-"); }
+  }
+  return parts.join("|");
+}
+async function loadDay(day, { keepView = false } = {}) {
+  const t0 = dayStart(day), t1 = t0 + 86400000;
+  const [streams, prevMedia, nextMedia, logText] = await Promise.all([
+    Promise.all(STREAMS.map((s) => readStream(s, day))),
+    readStream("media", shiftDay(day, -1)), readStream("media", shiftDay(day, 1)),
+    readText(`${D.logsDir}\\app.log`).catch(() => ""),
+  ]);
+  D.day = day;
+  D.events = streams.flat().filter((e) => e.t >= t0 && e.t < t1).sort((a, b) => a.t - b.t);
+  D.media = [...prevMedia, ...streams[0], ...nextMedia].sort((a, b) => a.t - b.t);
+  const prevCount = D.logCount;
+  D.log = parseLog(logText);
+  D.logCount = D.log.length;
+  D.logDay = D.log.filter((e) => e.t >= t0 && e.t < t1);
+  D.appStarts = findAppStarts(D.log);
+  D.sessions = buildSessions(D.media).filter((s) => s.end > t0 && s.start < t1);
+  D.findings = runChecks(t0, t1);
+  D.items = buildItems();
+  D.loadedAt = Date.now();
+  const last = Math.max(D.events.at(-1)?.t || 0, D.logDay.at(-1)?.t || 0);
+  setLed("led-logs", last && Date.now() - last < 15 * 60000 ? "ok" : last ? "" : "warn", last ? "Logs " + ago(last) : "No logs today");
+  if (prevCount >= 0 && D.logCount > prevCount) onNewLogLines(D.log.slice(prevCount));
+  renderRoom(keepView);
+  updateTray();
+}
+
+function buildSessions(media) {
+  const now = Date.now(), out = [], open = new Map();
+  const keyOf = (e) => `${e.device}|${e.data.kind}|${streamerOf(e.data)}`;
+  const mk = (e, start, end, extra) => ({
+    lane: laneOf(e), start, end, data: e.data, kind: e.data.kind, title: e.data.title || "(no title)", ...extra,
+  });
+  for (const e of media) {
+    if (e.event === "session.started") {
+      const k = keyOf(e); if (!open.has(k)) open.set(k, []); open.get(k).push(e);
+    } else if (e.event === "session.ended") {
+      const k = keyOf(e), q = open.get(k) || [];
+      let i = q.findIndex((s) => s.data.title === e.data.title);
+      if (i < 0 && q.length) i = q.length - 1;
+      const started = i >= 0 ? q.splice(i, 1)[0] : null;
+      const dur = (+e.data.durationSec || 0) * 1000;
+      out.push(mk(e, e.t - dur, e.t, { started, ended: e, open: false }));
+    }
+  }
+  for (const q of open.values()) {
+    q.sort((a, b) => a.t - b.t);
+    q.forEach((s, i) => {
+      const start = s.t - (+s.data.dwellConfirmedSec || 0) * 1000;
+      const next = q[i + 1];
+      const restart = D.appStarts.find((a) => a.t > s.t);
+      let end, live = false, replaced = false, stoppedAt = null;
+      if (next) { end = next.t; replaced = true; }
+      else if (!restart && P.appRunning !== false && now - s.t < 20 * 3600000) { end = now; live = true; }
+      else if (restart) { end = restart.stopT ?? restart.t; stoppedAt = end; }
+      else { end = Math.max(D.log.at(-1)?.t || s.t, s.t + 60000); stoppedAt = end; }
+      out.push(mk(s, start, end, { started: s, ended: null, open: true, live, replaced, stoppedAt }));
+    });
+  }
+  return out.sort((a, b) => a.start - b.start);
+}
+
+function powerSpans(laneId, t0, t1) {
+  const base = laneBase(laneId), sub = laneSub(laneId);
+  const pts = [];
+  let initial = null;
+  for (const e of D.events) {
+    const x = e.data;
+    if (base === "receiver" && e.stream === "avr" && e.event === "power.changed") {
+      if (initial == null && x.from) initial = /on/i.test(x.from);
+      pts.push([e.t, /on/i.test(x.to || "")]);
+    } else if (base === "lg-tv" && e.stream === "tv" && e.event === "power.changed") {
+      if (initial == null && x.from) initial = x.from === "on";
+      pts.push([e.t, x.to === "on"]);
+    } else if (base === "apple-tv" && e.device === "apple-tv" && (x.appleTvDevice || "") === sub) {
+      if (e.event === "appletv.slept") pts.push([e.t, false]);
+      else if (e.event === "appletv.woke") pts.push([e.t, true]);
+      else if (e.event === "appletv.connected" && x.power) pts.push([e.t, x.power !== "Asleep"]);
+    }
+  }
+  if (!pts.length) return [];
+  const spans = [];
+  let state = initial, from = t0;
+  for (const [t, on] of pts) {
+    if (on === state) continue;
+    if (state === false && t > from) spans.push([from, t]);
+    state = on; from = t;
+  }
+  if (state === false) spans.push([from, Math.min(t1, Date.now())]);
+  return spans;
+}
+function linkOf(e) {
+  if (e.event === "connection.changed") return e.data.connected ? "up" : "down";
+  if (/\.connected$/.test(e.event)) return "up";
+  if (/\.disconnected$/.test(e.event)) return "down";
+  return null;
+}
+
+// =====================================================================
+// Room: checks
+// =====================================================================
+function runChecks(t0, t1) {
+  const f = [];
+  const add = (sev, title, detail, t, tEnd, ref) => { if (t >= t0 - 3600000 && t < t1) f.push({ sev, title, detail, t, t1: tEnd ?? t, ref }); };
+  const S = D.sessions;
+  for (const s of S) {
+    const where = laneLabel(s.lane);
+    if (s.open && !s.live) {
+      add("warn", `“${s.title}” never ended`,
+        `${where}: started ${hhmm(s.start)} with no session.ended. ` +
+        (s.replaced ? `A new session started on the same device at ${hhmm(s.end)}.` : `The app stopped at ${hhmm(s.end)} without closing it.`),
+        s.start, s.end, { session: s });
+    }
+    if (!s.ended) continue;
+    const x = s.data, dur = +x.durationSec || 0, cov = Number(x.coveredSec), exc = Number(x.exclusiveSec);
+    if (dur <= 0) add("info", `“${s.title}” has no duration`, `${where}: durationSec is ${x.durationSec}.`, s.end, s.end, { session: s });
+    if (Number.isFinite(+x.watchedSec) && +x.watchedSec > dur + 2) add("warn", "Watched time is longer than the session", `“${s.title}”: watchedSec ${x.watchedSec} > durationSec ${dur}.`, s.start, s.end, { session: s });
+    // Overlap is counted on played time: watchedSec when the session has it (paused time is left out), else durationSec.
+    const played = x.watchedSec != null && Number.isFinite(+x.watchedSec) ? +x.watchedSec : dur, playedKey = x.watchedSec != null ? "watchedSec" : "durationSec";
+    if (Number.isFinite(cov) && cov > played + 2) add("error", "Covered time is longer than the played time", `“${s.title}”: coveredSec ${cov} > ${playedKey} ${played}.`, s.start, s.end, { session: s });
+    if (Number.isFinite(cov) && Number.isFinite(exc) && Math.abs(cov + exc - played) > 3 && played > 0)
+      add("warn", "Covered and exclusive time do not add up", `“${s.title}”: ${cov} + ${exc} s, but ${playedKey} is ${played} s.`, s.start, s.end, { session: s });
+    for (const label of x.coveredBy || []) {
+      const cut = String(label).indexOf(":"), kind = String(label).slice(0, cut), who = String(label).slice(cut + 1);
+      const hit = S.some((o) => o !== s && o.kind === kind && (streamerOf(o.data) === who || (o.ended || o.started)?.device === who) &&
+        Math.min(o.end, s.end) - Math.max(o.start, s.start) > 0);
+      if (!hit) add("warn", `Covered by ${label}, but it had no session then`, `“${s.title}” on ${where} (${hhmm(s.start)}–${hhmm(s.end)}).`, s.start, s.end, { session: s });
+    }
+    if (x.receiverInput && laneBase(s.lane) !== "receiver") {
+      const off = powerSpans("receiver", t0, t1).find(([a]) => a > s.start + 5000 && a < s.end - 120000);
+      if (off) add("warn", "Kept counting after the receiver went to standby",
+        `“${s.title}” on ${where} ended ${fmtDur((s.end - off[0]) / 1000)} after the receiver went to standby at ${hhmm(off[0])}.`, off[0], s.end, { session: s });
+    }
+  }
+  // Flapping links: three or more lost links on one device in ten minutes, app restarts left out.
+  const downs = new Map();
+  for (const e of D.events) {
+    if (linkOf(e) !== "down" || nearRestart(e.t)) continue;
+    const k = laneOf(e); if (!downs.has(k)) downs.set(k, []); downs.get(k).push(e.t);
+  }
+  for (const [lane, ts] of downs) {
+    let i = 0;
+    while (i < ts.length) {
+      let j = i; while (j + 1 < ts.length && ts[j + 1] - ts[i] <= 600000) j++;
+      if (j - i + 1 >= 3) { add("warn", `${laneLabel(lane)} lost its link ${j - i + 1} times`, `Between ${hhmmss(ts[i])} and ${hhmmss(ts[j])}, not counting app restarts.`, ts[i], ts[j], { lane }); i = j + 1; }
+      else i++;
+    }
+  }
+  // App log warnings and errors, grouped by message shape.
+  const groups = new Map();
+  for (const e of D.logDay) {
+    if (e.level === "info") continue;
+    const key = e.level + "|" + e.plugin + "|" + e.msg.split("\n")[0].replace(/\d+/g, "#").slice(0, 120);
+    const g = groups.get(key) || { e, n: 0, last: e.t }; g.n++; g.last = e.t; groups.set(key, g);
+  }
+  for (const g of groups.values()) {
+    add(g.e.level === "error" ? "error" : "warn", (g.e.plugin ? g.e.plugin + ": " : "") + g.e.msg.split("\n")[0].slice(0, 110),
+      g.n > 1 ? `${g.n} times, last at ${hhmm(g.last)}.` : "In app.log.", g.e.t, g.last, { log: g.e });
+  }
+  for (const a of D.appStarts) {
+    if (a.clean || a.stopT == null) continue;
+    const lost = S.filter((s) => s.open && !s.replaced && s.stoppedAt === a.stopT);
+    add("warn", "The app stopped without a clean shutdown", `Last line at ${hhmmss(a.stopT)}, next start at ${hhmmss(a.t)}. No "Application shutting down" line, so it was killed or crashed.` +
+      (lost.length ? ` ${lost.length} open session(s) never ended.` : ""), a.stopT, a.t, {});
+  }
+  const starts = D.appStarts.filter((a) => a.t >= t0 && a.t < t1);
+  if (starts.length >= 4) add("info", `The app started ${starts.length} times`, "Restarts end every open session with reason app_shutdown.", starts[0].t, starts.at(-1).t, {});
+  const rank = { error: 0, warn: 1, info: 2 };
+  return f.sort((a, b) => rank[a.sev] - rank[b.sev] || b.t - a.t);
+}
+
+// =====================================================================
+// Room: feed items
+// =====================================================================
+function describe(e) {
+  const x = e.data || {}, ev = e.event, nm = streamerOf(x);
+  const app = x.app || x.source;
+  switch (ev) {
+    case "session.started": return `Started “${x.title ?? "untitled"}”${app ? " in " + app : ""}${nm ? " on " + nm : ""}`;
+    case "session.ended": {
+      let s = `Ended “${x.title ?? "untitled"}” after ${fmtDur(x.durationSec)}`;
+      if (x.reason) s += ", " + String(x.reason).replace(/_/g, " ");
+      if (+x.coveredSec > 0) s += `; ${fmtDur(x.coveredSec)} covered by ${(x.coveredBy || []).join(", ")}`;
+      return s;
+    }
+    case "connection.changed": return x.connected ? `Receiver link up${x.ip ? " (" + x.ip + ")" : ""}` : "Receiver link lost";
+    case "power.changed": return `${e.stream === "tv" ? "TV" : "Receiver"} power ${x.from || "?"} → ${x.to}`;
+    case "input.changed": return `Input ${x.from || "?"} → ${x.to}${x.friendlyName ? " (" + x.friendlyName + ")" : ""}`;
+    case "sound_mode.changed": return `Sound mode ${x.from || "?"} → ${x.to}`;
+    case "volume.settled": return `Volume settled at ${x.to}${x.delta != null ? " (" + (x.delta > 0 ? "+" : "") + x.delta + ")" : ""}`;
+    case "mute.changed": return x.muted ? "Muted" : "Unmuted";
+    case "zone2.changed": return `Zone 2 ${x.to}`;
+    case "eco.changed": return `ECO mode ${x.to}`;
+    case "app.changed": return `TV app: ${x.appTitle || x.toAppId}`;
+    case "channel.changed": return `TV channel ${x.channelNumber || ""} ${x.channelName || ""}`.trim();
+    case "audio_output.changed": return `TV sound to ${x.label || x.to}`;
+    case "screen.changed": return x.screenOff ? "TV screen off" : "TV screen on";
+    case "lighting.state_changed": return `Hue: ${x.to}`;
+    case "music_sync.changed": return `Hue Music Sync ${x.enabled ? "on" : "off"}${x.mode ? " (" + x.mode + ")" : ""}`;
+    case "plugin.action": return `Action ${x.pluginId}/${x.actionId} from ${String(e.origin || "").replace(/_/g, " ")}`;
+  }
+  if (/\.connected$/.test(ev)) return `${nm || e.device} linked${x.power ? " (" + x.power + ")" : ""}`;
+  if (/\.disconnected$/.test(ev)) return `${nm || e.device} lost link${x.error ? ": " + x.error : ""}`;
+  if (/\.woke$/.test(ev)) return `${nm} woke${x.power ? " (" + x.power + ")" : ""}`;
+  if (/\.slept$/.test(ev)) return `${nm} went to sleep`;
+  if (/playback_changed$/.test(ev)) return `${nm}: ${x.playerState || x.playbackState || "?"}${x.title ? " “" + x.title + "”" : ""}${x.app ? " in " + x.app : ""}`;
+  if (/app_started$/.test(ev)) return `${nm}: ${x.app} started`;
+  if (/app_ended$/.test(ev)) return `${nm}: ${x.app} closed after ${fmtDur(x.durationSec)}`;
+  if (/paused_by_automation$/.test(ev)) return `${nm} paused by an automation`;
+  const bits = Object.entries(x).filter(([, v]) => v != null && v !== "" && typeof v !== "object").slice(0, 4).map(([k, v]) => `${k}=${v}`);
+  return `${ev}${bits.length ? " " + bits.join(", ") : ""}`;
+}
+function buildItems() {
+  const items = [];
+  for (const e of D.logDay) items.push({ t: e.t, src: "log", level: e.level, who: e.plugin || "app", text: e.msg, raw: e.line, log: e });
+  for (const e of D.events) {
+    const link = linkOf(e);
+    items.push({ t: e.t, src: e.stream, level: "info", dim: !!link || e.event === "volume.settled", who: e.device, text: describe(e), raw: JSON.stringify(e.data, null, 1), ev: e });
+  }
+  return items.sort((a, b) => a.t - b.t);
+}
+
+// =====================================================================
+// Room: rendering
+// =====================================================================
+const R = {
+  view: null, zoom: store.get("zoom", "fit"), sel: null, brush: null, cursor: null, range: null,
+  srcOn: store.get("srcOn", { log: true, media: true, avr: true, tv: true, lighting: true, control: true }),
+  warnOnly: false, who: "", q: "", shown: 500, openRaw: new Set(), stick: true,
+};
+function computeView() {
+  const t0 = dayStart(D.day), t1 = t0 + 86400000, now = Date.now(), isToday = D.day === dateKey(new Date());
+  const end = isToday ? Math.min(t1, now + 10 * 60000) : t1;
+  if (R.zoom === "day") return [t0, t1];
+  if (R.zoom === "6h" || R.zoom === "1h") { const span = R.zoom === "6h" ? 6 * 3600000 : 3600000; const e = isToday ? now + 5 * 60000 : t1; return [Math.max(t0, e - span), e]; }
+  if (R.zoom === "span" && R.view) return R.view;
+  const ts = [...D.sessions.flatMap((s) => [s.start, s.end]), ...D.events.map((e) => e.t), ...D.logDay.map((e) => e.t)].filter((t) => t >= t0 && t <= t1);
+  if (!ts.length) return [t0, end];
+  const a = Math.min(...ts), b = Math.max(...ts, isToday ? now : 0), padT = Math.max(10 * 60000, (b - a) * 0.03);
+  return [Math.max(t0, a - padT), Math.min(t1, b + padT)];
+}
+function lanesForDay() {
+  const ids = new Set(["app", "receiver"]);
+  for (const s of D.sessions) ids.add(s.lane);
+  for (const e of D.events) ids.add(laneOf(e));
+  return [...ids].sort((a, b) => LANE_ORDER.indexOf(laneBase(a)) - LANE_ORDER.indexOf(laneBase(b)) || a.localeCompare(b));
+}
+function renderTimeline() {
+  const host = $("#tl"); host.textContent = "";
+  const W = Math.max(320, host.clientWidth), narrow = W < 600, LW = narrow ? 96 : 150, RP = 12;
+  const [v0, v1] = R.view = computeView();
+  const X = (t) => LW + ((t - v0) / (v1 - v0)) * (W - LW - RP);
+  const T = (x) => v0 + ((x - LW) / (W - LW - RP)) * (v1 - v0);
+  const lanes = lanesForDay();
+  const tickLanes = new Set(["app", "lights", "control"]);
+  // Pack overlapping sessions of a lane into rows.
+  const rowsOf = new Map();
+  for (const id of lanes) {
+    const rows = []; const list = D.sessions.filter((s) => s.lane === id && s.end > v0 && s.start < v1);
+    for (const s of list) { let r = rows.findIndex((end) => end <= s.start); if (r < 0) { r = rows.length; rows.push(0); } rows[r] = s.end; s.row = r; }
+    rowsOf.set(id, Math.max(1, rows.length));
+  }
+  const BAR = 16, GAP = 3, AX = 24;
+  let y = AX; const layout = [];
+  for (const id of lanes) {
+    const h = tickLanes.has(laneBase(id)) ? 24 : rowsOf.get(id) * (BAR + GAP) + 14;
+    layout.push({ id, y, h }); y += h;
+  }
+  const H = y + 6;
+  const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": "Timeline of device sessions" });
+  // Axis and grid.
+  const span = v1 - v0, steps = [5, 10, 15, 30, 60, 120, 180, 360].map((m) => m * 60000);
+  const step = steps.find((s) => span / s <= (W - LW) / 64) || steps.at(-1);
+  const axis = sv("g", { class: "axis" });
+  for (let t = Math.ceil(v0 / step) * step; t <= v1; t += step) {
+    const x = X(t);
+    axis.append(sv("line", { class: "grid", x1: x, x2: x, y1: AX - 4, y2: H }), sv("text", { x: x + 3, y: 14 }, hhmm(t)));
+  }
+  svg.append(axis);
+  // Brush target (behind the bars).
+  const hit = sv("rect", { x: LW, y: AX, width: W - LW - RP, height: H - AX, fill: "transparent" });
+  svg.append(hit);
+  for (const L of layout) {
+    const base = laneBase(L.id), color = `var(${LANE_META[base]?.color || "--l-other"})`;
+    svg.append(sv("line", { class: "lane-sep", x1: 0, x2: W, y1: L.y, y2: L.y }));
+    const sub = laneSub(L.id);
+    svg.append(sv("text", { class: "lane-name", x: 0, y: L.y + (sub ? 15 : Math.min(L.h / 2 + 4, 19)) }, LANE_META[base]?.name || base));
+    if (sub) svg.append(sv("text", { class: "lane-sub", x: 0, y: L.y + 29 }, sub.length > (narrow ? 12 : 20) ? sub.slice(0, narrow ? 11 : 19) + "…" : sub));
+    for (const [a, b] of powerSpans(L.id, v0, v1)) {
+      const x1 = Math.max(LW, X(a)), x2 = Math.min(W - RP, X(b));
+      if (x2 > x1) svg.append(sv("rect", { x: x1, y: L.y + 1, width: x2 - x1, height: L.h - 2, fill: "var(--off)" }, sv("title", {}, `${LANE_META[base].name} off or asleep ${hhmm(a)}–${hhmm(b)}`)));
+    }
+    if (base === "app") {
+      for (const a of D.appStarts) if (a.t >= v0 && a.t <= v1) svg.append(sv("path", { d: `M${X(a.t)} ${L.y + 5} l5 7 l-10 0 z`, fill: "var(--accent)" }, sv("title", {}, "App started " + hhmmss(a.t))));
+      for (const e of D.logDay) if (e.level !== "info" && e.t >= v0 && e.t <= v1)
+        svg.append(sv("rect", { x: X(e.t) - 1.5, y: L.y + 4, width: 3, height: 16, fill: e.level === "error" ? "var(--err)" : "var(--warn)" }, sv("title", {}, `${hhmmss(e.t)} ${e.msg.split("\n")[0]}`)));
+      continue;
+    }
+    // Event ticks: links on device lanes, every event on tick lanes.
+    for (const e of D.events) {
+      if (e.t < v0 || e.t > v1 || laneOf(e) !== L.id) continue;
+      const link = linkOf(e);
+      if (tickLanes.has(base)) svg.append(sv("rect", { x: X(e.t) - 1, y: L.y + 6, width: 2, height: 12, fill: color }, sv("title", {}, `${hhmmss(e.t)} ${describe(e)}`)));
+      else if (link) svg.append(sv("rect", { x: X(e.t) - 1, y: L.y + L.h - (link === "down" ? 7 : 5), width: 2, height: link === "down" ? 6 : 4, fill: link === "down" ? "var(--err)" : "var(--faint)" }, sv("title", {}, `${hhmmss(e.t)} ${describe(e)}`)));
+    }
+    for (const s of D.sessions) {
+      if (s.lane !== L.id || s.end < v0 || s.start > v1) continue;
+      const x1 = Math.max(LW, X(s.start)), x2 = Math.min(W - RP, X(s.end)), w = Math.max(3, x2 - x1);
+      const by = L.y + 7 + s.row * (BAR + GAP);
+      const fullCover = s.ended && +s.data.exclusiveSec === 0 && +s.data.coveredSec > 0;
+      const g = sv("g", { class: "bar" + (s === R.sel?.session ? " sel" : "") + (s.live ? " live" : ""), tabindex: 0, role: "button", "aria-label": `${s.title}, ${hhmm(s.start)} to ${hhmm(s.end)}` });
+      g.append(sv("rect", {
+        x: x1, y: by, width: w, height: BAR, rx: 3,
+        style: `fill:${color};stroke:${color};fill-opacity:${fullCover ? 0.3 : 1}` + (s.open && !s.live ? ";stroke-dasharray:4 3;fill-opacity:.35" : ""),
+      }));
+      if (w > 46) {
+        const chars = Math.floor((w - 10) / 6.4), label = s.title.length > chars ? s.title.slice(0, Math.max(1, chars - 1)) + "…" : s.title;
+        const t = sv("text", { x: x1 + 5, y: by + 12 }, label);
+        if (fullCover || (s.open && !s.live)) t.style.fill = "var(--ink)";
+        g.append(t);
+      }
+      g.addEventListener("click", (ev) => { ev.stopPropagation(); selectSession(s); });
+      g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); selectSession(s); } });
+      g.addEventListener("pointerenter", (ev) => showTip(ev, s));
+      g.addEventListener("pointermove", (ev) => moveTip(ev));
+      g.addEventListener("pointerleave", hideTip);
+      svg.append(g);
+    }
+  }
+  const isToday = D.day === dateKey(new Date());
+  if (isToday && Date.now() >= v0 && Date.now() <= v1) svg.append(sv("line", { class: "now", x1: X(Date.now()), x2: X(Date.now()), y1: AX - 6, y2: H }, sv("title", {}, "Now")));
+  const b = R.brush || (R.sel?.span ? R.sel.span : null);
+  if (b) { const x1 = Math.max(LW, X(b[0])), x2 = Math.min(W - RP, X(b[1])); if (x2 > x1) svg.append(sv("rect", { class: "brush", x: x1, y: AX, width: x2 - x1, height: H - AX, "pointer-events": "none" })); }
+  if (R.cursor && R.cursor >= v0 && R.cursor <= v1) svg.append(sv("line", { class: "cursor", x1: X(R.cursor), x2: X(R.cursor), y1: AX, y2: H, "pointer-events": "none" }));
+  // Drag across empty space to select a span.
+  let drag = null;
+  hit.addEventListener("pointerdown", (ev) => {
+    const pt = svgX(svg, ev, W); drag = { x0: pt }; hit.setPointerCapture(ev.pointerId);
+  });
+  hit.addEventListener("pointermove", (ev) => {
+    if (!drag) return;
+    const x = svgX(svg, ev, W);
+    if (Math.abs(x - drag.x0) < 4) return;
+    R.brush = [T(Math.min(drag.x0, x)), T(Math.max(drag.x0, x))];
+    const rect = svg.querySelector(".brush") || svg.appendChild(sv("rect", { class: "brush", y: AX, height: H - AX, "pointer-events": "none" }));
+    rect.setAttribute("x", Math.max(LW, Math.min(drag.x0, x))); rect.setAttribute("width", Math.abs(x - drag.x0));
+  });
+  hit.addEventListener("pointerup", (ev) => {
+    const x = svgX(svg, ev, W), moved = drag && Math.abs(x - drag.x0) >= 4; drag = null;
+    if (moved && R.brush) { const s = R.brush; R.brush = null; selectSpan(s); }
+    else { R.brush = null; if (R.sel) clearSelection(); }
+  });
+  host.append(svg);
+}
+function svgX(svg, ev, W) { const r = svg.getBoundingClientRect(); return ((ev.clientX - r.left) / r.width) * W; }
+let tipEl;
+function showTip(ev, s) {
+  tipEl = tipEl || el("div", { class: "tip" }); $("#tl").append(tipEl);
+  tipEl.textContent = "";
+  const x = s.data;
+  tipEl.append(el("b", { text: s.title }), `${laneLabel(s.lane)} · ${x.app || x.source || s.kind}`, el("br"),
+    `${hhmm(s.start)}–${s.live ? "now" : hhmm(s.end)} · ${fmtDur((s.end - s.start) / 1000)}` + (s.ended && +x.coveredSec > 0 ? ` · ${fmtDur(x.coveredSec)} covered` : "") + (s.open && !s.live ? " · never ended" : ""));
+  moveTip(ev);
+}
+function moveTip(ev) {
+  if (!tipEl) return; const host = $("#tl").getBoundingClientRect();
+  const x = Math.min(ev.clientX - host.left + 12, host.width - 330), y = ev.clientY - host.top + 14;
+  tipEl.style.left = Math.max(4, x) + "px"; tipEl.style.top = y + "px";
+}
+function hideTip() { tipEl?.remove(); }
+
+function selectSession(s) { R.sel = { session: s }; R.cursor = null; renderTimeline(); renderSelection(); }
+function selectSpan(span) { R.sel = { span }; R.cursor = null; renderTimeline(); renderSelection(); }
+function clearSelection() { R.sel = null; R.range = null; renderTimeline(); renderSelection(); renderFeed(); }
+function zoomTo(a, b) { const padT = Math.max(60000, (b - a) * 0.15); R.zoom = "span"; R.view = [a - padT, b + padT]; syncZoomSeg(); renderTimeline(); }
+function syncZoomSeg() { $$("#zoom-seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.z === R.zoom))); }
+
+function renderSelection() {
+  const body = $("#sel-body"); body.textContent = "";
+  $("#sel-clear").classList.toggle("hidden", !R.sel);
+  if (!R.sel) { body.append(el("div", { class: "muted", text: "Click a session bar, or drag across the timeline to pick a span. Then ask Claude about it, or show its lines in the feed." })); return; }
+  if (R.sel.session) {
+    const s = R.sel.session, x = s.data;
+    body.append(el("p", { class: "sel-title", text: s.title }),
+      el("div", { class: "muted", style: "margin-bottom:10px", text: `${laneLabel(s.lane)} · ${hhmm(s.start)}–${s.live ? "now" : hhmm(s.end)} · ${fmtDur((s.end - s.start) / 1000)}` + (s.live ? " · playing" : s.open ? " · never ended" : "") }));
+    const dl = el("dl", { class: "kv" });
+    for (const [k, v] of Object.entries(x)) {
+      if (v == null || v === "" || k === "title") continue;
+      dl.append(el("dt", { text: k }), el("dd", { text: Array.isArray(v) ? v.join(", ") : typeof v === "object" ? JSON.stringify(v) : String(v) }));
+    }
+    body.append(dl);
+    body.append(el("div", { class: "row", style: "margin-top:12px" },
+      el("button", { class: "btn ask-btn", text: "Ask Claude about this session", onclick: () => openAsk(contextForRange(s.start - 60000, s.end + 60000, s), `Explain this ${s.kind} session: “${s.title}”. Did it start, get covered and end correctly? Is anything wrong in the logs around it?`) }),
+      el("button", { class: "btn", text: "Show its lines", onclick: () => setFeedRange([s.start - 30000, s.end + 30000]) }),
+      el("button", { class: "btn", text: "Zoom to it", onclick: () => zoomTo(s.start, s.end) })));
+  } else {
+    const [a, b] = R.sel.span;
+    const ev = D.events.filter((e) => e.t >= a && e.t <= b).length, lg = D.logDay.filter((e) => e.t >= a && e.t <= b);
+    const ss = D.sessions.filter((s) => s.end > a && s.start < b).length;
+    const bad = lg.filter((e) => e.level !== "info").length;
+    body.append(el("p", { class: "sel-title", text: `${hhmmss(a)} – ${hhmmss(b)}` }),
+      el("div", { class: "muted", text: `${fmtDur((b - a) / 1000)} · ${ss} session(s) · ${ev} event(s) · ${lg.length} log line(s)` + (bad ? ` · ${bad} warning(s) or error(s)` : "") }),
+      el("div", { class: "row", style: "margin-top:12px" },
+        el("button", { class: "btn ask-btn", text: "Ask Claude about this span", onclick: () => openAsk(contextForRange(a, b), "What happened in the room in this span? Point out anything that looks wrong and the likely cause.") }),
+        el("button", { class: "btn", text: "Show its lines", onclick: () => setFeedRange([a, b]) }),
+        el("button", { class: "btn", text: "Zoom to it", onclick: () => zoomTo(a, b) })));
+  }
+  syncAskButtons();
+}
+function renderChecks() {
+  const ul = $("#checks"); ul.textContent = "";
+  const n = { error: 0, warn: 0, info: 0 }; D.findings.forEach((f) => n[f.sev]++);
+  $("#checks-sum").textContent = D.findings.length ? `${n.error} error(s), ${n.warn} warning(s), ${n.info} note(s)` : "";
+  if (!D.findings.length) { ul.append(el("li", { class: "muted", style: "cursor:default" }, "No problems found for this day.")); return; }
+  for (const f of D.findings) {
+    ul.append(el("li", { tabindex: 0, onclick: () => openFinding(f), onkeydown: (e) => { if (e.key === "Enter") openFinding(f); } },
+      el("i", { class: "sev " + f.sev, "aria-label": f.sev }), el("div", {}, el("b", { text: f.title }), el("span", { text: f.detail })), el("time", { text: hhmm(f.t) })));
+  }
+}
+function openFinding(f) {
+  if (f.ref?.session) { zoomTo(f.ref.session.start, f.ref.session.end); selectSession(f.ref.session); }
+  else { const a = f.t - 120000, b = Math.max(f.t1, f.t) + 120000; zoomTo(a, b); selectSpan([a, b]); }
+  setFeedRange([f.t - 120000, Math.max(f.t1, f.t) + 120000]);
+}
+
+// ---- feed
+function renderFeedTools() {
+  const srcs = $("#f-srcs"); srcs.textContent = "";
+  const counts = {}; D.items.forEach((i) => counts[i.src] = (counts[i.src] || 0) + 1);
+  for (const [k, m] of Object.entries(SRC_META)) {
+    srcs.append(el("button", { class: "chip", "aria-pressed": String(R.srcOn[k] !== false), onclick: () => { R.srcOn[k] = R.srcOn[k] === false; store.set("srcOn", R.srcOn); renderFeedTools(); renderFeed(); } },
+      el("i", { style: `background:var(${m.color})` }), m.name, el("span", { class: "n", text: counts[k] || 0 })));
+  }
+  const who = $("#f-who"), cur = R.who; who.textContent = ""; who.append(el("option", { value: "", text: "All plugins and devices" }));
+  [...new Set(D.items.map((i) => i.who))].filter(Boolean).sort().forEach((w) => who.append(el("option", { value: w, text: w })));
+  who.value = cur;
+  const rg = $("#f-range"); rg.textContent = "";
+  if (R.range) rg.append(el("span", { class: "chip x" }, `${hhmm(R.range[0])}–${hhmm(R.range[1])}`, el("button", { "aria-label": "Show the whole day", text: "×", onclick: () => setFeedRange(null) })));
+}
+function setFeedRange(r) { R.range = r; R.shown = 500; R.stick = !r; renderFeedTools(); renderFeed(r ? "top" : "bottom"); }
+function feedMatches() {
+  const q = R.q.trim().toLowerCase();
+  return D.items.filter((i) => R.srcOn[i.src] !== false && (!R.warnOnly || i.level !== "info") && (!R.who || i.who === R.who) &&
+    (!R.range || (i.t >= R.range[0] && i.t <= R.range[1])) && (!q || i.text.toLowerCase().includes(q) || i.raw.toLowerCase().includes(q)));
+}
+function renderFeed(scroll) {
+  const box = $("#feed"), atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  const list = feedMatches(), start = Math.max(0, list.length - R.shown);
+  $("#feed-sum").textContent = `${list.length} line(s)`;
+  box.textContent = "";
+  if (start > 0) box.append(el("button", { class: "btn small more", text: `Show ${Math.min(500, start)} earlier`, onclick: () => { R.shown += 500; renderFeed("keep"); } }));
+  if (!list.length) box.append(el("div", { class: "empty", text: D.items.length ? "Nothing matches these filters." : "No log lines for this day yet." }));
+  for (const i of list.slice(start)) {
+    const key = i.t + "|" + i.src + "|" + i.text.slice(0, 40);
+    const row = el("div", { class: `fi ${i.src === "log" ? "log" : ""} ${i.level !== "info" ? i.level : ""} ${i.dim ? "dim" : ""}`, tabindex: 0 },
+      el("time", { text: hhmmss(i.t) }),
+      el("span", { class: "src", title: i.who }, el("i", { style: `background:var(${SRC_META[i.src]?.color || "--l-other"})` }), i.src === "log" ? (i.who === "app" ? "app" : i.who) : i.who),
+      el("span", { class: "txt", text: i.text }));
+    if (R.openRaw.has(key)) row.append(el("div", { class: "raw", text: i.raw }));
+    const toggle = () => { R.openRaw.has(key) ? R.openRaw.delete(key) : R.openRaw.add(key); R.cursor = i.t; renderTimeline(); renderFeed("keep"); };
+    row.addEventListener("click", toggle);
+    row.addEventListener("keydown", (e) => { if (e.key === "Enter") toggle(); });
+    box.append(row);
+  }
+  if (scroll === "top") box.scrollTop = 0;
+  else if (scroll === "bottom" || (scroll !== "keep" && (atBottom || R.stick))) box.scrollTop = box.scrollHeight;
+}
+function renderRoom(keepView) {
+  const sel = $("#day-pick"); sel.textContent = "";
+  for (const d of D.days) sel.append(el("option", { value: d, text: dayLabel(d) + (d === dateKey(new Date()) ? " (today)" : "") }));
+  sel.value = D.day;
+  $("#day-next").disabled = D.days.indexOf(D.day) <= 0; $("#day-prev").disabled = D.days.indexOf(D.day) >= D.days.length - 1;
+  const live = D.sessions.filter((s) => s.live).length;
+  $("#room-stat").textContent = `${D.sessions.length} session(s), ${D.events.length} event(s), ${D.logDay.length} log line(s)` + (live ? ` · ${live} playing now` : "") +
+    (D.day === dateKey(new Date()) ? " · live" : "");
+  if (R.sel?.session) { const s = R.sel.session; R.sel.session = D.sessions.find((o) => o.lane === s.lane && Math.abs(o.start - s.start) < 30000 && o.title === s.title) || null; if (!R.sel.session) R.sel = null; }
+  if (!keepView && R.zoom === "span") R.zoom = "fit";
+  syncZoomSeg(); renderTimeline(); renderSelection(); renderChecks(); renderFeedTools(); renderFeed();
+}
+
+// =====================================================================
+// Ask Claude
+// =====================================================================
+const ASK = { ctx: null, ctl: null };
+function syncAskButtons() { $$(".ask-btn").forEach((b) => b.classList.toggle("hidden", !P.sample)); $("#con-ask").classList.toggle("hidden", !P.sample); }
+function contextForRange(a, b, session) {
+  const ev = D.events.filter((e) => e.t >= a && e.t <= b), media = D.media.filter((e) => e.t >= a && e.t <= b && !ev.includes(e));
+  const lg = D.log.filter((e) => e.t >= a && e.t <= b);
+  const fs = D.findings.filter((f) => f.t1 >= a && f.t <= b);
+  let evLines = [...ev, ...media].sort((x, y) => x.t - y.t).map((e) => `${hhmmss(e.t)} ${e.stream}/${e.device} ${e.event} origin=${e.origin} ${JSON.stringify(e.data)}`).join("\n");
+  let logLines = lg.map((e) => e.line).join("\n");
+  const CAP = 150000;
+  if (evLines.length > CAP) evLines = "…(earlier lines cut)\n" + evLines.slice(-CAP);
+  if (logLines.length > CAP / 2) logLines = "…(earlier lines cut)\n" + logLines.slice(-CAP / 2);
+  const label = session ? `Session “${session.title}” on ${laneLabel(session.lane)}, ${hhmm(session.start)}–${hhmm(session.end)}` : `${dayLabel(D.day)}, ${hhmmss(a)}–${hhmmss(b)}`;
+  const text = [
+    `Time span: ${new Date(a).toString()} to ${new Date(b).toString()}.`,
+    session ? `Selected session (session.ended data): ${JSON.stringify(session.data)}${session.open ? " — this session has no session.ended" : ""}` : "",
+    fs.length ? "Automated checks found:\n" + fs.map((f) => `- [${f.sev}] ${hhmm(f.t)} ${f.title}: ${f.detail}`).join("\n") : "Automated checks found nothing in this span.",
+    `Event log lines (${ev.length + media.length}):\n${evLines || "(none)"}`,
+    `app.log lines (${lg.length}):\n${logLines || "(none)"}`,
+  ].filter(Boolean).join("\n\n");
+  return { label, summary: `${ev.length + media.length} event(s) and ${lg.length} app.log line(s)`, text };
+}
+const ROOM_FACTS = `You help debug Denon Desktop, a Windows app that controls a Denon AV receiver and logs what the devices in one living room do (LG webOS TV, Apple TV, Chromecast, HomePods, Philips Hue).
+Facts about its logs:
+- Event lines are JSON: time, stream/device, event, origin (external, desktop_ui, mcp_agent, system...), data.
+- Streams: media (sessions and device links), avr (the receiver), tv (LG TV), lighting (Hue), control (actions).
+- A media session.started is written after a dwell (dwellConfirmedSec). session.ended carries durationSec, watchedSec, coveredSec (time while another source in the room played at the same time and covered this one), coveredBy (kind:device labels), exclusiveSec and reason (switched, stopped, paused, app_shutdown, ...).
+- On app shutdown every open session ends with reason app_shutdown, and plugins log lost links. That is normal.
+- app.log lines: "yyyy-MM-dd HH:mm:ss [Level] [Plugin:id] message".`;
+function openAsk(ctx, question) {
+  if (!P.sample) return;
+  ASK.ctx = ctx;
+  $("#ask-ctx").textContent = `${ctx.label} · ${ctx.summary}`;
+  $("#ask-q").value = question; $("#ask-out").textContent = "";
+  $("#ask").classList.remove("hidden"); $("#ask-q").focus();
+}
+function renderAnswer(text) {
+  const out = $("#ask-out"); out.textContent = "";
+  const inline = (s, parent) => {
+    const parts = s.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
+    for (const p of parts) {
+      if (!p) continue;
+      if (p.startsWith("`") && p.endsWith("`") && p.length > 2) parent.append(el("code", { text: p.slice(1, -1) }));
+      else if (p.startsWith("**") && p.endsWith("**") && p.length > 4) parent.append(el("b", { text: p.slice(2, -2) }));
+      else parent.append(p);
+    }
+  };
+  let ul = null;
+  for (const line of text.split(/\r?\n/)) {
+    const li = /^\s*(?:[-*•]|\d+\.)\s+(.*)$/.exec(line);
+    if (li) { if (!ul) { ul = el("ul"); out.append(ul); } const n = el("li"); inline(li[1], n); ul.append(n); continue; }
+    ul = null;
+    if (!line.trim()) continue;
+    const hd = /^#{1,4}\s+(.*)$/.exec(line);
+    const n = el(hd ? "h4" : "p"); inline(hd ? hd[1] : line, n); out.append(n);
+  }
+}
+async function askGo() {
+  if (!P.sample || !ASK.ctx) return;
+  ASK.ctl?.abort(); const ctl = ASK.ctl = new AbortController();
+  $("#ask-go").disabled = true; $("#ask-stop").disabled = false;
+  $("#ask-out").textContent = "Thinking…";
+  const prompt = `${ROOM_FACTS}\n\n${ASK.ctx.text}\n\nQuestion: ${$("#ask-q").value.trim() || "What happened here?"}\n\nAnswer in short, plain English. Say what happened (in time order where it helps), what looks wrong and the most likely cause, and quote the times of the lines that show it. Use short paragraphs or bullets. No preamble.`;
+  try {
+    const { truncated } = await P.sample(prompt, { signal: ctl.signal, onText: ({ text }) => renderAnswer(text) });
+    if (truncated) $("#ask-out").append(el("p", { class: "muted", text: "The answer was cut short. Pick a shorter span and ask again." }));
+  } catch (e) {
+    if (e.text) renderAnswer(e.text); else $("#ask-out").textContent = "";
+    const msg = { cancelled: "", not_granted: "Claude is not allowed for this app. Allow it from the app's menu to use this.", rate_limited: "Too many questions at once, or a usage limit. Try again later.",
+      prompt_too_large: "Too many log lines. Pick a shorter span.", refused: "Claude declined this question. Ask it in another way.", sampling_disabled: "Claude is not available for this account." }[e.code];
+    if (msg !== "") $("#ask-out").append(el("p", { class: "muted", text: msg || `The answer stopped (${e.code || "error"}). Try again.` }));
+    if (e.code === "not_granted" || e.code === "sampling_disabled") { P.sample = null; syncAskButtons(); }
+  } finally {
+    if (ASK.ctl === ctl) { $("#ask-go").disabled = false; $("#ask-stop").disabled = true; }
+  }
+}
+
+// =====================================================================
+// MCP mode
+// =====================================================================
+const M = { port: 18926, tier: null, tools: [], cur: null, loaded: false, history: store.get("mcpHistory", []), q: "", pending: false, last: null };
+const TIERS = ["Observer", "SafeControl", "FullOrchestration"];
+async function mcpSettings() {
+  const s = await readJson(`${P.env.LOCALAPPDATA}\\DenonDesktop\\settings.json`);
+  const m = s?.mcp || {};
+  M.port = m.port || 18926; M.tier = TIERS[m.permissionTier] ?? m.permissionTier;
+  return { enabled: m.enabled !== false, token: m.requireBearerAuth === false ? null : m.bearerToken || null };
+}
+async function mcpCall(method, params) {
+  const cfg = await mcpSettings(); // read fresh each call: the token never sits in the page's state
+  if (!cfg.enabled) throw new Error("The MCP server is turned off in Denon Desktop (Brain page).");
+  const bodyF = tmpFile("json"), hdrF = tmpFile("txt");
+  await P.fs.writeFile(bodyF, JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method, params: params || {} }), "utf8");
+  await P.fs.writeFile(hdrF, cfg.token ? `Authorization: Bearer ${cfg.token}\n` : "X-None: 1\n", "utf8");
+  const t0 = performance.now();
+  try {
+    const r = await sh(`curl.exe -s -S -m 90 -X POST "http://127.0.0.1:${M.port}/mcp" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -H @"${hdrF}" --data-binary @"${bodyF}"`, { timeout: 100000 });
+    const ms = Math.round(performance.now() - t0);
+    if (r.code !== 0) throw new Error((r.stderr || "curl failed").trim() + (/Failed to connect|Couldn't connect/i.test(r.stderr) ? " — is Denon Desktop running with the MCP server on?" : ""));
+    let txt = r.stdout.trim();
+    if (txt.startsWith("event:") || txt.startsWith("data:")) txt = txt.split(/\r?\n/).filter((l) => l.startsWith("data:")).map((l) => l.slice(5)).join("");
+    const json = JSON.parse(txt);
+    if (json.error && !json.jsonrpc) throw new Error(json.error);
+    if (json.error) throw new Error(`${json.error.message} (${json.error.code})`);
+    setLed("led-mcp", "ok", "MCP");
+    return { result: json.result, ms };
+  } catch (e) { setLed("led-mcp", "err", "MCP"); throw e; }
+  finally { P.fs.rm(bodyF, { force: true }).catch(() => {}); P.fs.rm(hdrF, { force: true }).catch(() => {}); }
+}
+async function mcpLoad() {
+  $("#mcp-stat").textContent = "Loading tools…";
+  try {
+    const { result, ms } = await mcpCall("tools/list");
+    M.tools = result.tools || []; M.loaded = true;
+    const ro = M.tools.filter(isRo).length;
+    $("#mcp-stat").textContent = `Connected to 127.0.0.1:${M.port} · ${M.tools.length} tools (${ro} read, ${M.tools.length - ro} change things) · permission tier ${M.tier} · ${ms} ms`;
+  } catch (e) { $("#mcp-stat").textContent = "Cannot reach the MCP server: " + errText(e); M.tools = []; }
+  renderTools();
+}
+const isRo = (t) => !!t.annotations?.readOnlyHint;
+function renderTools() {
+  const box = $("#tools"); box.textContent = "";
+  const q = M.q.toLowerCase();
+  const list = M.tools.filter((t) => !q || t.name.toLowerCase().includes(q) || (t.description || "").toLowerCase().includes(q));
+  for (const [label, group] of [["Reads", list.filter(isRo)], ["Changes the room", list.filter((t) => !isRo(t))]]) {
+    if (!group.length) continue;
+    box.append(el("h3", { text: `${label} (${group.length})` }));
+    for (const t of group) box.append(el("button", { class: isRo(t) ? "" : "rw", title: t.description || "", "aria-current": String(M.cur?.name === t.name), text: t.name, onclick: () => pickTool(t) }));
+  }
+  if (!list.length) box.append(el("div", { class: "empty", text: M.loaded ? "No tool matches." : "No tools loaded." }));
+}
+function schemaProps(t) { return t.inputSchema?.properties || {}; }
+function pickTool(t, args) {
+  M.cur = t; renderTools();
+  const card = $("#tool-card"); card.textContent = "";
+  const ro = isRo(t), props = schemaProps(t), req = new Set(t.inputSchema?.required || []);
+  const head = el("div", { class: "pad" },
+    el("div", { class: "row" }, el("p", { class: "tool-name", text: t.name }), el("span", { class: "tag " + (ro ? "ok" : "warn"), text: ro ? "Read-only" : "Changes the room" }),
+      t.annotations?.destructiveHint ? el("span", { class: "tag err", text: "Destructive" }) : null),
+    el("p", { class: "tool-desc", text: t.description || "" }));
+  const form = el("div", { class: "argform" });
+  const fields = {};
+  for (const [name, p] of Object.entries(props)) {
+    const type = Array.isArray(p.type) ? p.type.find((x) => x !== "null") : p.type;
+    let input;
+    if (p.enum) { input = el("select", {}, el("option", { value: "", text: "—" }), ...p.enum.map((v) => el("option", { value: JSON.stringify(v), text: String(v) }))); }
+    else if (type === "boolean") input = el("select", {}, el("option", { value: "", text: "—" }), el("option", { value: "true", text: "true" }), el("option", { value: "false", text: "false" }));
+    else if (type === "integer" || type === "number") input = el("input", { type: "number", step: type === "integer" ? 1 : "any", min: p.minimum, max: p.maximum });
+    else if (type === "object" || type === "array") input = el("textarea", { rows: 3, placeholder: type === "array" ? "[ ]" : "{ }" });
+    else input = el("input", { type: "text", placeholder: p.default != null ? String(p.default) : "" });
+    fields[name] = { input, type, p };
+    form.append(el("label", {}, el("span", {}, el("b", { text: name }), req.has(name) ? " (required)" : "", type ? el("span", { class: "faint", text: " · " + type }) : null), input, p.description ? el("small", { text: p.description }) : null));
+  }
+  if (!Object.keys(props).length) form.append(el("div", { class: "muted", text: "This tool takes no arguments." }));
+  const raw = el("textarea", { rows: 6, class: "hidden", "aria-label": "Arguments as JSON" });
+  const readArgs = () => {
+    if (!raw.classList.contains("hidden")) return JSON.parse(raw.value || "{}");
+    const out = {};
+    for (const [name, f] of Object.entries(fields)) {
+      const v = f.input.value.trim(); if (v === "") continue;
+      if (f.p.enum) out[name] = JSON.parse(v);
+      else if (f.type === "boolean") out[name] = v === "true";
+      else if (f.type === "integer" || f.type === "number") out[name] = Number(v);
+      else if (f.type === "object" || f.type === "array") out[name] = JSON.parse(v);
+      else out[name] = v;
+    }
+    return out;
+  };
+  const fill = (a) => {
+    for (const [name, f] of Object.entries(fields)) {
+      const v = a?.[name]; if (v === undefined) { f.input.value = ""; continue; }
+      f.input.value = f.p.enum ? JSON.stringify(v) : typeof v === "object" ? JSON.stringify(v) : String(v);
+    }
+    raw.value = JSON.stringify(a || {}, null, 2);
+  };
+  if (args) fill(args);
+  const rawToggle = el("button", { class: "btn small", text: "Edit as JSON", onclick: () => {
+    try {
+      if (raw.classList.contains("hidden")) { raw.value = JSON.stringify(readArgs(), null, 2); raw.classList.remove("hidden"); form.classList.add("hidden"); rawToggle.textContent = "Edit as form"; }
+      else { fill(JSON.parse(raw.value || "{}")); raw.classList.add("hidden"); form.classList.remove("hidden"); rawToggle.textContent = "Edit as JSON"; }
+    } catch (e) { toast("The JSON is not valid: " + errText(e)); }
+  } });
+  const result = el("div", { class: "result" });
+  const confirmBox = el("div");
+  const runBtn = el("button", { class: "btn " + (ro ? "primary" : "danger"), text: ro ? "Run" : "Run…" });
+  const doRun = async () => {
+    let a; try { a = readArgs(); } catch (e) { toast("The JSON is not valid: " + errText(e)); return; }
+    confirmBox.textContent = ""; runBtn.disabled = true;
+    result.textContent = ""; result.append(el("div", { class: "result-head muted", text: "Running…" }));
+    const entry = { name: t.name, args: a, at: Date.now(), ro };
+    try {
+      const { result: r, ms } = await mcpCall("tools/call", { name: t.name, arguments: a });
+      entry.ok = !r?.isError; entry.ms = ms;
+      showResult(result, t, a, r, ms);
+    } catch (e) {
+      entry.ok = false; result.textContent = "";
+      result.append(el("div", { class: "result-head" }, el("span", { class: "bad", text: "Request failed" }), el("span", { class: "muted", text: errText(e) })));
+    } finally {
+      runBtn.disabled = false;
+      M.history = [entry, ...M.history].slice(0, 30); store.set("mcpHistory", M.history); renderHistory();
+    }
+  };
+  runBtn.addEventListener("click", () => {
+    if (ro) { doRun(); return; }
+    confirmBox.textContent = "";
+    confirmBox.append(el("div", { class: "confirm" }, el("span", {}, el("b", { text: t.name }), " changes the room (receiver, TV, lights or media). Run it now?"),
+      el("button", { class: "btn danger", text: "Run it", onclick: doRun }), el("button", { class: "btn", text: "Cancel", onclick: () => { confirmBox.textContent = ""; } })));
+  });
+  card.append(head, el("div", { class: "pad", style: "padding-top:0" }, form, raw, el("div", { class: "row", style: "margin-top:12px" }, runBtn, Object.keys(props).length ? rawToggle : null), confirmBox), result);
+}
+function showResult(box, t, args, r, ms) {
+  box.textContent = "";
+  const err = !!r?.isError;
+  const parts = [];
+  for (const c of r?.content || []) {
+    if (c.type === "text") { try { parts.push({ json: JSON.parse(c.text) }); } catch { parts.push({ text: c.text }); } }
+    else if (c.type === "image" && c.data) parts.push({ img: `data:${c.mimeType || "image/png"};base64,${c.data}` });
+    else parts.push({ json: c });
+  }
+  if (r?.structuredContent && !parts.length) parts.push({ json: r.structuredContent });
+  const flat = parts.map((p) => p.json !== undefined ? JSON.stringify(p.json, null, 2) : p.text || "[image]").join("\n\n");
+  box.append(el("div", { class: "result-head" }, el("span", { class: err ? "bad" : "ok", text: err ? "Tool error" : "OK" }), el("span", { class: "muted", text: `${ms} ms · ${flat.length.toLocaleString()} characters` }),
+    el("span", { style: "flex:1" }),
+    el("button", { class: "btn small", text: "Copy", onclick: () => navigator.clipboard.writeText(flat).then(() => toast("Copied."), () => toast("Copy failed.")) }),
+    P.sample ? el("button", { class: "btn small", text: "Explain with Claude", onclick: () => openAsk({ label: `MCP tool ${t.name}`, summary: `${flat.length.toLocaleString()} characters of result`, text: `The app's MCP tool ${t.name} was called with arguments ${JSON.stringify(args)}.\nTool description: ${t.description}\nResult${err ? " (marked isError)" : ""}:\n${flat.slice(0, 120000)}` }, "Explain this result. Is anything in it wrong, missing or inconsistent?") }) : null));
+  for (const p of parts) {
+    if (p.img) box.append(el("img", { src: p.img, alt: "Image from the tool" }));
+    else { const pre = el("pre", { class: "out" }); if (p.json !== undefined) pre.innerHTML = jsonHtml(p.json); else pre.textContent = p.text; box.append(pre); }
+  }
+}
+function renderHistory() {
+  const ul = $("#hist"); ul.textContent = "";
+  if (!M.history.length) { ul.append(el("li", { class: "muted", style: "cursor:default" }, "No runs yet.")); return; }
+  for (const h of M.history) {
+    ul.append(el("li", { onclick: () => { const t = M.tools.find((x) => x.name === h.name); if (t) pickTool(t, h.args); else toast("That tool is not on the server now."); } },
+      el("span", { class: h.ok ? "tag ok" : "tag err", text: h.ok ? "OK" : "Failed" }), el("code", { text: `${h.name} ${JSON.stringify(h.args)}` }), el("span", { class: "faint", text: hhmm(h.at) })));
+  }
+}
+
+// =====================================================================
+// LAN mode
+// =====================================================================
+const L = { devs: [], ports: {}, proc: null, out: "", probe: null };
+async function lanDevices() {
+  const base = `${P.env.LOCALAPPDATA}\\DenonDesktop`, cfg = (id) => readJson(`${base}\\plugins\\data\\${id}\\config.json`);
+  const [s, atv, cc, hp, hue, tv] = await Promise.all([readJson(`${base}\\settings.json`), cfg("apple-tv"), cfg("chromecast"), cfg("homepod"), cfg("philips-hue"), cfg("smart-tv")]);
+  // Only names, hosts and ports are kept; keys and pairing data in these files are never copied.
+  const devs = [];
+  if (s?.receiver?.host) devs.push({ id: "avr", kind: "Receiver", name: "Denon receiver", host: s.receiver.host, ports: [80, 8080, 1255] });
+  if (tv?.TvIp) devs.push({ id: "tv", kind: "LG TV", name: tv.LastModelName || tv.TvName || "LG TV", host: tv.TvIp, ports: [3000, 3001] });
+  for (const d of atv?.Devices || []) devs.push({ id: "atv-" + d.Id, kind: "Apple TV", name: d.Name, host: d.Host, ports: [d.CompanionPort || 49153, d.AirPlayPort || 7000], probe: "appletv" });
+  for (const d of cc?.Devices || []) devs.push({ id: "cc-" + d.Id, kind: "Chromecast", name: d.Name, host: d.Host, ports: [d.Port || 8009] });
+  for (const d of hp?.Speakers || []) devs.push({ id: "hp-" + d.Id, kind: d.ModelName || "HomePod", name: d.Name, host: d.Host, ports: [d.AirPlayPort || 7000], probe: "homepod" });
+  if (hue?.BridgeIp) devs.push({ id: "hue", kind: "Hue Bridge", name: "Philips Hue", host: hue.BridgeIp, ports: [443, 80] });
+  devs.push({ id: "mcp", kind: "This PC", name: "MCP server", host: "127.0.0.1", ports: [s?.mcp?.port || 18926] });
+  return devs;
+}
+function probePath() { return `${repoPath()}\\external-plugins\\Denon.Plugin.AppleTv.Probe\\bin\\Debug\\net10.0-windows\\atvprobe.exe`; }
+async function lanInit() {
+  try { L.devs = await lanDevices(); } catch (e) { L.devs = []; $("#lan-stat").textContent = "Cannot read the device list: " + errText(e); }
+  L.probe = await P.fs.exists(probePath()).catch(() => false);
+  renderLan();
+  if (!Object.keys(L.ports).length) lanCheck();
+}
+function renderLan() {
+  const box = $("#lan-devs"); box.textContent = "";
+  for (const d of L.devs) {
+    const acts = [];
+    if (d.probe === "homepod") acts.push(el("button", { class: "btn small", text: "Now playing (6 s)", onclick: () => runProbe(["homepod", "--host", d.host, "--seconds", "6"]) }));
+    if (d.probe === "appletv") acts.push(el("button", { class: "btn small", text: "Power state", onclick: () => runProbe(["status", "--host", d.host]) }),
+      el("button", { class: "btn small", text: "Now playing (6 s)", onclick: () => runProbe(["nowplaying", "--host", d.host, "--seconds", "6"]) }));
+    box.append(el("div", { class: "card dev" },
+      el("header", {}, el("div", {}, el("h2", { text: d.name }), el("div", { class: "kind", text: `${d.kind} · ${d.host}` }))),
+      el("div", { class: "pad", style: "padding-top:8px" },
+        el("div", { class: "ports" }, ...d.ports.map((p) => { const st = L.ports[`${d.host}:${p}`]; return el("span", { class: "port", "data-s": st || "", text: `${p} ${st === "open" ? "open" : st === "closed" ? "no answer" : "…"}` }); })),
+        acts.length ? el("div", { class: "row" }, ...acts) : null)));
+  }
+  if (!L.devs.length) box.append(el("div", { class: "empty", text: "No devices found in Denon Desktop's settings." }));
+  $("#lan-discover").disabled = !L.probe;
+  const note = $("#lan-probe-note") || $("#mode-lan .room-bar").appendChild(el("span", { id: "lan-probe-note" }));
+  note.textContent = "";
+  if (!L.probe) note.append(el("span", { class: "muted", text: "The Apple probe is not built. " }), el("button", { class: "btn small", text: "Build the probe", onclick: buildProbe }));
+}
+async function lanCheck() {
+  const targets = L.devs.flatMap((d) => d.ports.map((p) => ({ host: d.host, port: p })));
+  if (!targets.length) return;
+  $("#lan-check").disabled = true; $("#lan-stat").textContent = "Checking…";
+  const script = `$t = ConvertFrom-Json @'\n${JSON.stringify(targets)}\n'@
+$jobs = foreach ($x in $t) { $c = New-Object Net.Sockets.TcpClient; [pscustomobject]@{ x = $x; c = $c; task = $c.ConnectAsync([string]$x.host, [int]$x.port) } }
+try { [void][Threading.Tasks.Task]::WaitAll([Threading.Tasks.Task[]]@($jobs.task), 1500) } catch { }
+$out = foreach ($j in $jobs) { $ok = $j.task.IsCompleted -and -not $j.task.IsFaulted -and $j.c.Connected; $j.c.Close(); [pscustomobject]@{ host = $j.x.host; port = $j.x.port; ok = $ok } }
+ConvertTo-Json -Compress -InputObject @($out)`;
+  try {
+    const r = await ps(script, 30000);
+    for (const o of JSON.parse(r.stdout.trim() || "[]")) L.ports[`${o.host}:${o.port}`] = o.ok ? "open" : "closed";
+    const open = Object.values(L.ports).filter((v) => v === "open").length;
+    $("#lan-stat").textContent = `${open} of ${targets.length} ports answer · checked ${hhmm(Date.now())}`;
+  } catch (e) { $("#lan-stat").textContent = "The check failed: " + errText(e); }
+  $("#lan-check").disabled = false; renderLan();
+}
+function conWrite(s) { L.out += s; if (L.out.length > 200000) L.out = L.out.slice(-150000); const o = $("#con-out"); o.textContent = L.out; o.scrollTop = o.scrollHeight; }
+function runProcess(cmd, args, label, opts = {}) {
+  if (L.proc) { toast("A probe is still running. Stop it first."); return; }
+  $("#con-cmd").textContent = label; $("#con-state").textContent = "Running…"; $("#con-stop").disabled = false;
+  conWrite(`\n$ ${label}\n`);
+  const p = L.proc = P.desktop.childProcess.spawn(cmd, args, opts);
+  p.stdout.on("data", conWrite); p.stderr.on("data", conWrite);
+  const done = (msg) => { if (L.proc !== p) return; L.proc = null; $("#con-state").textContent = msg; $("#con-stop").disabled = true; opts.onDone?.(); };
+  p.on("exit", (code) => done(code === 0 ? "Done" : `Exit code ${code}`));
+  p.on("error", (e) => { conWrite(`\n${errText(e)}\n`); done("Failed"); });
+}
+function runProbe(args) {
+  if (!L.probe) { toast("Build the probe first."); return; }
+  runProcess(probePath(), args, "atvprobe " + args.join(" "));
+}
+function buildProbe() {
+  const proj = `${repoPath()}\\external-plugins\\Denon.Plugin.AppleTv.Probe\\Denon.Plugin.AppleTv.Probe.csproj`;
+  runProcess("dotnet", ["build", proj, "-c", "Debug", "-nologo", "-v", "q"], "dotnet build Denon.Plugin.AppleTv.Probe", { cwd: repoPath(), onDone: async () => { L.probe = await P.fs.exists(probePath()).catch(() => false); renderLan(); } });
+}
+async function mcpToConsole(name) {
+  $("#con-cmd").textContent = "MCP " + name; $("#con-state").textContent = "Running…";
+  conWrite(`\n$ mcp ${name}\n`);
+  try {
+    const { result, ms } = await mcpCall("tools/call", { name, arguments: {} });
+    for (const c of result?.content || []) { let t = c.text ?? JSON.stringify(c); try { t = JSON.stringify(JSON.parse(t), null, 2); } catch { /* plain text */ } conWrite(t + "\n"); }
+    $("#con-state").textContent = `Done in ${ms} ms`;
+  } catch (e) { conWrite(errText(e) + "\n"); $("#con-state").textContent = "Failed"; }
+}
+
+// =====================================================================
+// Release mode
+// =====================================================================
+const REL = { runs: [], seenDone: new Set(), firstRuns: true, timer: null, releases: [] };
+function repoPath() { return (store.get("repo", "") || `${P.env.USERPROFILE}\\Projects\\DENON`).replace(/[\\/]+$/, ""); }
+async function git(args, timeout = 30000) { return ps(`Set-Location -LiteralPath ${psq(repoPath())}\n& git ${args}`, timeout); }
+const FAMILIES = [
+  { name: "Denon Desktop", proj: "Denon.App.Desktop\\Denon.App.Desktop.csproj", tag: /^v(\d+\.\d+\.\d+)$/, iss: true },
+  { name: "Plugin SDK", proj: "Denon.App.PluginSdk\\Denon.App.PluginSdk.csproj", tag: null },
+  { name: "Apple TV plugin", proj: "external-plugins\\Denon.Plugin.AppleTv\\Denon.Plugin.AppleTv.csproj", tag: /^appletv-v(\d+\.\d+\.\d+)$/ },
+  { name: "Chromecast plugin", proj: "external-plugins\\Denon.Plugin.Chromecast\\Denon.Plugin.Chromecast.csproj", tag: /^chromecast-v(\d+\.\d+\.\d+)$/ },
+  { name: "HomePod plugin", proj: "external-plugins\\Denon.Plugin.HomePod\\Denon.Plugin.HomePod.csproj", tag: /^homepod-v(\d+\.\d+\.\d+)$/ },
+];
+const cmpVer = (a, b) => { const x = a.split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); return 0; };
+async function relRefresh() {
+  const repo = repoPath(); $("#repo").value = repo;
+  if (!(await P.fs.exists(repo + "\\.git").catch(() => false))) { $("#rel-stat").textContent = "No git repository in this folder."; return; }
+  $("#rel-stat").textContent = "Reading…";
+  await Promise.allSettled([relVersions(), relGit(), relUnreleased(), relTodo(), relRuns(), relReleases()]);
+  $("#rel-stat").textContent = "Updated " + hhmm(Date.now());
+}
+async function relVersions() {
+  const repo = repoPath();
+  const tags = (await git("tag --list --sort=-v:refname")).stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  const iss = await readText(repo + "\\installer\\DenonDesktop.iss").catch(() => "");
+  const issVer = /#define\s+MyAppVersion\s+"([^"]+)"/.exec(iss)?.[1];
+  const rows = [];
+  for (const f of FAMILIES) {
+    const src = await readText(repo + "\\" + f.proj).catch(() => "");
+    const ver = /<Version>([^<]+)<\/Version>/.exec(src)?.[1] || "?";
+    const tag = f.tag ? tags.map((t) => f.tag.exec(t)?.[1]).find(Boolean) : null;
+    let state;
+    if (!f.tag) state = el("span", { class: "tag info", text: "No own tag" });
+    else if (!tag) state = el("span", { class: "tag warn", text: "Never released" });
+    else if (cmpVer(ver, tag) === 0) state = el("span", { class: "tag ok", text: "Released" });
+    else if (cmpVer(ver, tag) > 0) state = el("span", { class: "tag warn", text: "Bumped, not tagged" });
+    else state = el("span", { class: "tag err", text: "Behind the tag" });
+    const extra = f.iss && issVer && issVer !== ver ? el("div", { class: "tag err", style: "margin-top:4px;display:inline-block", text: `Installer says ${issVer}` }) : null;
+    rows.push(el("tr", {}, el("td", { text: f.name }), el("td", { class: "mono", text: ver }), el("td", { class: "mono", text: tag || "—" }), el("td", {}, state, extra)));
+  }
+  const box = $("#rel-versions"); box.textContent = "";
+  box.append(el("table", { class: "t" }, el("thead", {}, el("tr", {}, el("th", { text: "Part" }), el("th", { text: "Project" }), el("th", { text: "Newest tag" }), el("th", { text: "State" }))), el("tbody", {}, rows)));
+}
+async function relGit() {
+  const st = (await git("status --porcelain=v1 -b")).stdout.split(/\r?\n/).filter(Boolean);
+  const head = st.shift() || "";
+  const m = /^## ([^.\s]+)(?:\.\.\.(\S+))?(?: \[(.+)\])?/.exec(head);
+  $("#git-sub").textContent = m ? `${m[1]}${m[2] ? " → " + m[2] : ""}${m[3] ? " · " + m[3] : " · up to date"}` : head;
+  const log = (await git("log -8 --format=%h%x09%cr%x09%s")).stdout.split(/\r?\n/).filter(Boolean).map((l) => l.split("\t"));
+  const box = $("#rel-git"); box.textContent = "";
+  box.append(st.length ? el("pre", { class: "files", text: st.join("\n") }) : el("div", { class: "pad muted", text: "No changes." }));
+  box.append(el("table", { class: "t" }, el("tbody", {}, log.map(([h, when, s]) => el("tr", {}, el("td", { class: "mono", text: h }), el("td", { text: s }), el("td", { class: "faint", style: "white-space:nowrap", text: when }))))));
+}
+async function relUnreleased() {
+  const txt = await readText(repoPath() + "\\CHANGELOG.md").catch(() => "");
+  const m = /^## \[Unreleased\][^\n]*\n([\s\S]*?)(?=^## \[)/m.exec(txt);
+  const lines = (m?.[1] || "").split(/\r?\n/).filter((l) => /^\s*-\s+/.test(l)).map((l) => l.replace(/^\s*-\s+/, "").replace(/\*\*/g, ""));
+  const box = $("#rel-unrel"); box.textContent = "";
+  if (!m) box.append(el("div", { class: "pad muted", text: "No [Unreleased] section. The last release took it." }));
+  else if (!lines.length) box.append(el("div", { class: "pad muted", text: "The [Unreleased] section is empty." }));
+  else box.append(el("ul", { class: "lines" }, lines.slice(0, 20).map((l) => el("li", { text: l.length > 220 ? l.slice(0, 220) + "…" : l }))));
+}
+async function relTodo() {
+  const txt = await readText(repoPath() + "\\TODO.md").catch(() => "");
+  const items = []; let section = "";
+  for (const line of txt.split(/\r?\n/)) {
+    const h = /^##+\s+(.*)/.exec(line); if (h) { section = h[1]; continue; }
+    const t = /^\s*- \[ \]\s+(.*)/.exec(line); if (t) items.push({ section, text: t[1].replace(/\*\*/g, "") });
+  }
+  $("#todo-sub").textContent = `${items.length} open`;
+  const box = $("#rel-todo"); box.textContent = "";
+  if (!items.length) { box.append(el("div", { class: "pad muted", text: "Nothing open." })); return; }
+  box.append(el("ul", { class: "lines" }, items.slice(0, 14).map((i) => el("li", {}, el("span", { class: "faint", text: i.section + ": " }), i.text.length > 160 ? i.text.slice(0, 160) + "…" : i.text))));
+  if (items.length > 14) box.append(el("div", { class: "pad faint", style: "padding-top:0", text: `And ${items.length - 14} more in TODO.md.` }));
+}
+async function relRuns(fromTimer) {
+  try {
+    const r = await sh("gh run list --limit 10 --json databaseId,name,status,conclusion,headBranch,event,createdAt,updatedAt,displayTitle,url", { cwd: repoPath(), timeout: 30000 });
+    if (r.code !== 0) throw new Error(r.stderr.trim() || "gh failed");
+    REL.runs = JSON.parse(r.stdout);
+  } catch (e) {
+    if (!fromTimer) { $("#runs").textContent = ""; $("#runs").append(el("li", { class: "muted", style: "display:block" }, "Cannot read runs: " + errText(e))); }
+    return;
+  }
+  for (const run of REL.runs) {
+    if (run.status !== "completed") continue;
+    if (!REL.seenDone.has(run.databaseId)) {
+      REL.seenDone.add(run.databaseId);
+      if (!REL.firstRuns) notify(`${run.name}: ${run.conclusion} (${run.headBranch}).`);
+    }
+  }
+  REL.firstRuns = false;
+  const busy = REL.runs.filter((r) => r.status !== "completed");
+  $("#runs-sub").textContent = busy.length ? `${busy.length} running · checks every 30 s` : "Checks every 5 min";
+  const ul = $("#runs"); ul.textContent = "";
+  for (const run of REL.runs) {
+    const cls = run.status === "completed" ? run.conclusion : "running";
+    ul.append(el("li", {}, el("i", { class: "dot " + cls, "aria-label": cls }),
+      el("div", {}, run.url?.startsWith("https://") ? el("a", { href: run.url, target: "_blank", rel: "noopener", text: run.displayTitle }) : run.displayTitle,
+        el("div", { class: "muted", style: "font-size:13px", text: `${run.name} · ${run.headBranch} · ${run.status === "completed" ? run.conclusion : run.status}` })),
+      el("span", { class: "faint", style: "font-size:13px;white-space:nowrap", text: ago(Date.parse(run.updatedAt || run.createdAt)) })));
+  }
+  clearTimeout(REL.timer);
+  REL.timer = setTimeout(() => relRuns(true), busy.length ? 30000 : 300000);
+  updateTray();
+}
+async function relReleases() {
+  const box = $("#rel-verify"); box.textContent = "";
+  try {
+    const r = await sh("gh release list --limit 12 --json tagName,name,isLatest,publishedAt", { cwd: repoPath(), timeout: 30000 });
+    REL.releases = JSON.parse(r.stdout);
+  } catch (e) { box.append(el("div", { class: "muted", text: "Cannot list releases: " + errText(e) })); return; }
+  const pick = el("select", { "aria-label": "Release" }, REL.releases.map((x) => el("option", { value: x.tagName, text: `${x.tagName}${x.isLatest ? " (latest)" : ""}` })));
+  const info = el("div", { class: "muted", style: "margin:8px 0;font-size:14px" });
+  const out = el("div");
+  const go = el("button", { class: "btn primary", text: "Download and check" });
+  const showAssets = async () => {
+    info.textContent = "Reading the assets…"; out.textContent = "";
+    try {
+      const r = await sh(`gh release view ${pick.value} --json assets`, { cwd: repoPath(), timeout: 30000 });
+      const assets = JSON.parse(r.stdout).assets || [];
+      const mb = assets.reduce((n, a) => n + (a.size || 0), 0) / 1048576;
+      info.textContent = `${assets.length} file(s), ${mb.toFixed(1)} MB: ${assets.map((a) => a.name).join(", ")}`;
+      go.textContent = `Download ${mb.toFixed(0)} MB and check`;
+    } catch (e) { info.textContent = errText(e); }
+  };
+  pick.addEventListener("change", showAssets);
+  go.addEventListener("click", async () => {
+    go.disabled = true; out.textContent = ""; out.append(el("div", { class: "muted", text: "Downloading and hashing… This can take a minute." }));
+    const tag = pick.value;
+    const script = `Set-Location -LiteralPath ${psq(repoPath())}
+$dir = Join-Path $env:TEMP ${psq("room-dev-deck-verify\\" + tag)}
+New-Item -ItemType Directory -Force -Path $dir | Out-Null
+$dl = (& gh release download ${psq(tag)} -D $dir --clobber 2>&1 | Out-String)
+$sumFile = Join-Path $dir 'SHA256SUMS.txt'
+$res = @()
+if (Test-Path $sumFile) {
+  foreach ($line in Get-Content $sumFile) {
+    if ($line -match '^([0-9a-fA-F]{64})\\s+\\*?(.+)$') {
+      $name = $Matches[2].Trim(); $p = Join-Path $dir $name
+      $act = if (Test-Path $p) { (Get-FileHash -Algorithm SHA256 -LiteralPath $p).Hash.ToLower() } else { '' }
+      $res += [pscustomobject]@{ name = $name; ok = ($act -eq $Matches[1].ToLower()); found = [bool]$act }
+    }
+  }
+}
+ConvertTo-Json -Compress -Depth 4 -InputObject ([pscustomobject]@{ dir = $dir; sums = (Test-Path $sumFile); log = $dl.Trim(); files = @($res) })`;
+    try {
+      const r = await ps(script, 900000);
+      const o = JSON.parse(r.stdout.trim());
+      out.textContent = "";
+      if (!o.sums) out.append(el("div", { class: "tag err", text: "This release has no SHA256SUMS.txt." }), o.log ? el("pre", { class: "files", text: o.log }) : null);
+      else {
+        const allOk = o.files.length && o.files.every((f) => f.ok);
+        out.append(el("div", { class: "row" }, el("span", { class: "tag " + (allOk ? "ok" : "err"), text: allOk ? `All ${o.files.length} file(s) match` : "Mismatch" }),
+          el("button", { class: "btn small", text: "Show the folder", onclick: () => P.desktop.shell.showItemInFolder(o.dir + "\\SHA256SUMS.txt").catch((e) => toast(errText(e))) })));
+        out.append(el("table", { class: "t", style: "margin-top:8px" }, el("tbody", {}, o.files.map((f) => el("tr", {}, el("td", { class: "mono", text: f.name }), el("td", {}, el("span", { class: "tag " + (f.ok ? "ok" : "err"), text: f.ok ? "SHA-256 OK" : f.found ? "Does not match" : "Missing" })))))));
+        if (!allOk) notify(`Release ${tag}: a checksum does not match.`);
+      }
+    } catch (e) { out.textContent = ""; out.append(el("div", { class: "tag err", text: "The check failed: " + errText(e) })); }
+    go.disabled = false;
+  });
+  box.append(el("div", { class: "row" }, pick, go), info, out);
+  if (REL.releases.length) showAssets();
+}
+
+// =====================================================================
+// Tray, notifications, icon
+// =====================================================================
+const TRAY = { on: false, key: "", lastNotify: 0, pendingErrors: 0, alerts: store.get("alerts", true) };
+function drawIcon(size) {
+  const c = document.createElement("canvas"); c.width = c.height = size; const g = c.getContext("2d"), s = size / 256;
+  const grad = g.createLinearGradient(0, 0, 0, size); grad.addColorStop(0, "#eef0ee"); grad.addColorStop(1, "#c9ccc8");
+  g.fillStyle = grad; g.beginPath(); g.roundRect(8 * s, 8 * s, 240 * s, 240 * s, 46 * s); g.fill();
+  g.strokeStyle = "rgba(0,0,0,.18)"; g.lineWidth = 3 * s; g.stroke();
+  const bars = [[40, 62, 150, "#1d5ca3"], [92, 108, 120, "#8a3a86"], [56, 154, 84, "#23857a"], [150, 154, 66, "#bf5617"]];
+  for (const [x, y, w, col] of bars) { g.fillStyle = col; g.beginPath(); g.roundRect(x * s, y * s, w * s, 30 * s, 8 * s); g.fill(); }
+  g.fillStyle = "#b02a1e"; g.fillRect(186 * s, 44 * s, 6 * s, 168 * s);
+  return c.toDataURL("image/png");
+}
+function drawTray(state) {
+  const size = 32, c = document.createElement("canvas"); c.width = c.height = size; const g = c.getContext("2d");
+  const col = state === "error" ? "#d6402f" : state === "warn" ? "#e19b2c" : state === "busy" ? "#4f8fd6" : "#3d9b63";
+  g.fillStyle = "#2a2e33"; g.beginPath(); g.roundRect(1, 1, 30, 30, 7); g.fill();
+  g.fillStyle = "#9aa3ad"; g.fillRect(6, 8, 14, 4); g.fillRect(10, 15, 12, 4); g.fillRect(6, 22, 9, 4);
+  g.fillStyle = col; g.beginPath(); g.arc(24, 9, 6, 0, Math.PI * 2); g.fill();
+  return c.toDataURL("image/png");
+}
+function trayState() {
+  const since = Date.now() - 30 * 60000;
+  const recent = D.log.filter((e) => e.t >= since && e.level !== "info");
+  if (recent.some((e) => e.level === "error")) return "error";
+  if (recent.length || (D.day === dateKey(new Date()) && D.findings.some((f) => f.sev !== "info" && f.t >= since))) return "warn";
+  if (REL.runs.some((r) => r.status !== "completed")) return "busy";
+  return "ok";
+}
+async function updateTray() {
+  if (!TRAY.on) return;
+  const st = trayState();
+  const live = D.sessions.filter((s) => s.live).map((s) => s.title);
+  const busy = REL.runs.filter((r) => r.status !== "completed").length;
+  const tip = ({ error: "Errors in the last 30 min", warn: "Warnings in the last 30 min", busy: "A GitHub run is going", ok: "All quiet" }[st]) +
+    (live.length ? ` · playing ${live[0]}` : "") + (busy ? ` · ${busy} run(s)` : "");
+  const key = st + "|" + tip + "|" + TRAY.alerts;
+  if (key === TRAY.key) return; TRAY.key = key;
+  const show = (mode) => () => { P.desktop.window.show().catch(() => {}); if (mode) setMode(mode); };
+  try {
+    await P.desktop.tray.set({
+      icon: drawTray(st), iconIsTemplate: false, title: "Room Dev Deck", toolTip: tip.slice(0, 100),
+      menu: [
+        { label: "Show Room Dev Deck", click: show() }, { type: "separator" },
+        { label: "Room", click: show("room") }, { label: "MCP", click: show("mcp") }, { label: "LAN", click: show("lan") }, { label: "Release", click: show("release") },
+        { type: "separator" },
+        { label: "Alerts for errors and runs", type: "checkbox", checked: TRAY.alerts, click: () => { TRAY.alerts = !TRAY.alerts; store.set("alerts", TRAY.alerts); TRAY.key = ""; updateTray(); } },
+      ],
+    });
+  } catch (e) { TRAY.on = false; console.warn("tray", e); }
+}
+async function notify(body) {
+  if (!TRAY.alerts || P.perms.notifications !== "granted") return;
+  try { await P.desktop.notification.show({ body: body.slice(0, 300) }); } catch (e) { console.warn("notify", e); }
+}
+function onNewLogLines(lines) {
+  const errs = lines.filter((e) => e.level === "error");
+  if (!errs.length) return;
+  TRAY.pendingErrors += errs.length;
+  if (Date.now() - TRAY.lastNotify < 60000) return;
+  TRAY.lastNotify = Date.now();
+  const first = errs[0];
+  notify(TRAY.pendingErrors > 1 ? `${TRAY.pendingErrors} new errors in Denon Desktop. Latest: ${(first.plugin ? first.plugin + ": " : "") + first.msg.split("\n")[0]}` : `Denon Desktop error: ${(first.plugin ? first.plugin + ": " : "") + first.msg.split("\n")[0]}`);
+  TRAY.pendingErrors = 0;
+}
+async function syncPerms() {
+  try { P.perms = await P.desktop.permissions.state(); } catch { P.perms = {}; }
+  const needs = ["notifications", "menu-bar"].filter((p) => P.perms[p] === "prompt");
+  const denied = ["notifications", "menu-bar"].filter((p) => P.perms[p] === "denied");
+  const btn = $("#perm-btn");
+  btn.classList.toggle("hidden", !needs.length && !denied.length);
+  btn.textContent = needs.length ? "Turn on tray icon and alerts" : "Tray or alerts are off: change";
+  btn.onclick = async () => {
+    try {
+      if (needs.length) P.perms = await P.desktop.permissions.request(["notifications", "menu-bar"]);
+      else await P.desktop.permissions.manage();
+    } catch (e) { toast(errText(e)); }
+    await syncPerms(); startTray();
+  };
+}
+function startTray() { if (P.perms["menu-bar"] === "granted" && !TRAY.on) { TRAY.on = true; TRAY.key = ""; updateTray(); } }
+
+// =====================================================================
+// Modes and wiring
+// =====================================================================
+let mode = null;
+function setMode(m) {
+  if (!["room", "mcp", "lan", "release"].includes(m)) m = "room";
+  mode = m; store.set("mode", m);
+  $$(".modes button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.mode === m)));
+  for (const k of ["room", "mcp", "lan", "release"]) $("#mode-" + k).classList.toggle("hidden", k !== m);
+  if (m === "room") renderTimeline();
+  if (m === "mcp" && !M.loaded) mcpLoad();
+  if (m === "lan" && !L.devs.length) lanInit();
+  if (m === "release" && !REL.loadedOnce) { REL.loadedOnce = true; relRefresh(); }
+}
+function wire() {
+  $$(".modes button").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
+  document.addEventListener("keydown", (e) => {
+    if (e.target.closest("input, textarea, select")) { if (e.key === "Escape") e.target.blur(); return; }
+    if (e.key === "Escape") { $("#ask").classList.add("hidden"); return; }
+    const i = ["1", "2", "3", "4"].indexOf(e.key); if (i >= 0 && !e.ctrlKey && !e.metaKey && !e.altKey) { setMode(["room", "mcp", "lan", "release"][i]); return; }
+    if (e.key === "/" && mode === "room") { e.preventDefault(); $("#f-q").focus(); }
+  });
+  $("#day-pick").addEventListener("change", (e) => goDay(e.target.value));
+  $("#day-prev").addEventListener("click", () => { const i = D.days.indexOf(D.day); if (i < D.days.length - 1) goDay(D.days[i + 1]); });
+  $("#day-next").addEventListener("click", () => { const i = D.days.indexOf(D.day); if (i > 0) goDay(D.days[i - 1]); });
+  $$("#zoom-seg button").forEach((b) => b.addEventListener("click", () => { R.zoom = b.dataset.z; store.set("zoom", R.zoom); syncZoomSeg(); renderTimeline(); }));
+  $("#sel-clear").addEventListener("click", clearSelection);
+  $("#f-warn").addEventListener("change", (e) => { R.warnOnly = e.target.checked; renderFeed(); });
+  $("#f-who").addEventListener("change", (e) => { R.who = e.target.value; renderFeed(); });
+  let qT; $("#f-q").addEventListener("input", (e) => { clearTimeout(qT); qT = setTimeout(() => { R.q = e.target.value; R.shown = 500; renderFeed(); }, 150); });
+  $("#feed").addEventListener("scroll", (e) => { const b = e.target; R.stick = b.scrollHeight - b.scrollTop - b.clientHeight < 40; });
+  $("#ask-day").addEventListener("click", () => { const [a, b] = R.view || computeView(); openAsk(contextForRange(a, b), "What happened in the room in this view? Point out anything that looks wrong and the likely cause."); });
+  $("#ask-close").addEventListener("click", () => { ASK.ctl?.abort(); $("#ask").classList.add("hidden"); });
+  $("#ask-go").addEventListener("click", askGo);
+  $("#ask-stop").addEventListener("click", () => ASK.ctl?.abort());
+  $("#ask-q").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) askGo(); });
+  $("#mcp-refresh").addEventListener("click", mcpLoad);
+  $("#mcp-q").addEventListener("input", (e) => { M.q = e.target.value; renderTools(); });
+  $("#lan-check").addEventListener("click", lanCheck);
+  $("#lan-discover").addEventListener("click", () => runProbe(["discover", "--seconds", "4", "--all", "--txt"]));
+  $("#lan-roomstate").addEventListener("click", () => mcpToConsole("get_room_state"));
+  $("#lan-doctor").addEventListener("click", () => mcpToConsole("diagnose_room"));
+  $("#con-stop").addEventListener("click", () => L.proc?.kill().catch(() => {}));
+  $("#con-clear").addEventListener("click", () => { L.out = ""; $("#con-out").textContent = ""; });
+  $("#con-ask").addEventListener("click", () => openAsk({ label: "LAN console", summary: `${L.out.length.toLocaleString()} characters of probe output`, text: "Output of developer probes (atvprobe and MCP reads) on the home LAN:\n" + L.out.slice(-100000) }, "Explain this probe output. Does anything look wrong?"));
+  $("#rel-refresh").addEventListener("click", relRefresh);
+  $("#runs-refresh").addEventListener("click", () => relRuns());
+  $("#repo").addEventListener("change", (e) => { store.set("repo", e.target.value.trim()); L.probe = null; relRefresh(); });
+  new ResizeObserver(() => { if (mode === "room") renderTimeline(); }).observe($("#tl"));
+}
+async function goDay(day) { D.followToday = day === dateKey(new Date()); R.sel = null; R.range = null; R.zoom = store.get("zoom", "fit"); if (R.zoom === "span") R.zoom = "fit"; await loadDay(day); }
+
+let polling = false;
+async function poll() {
+  if (polling) return; polling = true;
+  try {
+    const today = dateKey(new Date());
+    if (D.followToday && D.day !== today) { D.days = await listDays(); await loadDay(today); return; }
+    if (D.day !== today) return;
+    const sig = await filesSignature(D.day);
+    if (sig !== D.sig) { D.sig = sig; await loadDay(D.day, { keepView: true }); }
+    else if (D.sessions.some((s) => s.live)) { for (const s of D.sessions) if (s.live) s.end = Date.now(); if (mode === "room") renderTimeline(); }
+  } catch (e) { console.warn("poll", e); }
+  finally { polling = false; }
+}
+
+async function start() {
+  $("#gate").classList.add("hidden"); $("#app").classList.remove("hidden");
+  try {
+    const r = await sh("set LOCALAPPDATA & set USERPROFILE & set TEMP", { timeout: 15000 });
+    for (const line of r.stdout.split(/\r?\n/)) { const i = line.indexOf("="); if (i > 0) P.env[line.slice(0, i).toUpperCase()] = line.slice(i + 1).trim(); }
+  } catch (e) { toast("Cannot read the environment: " + errText(e)); return; }
+  D.logsDir = `${P.env.LOCALAPPDATA}\\DenonDesktop\\logs`; D.evDir = `${D.logsDir}\\events`;
+  wire();
+  syncAskButtons();
+  await syncPerms(); startTray();
+  await checkAppRunning();
+  D.days = await listDays();
+  D.followToday = true;
+  try { await loadDay(D.days[0] || dateKey(new Date())); D.sig = await filesSignature(D.day); }
+  catch (e) { $("#room-stat").textContent = "Cannot read the logs: " + errText(e); }
+  setMode(store.get("mode", "room"));
+  setInterval(poll, 3000);
+  setInterval(checkAppRunning, 30000);
+  setTimeout(() => { if (!REL.loadedOnce) relRuns(true); }, 4000); // the tray and alerts follow CI runs from the start
+  mcpSettings().then((c) => setLed("led-mcp", c.enabled ? "" : "warn", c.enabled ? "MCP" : "MCP off")).catch(() => {});
+}
+
+function showGate(kind) {
+  const g = $("#gate"); g.textContent = ""; g.classList.remove("hidden"); $("#app").classList.add("hidden");
+  g.append(el("h1", { text: "Room Dev Deck" }),
+    el("p", { text: "A desktop app for building and debugging Denon Desktop. It reads the app's logs and its local MCP server, and shows what every device in the room did, minute by minute. It never sends a command to a device unless you click Run on a tool that says it changes the room." }),
+    el("ul", {},
+      el("li", {}, el("b", { text: "Room" }), el("span", { text: "A timeline of sessions per device, a live feed of app.log and events, checks for broken sessions and flapping links, and Ask Claude about a span." })),
+      el("li", {}, el("b", { text: "MCP" }), el("span", { text: "Every tool on the app's MCP server, a form for its arguments, the JSON result and a history." })),
+      el("li", {}, el("b", { text: "LAN" }), el("span", { text: "Port checks for each device, and read-only probes for Apple TV and HomePod now playing." })),
+      el("li", {}, el("b", { text: "Release" }), el("span", { text: "Versions against tags, GitHub Actions runs with alerts, the unreleased changelog, and a checksum check of a release." }))));
+  const act = el("div", { class: "act" });
+  if (kind === "install") {
+    const b = el("button", { class: "btn primary", text: "Install as app" });
+    b.addEventListener("click", async () => {
+      b.disabled = true;
+      try { const r = await P.desktop.install.request(); if (r !== "installed") { b.disabled = false; if (r === "failed") toast("The install failed. Try again from the artifact's menu."); } }
+      catch (e) { b.disabled = false; toast(errText(e)); }
+    });
+    act.append(b, el("span", { class: "note", text: "It needs Windows or macOS, the Claude desktop app, and Denon Desktop on the same computer." }));
+  } else if (kind === "connect") {
+    const b = el("button", { class: "btn primary", text: "Allow file and command access" });
+    b.addEventListener("click", async () => {
+      try { P.perms = await P.desktop.permissions.request(["full-access", "notifications", "menu-bar"]); } catch (e) { toast(errText(e)); return; }
+      if (P.perms["full-access"] === "granted") start();
+      else showGate(P.perms["full-access"] === "denied" ? "denied" : "unavailable");
+    });
+    act.append(b, el("span", { class: "note", text: "It reads the logs in AppData, runs git, gh, curl and the probes, and writes only temporary files." }));
+  } else if (kind === "denied") {
+    act.append(el("button", { class: "btn primary", text: "Open permissions", onclick: () => P.desktop.permissions.manage().then(() => location.reload()).catch((e) => toast(errText(e))) }),
+      el("span", { class: "note", text: "File and command access is off. The deck cannot read the logs without it." }));
+  } else if (kind === "unavailable") {
+    act.append(el("span", { class: "note", text: "File and command access is not available in this window. It works only for an artifact of your own organization." }));
+  } else {
+    act.append(el("span", { class: "note", text: "This page works only in its desktop app, which can be installed from the Claude desktop app." }));
+  }
+  g.append(act);
+}
+
+// ---- boot
+(async () => {
+  P.desktop = window.__deckDesktop || (window.claude?.use ? await window.claude.use("desktop").catch(() => null) : null);
+  if (window.claude?.use) window.claude.use("sample").then((s) => { P.sample = s; syncAskButtons(); }).catch(() => {});
+  if (!P.desktop?.fs) {
+    const st = await P.desktop?.install?.state?.().catch(() => "unavailable");
+    showGate(st === "available" ? "install" : "browser");
+    return;
+  }
+  P.desktop.app?.dock?.setIcon(drawIcon(256)).catch(() => {});
+  P.desktop.window?.setOptions({ width: 1320, height: 900, minWidth: 420, minHeight: 520 }).catch(() => {});
+  P.fs = P.desktop.fs;
+  let st = {};
+  try { st = await P.desktop.permissions.state(); } catch { /* treat as unknown */ }
+  P.perms = st;
+  if (st["full-access"] === "granted") start();
+  else if (st["full-access"] === "denied") showGate("denied");
+  else showGate("connect");
+})();
+</script>

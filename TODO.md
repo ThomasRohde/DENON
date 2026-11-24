@@ -33,6 +33,11 @@ Phase 2 is done in 1.18.0: YouTube / YouTube Music and jukebox tracks are decode
 ## Habit telemetry
 
 - [ ] Events written before 1.15.0 have no `coveredSec` / `exclusiveSec`. Readers must fall back to `durationSec`.
+- [ ] **Open sessions are lost when the app is killed.** On 2026-11-24 the app stopped at 21:57:42 with no
+      "Application shutting down" line (probably the installer). "TV Audio" (receiver, from 18:54) and an LG TV channel
+      session (from 21:35) never got a `session.ended`, so their time is not in Insights. Idea: at start, end the
+      sessions the last run left open (reason `app_crashed`, end time = the last log line of that run).
+      Found by Room Dev Deck (`tools/room-dev-deck`).
 
 ## Insights page
 
@@ -61,6 +66,8 @@ The bridge returns JSON + images and uses declared parameters/hints since app 1.
       mDNS or by a port-8009 scan on 2026-11-23. Check if it is off, in deep standby, or on another network.
 - [x] Documented Windows **Private vs. Public** network profile for mDNS in `external-plugins/Denon.Plugin.Chromecast/README.md`.
 - [ ] Speaker groups (`Google Cast Group`) are skipped.
+- [ ] Stuen 2 lost its link 3 times between 02:57:09 and 02:57:20 on 2026-11-24, with no app restart near it
+      (reconnected at 02:57:32). Find out why, and whether the reconnect needs a back-off.
 - [ ] Netflix shares only "Netflix" as the media title (no program or episode), so all Netflix viewing is one session
       per app run (`hasTitle: false` since plugin 0.1.1). It does report PLAYING/PAUSED, so `watchedSec` is right.
       Check if play/pause commands work for Netflix.
