@@ -132,8 +132,17 @@ public sealed class UiSettings
     /// <summary>Theme: <c>system</c> (follow the Windows app mode), <c>dark</c> or <c>light</c> (docs/theming.md).</summary>
     public string Theme { get; set; } = "system";
 
-    /// <summary>Skin: <c>default</c> is the only one so far; applied at start.</summary>
+    /// <summary>Skin: <c>default</c>, <c>hifi</c>, <c>compact</c> or <c>large</c>; applied at start (docs/theming.md).</summary>
     public string Skin { get; set; } = "default";
+
+    /// <summary>
+    /// The main window's last size and position (saved when it hides or the app exits). Null until then: the
+    /// window then fits itself to the monitor and the skin.
+    /// </summary>
+    public WindowPlacementSettings? Window { get; set; }
+
+    /// <summary>The install the splash screen was last shown for (version and exe time); a new install shows it again.</summary>
+    public string? SplashShownFor { get; set; }
 
     public UiSettings Clone() =>
         new()
@@ -146,7 +155,34 @@ public sealed class UiSettings
             LaunchAtWindowsStartup = LaunchAtWindowsStartup,
             Theme = Theme,
             Skin = Skin,
+            Window = Window?.Clone(),
+            SplashShownFor = SplashShownFor,
         };
+}
+
+/// <summary>The main window's normal (not maximized) bounds in device-independent pixels, and its state.</summary>
+public sealed class WindowPlacementSettings
+{
+    public double Left { get; set; }
+
+    public double Top { get; set; }
+
+    public double Width { get; set; }
+
+    public double Height { get; set; }
+
+    public bool Maximized { get; set; }
+
+    /// <summary>
+    /// True once the user moved or resized the window: from then on it keeps their size. Until then it grows to
+    /// fit when the deck grows (for example when the receiver connects after the first start).
+    /// </summary>
+    public bool UserSized { get; set; }
+
+    /// <summary>The window's DPI scale when saved (1 = 96 DPI), to find its monitor again.</summary>
+    public double Scale { get; set; } = 1;
+
+    public WindowPlacementSettings Clone() => (WindowPlacementSettings)MemberwiseClone();
 }
 
 public sealed class StationPreset

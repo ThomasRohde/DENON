@@ -41,6 +41,9 @@ public sealed class AppSettingsStore
 
     public string? LastLoadWarning { get; private set; }
 
+    /// <summary>True when this run created the settings file (a first start on this PC).</summary>
+    public bool CreatedThisRun { get; private set; }
+
     public async Task<AppSettings> InitializeAsync(CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken);
@@ -51,6 +54,7 @@ public sealed class AppSettingsStore
             {
                 _current = Normalize(AppSettings.CreateDefault(), seedDefaultsIfEmpty: true);
                 await SaveInternalAsync(_current, cancellationToken);
+                CreatedThisRun = true;
                 _logStore.Info("Created default settings file.");
             }
             else
@@ -99,6 +103,27 @@ public sealed class AppSettingsStore
     /// the store lock so concurrent/independent writers (discovery, volume unit, remote toggles,
     /// calibration, settings editor) never clobber each other's changes.
     /// </summary>
+    /// <summary>
+    /// Saves window and splash state (<see cref="UiSettings.Window"/>, <see cref="UiSettings.SplashShownFor"/>)
+    /// without <see cref="SettingsChanged"/>: listeners such as the HEOS connection must not react to a moved window.
+    /// </summary>
+    public async Task SaveWindowStateAsync(Action<UiSettings> mutator, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(mutator);
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var draft = _current.Clone();
+            mutator(draft.Ui);
+            await SaveInternalAsync(draft, cancellationToken);
+            _current = draft;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public async Task<AppSettings> UpdateAsync(Action<AppSettings> mutator, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(mutator);

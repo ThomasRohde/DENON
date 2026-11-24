@@ -496,7 +496,7 @@
                                         FontSize="{DynamicResource FontSize03}" />
                             </Grid>
                         </Border>
-                        <TextBlock Text="Built-in: Ctrl+1..7 switches views • Ctrl+R refreshes • Mouse wheel over Volume adjusts ±2 steps"
+                        <TextBlock Text="Built-in: Ctrl+1..9 switches views • Ctrl+R refreshes • Mouse wheel over Volume adjusts ±2 steps"
                                    FontSize="{DynamicResource FontSize03}"
                                    Foreground="{DynamicResource TextMutedBrush}" />
                     </StackPanel>

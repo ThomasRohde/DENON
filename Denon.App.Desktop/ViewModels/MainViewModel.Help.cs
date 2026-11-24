@@ -291,21 +291,21 @@ public sealed partial class MainViewModel
                     item.IsComplete = snap.IsConnected;
                     item.StatusSummary = snap.IsConnected
                         ? $"{ReceiverTitle}{(IsLivePushConnected ? " • LIVE PUSH" : string.Empty)}"
-                        : "Connect your Denon or Marantz AVR via Settings";
+                        : "Connect your Denon or Marantz receiver in Settings";
                     break;
 
                 case "relay":
                     item.IsComplete = !string.IsNullOrWhiteSpace(RemoteWebUrl) && RemoteWebUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase);
                     item.StatusSummary = item.IsComplete
                         ? $"Active on {RemoteWebUrl}"
-                        : "LAN audio relay & Phone Remote (:18925)";
+                        : "Audio relay and Phone Remote (TCP 18925 by default)";
                     break;
 
                 case "hue":
                 {
                     var p = InstalledPlugins.FirstOrDefault(x => x.Id.Equals("philips-hue", StringComparison.OrdinalIgnoreCase));
                     item.IsComplete = p is not null && p.IsEnabled && p.Health == PluginHealthState.Connected;
-                    item.StatusSummary = p?.StatusText ?? "Pair your Philips Hue Bridge for rooms & 50 Hz Music Sync";
+                    item.StatusSummary = p?.StatusText ?? "Pair your Philips Hue Bridge for rooms, scenes and Music Sync";
                     break;
                 }
 
@@ -314,7 +314,7 @@ public sealed partial class MainViewModel
                     var p = InstalledPlugins.FirstOrDefault(x => x.Id.Equals("smart-tv", StringComparison.OrdinalIgnoreCase));
                     item.IsComplete = p is not null && p.IsEnabled &&
                                       (p.Health == PluginHealthState.Connected || p.StatusText.Contains("Paired", StringComparison.OrdinalIgnoreCase));
-                    item.StatusSummary = p?.StatusText ?? "Pair your LG webOS TV for apps, OLED Screen Off & eARC";
+                    item.StatusSummary = p?.StatusText ?? "Pair your LG webOS TV for inputs, apps, Screen Off and eARC";
                     break;
                 }
 
@@ -322,13 +322,13 @@ public sealed partial class MainViewModel
                 {
                     var p = InstalledPlugins.FirstOrDefault(x => x.Id.Equals("home-assistant", StringComparison.OrdinalIgnoreCase));
                     item.IsComplete = p is not null && p.IsEnabled && p.Health == PluginHealthState.Connected;
-                    item.StatusSummary = p?.StatusText ?? "Optional: connect Home Assistant scenes & live AVR sensor";
+                    item.StatusSummary = p?.StatusText ?? "Optional: connect Home Assistant scenes and the receiver sensor";
                     break;
                 }
 
                 case "scenes":
                     item.IsComplete = ScenePresets.Count > 0;
-                    item.StatusSummary = $"{ScenePresets.Count} Smart Scenes & {AutomationRules.Count} Automation Rules configured";
+                    item.StatusSummary = $"{ScenePresets.Count} Smart Scenes and {AutomationRules.Count} automation rules";
                     break;
             }
 
@@ -345,46 +345,56 @@ public sealed partial class MainViewModel
     private void SeedSetupChecklist()
     {
         SetupChecklistItems.Clear();
-        SetupChecklistItems.Add(new SetupChecklistItem("avr", "Denon / Marantz AVR", "Settings →", "Settings"));
-        SetupChecklistItems.Add(new SetupChecklistItem("relay", "Phone Remote & Audio Relay", "Phone QR →", "CastRemote"));
-        SetupChecklistItems.Add(new SetupChecklistItem("hue", "Philips Hue Smart Lighting", "Open Hue →", "Plugins", "philips-hue"));
-        SetupChecklistItems.Add(new SetupChecklistItem("tv", "LG webOS Smart TV", "Open TV →", "Plugins", "smart-tv"));
-        SetupChecklistItems.Add(new SetupChecklistItem("ha", "Home Assistant Bridge", "Open HA →", "Plugins", "home-assistant"));
-        SetupChecklistItems.Add(new SetupChecklistItem("scenes", "Smart Scenes & Automations", "Scenes →", "Acoustics"));
+        SetupChecklistItems.Add(new SetupChecklistItem("avr", "Denon / Marantz receiver", "Settings →", "Settings"));
+        SetupChecklistItems.Add(new SetupChecklistItem("relay", "Phone Remote & audio relay", "Phone QR →", "CastRemote"));
+        SetupChecklistItems.Add(new SetupChecklistItem("hue", "Philips Hue lighting", "Open Hue →", "Plugins", "philips-hue"));
+        SetupChecklistItems.Add(new SetupChecklistItem("tv", "LG webOS TV", "Open TV →", "Plugins", "smart-tv"));
+        SetupChecklistItems.Add(new SetupChecklistItem("ha", "Home Assistant", "Open HA →", "Plugins", "home-assistant"));
+        SetupChecklistItems.Add(new SetupChecklistItem("scenes", "Smart Scenes & automations", "Scenes →", "Acoustics"));
     }
 
     private void SeedHelpShortcutsReference()
     {
+        // Keep in step with MainWindow.Window_PreviewKeyDown, ShortcutSettings.CreateDefaults and YouTubeCinemaWindow.
         HelpShortcutsReference.Clear();
-        HelpShortcutsReference.Add(new("F1", "Anywhere in App", "Open Context-Aware Help & Guide for the current screen or plugin"));
-        HelpShortcutsReference.Add(new("Ctrl + 1 .. 9", "Anywhere in App", "Switch sections (1 Control, 2 YouTube, 3 Scenes, 4 Cast, 5 Stations, 6 Plugins, 7 Settings, 8 Health, 9 Help)"));
-        HelpShortcutsReference.Add(new("Ctrl + R / F5", "In-App", "Force-refresh Denon AVR & HEOS state"));
-        HelpShortcutsReference.Add(new("Space", "In-App", "Play / Pause HEOS playback"));
-        HelpShortcutsReference.Add(new("M", "In-App", "Toggle Master Mute"));
-        HelpShortcutsReference.Add(new("Ctrl + Up / Down", "In-App", "Adjust Master Volume ±2"));
-        HelpShortcutsReference.Add(new("Mouse Wheel", "Volume Card", "Scroll smoothly over the Volume Card to nudge Master Volume ±2"));
-        HelpShortcutsReference.Add(new("Ctrl + Alt + D", "Global Windows", "Show / Hide Denon Desktop from anywhere (even minimized to tray)"));
-        HelpShortcutsReference.Add(new("Ctrl + Alt + P", "Global Windows", "Global Play / Pause"));
-        HelpShortcutsReference.Add(new("Ctrl + Alt + M", "Global Windows", "Global Mute toggle"));
-        HelpShortcutsReference.Add(new("Ctrl + Alt + Up / Down", "Global Windows", "Global Master Volume ±2"));
-        HelpShortcutsReference.Add(new("Ctrl + Alt + Left / Right", "Global Windows", "Global Previous / Next Track"));
-        HelpShortcutsReference.Add(new("F11 / H / Esc", "YouTube Cinema", "Toggle monitor fullscreen / Hide chrome bars / Progressive exit"));
-        HelpShortcutsReference.Add(new("Enter", "Smart TV Inputs", "Instantly cast YouTube URL, type to TV keyboard, or send on-screen toast"));
+        HelpShortcutsReference.Add(new("F1", "Main window", "Open Help for the page or plugin you are on"));
+        HelpShortcutsReference.Add(new("Ctrl + 1 .. 9", "Main window", "Go to a page: 1 Deck, 2 Music, 3 Scenes, 4 Cast, 5 Stations, 6 Plugins, 7 Settings, 8 Health, 9 Help (Brain has no number)"));
+        HelpShortcutsReference.Add(new("Ctrl + R", "Main window", "Refresh the receiver state (fixed key)"));
+        HelpShortcutsReference.Add(new("F5", "Main window", "Refresh the receiver state (you can change this key)"));
+        HelpShortcutsReference.Add(new("Space", "Main window", "Play / pause (not while a text box, button or list has focus)"));
+        HelpShortcutsReference.Add(new("M", "Main window", "Mute on / off"));
+        HelpShortcutsReference.Add(new("Ctrl + Up / Down", "Main window", "Master volume up / down 2 steps"));
+        HelpShortcutsReference.Add(new("Mouse wheel", "Master Volume card", "Master volume up / down 2 steps"));
+        HelpShortcutsReference.Add(new("Ctrl + Alt + D", "Global (Windows)", "Show or hide the main window, also from the tray"));
+        HelpShortcutsReference.Add(new("Ctrl + Alt + P", "Global (Windows)", "Play / pause"));
+        HelpShortcutsReference.Add(new("Ctrl + Alt + M", "Global (Windows)", "Mute on / off"));
+        HelpShortcutsReference.Add(new("Ctrl + Alt + Up / Down", "Global (Windows)", "Master volume up / down 2 steps"));
+        HelpShortcutsReference.Add(new("Ctrl + Alt + Left / Right", "Global (Windows)", "Previous / next track"));
+        HelpShortcutsReference.Add(new("F11", "Cinema window", "Fullscreen on / off"));
+        HelpShortcutsReference.Add(new("H", "Cinema window", "Hide / show the bars"));
+        HelpShortcutsReference.Add(new("Esc", "Cinema window", "Step back: show the bars, then leave fullscreen, then close"));
+        HelpShortcutsReference.Add(new("Esc / Backspace", "Shortcut recorder", "Cancel the recording / clear the shortcut"));
+        HelpShortcutsReference.Add(new("Esc", "Tray flyout", "Close the flyout"));
+        HelpShortcutsReference.Add(new("Enter", "LG TV page text boxes", "Send: cast the YouTube link, type to the TV, show the toast, or open the URL"));
     }
 
     private void SeedHelpPortsReference()
     {
         HelpPortsReference.Clear();
-        HelpPortsReference.Add(new("TCP 23", "Denon / Marantz AVR Telnet", "Hardware power, master volume, HDMI inputs, sound modes, Audyssey, ECO, Zone 2 & dimmer"));
-        HelpPortsReference.Add(new("TCP 1255", "HEOS CLI & LIVE PUSH", "Zero-lag (<50 ms) real-time playback, volume, album art, favorites & queue events"));
-        HelpPortsReference.Add(new("TCP 18925", "LAN Audio Relay & Phone Remote", "Streams YouTube, PC Audio Cast & local FLACs to HEOS + hosts the QR Couch Phone Remote web UI"));
-        HelpPortsReference.Add(new("TCP 18926", "Streamable HTTP MCP Server", "Spec-compliant 2025-11-25 MCP server (POST /mcp + SSE) with Bearer auth, Room Graph resources & auto-bridged plugin tools"));
-        HelpPortsReference.Add(new("UDP 1900", "SSDP Auto-Discovery", "Zero-config LAN discovery for Denon/Marantz AVRs, Philips Hue Bridges & LG webOS TVs"));
-        HelpPortsReference.Add(new("HTTPS 443 / HTTP 80", "Philips Hue Bridge API", "Room/light controls, native Hue scenes & Entertainment Area discovery on local LAN"));
-        HelpPortsReference.Add(new("UDP 2100", "Hue Entertainment API v2 (DTLS)", "True 50 Hz zero-lag binary RGB streaming for FFT Music Sync"));
-        HelpPortsReference.Add(new("WSS 3001 / WS 3000", "LG webOS SSAP WebSocket", "Persistent LG Smart TV control, live subscriptions, installed apps, OLED Screen Off & Magic Remote"));
-        HelpPortsReference.Add(new("UDP 9 & 7", "Wake-on-LAN (Magic Packet)", "Multi-interface broadcast wake packet to power on LG webOS TVs from standby"));
-        HelpPortsReference.Add(new("HTTP/HTTPS 8123", "Home Assistant REST & Webhooks", "Entity sync, scene/script/switch triggering & sensor.denon_desktop_receiver telemetry"));
+        HelpPortsReference.Add(new("TCP 23", "Denon / Marantz AVR control (Telnet)", "Power, volume, inputs, sound modes, Audyssey, ECO, Zone 2 and dimmer. The receiver accepts one client at a time."));
+        HelpPortsReference.Add(new("TCP 1255", "HEOS CLI and LIVE PUSH", "Playback, volume, track data, artwork, favorites and queue, plus push events from the receiver"));
+        HelpPortsReference.Add(new("TCP 18925", "Audio relay and Phone Remote", "Streams YouTube, PC Audio Cast and jukebox files to HEOS and serves the Phone Remote. Inbound: use Allow Firewall. Change it in Settings → Relay Port."));
+        HelpPortsReference.Add(new("TCP 18926", "MCP server (HTTP)", "POST /mcp and SSE with a Bearer token. Localhost only by default. Change it in Brain → HTTP PORT."));
+        HelpPortsReference.Add(new("UDP 1900", "SSDP discovery", "Finds Denon / Marantz receivers, Philips Hue Bridges and LG webOS TVs on the LAN"));
+        HelpPortsReference.Add(new("HTTPS 443 / HTTP 80", "Philips Hue Bridge API", "Rooms, lights, Hue scenes and Entertainment Areas on the LAN"));
+        HelpPortsReference.Add(new("UDP 2100", "Hue Entertainment (DTLS)", "50 Hz light stream for Music Sync when an Entertainment Area exists"));
+        HelpPortsReference.Add(new("WSS 3001 / WS 3000", "LG webOS SSAP WebSocket", "TV control, live state, apps, inputs, Screen Off and Magic Remote. Secure 3001 first, then 3000."));
+        HelpPortsReference.Add(new("UDP 9 and 7", "Wake-on-LAN", "Broadcast wake packet that turns an LG webOS TV on from standby"));
+        HelpPortsReference.Add(new("HTTP / HTTPS 8123", "Home Assistant REST and webhooks", "Entity sync, scene / script / switch triggers and the sensor.denon_desktop_receiver state"));
+        HelpPortsReference.Add(new("TCP 8009 (TLS)", "Chromecast plugin: Cast v2", "Status and control of Chromecast and Google Cast devices"));
+        HelpPortsReference.Add(new("UDP 5353", "mDNS / DNS-SD", "The Chromecast and Apple TV plugins find devices. Windows Firewall must let the answers in."));
+        HelpPortsReference.Add(new("TCP (port from DNS-SD)", "Apple TV plugin: Companion and AirPlay", "Pairing, power, keys, apps and now playing. The Apple TV announces the ports (for example Companion 49153, AirPlay 7000)."));
+        HelpPortsReference.Add(new("HTTPS 443 (internet)", "Online services", "YouTube, the Radio Browser directory, LRCLIB lyrics and Hue cloud discovery. Device control does not need the internet."));
     }
 
     private void SeedHelpTopics()
@@ -397,26 +407,30 @@ public sealed partial class MainViewModel
             accentHex: "#00D4FF",
             category: "Getting Started",
             title: "Quick Start & First-Time Setup",
-            subtitle: "Get your Denon/Marantz AVR, LIVE PUSH, Phone Remote, and smart-home ecosystem online in 2 minutes.",
-            overview: "Denon Desktop talks directly to your Denon or Marantz AV receiver over your local Wi-Fi/Ethernet network — no cloud account required. It combines hardware AVR Telnet (:23) with real-time HEOS push events (:1255) for <50 ms response, plus a built-in LAN audio relay (:18925) and modular smart-home plugins.",
+            subtitle: "Connect your Denon or Marantz receiver, allow the firewall rule, and add the devices you use.",
+            overview: "Denon Desktop controls your Denon or Marantz AV receiver over your local network. It needs no cloud account. It uses the AVR control port (TCP 23) for power, volume, inputs and sound modes, and the HEOS port (TCP 1255) for playback and live push events. A built-in audio relay (TCP 18925) streams YouTube, PC audio and local files to the receiver and serves the Phone Remote. Plugins add Philips Hue, LG webOS TV, Home Assistant and, as separate downloads, Chromecast and Apple TV.",
             steps:
             [
-                new("01", "Connect Your Receiver", "Open Settings and click Auto-Discover Receivers (or type your AVR's LAN IP). Denon Desktop automatically detects your exact model, firmware, and HEOS player."),
-                new("02", "Verify LIVE PUSH Status", "Look at the top status pill: a green ONLINE badge plus LIVE PUSH means volume knob turns and physical remote clicks sync to your PC in under 50 ms."),
-                new("03", "Allow Windows Firewall for Audio & Phone Remote", "If you plan to play YouTube, cast PC audio, stream FLACs, or use the Couch Phone Remote, click Allow Firewall in Cast & Remote (or Settings) once so port 18925 is reachable on your private LAN."),
-                new("04", "Connect Your Ecosystem (Optional)", "Use the LIVE ECOSYSTEM quick-jump strip in the left sidebar to pair Philips Hue, your LG webOS Smart TV, or Home Assistant — all three also work in Smart Scenes & Couch Phone Remote."),
-                new("05", "Pin to System Tray", "By default, closing the window minimizes cleanly to the Windows system tray (right-click for the floating mini-flyout or Exit). Toggle Launch at Windows Startup in Settings if desired."),
+                new("01", "Let the app find your receiver", "Start Denon Desktop. On the first start it scans the LAN and connects when it finds one receiver."),
+                new("02", "Choose a receiver yourself if needed", "In Settings → NETWORK AUTO-DISCOVERY, click Scan LAN and then click your receiver in the list."),
+                new("03", "Or type the address", "In Settings → RECEIVER CONNECTION PROFILE, type the IP in Receiver IP / Host and click Save & Sync."),
+                new("04", "Check the connection", "Look at the title bar. ONLINE and the green LIVE PUSH badge show that the app gets live updates from the receiver."),
+                new("05", "Allow the firewall rule", "To use YouTube, PC Audio Cast, the jukebox or the Phone Remote, click Allow Firewall in Music or Cast once. Windows asks for permission. Click Yes."),
+                new("06", "Add your other devices (optional)", "Open Plugins and set up Philips Hue, LG webOS TV or Home Assistant. Their badges then show at the bottom of the left rail."),
+                new("07", "Choose a look (optional)", "In Settings → APPEARANCE, choose a theme and a skin. See the Appearance topic."),
             ],
             proTips:
             [
-                "Press F1 anywhere in the app (or click ? Help in the title bar) to jump straight to the guide for the exact screen or plugin you are currently using.",
-                "Click the live ecosystem pills in the left sidebar (HUE, TV, HA) from any screen to jump directly into that plugin in 1 click.",
-                "The Windows system tray icon dynamically changes color and shape to show Connected Idle, Active Playback, Muted, or Standby at a glance.",
+                "Press F1 on any page, or click Help in the left rail, to open the topic for the page or plugin you are on.",
+                "Click a device badge at the bottom of the left rail to open that plugin. The dot on the badge shows its health.",
+                "Close and Minimize send the window to the Windows tray by default. Change this in Settings → DESKTOP & TRAY BEHAVIOR. Right-click the tray icon to exit.",
+                "The tray icon changes to show playback, mute and standby.",
             ],
             troubleshooting:
             [
-                new("Receiver shows OFFLINE even though it's plugged in?", "Check that Network Control is set to 'Always On' in your Denon AVR on-screen menu (Setup → Network → Network Control → Always On), and verify PC and AVR are on the same subnet."),
-                new("Multiple Denon/Marantz devices on the network?", "Open Settings → Auto-Discover and click the exact receiver you want; Denon Desktop remembers its IP and HEOS Player ID automatically."),
+                new("The receiver shows OFFLINE but it is plugged in?", "On the receiver, set Setup → Network → Network Control to Always On. Make sure the PC and the receiver are on the same subnet."),
+                new("More than one Denon or Marantz receiver on the network?", "The app connects by itself only when it finds one. Open Settings, click Scan LAN and click the receiver you want. The app remembers its IP and HEOS player."),
+                new("Only HEOS controls work?", "Some HEOS speakers have no AVR control port (TCP 23). The app then uses HEOS for status, volume, mute and playback. Input, sound mode and acoustics need port 23."),
             ],
             quickJumps:
             [
@@ -427,29 +441,101 @@ public sealed partial class MainViewModel
             contextSection: "Settings"));
 
         _allHelpTopics.Add(new HelpGuideTopic(
+            id: "appearance",
+            badge: "LOOK",
+            accentHex: "#EC4899",
+            category: "Getting Started",
+            title: "Appearance: Themes & Skins",
+            subtitle: "Choose Follow Windows, Dark or Light, and the Default, Hi-Fi, Compact or Large skin.",
+            overview: "The theme sets the colors. The skin sets type, spacing, corners and the look of the meters. Any skin works with any theme. Both apply at once, with no restart, and the app saves your choice. The plugin pages follow the theme and the skin too.",
+            steps:
+            [
+                new("01", "Open the Appearance card", "Open Settings. The APPEARANCE card is at the top."),
+                new("02", "Choose a theme", "Click Follow Windows, Dark or Light. Follow Windows is the default. It uses light or dark as set in Windows (Settings → Personalization → Colors). The line under the buttons shows the theme in use now."),
+                new("03", "Choose a skin", "Under SKIN, click Default, Hi-Fi, Compact or Large. Default is the standard look. Hi-Fi is a rack-receiver look with square corners, display type and backlit meters. Compact has smaller type and spacing, so more fits on the screen. Large has larger type, icons and spacing, for the sofa or a touch screen."),
+                new("04", "Look at the meters", "In a dark theme the VU dials and the spectrum have dark faces. In a light theme the VU dials have cream faces with black print and a black needle, and the spectrum has a light screen with deep blue to red segments. With Hi-Fi in a light theme, the dials are ivory with an amber lamp and the segments are deep teal."),
+                new("05", "Let the window fit the skin", "When you change the skin, the main window fits itself again to the new skin and to the monitor it is on."),
+            ],
+            proTips:
+            [
+                "Use Large on a TV or a touch screen. Use Compact on a small laptop screen.",
+                "Follow Windows switches with Windows. You do not have to restart the app.",
+            ],
+            troubleshooting:
+            [
+                new("The Chromecast or Apple TV page stays dark in a light theme?", "Update the plugin. Chromecast 0.5.0 or later and Apple TV 0.4.0 or later follow the theme and the skin. Older versions keep the Dark colors and the Default sizes."),
+                new("Follow Windows shows the wrong theme?", "Follow Windows uses the Windows app mode, not the Windows mode for the taskbar. Check 'Choose your default app mode' in Windows Settings → Personalization → Colors."),
+            ],
+            quickJumps:
+            [
+                new("Open Settings → Appearance →", "Settings"),
+            ]));
+
+        _allHelpTopics.Add(new HelpGuideTopic(
+            id: "window-layout",
+            badge: "WIN",
+            accentHex: "#14B8A6",
+            category: "Getting Started",
+            title: "Window, Navigation & Status Line",
+            subtitle: "Splash screen, window size and position, the left rail, the title bar and the status line.",
+            overview: "The main window has a title bar at the top, a rail with the pages on the left, the page in the middle and a status line at the bottom. The window sizes itself to your screen and remembers where you put it.",
+            steps:
+            [
+                new("01", "First start after an install", "A splash screen shows on the first start after you install, upgrade or reinstall Denon Desktop. Later starts do not show it."),
+                new("02", "Window size on start", "The main window opens on the monitor under the mouse pointer. It sizes itself to the skin, so the Control Deck shows without scrolling where the screen is large enough. Long pages such as Settings and Help still scroll."),
+                new("03", "Skin for your screen", "On the first start with the Default skin, the app picks the Compact skin when Default would scroll on your screen, and the Large skin on a very large screen at low scaling. The status line tells you. Change it in Settings → APPEARANCE."),
+                new("04", "Move or resize the window", "Until you move or resize the window, it grows when the Control Deck grows (for example when the receiver connects). After you move or resize it, it keeps your size. The app remembers the size, the position and whether the window was maximized, for the next start."),
+                new("05", "Change the page", "Click a page in the left rail. The top group is for listening: Deck, Music, Stations, Cast. The middle group is for the room: Scenes, Plugins. The bottom group is for the system: Brain, Settings, Health, Help."),
+                new("06", "Open a device", "Click a device badge at the bottom of the rail. There is one badge for each plugin. The dot on the badge shows its health."),
+                new("07", "Use the title bar", "The title bar shows the receiver model, its name, ONLINE / STANDBY / OFFLINE and LIVE PUSH. At the right are the MCP badge (opens Brain), Phone QR (opens Cast), Refresh and the power button."),
+                new("08", "Read the status line", "The status line at the bottom shows the receiver, the last action and the last error. At the right it shows the time of the last update and the app version."),
+            ],
+            proTips:
+            [
+                "When you change the skin in Settings → APPEARANCE, the window fits itself again.",
+                "Give the app version from the status line when you report a problem. Add the text from Health → Copy Report.",
+                "Left-click the tray icon to open a small flyout with inputs, volume and stations. Double-click the tray icon to open the main window.",
+            ],
+            troubleshooting:
+            [
+                new("The window does not show after I close it?", "Close sends the window to the tray by default. Double-click the tray icon or press Ctrl + Alt + D. Turn off 'Close hides to tray' in Settings → DESKTOP & TRAY BEHAVIOR to change this."),
+            ],
+            quickJumps:
+            [
+                new("Open Settings →", "Settings"),
+            ]));
+
+        _allHelpTopics.Add(new HelpGuideTopic(
             id: "control-deck",
             badge: "DECK",
             accentHex: "#38BDF8",
             category: "Audio & Media",
-            title: "Control Deck, 31-Band RTA & Live Lyrics",
-            subtitle: "Master volume, OLED Now Playing, Analog VU vs 31-Band FFT Spectrum, synced lyrics, inputs & Zone 2.",
-            overview: "The Control Deck is your studio-grade daily console. Every hardware control updates live via HEOS LIVE PUSH and AVR Telnet, while the OLED deck visualizes live Windows WASAPI audio at 60–144 Hz VSync.",
+            title: "Control Deck, Meters & Live Lyrics",
+            subtitle: "Master volume, now playing, VU meters and 31-band spectrum, synced lyrics, inputs, sound modes and zones.",
+            overview: "The Control Deck is the main page. The left column shows what plays, with the meters, quick scenes and stations. The right column has the controls that change the receiver: volume, input, sound mode, and power and zones. All values update live from the receiver.",
             steps:
             [
-                new("01", "Master Volume & dB Display", "Drag the cyan volume slider, scroll your mouse wheel anywhere over the Volume Card (±2 steps), use Fine ±0.5 dB buttons, or click the dB readout to toggle between Relative dB (-80.0 to +18.0 dB) and 0–98 scale."),
-                new("02", "Switch Audio Visualizers (VU / RTA 31 / Both)", "On the Hero OLED Now Playing card, click the meter switcher pill to cycle between Illuminated Dual Analog VU Meters, the 31-Band ISO Real-Time FFT Spectrum Analyzer (25 Hz–16 kHz with peak hold), or Both side-by-side."),
-                new("03", "Toggle Synced Live Lyrics", "Click the Lyrics button on the OLED deck whenever a track is playing — Denon Desktop queries LRCLIB (zero API key) and highlights the current lyric line in sync with playback."),
-                new("04", "Inputs, Sound Modes, ECO & Zone 2", "Switch physical HDMI/HEOS inputs, surround modes (Stereo, Pure Direct, Dolby/DTS, Multi-Ch Stereo), ECO power saver, Sleep Timer, and independent Zone 2 power/volume directly from the deck."),
+                new("01", "Set the volume", "In MASTER VOLUME, drag the slider, click -5, -1, +1 or +5, or turn the mouse wheel over the card (2 steps for each notch)."),
+                new("02", "Change the volume scale", "Click the volume readout to switch between the 0–98 front-panel scale and dB. To make dB the default, tick Primary dB readout in Settings."),
+                new("03", "Choose the meters", "On the now-playing card, click the meter button to step through VU Meter, RTA 31 and VU + RTA. Click VU Meters: ON / OFF to show or hide them."),
+                new("04", "Read the meter badge", "DENON shows the real audio that the app streams to the receiver (PC Audio Cast, YouTube and the jukebox). SIM shows a simulation from the receiver volume for sources the app cannot hear, such as TV, HDMI or Spotify. PC shows the PC's own output while the receiver is off or idle. MUTED and IDLE show those states."),
+                new("05", "Show synced lyrics", "Click Lyrics on the now-playing card while a track plays. The app gets the lyrics from LRCLIB and marks the current line."),
+                new("06", "Change input and sound mode", "Use the INPUT SOURCE and SOUND MODE & DSP cards in the right column."),
+                new("07", "Set sleep, ECO and Zone 2", "Use the POWER & ZONES card for the SLEEP TIMER, ECO On / Auto / Off and Zone 2."),
             ],
             proTips:
             [
-                "Analog VU & 31-Band RTA automatically tap live Windows PC WASAPI audio even when you aren't actively using PC Audio Cast.",
-                "Click Phone QR in the top-right title bar at any time to grab your Couch Phone Remote QR code.",
+                "QUICK SCENES & STATIONS runs a scene or a station in one click. Low Vol starts a station at the Safety Low Volume from Settings.",
+                "The ROOM BRAIN strip shows only when the Room Doctor finds a problem. Click its fix, or Undo to go back.",
+                "During a Chromecast or Apple TV program, the now-playing card shows that program, and Play / Pause (and Space) control that device.",
+                "Click Phone QR in the title bar to show the Phone Remote QR code.",
             ],
             troubleshooting:
             [
-                new("VU meters or RTA bars aren't moving?", "Make sure audio is playing on your Windows default playback device; if playing directly on HEOS without PC audio, the meters gently idle until PC audio or Demo Beat is active."),
-                new("Lyrics say 'No synced lyrics found'?", "Some radio streams or YouTube titles with extra tags (like '[Official 4K Video]') may not match LRCLIB; clean Artist – Title tracks match best."),
+                new("The meters show SIM?", "The receiver plays a source that the app cannot hear (TV, HDMI, Bluetooth or another app). The meters then show a simulation from the receiver volume."),
+                new("YouTube or jukebox meters show SIM, not DENON?", "Real meters for YouTube and the jukebox need FFmpeg. They also wait until the analysis reaches the playing position."),
+                new("The meters move before or after the sound?", "The meters use the Cinema Offset from Settings. Run Auto-Calibrate Mic in Settings, or change Cinema Offset (ms) by hand."),
+                new("Lyrics say that no synced lyrics were found?", "Radio streams and YouTube titles with extra words (for example '[Official Video]') often do not match LRCLIB. Plain 'Artist – Title' tracks match best."),
             ],
             quickJumps:
             [
@@ -462,30 +548,35 @@ public sealed partial class MainViewModel
             badge: "YT",
             accentHex: "#EF4444",
             category: "Audio & Media",
-            title: "YouTube, Cinema Mode & Lip-Sync Calibration",
-            subtitle: "Stream YouTube audio to Denon HEOS, watch pure full-bleed synced video, and auto-calibrate lip-sync via mic.",
-            overview: "Denon Desktop resolves YouTube searches, video URLs, and full playlists directly, transcodes high-bitrate audio (320 kbps MP3 via FFmpeg or Direct M4A fallback) over your local LAN relay (:18925) straight to HEOS, and optionally opens a synced Pure-Video Cinema window on your monitor or TV.",
+            title: "YouTube, Cinema Window & Lip-Sync",
+            subtitle: "Play YouTube and YouTube Music on the receiver, watch the video in sync, and measure the delay with the PC microphone.",
+            overview: "The Music page finds YouTube songs, videos and playlists, or opens a YouTube link. The app sends the audio over the LAN relay (TCP 18925) to HEOS. With FFmpeg it sends 320 kbps MP3; without FFmpeg it sends the M4A audio directly. The Cinema window can show the video without sound, in sync with the receiver.",
             steps:
             [
-                new("01", "Search or Paste Any YouTube Link", "In YouTube & Music, type a search query or paste any YouTube video/playlist URL and press Enter. Click Play Now or + Queue to build an auto-advancing Up-Next queue."),
-                new("02", "Pure-Video Cinema Companion", "Click Open Cinema Video (or enable Auto-Open Cinema) to launch the dedicated WebView2 viewer with all YouTube UI chrome stripped. Press F11 for monitor fullscreen, H to hide the sync toolbar, and Esc to exit progressively."),
-                new("03", "1-Click Acoustic Lip-Sync Auto-Calibration", "Because HEOS buffers network audio (~1.5–3.5s), click Auto-Calibrate Sync (Mic) while your speakers are audible. Denon Desktop plays a precision 1,750 Hz 3-burst chirp through your AVR, listens via your PC mic, measures exact arrival latency in milliseconds, and saves CinemaSyncOffsetMs automatically."),
-                new("04", "Fine-Tune Sync Anytime", "Inside the Cinema toolbar, nudge sync with ±100ms / ±500ms or hit Re-Sync to Denon if you seek manually."),
+                new("01", "Search", "In Music, click Music, Videos or Playlists. Type in the search box and press Enter (or click Search / Load)."),
+                new("02", "Open a link", "Copy a YouTube or YouTube Music link and click Paste & Go."),
+                new("03", "Play or queue", "In RESULTS & TRACKS, click ▶ Play to play the audio, Video to play and open the Cinema window, or + Q to add the track to UP NEXT QUEUE. For a playlist, click Open Tracks →."),
+                new("04", "Open the Cinema window later", "Click Cinema Window in UP NEXT QUEUE, or Watch Video on the Control Deck."),
+                new("05", "Use the Cinema window", "Press F11 for fullscreen. Press H to hide the bars. Press Esc to step back: show the bars, then leave fullscreen, then close."),
+                new("06", "Measure the delay", "HEOS buffers network audio for a few seconds. With the speakers on, click Auto-Calibrate Mic in Settings → ACOUSTIC LIP-SYNC AUTO-CALIBRATION. The app plays a short 1,750 Hz chirp through the receiver, listens with the PC microphone and saves the delay as Cinema Offset (ms)."),
+                new("07", "Fine-tune the sync", "In the Cinema window, click -500ms, -100ms, +100ms or +500ms. After a manual seek, click Re-Sync to Denon."),
             ],
             proTips:
             [
-                "Want YouTube directly on your LG Smart TV screen instead of your PC monitor? Open Plugins → LG webOS TV and paste any YouTube URL into 'Cast YouTube URL / Video ID to TV'!",
-                "Completed relay stream tokens expire automatically at EOF so HEOS firmware never loops a finished song.",
+                "The same Cinema Offset also times the lyrics and the meters.",
+                "To play YouTube on the LG TV screen, open Plugins → LG webOS TV and paste the link in CAST YOUTUBE URL / VIDEO ID TO TV.",
+                "When a track ends, the app closes its stream, so HEOS does not play the same track again.",
             ],
             troubleshooting:
             [
-                new("HEOS starts loading a YouTube track then stops with no sound?", "Windows Firewall is likely blocking inbound TCP port 18925 from your AVR. Open Cast & Remote and click Allow Firewall (1-click UAC rule), then retry."),
-                new("Cinema video is slightly ahead or behind the speakers?", "Run the 1-Click Acoustic Lip-Sync Auto-Calibration or tap -500ms / +500ms on the Cinema toolbar; your calibrated offset is remembered permanently."),
+                new("HEOS starts to load a track and then stops with no sound?", "Windows Firewall blocks TCP 18925 from the receiver. Click Allow Firewall in Music or Cast, then try again."),
+                new("The video is ahead of or behind the speakers?", "Run Auto-Calibrate Mic in Settings, or click -500ms / +500ms in the Cinema window. The app remembers the offset."),
+                new("Do I need FFmpeg?", "No. Without FFmpeg the app sends M4A audio. With FFmpeg (for example 'winget install Gyan.FFmpeg') it sends 320 kbps MP3, and the meters can show the real YouTube audio."),
             ],
             quickJumps:
             [
                 new("Open YouTube & Music →", "YouTube"),
-                new("Open Cast & Firewall Helper →", "CastRemote"),
+                new("Open Settings (Lip-Sync) →", "Settings"),
             ],
             contextSection: "YouTube"));
 
@@ -494,24 +585,31 @@ public sealed partial class MainViewModel
             badge: "SCENES",
             accentHex: "#8B5CF6",
             category: "Scenes & Acoustics",
-            title: "Smart Scenes 2.0, Automations & Acoustics",
-            subtitle: "1-click multi-device macros, App Launch Watchers, Night Guard schedules, and live Audyssey tuning.",
-            overview: "Smart Scenes 2.0 turn your Denon AVR, Philips Hue lights, LG webOS TV, and Home Assistant into one coordinated home-theater rig — triggered manually, by keyboard shortcut, from your phone, by launching a PC app, or on a schedule.",
+            title: "Smart Scenes, Automations & Acoustics",
+            subtitle: "Scenes that set several devices, rules that run on an app start or a schedule, and live Audyssey and tone settings.",
+            overview: "A Smart Scene sets the receiver (power, volume, input, sound mode) and can run plugin actions in order, for example on Philips Hue, the LG TV or Home Assistant. You can run a scene from the app, a hotkey, the Phone Remote, an automation rule or an AI agent.",
             steps:
             [
-                new("01", "Activate or Customize Smart Scenes", "Open Scenes & Acoustics to run presets like Movie Night, Late Night, Pure Hi-Fi, Morning Jazz, or Party Multi-Ch. Click Capture Live AVR inside the Scene Editor to snapshot your receiver's current volume, input, and sound mode."),
-                new("02", "Chain Plugin Actions With Delays", "Inside the Scene Editor, attach ordered plugin actions with millisecond delays — for example: Movie Night → LG TV HDMI 2 (0 ms) → Philips Hue Cinema Dim (300 ms) → Home Assistant Close Blinds (500 ms)."),
-                new("03", "Build Automation Rules (App Watchers & Night Guard)", "Switch to the Automation Rules sub-tab to add App Launch Watchers (e.g., launching vlc, Plex, or a game automatically activates Movie Night) or Time-of-Day / Night Guard Schedules (Daily / Weekdays / Weekends) with Test Run and a live Activity Log."),
-                new("04", "Live Acoustic Tuning Console", "Dial in Audyssey MultEQ, Dynamic EQ, Dynamic Volume, Audio Restorer, Front Panel Dimmer, Subwoofer & Dialog Level trims, and Bass/Treble tone directly over Telnet :23."),
+                new("01", "Run a scene", "In Scenes, click ▶ Activate on a scene. The app has Movie Night, Late Night, Pure Hi-Fi, Morning Jazz and Party Multi-Ch."),
+                new("02", "Save the current receiver state", "Click Capture Live. The app saves the input, sound mode, volume and acoustics as a new scene."),
+                new("03", "Edit a scene", "Click Edit on a scene and change the fields in SCENE EDITOR."),
+                new("04", "Add plugin actions", "In PLUGIN ACTION CHAIN, click + Step for each action. Set a delay in milliseconds for each step."),
+                new("05", "Save the scenes", "Click Save Scenes."),
+                new("06", "Add an automation rule", "Click Automation Rules. Click + App Trigger to run a scene when a program starts, or + Schedule to run it at a time on Daily, Weekdays or Weekends."),
+                new("07", "Test and save the rules", "Click Test to run a rule now. Click Save Automations to keep your changes. AUTOMATION ACTIVITY LOG shows what ran."),
+                new("08", "Tune the acoustics", "In Smart Scenes & Acoustics → LIVE ACOUSTIC TUNING & AUDYSSEY, set MultEQ, Dynamic EQ, Dynamic Volume, Audio Restorer, the display dimmer, Subwoofer and Dialog levels, and Bass and Treble. Click Sync from AVR to read the values from the receiver."),
             ],
             proTips:
             [
-                "Any Smart Scene can be bound to a system-wide Windows Hotkey in Settings → Keyboard Shortcuts (+ Scene Key) or triggered from the Couch Phone Remote.",
-                "Enable 'Show on-screen TV toast on Smart Scenes' in the LG TV plugin to get a slick confirmation banner right on your TV screen whenever a scene fires.",
+                "Give a scene a global hotkey: Settings → SHORTCUT EDITOR & COLLISION CHECKER → + Scene Key.",
+                "Tick 'Show on-screen TV toast on Smart Scenes' in the LG TV plugin to see a message on the TV when a scene runs.",
+                "In an App Trigger, type process names without .exe, separated by commas (for example vlc, mpv, Plex).",
             ],
             troubleshooting:
             [
-                new("App Launch Watcher didn't fire twice in a row?", "Watchers are edge-triggered with a cooldown so they don't spam your receiver while an app stays open. Use the Test Run button to verify any rule immediately."),
+                new("An app trigger did not run a second time?", "A rule runs once when the program starts and then waits for its Cooldown (seconds). Click Test to check a rule at once."),
+                new("A plugin step fails with 'Missing … parameter'?", "The scene editor cannot set action parameters yet. Use an action that needs no parameter, or run the action from MCP."),
+                new("Bass and Treble do not change?", "The receiver turns off tone control while Dynamic EQ is ON."),
             ],
             quickJumps:
             [
@@ -525,24 +623,30 @@ public sealed partial class MainViewModel
             badge: "CAST",
             accentHex: "#06B6D4",
             category: "Audio & Media",
-            title: "Couch Phone Remote 2.0, PC Cast & FLAC Jukebox",
-            subtitle: "Control Denon + Hue + LG TV from any phone on Wi-Fi, cast live Windows audio, and stream bit-perfect local FLACs.",
-            overview: "Denon Desktop hosts an Obsidian mobile web app and audio relay right on your PC (:18925). Anyone on your home Wi-Fi can scan the QR code — no app store install required — to control volume, inputs, scenes, YouTube queue, Philips Hue lights, and Smart TV actions.",
+            title: "Phone Remote, PC Audio Cast & Jukebox",
+            subtitle: "Control the room from a phone on your Wi-Fi, send the PC's audio to the receiver, and play local files.",
+            overview: "The app serves a web remote from this PC (TCP 18925). A phone on the same Wi-Fi opens it from a QR code. It needs no app install. The Cast page also sends live Windows audio to HEOS and plays local music files.",
             steps:
             [
-                new("01", "Open Couch Phone Remote (QR Code)", "Click Phone QR in the title bar (or go to Cast & Remote) and scan the QR code with your phone camera. Use the Control, Queue, and Lights tabs to run your whole room from the couch."),
-                new("02", "Cast Any PC Audio (WASAPI Loopback)", "Pick your Windows audio output device, choose MP3 320 kbps or Lossless WAV, and click Start Casting PC Audio. Everything playing on your PC (Spotify, games, browsers, DAWs) streams wirelessly to HEOS."),
-                new("03", "Local Hi-Res FLAC Jukebox", "Drag and drop .flac, .wav, .mp3, or .m4a files (or whole folders) onto the Local Jukebox drop zone to play bit-perfect audio directly on your Denon AVR."),
-                new("04", "One-Click Windows Firewall Rule", "If your phone can't load the QR URL or HEOS can't reach the stream, click Allow Firewall once to open private-network inbound TCP port 18925."),
+                new("01", "Open the Phone Remote", "Click Phone QR in the title bar, or open Cast."),
+                new("02", "Choose the access", "Click Owner QR for full control, or Guest QR for a guest who can only search and queue YouTube tracks."),
+                new("03", "Scan the code", "Scan the QR code with the phone camera. The phone remote has the tabs Remote, Lights, Jukebox and Stations."),
+                new("04", "Remove old access", "Click Revoke & Rotate to make new codes. Phones with the old code lose access. Active streams continue."),
+                new("05", "Cast PC audio", "In CAST PC AUDIO TO DENON, choose the Windows output device, click MP3 320 kbps or PCM 16-bit WAV, and click ▶ Start PC Audio Cast."),
+                new("06", "Play local files", "Drag files or folders onto LOCAL HI-RES / FLAC JUKEBOX, or click + Add Files or + Add Folder. Then click ▶ Play All."),
             ],
             proTips:
             [
-                "Bookmark the Phone Remote URL on your iPhone/Android home screen for an instant native-like Couch Remote icon.",
-                "PC Audio Cast includes automatic silence keepalive so HEOS never drops the stream when you pause a video on your PC.",
+                "Click Remote: ON / OFF to turn phone control off. Streams to the receiver keep working.",
+                "Add the Phone Remote page to the phone home screen for quick access.",
+                "PC Audio Cast sends silence while nothing plays, so HEOS keeps the stream open.",
+                "MP3 casting needs FFmpeg. PCM 16-bit WAV works without it.",
+                "The jukebox plays .flac, .wav, .mp3, .m4a, .aac, .ogg and .opus files.",
             ],
             troubleshooting:
             [
-                new("Phone shows 'This site can't be reached' after scanning QR?", "Verify your phone is on the same Wi-Fi LAN (not Guest Wi-Fi or cellular), ensure Windows Firewall allows port 18925, and check that the correct LAN IP is selected if your PC has VPN/WSL adapters."),
+                new("The phone shows 'This site can't be reached'?", "Put the phone on the same Wi-Fi as the PC (not a guest network or mobile data). Click Allow Firewall once. If the PC has VPN or WSL adapters, check that the URL uses the PC's LAN IP."),
+                new("The phone shows 'Remote Disabled'?", "Phone control is off. Click Remote: OFF on the Cast page to turn it on."),
             ],
             quickJumps:
             [
@@ -555,22 +659,26 @@ public sealed partial class MainViewModel
             badge: "RADIO",
             accentHex: "#F59E0B",
             category: "Audio & Media",
-            title: "40,000+ Global Radio Explorer & Favorites",
-            subtitle: "Discover lossless FLAC internet radio stations, manage custom presets, and play HEOS favorites.",
-            overview: "Explore over 40,000 live global stations via Radio Browser with instant genre, country, and FLAC/Hi-Res filtering — or play your receiver's built-in HEOS favorites and custom stream URLs.",
+            title: "Radio Stations, Presets & HEOS Favorites",
+            subtitle: "Search the Radio Browser directory, save presets, play any stream URL, and load the receiver's HEOS favorites.",
+            overview: "The Stations page has two tabs. Saved Presets & Direct Stream holds your own stations, a stream launcher and the receiver's HEOS favorites. Global Radio Explorer searches the open Radio Browser directory of internet radio.",
             steps:
             [
-                new("01", "Search Global Radio Browser", "Open Stations & Streams, type a genre, city, or station name (e.g. 'jazz', 'lo-fi', 'BBC'), optionally tick FLAC / Hi-Res Only, and press Enter."),
-                new("02", "Play or Save to Your Presets", "Click Play directly on any discovered station, or click Save Preset to pin it to your custom Stations list with one-click Low-Volume Launch and Stream Health Probe."),
-                new("03", "Sync Receiver HEOS Favorites", "Click Load HEOS Favorites to pull the native favorites already saved on your Denon/Marantz receiver."),
+                new("01", "Search the directory", "Click Global Radio Explorer (40,000+). Type a station name, a genre or a country, and click Search Directory. Or click a genre chip."),
+                new("02", "Find high-quality streams", "Tick Hi-Res (256k+ / FLAC) only before you search."),
+                new("03", "Play or save a station", "Click ▶ Play to play a station, or + Save to add it to your presets."),
+                new("04", "Edit your presets", "Click Saved Presets & Direct Stream. Change names or URLs, use ↑ and ↓ to sort, and click Save Changes. Click + Add Station for a new one."),
+                new("05", "Play a stream URL", "In DIRECT STREAM LAUNCHER, paste the URL and click ▶  Stream Now. Click Test URL to check it first."),
+                new("06", "Load the HEOS favorites", "In RECEIVER HEOS FAVORITES, click Load from Receiver."),
             ],
             proTips:
             [
-                "Use Play @ Low Vol when starting late-night radio so you never get blasted if the receiver was left loud from a movie.",
+                "Tick 'Apply safety low volume on stream launch' so late-night radio does not start loud. Set the level in Settings → Safety Low Volume.",
+                "On the Control Deck, Low Vol starts a preset at the safety low volume.",
             ],
             troubleshooting:
             [
-                new("A radio URL fails to play on HEOS?", "Click Test Stream to probe the HTTP status & content-type. Some stations use HTTPS redirects or HLS playlists that older HEOS firmware can't decode directly — try an MP3/AAC/FLAC direct stream."),
+                new("A station does not play on HEOS?", "Click Test on the preset. It checks the HTTP status and the stream type. Some stations use HTTPS redirects or HLS playlists that older HEOS firmware cannot play. Try a direct MP3, AAC or FLAC stream."),
             ],
             quickJumps:
             [
@@ -583,25 +691,30 @@ public sealed partial class MainViewModel
             badge: "HUE",
             accentHex: "#F59E0B",
             category: "Plugins",
-            title: "Philips Hue Lighting & 50 Hz DTLS Music Sync",
-            subtitle: "Bridge pairing, All Lights & Rooms, 4-mode real-time FFT Music Sync (50 Hz Entertainment API v2) & AVR hooks.",
-            overview: "The built-in Philips Hue plugin connects directly over your local LAN to your Hue Bridge (HTTPS v1 + CLIP v2 Entertainment API over DTLS/UDP port 2100) for instant room/light control, album-art ambience, and true 50 Hz beat-reactive lighting.",
+            title: "Philips Hue Lighting & Music Sync",
+            subtitle: "Pair the bridge, control rooms and lights, run Music Sync, and link the lights to the receiver.",
+            overview: "The built-in Philips Hue plugin talks to your Hue Bridge on the LAN. It controls rooms, lights and Hue scenes. Music Sync makes the lights follow the music. With a Hue Entertainment Area it streams at 50 Hz over DTLS (UDP 2100); without one it uses the normal LAN API.",
             steps:
             [
-                new("01", "Discover & Pair Your Hue Bridge", "Open Plugins → Philips Hue (click Bridge Setup ▾ if collapsed), click Auto-Discover, press the physical round link button on top of your Hue Bridge, and click Press Bridge Button & Pair within 30 seconds."),
-                new("02", "Control All Lights, Rooms & Mood Swatches", "The All Lights chip is selected by default so every bulb on your bridge appears immediately. Click any Room chip to filter, drag brightness/warmth sliders smoothly, or tap Ambience Presets and native Hue Bridge Scenes."),
-                new("03", "Enable 50 Hz Real-Time FFT Music Sync", "Create an Entertainment Area in the Philips Hue mobile app, then click Start Music Sync in Denon Desktop. It automatically activates 50 Hz DTLS/UDP (:2100) streaming across 4 modes: Bass Pulse, Spectrum Split, Album-Art Ambient, and Cinema Subtle."),
-                new("04", "Turn On Denon AVR Lighting Automations", "Pick your Target Room and toggle Sync with Smart Scenes, Power ON/Standby sync, or Cinema Pause Lights (brightens gently to 55% on Pause, dims back to 18% on Resume)."),
+                new("01", "Open the plugin", "Open Plugins → Philips Hue. If the setup row is hidden, click Bridge Setup ▾."),
+                new("02", "Find the bridge", "Click Auto-Discover, or type the BRIDGE IP."),
+                new("03", "Press the bridge button", "Press the round link button on top of the Hue Bridge."),
+                new("04", "Pair", "Within 30 seconds, click Press Bridge Button & Pair."),
+                new("05", "Control the lights", "In MASTER & ROOMS, the All Lights chip shows every light. Click a room chip to filter. Drag the sliders, or click an AMBIENCE PRESETS or HUE BRIDGE SCENES button."),
+                new("06", "Start Music Sync", "Choose Bass Pulse, Spectrum Split, Album-Art Ambient or Cinema Subtle, and click Start Music Sync."),
+                new("07", "Link the lights to the receiver", "In DENON AVR LIGHTING AUTOMATIONS, choose the TARGET ROOM. Tick the actions you want: lights on with the receiver, lights off in standby, Sync with Denon Smart Scenes, and Cinema Pause Lights."),
             ],
             proTips:
             [
-                "Click Simulate Beat (125 BPM) to preview the FFT spectrum meters and beat-reactive lighting live even when no music is playing.",
-                "Once paired, click Bridge Setup ▾ to keep the pairing bar tucked away while All On, All Off, and Sync stay pinned in the header.",
+                "Click Simulate Beat to test the meters and Music Sync when no music plays.",
+                "Click Try Demo Mode to try the plugin without a bridge.",
+                "Music Sync follows the audio that plays on this PC.",
+                "After pairing, click Hide Setup ▴. All On, All Off and Sync stay in the header.",
             ],
             troubleshooting:
             [
-                new("Music Sync says 'LAN REST fallback' instead of '50 Hz DTLS'?", "Make sure you have at least one Entertainment Area configured in the official Philips Hue phone app and re-pair once if your bridge key predates Entertainment clientkey capture."),
-                new("Only seeing one room's lights?", "Click the 'All Lights' chip at the top of Master & Rooms or click 'Show All Lights' in the Individual Lights header."),
+                new("Music Sync uses the LAN API, not the 50 Hz stream?", "Create an Entertainment Area in the Philips Hue phone app. If the bridge was paired with an old version, pair it again."),
+                new("Only the lights of one room show?", "Click the All Lights chip in MASTER & ROOMS, or click Show All Lights."),
             ],
             quickJumps:
             [
@@ -616,30 +729,36 @@ public sealed partial class MainViewModel
             badge: "LG TV",
             accentHex: "#38BDF8",
             category: "Plugins",
-            title: "LG webOS Smart TV 2.0 & Virtual Magic Remote",
-            subtitle: "Persistent wss://:3001 connection, dynamic apps & HDMI inputs, OLED Screen Off, eARC switcher & Magic Remote.",
-            overview: "Smart TV Control 2.0 maintains a persistent encrypted SSAP WebSocket (wss://:3001 with ws://:3000 fallback) to your LG webOS TV with live state subscriptions, full Virtual Magic Remote, PC-to-TV keyboard typing, OLED Screen Off (Audio-Only Mode), and Denon AVR eARC coordination.",
+            title: "LG webOS TV & Virtual Magic Remote",
+            subtitle: "Pair the TV, switch inputs and apps, cast YouTube links, turn the screen off, and link the TV to the receiver.",
+            overview: "The built-in Smart TV plugin keeps a WebSocket connection to your LG webOS TV (secure port 3001, then 3000). It shows the real inputs and installed apps, has a virtual Magic Remote, a live screen preview, PC-to-TV typing and Screen Off, and can follow the receiver.",
             steps:
             [
-                new("01", "Enable Network Control on Your LG TV", "On your LG TV, check Settings → General → External Devices → TV On With Mobile (Turn on via Wi-Fi/LAN = ON) and Settings → Network → LG Connect Apps = ON."),
-                new("02", "Discover, Auto-MAC & Pair", "Open Plugins → LG webOS TV, click Setup ▾ → Auto-Discover TV (or enter the TV IP and click Auto-MAC so Wake-on-LAN works automatically). Make sure the TV is powered ON, click Pair with LG TV, and press Accept on the 'Denon Desktop' TV prompt."),
-                new("03", "Launch Real Installed Apps & Cast YouTube URLs", "Once the badge turns green (LIVE • WSS :3001), your TV's real HDMI ports (with green signal dots) and every installed app load automatically. Paste any YouTube link into 'Cast YouTube URL' and press Enter to play it directly on the TV."),
-                new("04", "Use OLED Screen Off, eARC Switcher & Magic Remote", "Click OLED Screen Off to blank your OLED panel while keeping eARC music playing (zero burn-in!), switch TV audio straight to HDMI ARC/eARC, navigate with the D-Pad, or type into TV search fields from your PC keyboard."),
-                new("05", "Enable Denon AVR Coordination", "Tick Wake TV on Denon ON, Power off on Standby, Auto-Switch to HDMI ARC/eARC, Mute TV Speakers, Scene Toasts, or OLED Screen Off on Music Scenes — every toggle saves automatically."),
+                new("01", "Prepare the TV", "On the TV, turn on 'Turn on via Wi-Fi' (often in Settings → General → External Devices → TV On With Mobile) and LG Connect Apps. The menu names change with the webOS version."),
+                new("02", "Find the TV", "Open Plugins → LG webOS TV. Click Setup ▾ and then Auto-Discover TV, or type the TV LAN IP ADDRESS."),
+                new("03", "Get the MAC address", "With the TV on, click Auto-MAC. Wake-on-LAN needs the MAC address."),
+                new("04", "Pair", "Click Pair with LG TV. On the TV, accept the 'Denon Desktop' prompt."),
+                new("05", "Use inputs and apps", "When the badge shows LIVE • WSS :3001, the HDMI & EXTERNAL INPUTS and INSTALLED TV APPS load. A green dot shows an input with a signal."),
+                new("06", "Cast a YouTube link", "Paste a YouTube link or video ID in CAST YOUTUBE URL / VIDEO ID TO TV and press Enter."),
+                new("07", "Turn the screen off", "Click Screen Off to turn off the picture while the sound plays. Click Wake Screen to turn it on."),
+                new("08", "Choose the TV audio output", "In AUDIO OUTPUT, click HDMI ARC / eARC, TV Speakers, Optical Out or Bluetooth."),
+                new("09", "Link the TV to the receiver", "In DENON AVR COORDINATION, tick the actions you want, for example 'Wake TV (WoL) when Denon powers ON'. Changes save automatically."),
             ],
             proTips:
             [
-                "Press Enter directly inside the Cast YouTube URL, PC Keyboard → TV, or On-Screen Toast boxes to send without clicking a button.",
-                "If Magic Remote buttons or Installed Apps return '401 insufficient permissions' on an older pairing key, open Setup ▾ and click Re-Pair (Full Permissions) once.",
+                "In LIVE TV SCREEN & VIRTUAL TRACKPAD, click Snap Now or Auto-Refresh to see the TV screen. Click on the image to click on the TV.",
+                "Press Enter in the YouTube, keyboard, toast or URL box to send without a click.",
+                "If remote buttons or apps fail with '401 insufficient permissions', open Setup ▾ and click Re-Pair (Full Permissions).",
             ],
             troubleshooting:
             [
-                new("Wake TV (WoL) doesn't turn the TV on?", "Verify the MAC address is filled in (click Auto-MAC while the TV is awake) and confirm 'Turn on via Wi-Fi / LAN' is enabled on the LG TV."),
-                new("TV shows 'PAIRED • STANDBY' after turning it off?", "That's normal — LG TVs shut down the WebSocket in standby. Click Wake TV (WoL) and Denon Desktop automatically reconnects ~6 seconds after webOS boots."),
+                new("Wake TV (WoL) does not turn the TV on?", "Check that the MAC ADDRESS is filled in (click Auto-MAC while the TV is on). Check that 'Turn on via Wi-Fi' is on in the TV."),
+                new("The badge shows PAIRED • STANDBY after the TV turns off?", "This is normal. The TV closes the connection in standby. Click Wake TV (WoL). The plugin connects again when webOS has started."),
+                new("Pairing fails with 'Could not connect'?", "Turn the TV on (not standby). Check that it is on the same subnet and that LG Connect Apps is on."),
             ],
             quickJumps:
             [
-                new("Open LG webOS Smart TV →", "Plugins", "smart-tv"),
+                new("Open LG webOS TV →", "Plugins", "smart-tv"),
             ],
             contextSection: "Plugins",
             contextPluginId: "smart-tv"));
@@ -649,24 +768,25 @@ public sealed partial class MainViewModel
             badge: "HA",
             accentHex: "#10B981",
             category: "Plugins",
-            title: "Home Assistant REST & Webhook Bridge",
-            subtitle: "Long-Lived Access Token setup, triggering scenes/scripts/switches, and live sensor.denon_desktop_receiver telemetry.",
-            overview: "Bridge Denon Desktop directly with your Home Assistant server over local REST & Webhooks — trigger blinds, smart plugs, scenes, and scripts from Denon Desktop or your Phone Remote while publishing real-time AVR telemetry to Home Assistant.",
+            title: "Home Assistant Bridge",
+            subtitle: "Connect with a long-lived access token, trigger scenes, scripts and switches, and publish the receiver state.",
+            overview: "The built-in Home Assistant plugin connects to your Home Assistant server over its REST API. You can trigger scenes, scripts, switches and lights from Denon Desktop, Smart Scenes and the Phone Remote. The plugin can also publish the receiver state to Home Assistant as sensor.denon_desktop_receiver.",
             steps:
             [
-                new("01", "Create a Long-Lived Access Token in Home Assistant", "Open Home Assistant in your browser → click your Profile name (bottom-left) → Security tab → scroll to Long-Lived Access Tokens → click Create Token (name it 'Denon Desktop') and copy the JWT string."),
-                new("02", "Connect & Sync Entities", "In Plugins → Home Assistant, enter your URL (e.g. http://homeassistant.local:8123 or http://192.168.1.50:8123), paste the token, optionally add a Webhook ID, and click Save & Sync."),
-                new("03", "Filter & Trigger Entities", "Use the All / Scenes / Scripts / Switches / Lights chips and search box to find entities quickly. Switches and lights show a live green ON badge and toggle state immediately."),
-                new("04", "Use Live Telemetry in Home Assistant Automations", "With auto-push enabled, Denon Desktop publishes sensor.denon_desktop_receiver with state (playing/paused/standby) plus attributes: model, volume, muted, input_source, sound_mode, now_playing, and last_scene."),
+                new("01", "Make a token in Home Assistant", "In Home Assistant, click your profile (bottom left) → Security → Long-Lived Access Tokens → Create Token. Name it 'Denon Desktop' and copy it."),
+                new("02", "Connect", "In Plugins → Home Assistant, type the HOME ASSISTANT URL (for example http://homeassistant.local:8123). Paste the token in LONG-LIVED ACCESS TOKEN and click Save & Sync."),
+                new("03", "Find entities", "Use the All, Scenes, Scripts, Switches and Lights chips or the filter box. Switches and lights show their ON / OFF state."),
+                new("04", "Publish the receiver state", "Tick 'Automatically push Denon AVR Power, Volume, Input & Smart Scene events to Home Assistant'. The sensor state is playing, paused or standby. Its attributes are model, volume, muted, input_source, sound_mode, now_playing and last_scene."),
             ],
             proTips:
             [
-                "No Home Assistant server handy yet? Click Try Demo to explore virtual blinds, subwoofer smart plugs, and scenes right away.",
-                "You can also drop custom .NET 10 plugins implementing IDenonPlugin into the External Plugins folder (Plugins → Plugins Folder) and click Rescan DLLs.",
+                "No Home Assistant server yet? Click Try Demo to try virtual blinds, smart plugs and scenes.",
+                "Click Push Status to send the receiver state now.",
+                "Add a WEBHOOK ID (optional) to also send receiver events to a Home Assistant webhook.",
             ],
             troubleshooting:
             [
-                new("Save & Sync returns 401 Unauthorized?", "Make sure you copied the complete Long-Lived Access Token without extra spaces or quotes, and check that your Home Assistant URL uses the right http:// or https:// scheme and port (default :8123)."),
+                new("Save & Sync returns 401 Unauthorized?", "Copy the whole token again, with no spaces or quotes. Check that the URL has the right http:// or https:// and the port (default 8123)."),
             ],
             quickJumps:
             [
@@ -676,29 +796,114 @@ public sealed partial class MainViewModel
             contextPluginId: "home-assistant"));
 
         _allHelpTopics.Add(new HelpGuideTopic(
+            id: "plugin-chromecast",
+            badge: "GCAST",
+            accentHex: "#F59E0B",
+            category: "Plugins",
+            title: "Chromecast & Google Cast Plugin",
+            subtitle: "Separate download. Find Cast devices, see what they play, control them, and let them drive the receiver.",
+            overview: "The Chromecast plugin is not part of the app. You install it separately. It finds Chromecast and Google Cast devices on the LAN (mDNS) at start and every 10 minutes. It shows the app, title, artist, artwork, player state and volume of each device, and controls them over Cast v2 (TLS port 8009). For each device it can drive the receiver when an app starts or stops. It also writes watch sessions to the habit log.",
+            steps:
+            [
+                new("01", "Download the plugin", "Download Denon.Plugin.Chromecast-<version>.zip from the chromecast-v* release that matches your Denon Desktop release."),
+                new("02", "Install it", "Close Denon Desktop. Unzip the file to %LocalAppData%\\DenonDesktop\\plugins\\external\\Chromecast\\. Start Denon Desktop."),
+                new("03", "Open the plugin", "Open Plugins → Chromecast & Google Cast. The devices that the plugin found show as cards."),
+                new("04", "Find a device", "Click Discover now. If a device does not show, type its IP address and click Add by IP."),
+                new("05", "Control a device", "On a device card, click Play / Pause, Stop, Vol −, Vol +, Mute or Quit app."),
+                new("06", "Let the device drive the receiver", "Open Denon automation on the card. Choose what to do: power on the Denon when an app starts, a Denon input, a sound mode, a Smart Scene, Idle power-off (min), and pause the device when the Denon powers off. Click Save."),
+                new("07", "Turn automations on or off", "Use Automations enabled at the top of the page. All device automations are off by default."),
+            ],
+            proTips:
+            [
+                "When the receiver is on TV Audio and the TV shows the HDMI input of the Chromecast, the Control Deck shows the cast program and its artwork. Play / Pause and Space then control the Chromecast.",
+                "Idle power-off turns the receiver off only if it is still on the input of that device. 0 minutes means never.",
+                "Each action is also an MCP tool, for example plugin_chromecast_now_playing. Use the actions in Smart Scenes and hotkeys too.",
+                "To update the plugin, close Denon Desktop first. The loaded plugin file is in use.",
+            ],
+            troubleshooting:
+            [
+                new("No Cast devices show?", "Put the PC and the devices on the same LAN. Windows Firewall must allow inbound UDP for Denon Desktop, or the mDNS answers do not arrive. Set the network to Private. Add by IP works without mDNS."),
+                new("A speaker group does not show?", "The plugin skips Google Cast speaker groups."),
+                new("A Netflix session has no program title?", "Netflix shares only its own name over Cast. The play state is correct."),
+                new("The plugin does not load?", "Use the plugin release that matches your Denon Desktop release. They must use the same Plugin SDK."),
+            ],
+            quickJumps:
+            [
+                new("Open Chromecast Plugin →", "Plugins", "chromecast"),
+            ],
+            contextSection: "Plugins",
+            contextPluginId: "chromecast"));
+
+        _allHelpTopics.Add(new HelpGuideTopic(
+            id: "plugin-apple-tv",
+            badge: "ATV",
+            accentHex: "#64748B",
+            category: "Plugins",
+            title: "Apple TV Plugin",
+            subtitle: "Separate download. Pair once with a PIN, see what plays, control the Apple TV, and let it drive the receiver.",
+            overview: "The Apple TV plugin is not part of the app. You install it separately. It finds Apple TVs on the LAN, pairs once with the PIN that the TV shows, and shows what plays: the app, the title, series and episode, and the play state. It can play and pause, send remote buttons, open apps, and wake or sleep the Apple TV. It can drive the receiver when the Apple TV wakes or sleeps. It does not open the now-playing channel while the Apple TV sleeps, so it does not wake it.",
+            steps:
+            [
+                new("01", "Download the plugin", "Download Denon.Plugin.AppleTv-<version>.zip from the appletv-v* release that matches your Denon Desktop release."),
+                new("02", "Install it", "Close Denon Desktop. Unzip the file to %LocalAppData%\\DenonDesktop\\plugins\\external\\AppleTv\\. Start Denon Desktop."),
+                new("03", "Find the Apple TV", "Open Plugins → Apple TV and click Discover now."),
+                new("04", "Start pairing", "On the Apple TV card, click Pair. The TV shows a 4-digit PIN."),
+                new("05", "Send the PIN", "Type the PIN and click Send PIN. One pairing gives both the control link and the now-playing channel."),
+                new("06", "See what plays", "The card shows the app, the title and the play state. The Control Deck now-playing card shows the program too, with artwork when the app has it."),
+                new("07", "Control the Apple TV", "On the card, click Play / Pause, Menu, Home, Wake or Sleep."),
+                new("08", "Let the Apple TV drive the receiver", "Open Settings and Denon automation on the card. Choose what to do: power on the Denon when the Apple TV wakes, a Denon input, a sound mode, a Smart Scene on wake, Power off after sleep (min), and pause the Apple TV when the Denon powers off. Click Save."),
+            ],
+            proTips:
+            [
+                "All automations are off by default. Automations enabled at the top of the page turns them all on or off.",
+                "The now-playing card shows the Apple TV when it is on an HDMI input of the TV (receiver on TV Audio) or plugged into the receiver. Play / Pause and Space then control the Apple TV.",
+                "Power off after sleep turns the receiver off only while it is still on that input. 0 minutes means never.",
+                "To remove the pairing on the Apple TV too, open Settings › Remotes and Devices › Remote App and Devices on the Apple TV.",
+                "The actions (now-playing, play-pause, key, launch-app, power-on, power-off and more) also work in Smart Scenes, hotkeys and MCP. power-off needs the Full Orchestration tier.",
+            ],
+            troubleshooting:
+            [
+                new("No Apple TV shows?", "Put the PC and the Apple TV on the same network and click Discover now again. A firewall that drops multicast answers can hide the Apple TV."),
+                new("The card shows no duration or artwork?", "Some apps do not send them. DRTV, for example, sends no duration or position."),
+                new("Pause does nothing?", "Some apps do not accept the command, for example live channels in DRTV."),
+                new("The page keeps the Dark colors in a light theme?", "Update to Apple TV plugin 0.4.0 or later."),
+            ],
+            quickJumps:
+            [
+                new("Open Apple TV Plugin →", "Plugins", "apple-tv"),
+            ],
+            contextSection: "Plugins",
+            contextPluginId: "apple-tv"));
+
+        _allHelpTopics.Add(new HelpGuideTopic(
             id: "mcp-room-brain",
             badge: "MCP",
             accentHex: "#10B981",
             category: "Plugins",
-            title: "Streamable HTTP MCP Server & Living-Room Brain",
-            subtitle: "Connect AI agents via 2025-11-25 Streamable HTTP (/mcp), Self-Healing Room Doctor, Snapshot Undo & Habits Memory.",
-            overview: "Denon Desktop hosts a native Streamable HTTP Model Context Protocol (MCP) server (POST /mcp + SSE) paired with an always-on local Living-Room Intelligence Engine. External AI agents (Antigravity, Claude Desktop, Cursor, VS Code, n8n) gain full situational awareness of your Denon AVR, Philips Hue, LG webOS TV, Home Assistant, and local listening habits — with hard safety guardrails and 1-click Undo.",
+            title: "MCP Server & Room Brain",
+            subtitle: "Connect AI agents over Streamable HTTP (/mcp), set safety limits, and use the Room Doctor and Undo.",
+            overview: "Denon Desktop has a built-in Model Context Protocol (MCP) server (POST /mcp and SSE) on TCP 18926. AI clients such as Claude Desktop, Cursor, VS Code or Antigravity can read the room state and control the receiver, the plugins and the scenes. Safety limits and an Undo snapshot protect the room. The Room Brain also checks the devices for problems and learns your volume habits on this PC only.",
             steps:
             [
-                new("01", "Copy Client Config JSON in One Click", "Open MCP & Room Brain (from the left sidebar or the green MCP :18926 badge in the title bar) and click Copy MCP Config JSON. Paste it directly into Antigravity, Claude Desktop, Cursor, or VS Code."),
-                new("02", "Configure Safety Guardrails", "Choose a Permission Tier — Observer (Read-Only), Safe Control (no power-off or config edits), or Full Orchestration — and set your Hard Max Safe Volume Ceiling (default 65 / -15.0 dB) so no AI can ever accidentally blast your speakers."),
-                new("03", "Use the Self-Healing Room Doctor & 1-Click Undo", "Denon Desktop continuously monitors cross-device health (AVR muted while playing, late-night loud volume, LG TV video playing while Denon isn't on TV eARC, OLED screen left on during audio-only music). Fix any detected issue in 1 click or roll back any AI/atmosphere change via Restore Previous State."),
-                new("04", "Auto-Bridged Plugin Tools & Local Habits Memory", "Every enabled plugin action (Philips Hue, LG webOS TV, Home Assistant, and external drop-in DLLs) is automatically exposed as an MCP tool alongside composite tools like apply_atmosphere, create_or_update_scene, and create_automation_rule. Your preferred volumes by time of day are learned 100% locally in room-habits.json (denon://memory/habits)."),
+                new("01", "Open the page", "Click Brain in the left rail, or the MCP :18926 badge in the title bar."),
+                new("02", "Copy the client config", "Click Copy MCP Config JSON and paste it into your MCP client."),
+                new("03", "Choose a permission tier", "Click Observer (Read-Only), Safe Control (No Power Off) or Full Orchestration. The default is Full Orchestration."),
+                new("04", "Set the volume ceiling", "Set HARD MAX SAFE VOLUME CEILING (default 65). An AI agent cannot set the volume above it."),
+                new("05", "Apply the settings", "Click Save & Apply."),
+                new("06", "Check the room", "Click Run Room Doctor. It finds problems such as a muted receiver while music plays, loud volume late at night, or a TV screen on during music. Click a fix to apply it."),
+                new("07", "Undo a change", "Click Restore Previous State to go back to the state before the last AI or atmosphere change."),
             ],
             proTips:
             [
-                "By default the MCP server binds strictly to 127.0.0.1 (localhost only) with an auto-generated Bearer token — toggle Allow LAN Connections only if you want agents on another machine to connect.",
-                "Watch every incoming MCP tool call and resource read in real time inside the Live MCP Activity Feed.",
+                "By default the server listens on 127.0.0.1 only and needs the Bearer token. Tick 'Allow LAN connections' only if an agent on another PC must connect.",
+                "LIVE MCP ACTIVITY FEED shows each tool call and resource read.",
+                "Each enabled plugin action is also an MCP tool (plugin_<id>_<action>). Read-only tools work in the Observer tier. Tools that a plugin marks destructive need Full Orchestration.",
+                "Learned preferences stay on this PC in room-habits.json (denon://memory/habits).",
             ],
             troubleshooting:
             [
-                new("MCP client receives 401 Unauthorized?", "Verify the Authorization: Bearer <token> header matches your token in MCP & Room Brain (use Copy MCP Config JSON to avoid typos), or temporarily disable Require Bearer Auth for trusted localhost testing."),
-                new("Can't connect from another PC on the LAN?", "Turn on 'Allow LAN connections' in MCP & Room Brain and click Save & Apply (note: Windows requires a URLACL or running elevated once to bind '+' on non-localhost interfaces)."),
+                new("The MCP client gets 401 Unauthorized?", "The Authorization: Bearer header must match BEARER AUTH TOKEN. Use Copy MCP Config JSON to avoid typing errors. Click Regenerate only if you want a new token; then update every client."),
+                new("Another PC on the LAN cannot connect?", "Tick 'Allow LAN connections' and click Save & Apply. Windows needs a URL reservation (URLACL) or one run as administrator to listen on the LAN. Without it, the server stays on localhost."),
             ],
             quickJumps:
             [
@@ -711,23 +916,26 @@ public sealed partial class MainViewModel
             badge: "KEYS",
             accentHex: "#A855F7",
             category: "Reference",
-            title: "Keyboard Shortcuts, Global Hotkeys & Tray Flyout",
-            subtitle: "Complete shortcut reference, interactive key recorder, 4-layer collision checker, and Scene/Plugin hotkeys.",
-            overview: "Control your Denon AVR, Smart Scenes, Philips Hue lights, and LG TV from any Windows app or fullscreen game using system-wide Global Hotkeys, fast in-app shortcuts, and the floating taskbar Tray Flyout.",
+            title: "Keyboard Shortcuts, Global Hotkeys & Tray",
+            subtitle: "All shortcuts, the shortcut recorder, collision checks, scene and plugin hotkeys, and the tray flyout.",
+            overview: "In-app shortcuts work while the main window has focus. Global hotkeys work from any Windows app, also while Denon Desktop is in the tray. You can change both in Settings.",
             steps:
             [
-                new("01", "Customize Any Shortcut in Settings", "Open Settings → Keyboard Shortcuts, click any shortcut pill, and press your desired key combination. Press Esc to cancel, or Backspace / ✕ to clear."),
-                new("02", "Bind Any Smart Scene or Plugin Action", "Click + Scene Key or + Plugin Key to assign a global Windows hotkey to Movie Night, Philips Hue Music Sync, OLED Screen Off, or All Lights Off."),
-                new("03", "Check 4-Layer Collision Badges", "Denon Desktop checks every binding live for internal duplicates (CONFLICT), Win32 OS ownership (OS TAKEN), reserved Windows combos (RESERVED), and cross-scope overlap (OVERLAP)."),
-                new("04", "Use the System Tray Mini-Flyout", "Left-click the Denon Desktop tray icon anytime for an instant floating mini-controller (Power, Volume, Mute, Now Playing) without pulling up the full window."),
+                new("01", "Record a shortcut", "In Settings → SHORTCUT EDITOR & COLLISION CHECKER, click Record on a row and press the new key combination. Press Esc to cancel or Backspace to clear."),
+                new("02", "Clear a shortcut", "Click ✕ on the row."),
+                new("03", "Add a scene or plugin hotkey", "Click + Scene Key or + Plugin Key to give a global hotkey to a Smart Scene or a plugin action."),
+                new("04", "Check for collisions", "Click Check Collisions. CONFLICT means a duplicate in the app. OS TAKEN means another app has the hotkey. RESERVED means Windows or the app uses it. OVERLAP means a global and an in-app key are the same (the global key wins)."),
+                new("05", "Save", "Click Save & Sync to apply the shortcuts. Click Reset to load the defaults into the editor."),
+                new("06", "Use the tray", "Left-click the tray icon to open the flyout with inputs, volume, stations and play / stop. Double-click it to open the main window. Right-click it for the menu."),
             ],
             proTips:
             [
-                "Global hotkeys use a hidden Win32 message-only window so they keep working smoothly even when Denon Desktop is minimized to the system tray.",
+                "Ctrl + 1 .. 9, Ctrl + R and F1 are fixed. They are not in the editor.",
+                "Global hotkeys keep working while the window is in the tray.",
             ],
             troubleshooting:
             [
-                new("A Global Hotkey shows 'OS TAKEN'?", "Another running app (like NVIDIA Overlay, PowerToys, Discord, or Spotify) already registered that Win32 hotkey. Record a different modifier combo (such as Ctrl+Alt+Shift+...) to resolve it immediately."),
+                new("A global hotkey shows OS TAKEN?", "Another app (for example an overlay, PowerToys, Discord or Spotify) already uses it. Record a different combination, for example with Ctrl + Alt + Shift."),
             ],
             quickJumps:
             [
@@ -740,26 +948,29 @@ public sealed partial class MainViewModel
             badge: "NET",
             accentHex: "#F43F5E",
             category: "Troubleshooting",
-            title: "Network Ports, Firewall & Troubleshooting FAQ",
-            subtitle: "Every LAN port used by Denon Desktop, 1-click Health Check, raw Telnet/HEOS Console, and top fixes.",
-            overview: "Everything in Denon Desktop runs 100% locally on your LAN for zero latency and complete privacy. Below is every protocol & port used, plus fast fixes for the most common home-network snags.",
+            title: "Network Ports, Firewall & Troubleshooting",
+            subtitle: "The ports that Denon Desktop uses, the Health Check, the AVR / HEOS console and common fixes.",
+            overview: "Device control runs on your local network. Some features use the internet: YouTube, the Radio Browser directory, LRCLIB lyrics and Hue cloud discovery. The table below lists the ports. The Health page tests the receiver and has tools for common problems.",
             steps:
             [
-                new("01", "Run the 5-Point Automated Health Check", "Open Health & Support and click Run Health Check to test Network Reachability, AVR Telnet (:23), HEOS Engine (:1255), Audio Output Readiness, and Radio Stream health in one click."),
-                new("02", "Use the Built-In AVR / HEOS Diagnostic Console", "Need to test a raw command? In Health & Support, toggle AVR (:23) or HEOS (:1255) and run commands like SI?, MV?, or heos://player/get_players with live output."),
-                new("03", "Fix Silent Audio in One Click", "If the receiver is on but silent, click Fix Silent Audio in Health & Support to unmute, verify audible volume, and wake standby."),
-                new("04", "Inspect Logs or Copy a Diagnostic Report", "Filter live app logs by Info / Warning / Error, open the logs folder (%LocalAppData%\\DenonDesktop\\logs), or click Copy Diagnostic Report."),
+                new("01", "Run the Health Check", "In Health, click Run Health Check. It tests the network connection, the AVR control port (23), the HEOS engine (1255), the audio output and the radio stream."),
+                new("02", "Fix silent audio", "If the receiver is on but silent, click Fix Silent Audio. It wakes the receiver, selects HEOS, unmutes it and sets an audible volume."),
+                new("03", "Reconnect", "Click Reset Links to close and open the connections to the receiver again."),
+                new("04", "Send a raw command", "In ADVANCED TOOLS, click AVR (:23) or HEOS (:1255), type a command such as SI? or MV?, and click Send. The Check buttons send common queries."),
+                new("05", "Read the activity history", "In ACTIVITY HISTORY, click All, Info, Warnings or Errors, or search. Click Open Folder to open the log files."),
+                new("06", "Copy a report", "Click Copy Report to copy a health summary and the recent activity to the clipboard."),
             ],
             proTips:
             [
-                "Assign DHCP static IP reservations in your router for your Denon AVR, Philips Hue Bridge, and LG TV so their local IPs never drift after a router reboot.",
+                "Give the receiver, the Hue Bridge and the TV fixed IP addresses (DHCP reservations) in your router.",
+                "The log files are in %LocalAppData%\\DenonDesktop\\logs.",
             ],
             troubleshooting:
             [
-                new("YouTube / PC Audio Cast / Phone Remote won't connect?", "Run Allow Firewall in Cast & Remote (opens private-network TCP 18925) and confirm your Windows network profile is set to 'Private' (not 'Public')."),
-                new("AVR Telnet commands lag or fail while HEOS works?", "Denon AVRs only accept one simultaneous Telnet (:23) client. Close other Denon telnet tools or click Reset Connections in Health & Support."),
-                new("LG TV pairing fails with 'Unable to connect'?", "Ensure the TV is powered ON (not standby), on the same subnet, and LG Connect Apps is enabled in TV Settings. Denon Desktop automatically tries secure wss://:3001 first, then ws://:3000."),
-                new("Smart TV or Hue settings aren't showing up in Phone Remote?", "Check that the plugin is Enabled in Plugins & Extensions — Phone Remote's Lights tab dynamically loads all enabled plugins' actions."),
+                new("YouTube, PC Audio Cast or the Phone Remote do not connect?", "Click Allow Firewall in Music or Cast (it opens TCP 18925 on private networks). Set the Windows network profile to Private, not Public."),
+                new("AVR commands are slow or fail while HEOS works?", "The receiver accepts one Telnet (port 23) client at a time. Close other Denon remote apps, or click Reset Links in Health."),
+                new("Chromecast or Apple TV devices do not show?", "These plugins find devices with mDNS (UDP 5353). Windows Firewall must let the answers in, and the network should be Private."),
+                new("A plugin does not show on the Phone Remote?", "Check that the plugin is enabled in Plugins. The Lights tab on the phone shows the actions of enabled plugins only."),
             ],
             quickJumps:
             [

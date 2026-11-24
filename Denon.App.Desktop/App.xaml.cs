@@ -7,6 +7,7 @@ using Denon.App.Core.Mcp;
 using Denon.App.Core.Plugins;
 using Denon.App.Core.Services;
 using Denon.App.Core.Services.Metering;
+using Denon.App.Desktop.Infrastructure;
 using Denon.App.Desktop.Infrastructure.Theming;
 using Denon.App.Desktop.Services;
 using Denon.App.Desktop.ViewModels;
@@ -25,6 +26,7 @@ public partial class App : System.Windows.Application
     private const string SingleInstanceSignalName = "Local\\DenonDesktop_ActivateSignal_v2";
 
     private Mutex? _singleInstanceMutex;
+    private WindowAutoFit? _windowAutoFit;
     private EventWaitHandle? _activationSignal;
     private CancellationTokenSource? _activationListenerCts;
     private IHost? _host;
@@ -82,6 +84,11 @@ public partial class App : System.Windows.Application
             }
 
             AppDataPaths.UseRootDirectory(showcaseRoot);
+        }
+        else if (ArgValue(e.Args, "--data-root") is { } dataRoot)
+        {
+            // A separate settings, logs and plugins folder: tests a first start without touching the real one.
+            AppDataPaths.UseRootDirectory(dataRoot);
         }
 
         AppDataPaths.EnsureCreated();
@@ -144,6 +151,12 @@ public partial class App : System.Windows.Application
             ThemeManager.ApplySkin(skinArg ?? (isScreenshotMode ? ThemeManager.DefaultSkinId : settingsStore.Current.Ui.Skin));
             ThemeManager.ApplyTheme(themeArg ?? (isScreenshotMode ? "dark" : settingsStore.Current.Ui.Theme));
 
+            var startMinimized = (settingsStore.Current.Ui.StartMinimizedToTray ||
+                                  e.Args.Contains("--minimized", StringComparer.OrdinalIgnoreCase)) &&
+                                 !e.Args.Contains("--show", StringComparer.OrdinalIgnoreCase);
+            var splash = isScreenshotMode || startMinimized ? null : await ShowSplashIfNewAsync(settingsStore, e.Args);
+
+            splash?.SetStatus("Starting plugins…");
             var pluginHost = _host.Services.GetRequiredService<PluginHostService>();
             await pluginHost.InitializeAndStartAsync();
 
@@ -194,6 +207,16 @@ public partial class App : System.Windows.Application
                 window.ShowActivated = false;
                 window.Show();
 
+                // --fit: size the window as a first start does on this monitor (and pick the skin unless --skin),
+                // and write the result to fit.txt (checks the fitter without a fresh install).
+                if (e.Args.Contains("--fit", StringComparer.OrdinalIgnoreCase))
+                {
+                    System.IO.Directory.CreateDirectory(captureDir!);
+                    var report = await PlaceMainWindowAsync(window, vm, settingsStore, mayPickSkin: skinArg is null, restore: false);
+                    window.UpdateLayout();
+                    await System.IO.File.WriteAllTextAsync(System.IO.Path.Combine(captureDir!, "fit.txt"), report);
+                }
+
                 // --switch-theme <id> and --switch-skin <id>: switch live with the window open (tests the live path).
                 if (ArgValue(e.Args, "--switch-theme") is { } switchTheme)
                 {
@@ -210,6 +233,13 @@ public partial class App : System.Windows.Application
                 // --all-pages: also the pages the README does not show (checks a theme on every page).
                 var allPages = e.Args.Any(a => string.Equals(a, "--all-pages", StringComparison.OrdinalIgnoreCase));
                 await CaptureScreenshotsAsync(window, vm, captureDir!, allPages);
+
+                // --capture-splash: the splash screen as 00-splash.png.
+                if (e.Args.Contains("--capture-splash", StringComparer.OrdinalIgnoreCase))
+                {
+                    await CaptureSplashAsync(captureDir!);
+                }
+
                 await ExitApplicationAsync();
                 return;
             }
@@ -250,9 +280,13 @@ public partial class App : System.Windows.Application
 
             StartActivationSignalListener();
 
-            var startMinimized = (settingsStore.Current.Ui.StartMinimizedToTray ||
-                                  e.Args.Contains("--minimized", StringComparer.OrdinalIgnoreCase)) &&
-                                 !e.Args.Contains("--show", StringComparer.OrdinalIgnoreCase);
+            splash?.SetStatus("Opening the control deck…");
+            var placement = await PlaceMainWindowAsync(window, mainVm, settingsStore, mayPickSkin: skinArg is null, restore: true);
+            _host.Services.GetRequiredService<AppLogStore>().Info($"Main window: {placement}");
+
+            // Until the user sizes the window it grows with the deck; a skin switch refits it on its monitor.
+            _windowAutoFit = new WindowAutoFit(window, window.ControlDeckPage, settingsStore.Current.Ui.Window?.UserSized == true);
+            ThemeManager.SkinChanged += (_, _) => WindowFitter.Refit(window, window.ControlDeckPage);
 
             if (startMinimized)
             {
@@ -261,6 +295,12 @@ public partial class App : System.Windows.Application
             else
             {
                 window.Show();
+                window.Activate();
+            }
+
+            if (splash is not null)
+            {
+                await splash.FadeOutAndCloseAsync();
                 window.Activate();
             }
         }
@@ -273,6 +313,119 @@ public partial class App : System.Windows.Application
                 MessageBoxImage.Error);
             await ExitApplicationAsync();
         }
+    }
+
+    /// <summary>
+    /// Shows the splash screen on the first start after an install, upgrade or reinstall (<c>--splash</c> forces it)
+    /// and records that this install has shown it.
+    /// </summary>
+    private static async Task<SplashWindow?> ShowSplashIfNewAsync(AppSettingsStore settingsStore, string[] args)
+    {
+        var kind = SplashWindow.KindFor(settingsStore.Current.Ui.SplashShownFor, settingsStore.CreatedThisRun);
+        if (args.Contains("--splash", StringComparer.OrdinalIgnoreCase))
+        {
+            kind ??= SplashKind.Updated;
+        }
+
+        if (kind is not { } shownKind)
+        {
+            return null;
+        }
+
+        var splash = new SplashWindow(shownKind);
+        splash.Show();
+        await settingsStore.SaveWindowStateAsync(ui => ui.SplashShownFor = AppInfo.InstallStamp);
+        return splash;
+    }
+
+    /// <summary>
+    /// Gives the main window its size and place before it shows: the user's saved placement when it is still on a
+    /// monitor, else a fit to the monitor under the pointer and the skin (docs/theming.md). On the very first fit
+    /// with the Default skin, a skin that suits the screen better is picked: Compact when Default would scroll,
+    /// Large on a big screen at low scaling. Returns a line for the log.
+    /// </summary>
+    private static async Task<string> PlaceMainWindowAsync(MainWindow window, MainViewModel vm, AppSettingsStore settingsStore, bool mayPickSkin, bool restore)
+    {
+        var ui = settingsStore.Current.Ui;
+        if (restore && WindowFitter.TryRestore(window, ui.Window))
+        {
+            return $"restored {ui.Window!.Width}x{ui.Window.Height} at {ui.Window.Left},{ui.Window.Top}{(ui.Window.Maximized ? ", maximized" : string.Empty)}";
+        }
+
+        await WindowFitter.LoadContentAsync(window);
+        var monitor = WindowFitter.MonitorAtPointer();
+        var area = monitor.WorkArea;
+        var deck = window.ControlDeckPage;
+        var fit = WindowFitter.Measure(window, deck, area);
+        var picked = string.Empty;
+
+        if (mayPickSkin && ui.Window is null && ThemeManager.CurrentSkin.Id == ThemeManager.DefaultSkinId)
+        {
+            SkinInfo? better = null;
+            WindowFitter.Fit betterFit = default;
+            if (!fit.NoScroll)
+            {
+                ThemeManager.ApplySkin("compact");
+                (better, betterFit) = (ThemeManager.CurrentSkin, WindowFitter.Measure(window, deck, area));
+            }
+            else if (area.Height >= 1400 && area.Width >= 2200)
+            {
+                ThemeManager.ApplySkin("large");
+                var largeFit = WindowFitter.Measure(window, deck, area);
+                if (largeFit.NoScroll)
+                {
+                    (better, betterFit) = (ThemeManager.CurrentSkin, largeFit);
+                }
+                else
+                {
+                    ThemeManager.ApplySkin(ThemeManager.DefaultSkinId);
+                }
+            }
+
+            if (better is not null)
+            {
+                fit = betterFit;
+                picked = $", picked skin {better.Id}";
+                vm.ReportSkinPickedForScreen(better);
+                _ = settingsStore.SaveWindowStateAsync(u => u.Skin = better.Id);
+            }
+        }
+
+        WindowFitter.Place(window, monitor, fit.Width, fit.Height);
+        return $"fitted {fit.Width}x{fit.Height} on work area {area.Width}x{area.Height} at scale {monitor.Scale:0.##}" +
+               $"{(fit.NoScroll ? string.Empty : " (deck scrolls)")}{picked}";
+    }
+
+    private async Task SaveWindowPlacementAsync(System.Windows.Window window)
+    {
+        if (_host?.Services.GetService<AppSettingsStore>() is not { } store || !window.IsLoaded)
+        {
+            return;
+        }
+
+        var placement = WindowFitter.Capture(window);
+        placement.UserSized = _windowAutoFit?.UserSized == true;
+        await store.SaveWindowStateAsync(ui => ui.Window = placement);
+    }
+
+    private static async Task CaptureSplashAsync(string outputDir)
+    {
+        var splash = new SplashWindow(SplashKind.Updated) { ShowActivated = false };
+        splash.Show();
+        await Task.Delay(1100);
+        splash.UpdateLayout();
+        var width = Math.Max(1, (int)Math.Round(splash.ActualWidth));
+        var height = Math.Max(1, (int)Math.Round(splash.ActualHeight));
+        var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(width, height, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        rtb.Render(splash);
+        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(rtb));
+        await using (var file = System.IO.File.Create(System.IO.Path.Combine(outputDir, "00-splash.png")))
+        {
+            encoder.Save(file);
+        }
+
+        splash.Close();
     }
 
     /// <summary>The value after a command-line option (<c>--theme light</c>), or null.</summary>
@@ -365,6 +518,21 @@ public partial class App : System.Windows.Application
     protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
     {
         _isExiting = true;
+
+        // Sign-out or shutdown skips ExitApplicationAsync: save the window placement here (off the UI thread, bounded).
+        if (MainWindow is MainWindow window && window.IsLoaded && _host?.Services.GetService<AppSettingsStore>() is { } store)
+        {
+            var placement = WindowFitter.Capture(window);
+            placement.UserSized = _windowAutoFit?.UserSized == true;
+            try
+            {
+                Task.Run(() => store.SaveWindowStateAsync(ui => ui.Window = placement)).Wait(TimeSpan.FromSeconds(1));
+            }
+            catch
+            {
+            }
+        }
+
         base.OnSessionEnding(e);
     }
 
@@ -440,6 +608,7 @@ public partial class App : System.Windows.Application
 
         var settings = _host.Services.GetRequiredService<AppSettingsStore>().Current;
         e.Cancel = true;
+        _ = SaveWindowPlacementAsync(window);
 
         if (settings.Ui.CloseToTray)
         {
@@ -506,6 +675,17 @@ public partial class App : System.Windows.Application
         try
         {
             _activationListenerCts?.Cancel();
+            if (MainWindow is MainWindow shownWindow)
+            {
+                try
+                {
+                    await SaveWindowPlacementAsync(shownWindow).WaitAsync(TimeSpan.FromSeconds(1));
+                }
+                catch
+                {
+                }
+            }
+
             _trayIconController?.Dispose();
             _trayIconController = null;
 

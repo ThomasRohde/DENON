@@ -7,6 +7,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:controls="clr-namespace:Denon.App.Desktop.Controls"
         xmlns:views="clr-namespace:Denon.App.Desktop.Views"
+        xmlns:infra="clr-namespace:Denon.App.Desktop.Infrastructure"
         mc:Ignorable="d"
         Title="{Binding WindowTitle}"
         Width="1360"
@@ -590,6 +591,13 @@
                         BorderThickness="0,1,0,0"
                         Padding="{skin:Space 16,6}">
                     <DockPanel LastChildFill="True">
+                        <!-- The app version, at the far right: what support asks first. -->
+                        <TextBlock DockPanel.Dock="Right"
+                                   Text="{x:Static infra:AppInfo.VersionLabel}"
+                                   FontSize="{DynamicResource FontSize03}"
+                                   Foreground="{DynamicResource TextFaintBrush}"
+                                   ToolTip="Denon Desktop version"
+                                   Margin="{skin:Space 16,0,0,0}" />
                         <TextBlock DockPanel.Dock="Right"
                                    Text="{Binding LastUpdatedText}"
                                    FontSize="{DynamicResource FontSize03}"

@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-24
+
+### Added
+- **Splash screen** on the first start after an install, upgrade or reinstall: the logo, "Welcome", "Updated to version …" or "Welcome back", an animated spectrum and the start-up step. It shows for at least 2.6 seconds and fades out over the main window. It follows the theme and the skin, and it does not show when the app starts minimized to the tray.
+- **The window fits your screen.** The main window opens on the monitor under the mouse pointer, sized to the skin so the Control Deck shows without scrolling, as far as the monitor allows, and centered. On the first start with the Default skin, a small screen gets the Compact skin, and a very large screen at low scaling gets the Large skin; the status line says so. Until you move or resize the window, it grows when the deck grows (for example when the receiver connects). A skin switch refits the window. The app remembers the size, the position and the maximized state, also at Windows sign-out.
+- **Version in the status line**, at the right.
+- **Help & Guide is up to date**: new topics for Appearance (themes, skins, light meters), the window and status line, the Chromecast plugin and the Apple TV plugin. Every topic, shortcut and port was checked against the app, with the real button and page names and plain wording.
+- Start option `--data-root <folder>` (a separate settings, logs and plugins folder, to test a first start), and screenshot-mode options `--fit` and `--capture-splash`.
+
+### Fixed
+- Settings and the README said `Ctrl+1..7` switches pages; it is `Ctrl+1..9`.
+- The default Control Deck window (1360 × 920) scrolled the right-hand column; the window now fits it.
+
 ## [2.1.0] - 2026-11-24
 
 ### Changed

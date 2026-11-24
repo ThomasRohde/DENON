@@ -82,7 +82,18 @@ can bind to it by name.
 Screenshot mode: `--capture-screenshots <dir>` with `--theme <id>`, `--skin <id>`, `--switch-theme <id>` and
 `--switch-skin <id>` (start with Dark and Default, then switch live with the window open) and `--all-pages`.
 A start in a theme or skin and a live switch to it give the same pixels; only the clock and the animated
-"now playing" bars differ.
+"now playing" bars differ. `--fit` sizes the window as a first start does (and writes `fit.txt`), and
+`--capture-splash` adds the splash screen as `00-splash.png`.
+
+## Window size and skins
+
+The main window fits the skin (`Infrastructure/WindowFitter.cs`): at the skin's width (1360 DIPs × `SizeScale`) it
+finds the smallest height at which no scroll area of the Control Deck scrolls, limited to the monitor's work area,
+and centers the window. It measures before the window shows (after the deck's bindings attach), so the first
+frame has the final size. On the first start with the Default skin it picks Compact when Default would scroll,
+and Large when the work area is at least 2200 × 1400 DIPs and Large fits. `WindowAutoFit` grows the window when the
+deck grows until the user moves or resizes it; a skin switch refits it. The placement is saved in
+`Ui.Window` (`SaveWindowStateAsync`, which does not raise `SettingsChanged`).
 
 ## Palette contract
 

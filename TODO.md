@@ -101,6 +101,10 @@ Design and decisions: `docs/theming.md` (branch `theming-2.0`).
 - [x] Plugin pages follow the skin (`HostSkin` in each plugin; `HostSkin.Follow` for the code-built Chromecast and
       Apple TV pages). Screenshots checked for every skin in Dark and Large in Light, start and live switch.
 - [x] Released Chromecast plugin 0.5.0 and Apple TV plugin 0.4.0 (theme brushes read at each use, `HostSkin`).
+- [x] First start: splash screen, window fitted to the monitor and skin (Compact or Large picked on the first
+      start), auto-grow until the user sizes the window, saved placement, version in the status line, Help updated.
+- [ ] Check live on a small screen (1366 × 768 or 1920 × 1080 at 150 %) that the first start picks Compact, and on a
+      second monitor with another scale that the window opens there at the right size.
 - [ ] Check live in the installed app: tray flyout, YouTube cinema window, Chromecast and Apple TV pages in Light and
       in each skin (screenshot mode does not show them).
 - [ ] Help topic badges and scene colors are content colors (not themed): check that they read on Light.

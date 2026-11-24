@@ -77,6 +77,16 @@ public sealed partial class MainViewModel
         StatusMessage = $"{option.Label} skin.";
     });
 
+    /// <summary>
+    /// On the first start the window picked a skin that fits the screen (App.PlaceMainWindow): mark it and say so.
+    /// The setting is saved by the caller.
+    /// </summary>
+    public void ReportSkinPickedForScreen(SkinInfo skin)
+    {
+        MarkActiveSkin(skin.Id);
+        StatusMessage = $"{skin.Name} skin chosen to fit this screen. Change it in Settings → Appearance.";
+    }
+
     /// <summary>Shown under the choices: what "Follow Windows" resolves to now.</summary>
     public string ThemeSummaryText => $"Now showing: {ThemeManager.Current.Name}";
 
