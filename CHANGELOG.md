@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-11-24
+
+### Fixed
+- **Text on buttons and chips takes the control's color.** The default text style set every text to the primary text color, so the blue Play and Activate buttons showed dark text in Light. Now text inherits the color of its button, chip or window: white on the blue buttons in Light, dark ink on the cyan buttons in Dark, cyan on the active chip, and red on Delete and Factory Reset. A test keeps the color out of the default text style.
+- **README screenshots** show the button colors.
+
 ## [2.0.0] - 2026-11-24
 
 Themes and skins. The Chromecast (0.5.0 or later) and Apple TV (0.4.0 or later) plugin pages follow both live;

@@ -111,6 +111,28 @@ public sealed partial class ThemePaletteTests
     }
 
     [Fact]
+    public void Text_takes_its_color_from_its_control()
+    {
+        // A Foreground in the implicit TextBlock style beats the inherited color, so text in a button would ignore
+        // the button's Foreground (dark text on the blue primary button in Light, 2.0.0).
+        var styles = File.ReadAllText(Path.Combine(Themes, "Styles.xaml"));
+        var implicitTextStyle = ImplicitTextBlockStyle().Match(styles);
+        Assert.True(implicitTextStyle.Success, "Styles.xaml has no implicit TextBlock style");
+        Assert.DoesNotContain("Property=\"Foreground\"", implicitTextStyle.Value, StringComparison.Ordinal);
+
+        // Instead every window sets the default text color, and text inherits it.
+        var windows = XamlFiles().Where(f => File.ReadAllText(f).TrimStart().StartsWith("<Window", StringComparison.Ordinal)).ToList();
+        Assert.NotEmpty(windows);
+        Assert.All(windows, f =>
+        {
+            var text = File.ReadAllText(f);
+            var root = text[..text.IndexOf('>', StringComparison.Ordinal)];
+            Assert.True(root.Contains("Foreground=\"{DynamicResource TextPrimaryBrush}\"", StringComparison.Ordinal),
+                $"{Path.GetFileName(f)}: the window sets no Foreground, so its text would be black");
+        });
+    }
+
+    [Fact]
     public void Unknown_theme_setting_gives_dark()
     {
         Assert.Equal("dark", ThemeManager.Resolve("no-such-theme").Id);
@@ -169,4 +191,7 @@ public sealed partial class ThemePaletteTests
 
     [GeneratedRegex(@"\{StaticResource\s+([A-Za-z_][\w.]*)\s*\}")]
     private static partial Regex StaticReference();
+
+    [GeneratedRegex(@"<Style TargetType=""TextBlock"">.*?</Style>", RegexOptions.Singleline)]
+    private static partial Regex ImplicitTextBlockStyle();
 }

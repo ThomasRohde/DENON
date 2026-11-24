@@ -12,9 +12,12 @@
     <infra:NullableBoolToBrushConverter x:Key="NullableBoolToBrush" />
     <infra:SafeImageSourceConverter x:Key="SafeImageSource" />
 
-    <!-- Typography Defaults -->
+    <!--
+        Typography defaults. No Foreground here: a style setter would beat the inherited color, so text in a button
+        or chip would ignore the control's Foreground (for example white text on a primary button). Text takes its
+        color from its control or window; the windows set TextPrimaryBrush.
+    -->
     <Style TargetType="TextBlock">
-        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
         <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
         <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
     </Style>
