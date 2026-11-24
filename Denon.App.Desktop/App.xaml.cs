@@ -215,6 +215,17 @@ public partial class App : System.Windows.Application
                     var report = await PlaceMainWindowAsync(window, vm, settingsStore, mayPickSkin: skinArg is null, restore: false);
                     window.UpdateLayout();
                     await System.IO.File.WriteAllTextAsync(System.IO.Path.Combine(captureDir!, "fit.txt"), report);
+
+                    // With --switch-skin the switch happens on the Settings page, as a user does it, and the window
+                    // refits to the deck it cannot see.
+                    ThemeManager.SkinChanged += async (_, _) =>
+                    {
+                        WindowFitter.Refit(window, window.ControlDeckPage);
+                        window.UpdateLayout();
+                        await System.IO.File.AppendAllTextAsync(System.IO.Path.Combine(captureDir!, "fit.txt"),
+                            $"{Environment.NewLine}after switch to {ThemeManager.CurrentSkin.Id} on {vm.ActiveSection}: {window.ActualWidth:0}x{window.ActualHeight:0}");
+                    };
+                    vm.ActiveSection = "Settings";
                 }
 
                 // --switch-theme <id> and --switch-skin <id>: switch live with the window open (tests the live path).

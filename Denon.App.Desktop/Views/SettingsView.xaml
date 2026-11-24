@@ -31,7 +31,8 @@
                                             ToolTip="{Binding Hint}"
                                             Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
                                             Command="{Binding DataContext.SetThemeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                            CommandParameter="{Binding}" />
+                                            CommandParameter="{Binding}"
+                                            Margin="{skin:Space 0,0,8,8}" />
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -52,7 +53,8 @@
                                             ToolTip="{Binding Hint}"
                                             Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
                                             Command="{Binding DataContext.SetSkinCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                            CommandParameter="{Binding}" />
+                                            CommandParameter="{Binding}"
+                                            Margin="{skin:Space 0,0,8,8}" />
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-11-24
+
+### Fixed
+- **A skin switch on the Settings page made the window too short.** The refit measured the Control Deck while it was hidden behind Settings, found nothing to fit, and shrank the window to its minimum height. The fitter now shows the deck for the moment it measures it, so the window gets the deck's size from any page.
+- **The theme and skin chips in Settings → Appearance had no space between them.**
+
 ## [2.2.0] - 2026-11-24
 
 ### Added

@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Interop;
 using System.Windows.Media;
 using Denon.App.Core.Models;
@@ -56,6 +57,8 @@ public static class WindowFitter
         var maxHeight = Math.Max(window.MinHeight, workArea.Height - (2 * ScreenMargin));
         var width = Math.Min(maxWidth, Math.Round(DesignWidth * SkinMetrics.Current.SizeScale));
 
+        // The deck may be hidden behind another page (a skin switch in Settings): show it for the measure only.
+        using var shown = new ShownForMeasure(deck);
         if (!ShowsWithoutScroll(window, deck, width, maxHeight))
         {
             return new Fit(width, maxHeight, NoScroll: false);
@@ -201,6 +204,42 @@ public static class WindowFitter
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Makes a hidden element and its hidden ancestors visible while it is measured, then puts their visibility back
+    /// (a bound visibility is read again from its binding). Nothing renders in between.
+    /// </summary>
+    private sealed class ShownForMeasure : IDisposable
+    {
+        private readonly List<(UIElement Element, Visibility Was)> _changed = [];
+
+        public ShownForMeasure(DependencyObject element)
+        {
+            for (var node = element; node is not null and not Window; node = VisualTreeHelper.GetParent(node))
+            {
+                if (node is UIElement { Visibility: not Visibility.Visible } hidden)
+                {
+                    _changed.Add((hidden, hidden.Visibility));
+                    hidden.SetCurrentValue(UIElement.VisibilityProperty, Visibility.Visible);
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+            foreach (var (element, was) in _changed)
+            {
+                if (BindingOperations.GetBindingExpressionBase(element, UIElement.VisibilityProperty) is { } binding)
+                {
+                    binding.UpdateTarget();
+                }
+                else
+                {
+                    element.SetCurrentValue(UIElement.VisibilityProperty, was);
+                }
+            }
+        }
     }
 
     /// <summary>True when a scroll area of the shown deck has more content than room (after a layout pass).</summary>
