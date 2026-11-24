@@ -395,6 +395,7 @@ public sealed partial class MainViewModel
                 OnPropertyChanged(nameof(ShowAnalogVu));
                 OnPropertyChanged(nameof(ShowRtaSpectrum));
                 OnPropertyChanged(nameof(IsAnyAudioMeterVisible));
+                UpdateMeterCaptureRequest();
             }
         }
     }
@@ -461,25 +462,31 @@ public sealed partial class MainViewModel
     private async Task TogglePhoneRemoteEnabledAsync()
     {
         var nextEnabled = !_settingsStore.Current.Remote.Enabled;
-        _suppressNextSettingsReload = true;
-        var updated = await _settingsStore.UpdateAsync(s => s.Remote.Enabled = nextEnabled);
+        var (updated, savedToDisk) = await _settingsStore.UpdateQuietAsync(s => s.Remote.Enabled = nextEnabled);
         IsPhoneRemoteEnabled = updated.Remote.Enabled;
         UpdateRemoteQrFromRelay(_relayServer.CurrentStatus, forceRegenerate: true);
         StatusMessage = updated.Remote.Enabled
             ? "Phone Remote enabled (pairing required). Active receiver streams continue uninterrupted."
             : "Phone Remote disabled. Denon receiver audio streams remain unaffected.";
+        if (!savedToDisk)
+        {
+            StatusMessage += " It is saved with your next Save & Sync (the settings file is being recovered).";
+        }
     }
 
     private async Task RotateRemoteTokensAsync()
     {
-        _suppressNextSettingsReload = true;
-        await _settingsStore.UpdateAsync(s =>
+        var (_, savedToDisk) = await _settingsStore.UpdateQuietAsync(s =>
         {
             s.Remote.OwnerToken = RemoteAccessSettings.GeneratePairingToken("own");
             s.Remote.GuestToken = RemoteAccessSettings.GeneratePairingToken("gst");
         });
         UpdateRemoteQrFromRelay(_relayServer.CurrentStatus, forceRegenerate: true);
         StatusMessage = "Revoked all previous Owner & Guest phone pairings and generated fresh QR codes.";
+        if (!savedToDisk)
+        {
+            StatusMessage += " It is saved with your next Save & Sync (the settings file is being recovered).";
+        }
     }
 
     private void UpdateRemoteQrFromRelay(RelayStatusSnapshot snap, bool forceRegenerate = false)
@@ -826,7 +833,8 @@ public sealed partial class MainViewModel
         IsMuted: IsMuted,
         IsPcCasting: _pcAudioCastService is { IsCasting: true },
         HasPcSignal: hasPcSignal,
-        HasAppStreamFrame: hasAppStreamFrame));
+        HasAppStreamFrame: hasAppStreamFrame,
+        IsRoomMicActive: _liveAudioAnalyzer?.IsRoomMicActive ?? false));
 
     /// <summary>
     /// Synced frame for a YouTube / jukebox track that this app streams to the Denon (not during PC Cast,
@@ -841,7 +849,7 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>Measured HEOS buffer + speaker delay (Auto-Calibrate Mic), used to line meters up with the speakers.</summary>
-    private int HeosSyncDelayMs => Math.Clamp(_settingsStore.Current.Media.CinemaSyncOffsetMs, 0, 8000);
+    private int HeosSyncDelayMs => Math.Clamp(_settingsStore.CinemaSyncOffsetMs, 0, 8000);
 
     public (double Left, double Right, AudioMeterSource Source) StepVuMeterFrame(double deltaSeconds)
     {
@@ -851,7 +859,7 @@ public sealed partial class MainViewModel
         }
 
         var dt = Math.Clamp(deltaSeconds, 0.001, 0.08);
-        _liveAudioAnalyzer?.SetVuCaptureRequested(ShowVuMeters);
+        UpdateMeterCaptureRequest();
 
         var analyzerFrame = _liveAudioAnalyzer?.GetLatestFrame() ?? default;
         var hasStreamFrame = TryGetAppStreamMeterFrame(out var streamL, out var streamR);
@@ -874,6 +882,16 @@ public sealed partial class MainViewModel
                 {
                     targetL = cast.Left;
                     targetR = cast.Right;
+                }
+
+                break;
+
+            case AudioMeterSource.Room:
+                var roomFrame = _liveAudioAnalyzer?.GetLatestRoomMicFrame() ?? default;
+                if (roomFrame.IsLiveSignal)
+                {
+                    targetL = roomFrame.LeftLevel;
+                    targetR = roomFrame.RightLevel;
                 }
 
                 break;
@@ -904,7 +922,7 @@ public sealed partial class MainViewModel
         if (_vuRightLevel < 0.003) _vuRightLevel = 0;
 
         _vuSource = source;
-        _isVuLiveSignal = source is AudioMeterSource.Denon or AudioMeterSource.Pc;
+        _isVuLiveSignal = source is AudioMeterSource.Denon or AudioMeterSource.Room or AudioMeterSource.Pc;
         return (_vuLeftLevel, _vuRightLevel, _vuSource);
     }
 

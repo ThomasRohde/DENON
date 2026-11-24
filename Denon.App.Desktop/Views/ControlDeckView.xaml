@@ -208,7 +208,8 @@
 
                         <Button Command="{Binding PlayPauseCommand}"
                                 Style="{StaticResource HeroPlayCircleButton}"
-                                ToolTip="Play / Pause (Space)"
+                                ToolTip="{Binding PlayPauseToolTip}"
+                                ToolTipService.ShowOnDisabled="True"
                                 Margin="{skin:Space 0,0,8,0}">
                             <Grid>
                                 <!-- Play Icon -->
@@ -351,8 +352,8 @@
                                                 Padding="{skin:Space 10,6}"
                                                 Margin="{skin:Space 0,0,7,7}">
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Border Background="{Binding AccentBrush}" CornerRadius="{DynamicResource Radius01}" Padding="{skin:Space 5,1.5}" Margin="{skin:Space 0,0,7,0}">
-                                                    <TextBlock Text="{Binding Badge}" FontSize="{DynamicResource FontSize01}" FontWeight="Black" Foreground="{DynamicResource TextOnAccentBrush}" />
+                                                <Border Background="{Binding AccentBrush}" BorderBrush="{DynamicResource BorderHairlineBrush}" BorderThickness="1" CornerRadius="{DynamicResource Radius01}" Padding="{skin:Space 5,1.5}" Margin="{skin:Space 0,0,7,0}">
+                                                    <TextBlock Text="{Binding Badge}" FontSize="{DynamicResource FontSize01}" FontWeight="Black" Foreground="{Binding BadgeForegroundBrush}" />
                                                 </Border>
                                                 <TextBlock Text="{Binding Name}" FontSize="{DynamicResource FontSize06}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                                             </StackPanel>
@@ -408,7 +409,7 @@
                                                     <TextBlock Text="{Binding Monogram}"
                                                                FontSize="{DynamicResource FontSize06}"
                                                                FontWeight="Black"
-                                                               Foreground="{DynamicResource TextOnAccentBrush}"
+                                                               Foreground="{Binding BadgeForegroundBrush}"
                                                                HorizontalAlignment="Center"
                                                                VerticalAlignment="Center" />
                                                 </Border>

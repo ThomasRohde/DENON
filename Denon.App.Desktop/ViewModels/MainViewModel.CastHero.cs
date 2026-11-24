@@ -14,13 +14,40 @@ public sealed partial class MainViewModel
     private string _castArtUrl = string.Empty;
     private DateTimeOffset _castArtFetchedUtc = DateTimeOffset.MinValue;
     private bool _isTransportPlaying;
+    private bool _canPauseTransport = true;
 
     /// <summary>Play/pause icon state: the cast's state while the hero shows a cast, else the HEOS state.</summary>
     public bool IsTransportPlaying
     {
         get => _isTransportPlaying;
-        private set => SetProperty(ref _isTransportPlaying, value);
+        private set
+        {
+            if (SetProperty(ref _isTransportPlaying, value))
+            {
+                PlayPauseCommand?.NotifyCanExecuteChanged();
+                OnPropertyChanged(nameof(PlayPauseToolTip));
+            }
+        }
     }
+
+    /// <summary>False when the active streamer (for example live DRTV on Apple TV) reports pause unsupported.</summary>
+    public bool CanPauseTransport
+    {
+        get => _canPauseTransport;
+        private set
+        {
+            if (SetProperty(ref _canPauseTransport, value))
+            {
+                PlayPauseCommand?.NotifyCanExecuteChanged();
+                OnPropertyChanged(nameof(PlayPauseToolTip));
+            }
+        }
+    }
+
+    public string PlayPauseToolTip =>
+        IsTransportPlaying && !CanPauseTransport
+            ? "Pause is not supported for this live stream"
+            : "Play / Pause (Space)";
 
     /// <summary>
     /// Remembers the cast the hero shows, sets the transport state, and adds the cast artwork when it is known.
@@ -30,6 +57,7 @@ public sealed partial class MainViewModel
     {
         _heroCast = resolved.Cast;
         IsTransportPlaying = resolved.Cast?.IsPlaying ?? IsPlaying;
+        CanPauseTransport = resolved.CanPause;
 
         if (resolved.Cast is not { } cast)
         {
@@ -96,6 +124,12 @@ public sealed partial class MainViewModel
     /// <summary>Play/pause for the Chromecast or Apple TV the hero shows (explicit play or pause, from the known state).</summary>
     private async Task PlayPauseCastAsync(CastNowPlaying cast)
     {
+        if (cast.IsPlaying && !cast.CanPause)
+        {
+            StatusMessage = $"Pause is not supported for {cast.Title ?? cast.App} on {cast.DeviceName}.";
+            return;
+        }
+
         var action = cast.IsPlaying ? "pause" : "play";
         try
         {

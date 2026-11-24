@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows.Media;
 using Denon.App.Core.Models;
 using Denon.App.Desktop.Infrastructure;
+using Denon.App.PluginSdk;
 using Brush = System.Windows.Media.Brush;
 using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
@@ -71,6 +72,7 @@ public sealed class ScenePresetEditor : ObservableObject
             if (SetProperty(ref _accentHex, value))
             {
                 OnPropertyChanged(nameof(AccentBrush));
+                OnPropertyChanged(nameof(BadgeForegroundBrush));
             }
         }
     }
@@ -79,19 +81,29 @@ public sealed class ScenePresetEditor : ObservableObject
     {
         get
         {
-            try
-            {
-                var color = (Color)ColorConverter.ConvertFromString(string.IsNullOrWhiteSpace(AccentHex) ? "#00D4FF" : AccentHex);
-                var brush = new SolidColorBrush(color);
-                brush.Freeze();
-                return brush;
-            }
-            catch
-            {
-                var fallback = new SolidColorBrush(Color.FromRgb(0, 212, 255));
-                fallback.Freeze();
-                return fallback;
-            }
+            var brush = new SolidColorBrush(ResolveAccentColor());
+            brush.Freeze();
+            return brush;
+        }
+    }
+
+    public Brush BadgeForegroundBrush => BadgeContrastHelper.PickThemeForegroundBrush(ResolveAccentColor());
+
+    public void RefreshThemeBrushes()
+    {
+        OnPropertyChanged(nameof(AccentBrush));
+        OnPropertyChanged(nameof(BadgeForegroundBrush));
+    }
+
+    private Color ResolveAccentColor()
+    {
+        try
+        {
+            return (Color)ColorConverter.ConvertFromString(string.IsNullOrWhiteSpace(AccentHex) ? "#00D4FF" : AccentHex);
+        }
+        catch
+        {
+            return Color.FromRgb(0, 212, 255);
         }
     }
 
@@ -245,7 +257,7 @@ public sealed class ScenePresetEditor : ObservableObject
         set => SetProperty(ref _isActivating, value);
     }
 
-    public ObservableCollection<ScenePluginActionStep> PluginActions { get; } = [];
+    public ObservableCollection<ScenePluginActionStepEditor> PluginActions { get; } = [];
 
     public bool HasPluginActions => PluginActions.Count > 0;
 
@@ -317,7 +329,9 @@ public sealed class ScenePresetEditor : ObservableObject
         }
     }
 
-    public static ScenePresetEditor FromModel(ScenePreset model)
+    public static ScenePresetEditor FromModel(
+        ScenePreset model,
+        Func<string, string, IReadOnlyList<PluginActionParameter>?>? parameterLookup = null)
     {
         var editor = new ScenePresetEditor
         {
@@ -348,7 +362,8 @@ public sealed class ScenePresetEditor : ObservableObject
         {
             foreach (var step in model.PluginActions)
             {
-                editor.PluginActions.Add(step.Clone());
+                var descriptors = parameterLookup?.Invoke(step.PluginId, step.ActionId);
+                editor.PluginActions.Add(ScenePluginActionStepEditor.FromModel(step, descriptors));
             }
         }
 
@@ -384,7 +399,7 @@ public sealed class ScenePresetEditor : ObservableObject
             SubwooferTrimDb = TryParseNullableInt(SubwooferTrimText),
             DialogTrimDb = TryParseNullableInt(DialogTrimText),
             StreamUrl = NullIfEmpty(StreamUrl),
-            PluginActions = PluginActions.Select(static s => s.Clone()).ToList(),
+            PluginActions = PluginActions.Select(static s => s.ToModel()).ToList(),
         };
 
     private static string? NullIfEmpty(string? value) =>

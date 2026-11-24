@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using Denon.App.Core.Models;
 using Denon.App.Core.Services;
 using Denon.App.Desktop.Infrastructure;
+using Denon.App.PluginSdk;
 
 namespace Denon.App.Desktop.ViewModels;
 
@@ -22,8 +23,14 @@ public sealed partial class MainViewModel
     private PluginActionChoice? _shortcutPluginActionToAdd;
 
     public ObservableCollection<PluginActionChoice> AvailablePluginActions { get; } = [];
+    public ObservableCollection<PluginActionParameterEditor> PendingSceneActionParameters { get; } = [];
+    public ObservableCollection<PluginActionParameterEditor> PendingRuleActionParameters { get; } = [];
     public ObservableCollection<AutomationRuleEditor> AutomationRules { get; } = [];
     public ObservableCollection<string> AutomationActivityLog { get; } = [];
+
+    public bool HasPendingSceneActionParameters => PendingSceneActionParameters.Count > 0;
+
+    public bool HasPendingRuleActionParameters => PendingRuleActionParameters.Count > 0;
 
     public IReadOnlyList<string> ScheduleDayOptions { get; } = ["Daily", "Weekdays", "Weekends"];
 
@@ -72,7 +79,14 @@ public sealed partial class MainViewModel
     public PluginActionChoice? SelectedScenePluginAction
     {
         get => _selectedScenePluginAction;
-        set => SetProperty(ref _selectedScenePluginAction, value);
+        set
+        {
+            if (SetProperty(ref _selectedScenePluginAction, value))
+            {
+                RebuildPendingParameters(PendingSceneActionParameters, value?.DeclaredParameters);
+                OnPropertyChanged(nameof(HasPendingSceneActionParameters));
+            }
+        }
     }
 
     public string SceneActionDelayMsText
@@ -84,7 +98,14 @@ public sealed partial class MainViewModel
     public PluginActionChoice? SelectedRulePluginAction
     {
         get => _selectedRulePluginAction;
-        set => SetProperty(ref _selectedRulePluginAction, value);
+        set
+        {
+            if (SetProperty(ref _selectedRulePluginAction, value))
+            {
+                RebuildPendingParameters(PendingRuleActionParameters, value?.DeclaredParameters);
+                OnPropertyChanged(nameof(HasPendingRuleActionParameters));
+            }
+        }
     }
 
     public string RuleActionDelayMsText
@@ -170,18 +191,32 @@ public sealed partial class MainViewModel
         var prevRuleKey = SelectedRulePluginAction is null ? null : $"{SelectedRulePluginAction.PluginId}:{SelectedRulePluginAction.ActionId}";
         var prevShortcutKey = ShortcutPluginActionToAdd is null ? null : $"{ShortcutPluginActionToAdd.PluginId}:{ShortcutPluginActionToAdd.ActionId}";
 
-        AvailablePluginActions.Clear();
-        foreach (var plugin in _pluginHost.GetPlugins())
+        // PluginsChanged also fires for plain status reports. Keep what the user is typing in the parameter
+        // fields: clearing the list clears the selections, and that rebuilds the fields empty.
+        var fresh = _pluginHost.GetPlugins()
+            .SelectMany(plugin => plugin.Actions.Select(action => new PluginActionChoice(
+                plugin.Id,
+                plugin.Name,
+                action.ActionId,
+                action.DisplayName,
+                $"{plugin.Name}: {action.DisplayName}",
+                action.Parameters)))
+            .ToList();
+
+        // Most PluginsChanged events are status reports with the same actions: leave the lists (and the field
+        // being typed in) alone.
+        if (fresh.Select(ActionSignature).SequenceEqual(AvailablePluginActions.Select(ActionSignature)))
         {
-            foreach (var action in plugin.Actions)
-            {
-                AvailablePluginActions.Add(new PluginActionChoice(
-                    plugin.Id,
-                    plugin.Name,
-                    action.ActionId,
-                    action.DisplayName,
-                    $"{plugin.Name}: {action.DisplayName}"));
-            }
+            return;
+        }
+
+        var sceneDraft = SnapshotPendingParameters(PendingSceneActionParameters);
+        var ruleDraft = SnapshotPendingParameters(PendingRuleActionParameters);
+
+        AvailablePluginActions.Clear();
+        foreach (var choice in fresh)
+        {
+            AvailablePluginActions.Add(choice);
         }
 
         SelectedScenePluginAction = AvailablePluginActions.FirstOrDefault(a => $"{a.PluginId}:{a.ActionId}" == prevSceneKey)
@@ -190,6 +225,84 @@ public sealed partial class MainViewModel
                                    ?? AvailablePluginActions.FirstOrDefault();
         ShortcutPluginActionToAdd = AvailablePluginActions.FirstOrDefault(a => $"{a.PluginId}:{a.ActionId}" == prevShortcutKey)
                                     ?? AvailablePluginActions.FirstOrDefault();
+
+        if (SelectedScenePluginAction is { } scene && $"{scene.PluginId}:{scene.ActionId}" == prevSceneKey)
+        {
+            RestorePendingParameters(PendingSceneActionParameters, sceneDraft);
+        }
+
+        if (SelectedRulePluginAction is { } rule && $"{rule.PluginId}:{rule.ActionId}" == prevRuleKey)
+        {
+            RestorePendingParameters(PendingRuleActionParameters, ruleDraft);
+        }
+
+        SyncPluginActionDescriptors();
+    }
+
+    private IReadOnlyList<PluginActionParameter>? FindPluginActionParameters(string pluginId, string actionId) =>
+        AvailablePluginActions
+            .FirstOrDefault(a =>
+                string.Equals(a.PluginId, pluginId, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(a.ActionId, actionId, StringComparison.OrdinalIgnoreCase))
+            ?.DeclaredParameters;
+
+    private void SyncPluginActionDescriptors()
+    {
+        foreach (var scene in ScenePresets)
+        {
+            foreach (var step in scene.PluginActions)
+            {
+                step.ApplyDescriptors(FindPluginActionParameters(step.PluginId, step.ActionId));
+            }
+        }
+
+        foreach (var rule in AutomationRules)
+        {
+            foreach (var step in rule.PluginActions)
+            {
+                step.ApplyDescriptors(FindPluginActionParameters(step.PluginId, step.ActionId));
+            }
+        }
+    }
+
+    private static string ActionSignature(PluginActionChoice choice) =>
+        $"{choice.PluginId}|{choice.ActionId}|{choice.FullLabel}|" +
+        string.Join(";", choice.DeclaredParameters.Select(static p => $"{p.Name}:{p.Type}:{p.Required}:{p.Description}"));
+
+    private static Dictionary<string, string> SnapshotPendingParameters(IEnumerable<PluginActionParameterEditor> pending) =>
+        pending.Where(static p => !string.IsNullOrEmpty(p.Value))
+            .GroupBy(static p => p.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(static g => g.Key, static g => g.First().Value, StringComparer.OrdinalIgnoreCase);
+
+    private static void RestorePendingParameters(IEnumerable<PluginActionParameterEditor> pending, Dictionary<string, string> draft)
+    {
+        foreach (var parameter in pending)
+        {
+            if (draft.TryGetValue(parameter.Name, out var value))
+            {
+                parameter.Value = value;
+            }
+        }
+    }
+
+    private static void RebuildPendingParameters(
+        ObservableCollection<PluginActionParameterEditor> target,
+        IReadOnlyList<PluginActionParameter>? descriptors)
+    {
+        target.Clear();
+        if (descriptors is null)
+        {
+            return;
+        }
+
+        foreach (var descriptor in descriptors)
+        {
+            target.Add(new PluginActionParameterEditor(
+                descriptor.Name,
+                descriptor.Type,
+                descriptor.Description,
+                descriptor.Required));
+        }
     }
 
     private void LoadAutomationsFromSettings(AppSettings settings)
@@ -198,7 +311,7 @@ public sealed partial class MainViewModel
         AutomationRules.Clear();
         foreach (var rule in settings.Automations ?? AutomationRule.CreateDefaults())
         {
-            AutomationRules.Add(AutomationRuleEditor.FromModel(rule));
+            AutomationRules.Add(AutomationRuleEditor.FromModel(rule, FindPluginActionParameters));
         }
 
         SelectedAutomationRule = AutomationRules.FirstOrDefault(r => string.Equals(r.Id, previousId, StringComparison.OrdinalIgnoreCase))
@@ -215,20 +328,27 @@ public sealed partial class MainViewModel
         }
 
         var delayMs = int.TryParse(SceneActionDelayMsText?.Trim(), out var d) ? Math.Clamp(d, 0, 30_000) : 0;
-        SelectedScene.PluginActions.Add(new ScenePluginActionStep
-        {
-            PluginId = SelectedScenePluginAction.PluginId,
-            ActionId = SelectedScenePluginAction.ActionId,
-            DisplayName = SelectedScenePluginAction.FullLabel,
-            DelayMs = delayMs,
-        });
+        var step = new ScenePluginActionStepEditor(
+            SelectedScenePluginAction.PluginId,
+            SelectedScenePluginAction.ActionId,
+            SelectedScenePluginAction.FullLabel,
+            delayMs,
+            PendingSceneActionParameters.Select(static p => p.Clone()));
+        SelectedScene.PluginActions.Add(step);
         SelectedScene.NotifyPluginActionsChanged();
-        StatusMessage = $"Added '{SelectedScenePluginAction.FullLabel}' to '{SelectedScene.Name}'. Click Save Scenes to persist.";
+
+        RebuildPendingParameters(PendingSceneActionParameters, SelectedScenePluginAction.DeclaredParameters);
+        OnPropertyChanged(nameof(HasPendingSceneActionParameters));
+
+        var missing = step.Parameters.Where(static p => p.IsMissingRequired).Select(static p => p.Name).ToList();
+        StatusMessage = missing.Count > 0
+            ? $"Added '{SelectedScenePluginAction.FullLabel}' to '{SelectedScene.Name}'. Fill required parameter(s) ({string.Join(", ", missing)}) and click Save Scenes."
+            : $"Added '{SelectedScenePluginAction.FullLabel}' to '{SelectedScene.Name}'. Click Save Scenes to persist.";
     }
 
     private void RemovePluginActionFromSelectedScene(object? parameter)
     {
-        if (SelectedScene is null || parameter is not ScenePluginActionStep step)
+        if (SelectedScene is null || parameter is not ScenePluginActionStepEditor step)
         {
             return;
         }
@@ -281,19 +401,20 @@ public sealed partial class MainViewModel
         }
 
         var delayMs = int.TryParse(RuleActionDelayMsText?.Trim(), out var d) ? Math.Clamp(d, 0, 30_000) : 0;
-        SelectedAutomationRule.PluginActions.Add(new ScenePluginActionStep
-        {
-            PluginId = SelectedRulePluginAction.PluginId,
-            ActionId = SelectedRulePluginAction.ActionId,
-            DisplayName = SelectedRulePluginAction.FullLabel,
-            DelayMs = delayMs,
-        });
+        SelectedAutomationRule.PluginActions.Add(new ScenePluginActionStepEditor(
+            SelectedRulePluginAction.PluginId,
+            SelectedRulePluginAction.ActionId,
+            SelectedRulePluginAction.FullLabel,
+            delayMs,
+            PendingRuleActionParameters.Select(static p => p.Clone())));
         SelectedAutomationRule.NotifyPluginActionsChanged();
+        RebuildPendingParameters(PendingRuleActionParameters, SelectedRulePluginAction.DeclaredParameters);
+        OnPropertyChanged(nameof(HasPendingRuleActionParameters));
     }
 
     private void RemovePluginActionFromSelectedRule(object? parameter)
     {
-        if (SelectedAutomationRule is null || parameter is not ScenePluginActionStep step)
+        if (SelectedAutomationRule is null || parameter is not ScenePluginActionStepEditor step)
         {
             return;
         }

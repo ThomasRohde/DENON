@@ -150,8 +150,14 @@ public sealed class UiSettings
     /// <summary>The install the splash screen was last shown for (version and exe time); a new install shows it again.</summary>
     public string? SplashShownFor { get; set; }
 
+    /// <summary>Opt-in "ROOM" mode: listen via a PC microphone / Line-In for TV/ARC, HDMI &amp; Chromecast audio meters (off by default).</summary>
+    public bool AllowRoomMicMeter { get; set; } = false;
+
+    /// <summary>Preferred Windows capture device ID for Room Mic meters (empty = system default microphone).</summary>
+    public string MeterMicDeviceId { get; set; } = string.Empty;
+
     /// <summary>
-    /// Copies the fields the Settings editor owns (tray, notification, dB and startup choices) from
+    /// Copies the fields the Settings editor owns (tray, notification, dB, startup, updates and Room Mic choices) from
     /// <paramref name="editor"/>. Theme, skin, window placement and the splash marker stay: the app and the
     /// Appearance chips set them, and Save &amp; Sync must not overwrite them with an older copy.
     /// </summary>
@@ -164,6 +170,8 @@ public sealed class UiSettings
         DisplayVolumeInDb = editor.DisplayVolumeInDb;
         LaunchAtWindowsStartup = editor.LaunchAtWindowsStartup;
         CheckForUpdates = editor.CheckForUpdates;
+        AllowRoomMicMeter = editor.AllowRoomMicMeter;
+        MeterMicDeviceId = editor.MeterMicDeviceId ?? string.Empty;
     }
 
     public UiSettings Clone() =>
@@ -181,6 +189,8 @@ public sealed class UiSettings
             Skin = Skin,
             Window = Window?.Clone(),
             SplashShownFor = SplashShownFor,
+            AllowRoomMicMeter = AllowRoomMicMeter,
+            MeterMicDeviceId = MeterMicDeviceId,
         };
 }
 

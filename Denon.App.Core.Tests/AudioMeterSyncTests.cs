@@ -1,4 +1,5 @@
 using Denon.App.Desktop.Services;
+using Denon.App.PluginSdk;
 using Xunit;
 
 namespace Denon.App.Core.Tests;
@@ -12,8 +13,9 @@ public sealed class AudioMeterSyncTests
         bool muted = false,
         bool pcCasting = false,
         bool pcSignal = false,
-        bool appStreamFrame = false) =>
-        AudioMeterSourceRouter.Resolve(new AudioMeterInputs(awake, input, heosPlaying, muted, pcCasting, pcSignal, appStreamFrame));
+        bool appStreamFrame = false,
+        bool roomMicActive = false) =>
+        AudioMeterSourceRouter.Resolve(new AudioMeterInputs(awake, input, heosPlaying, muted, pcCasting, pcSignal, appStreamFrame, roomMicActive));
 
     [Fact]
     public void Analyzed_youtube_or_jukebox_stream_is_real_denon_audio()
@@ -138,5 +140,44 @@ public sealed class AudioMeterSyncTests
         }
 
         Assert.False(history.TryGetAt(1_010, out _, out _));    // Overwritten by the ring.
+    }
+
+    [Fact]
+    public void Room_mic_activates_for_untappable_sources_but_respects_priority()
+    {
+        Assert.Equal(AudioMeterSource.Room, Route(input: "TV", roomMicActive: true));
+        Assert.Equal(AudioMeterSource.Room, Route(input: "MPLAY", roomMicActive: true));
+        Assert.Equal(AudioMeterSource.Room, Route(input: "NET", heosPlaying: true, roomMicActive: true));
+
+        // Real digital app streams and Mute always take precedence over Room Mic.
+        Assert.Equal(AudioMeterSource.Denon, Route(input: "NET", pcCasting: true, roomMicActive: true));
+        Assert.Equal(AudioMeterSource.Denon, Route(input: "NET", heosPlaying: true, appStreamFrame: true, roomMicActive: true));
+        Assert.Equal(AudioMeterSource.Muted, Route(input: "TV", muted: true, roomMicActive: true));
+
+        // When Denon is off or idle on NET, Room Mic is never selected.
+        Assert.Equal(AudioMeterSource.Off, Route(awake: false, input: "TV", roomMicActive: true));
+        Assert.Equal(AudioMeterSource.Pc, Route(awake: false, input: "TV", pcSignal: true, roomMicActive: true));
+        Assert.Equal(AudioMeterSource.Off, Route(awake: true, input: "NET", heosPlaying: false, roomMicActive: true));
+    }
+
+    [Fact]
+    public void History_preserves_delayed_plugin_audio_frame_metadata()
+    {
+        var history = new AudioFrameHistory(capacity: 64);
+        var bands = new double[31];
+        bands[4] = 0.72;
+        var expected = new PluginAudioFrame(0.65, 0.58, 0.81, 0.44, 0.29, 0.90, IsBeat: true, IsLiveSignal: true, TimestampMs: 12_000);
+        history.Add(in expected, bands);
+
+        var outBands = new double[31];
+        Assert.True(history.TryGetFrameAt(12_100, out var actual, outBands));
+        Assert.Equal(expected.LeftLevel, actual.LeftLevel, 6);
+        Assert.Equal(expected.RightLevel, actual.RightLevel, 6);
+        Assert.Equal(expected.BassEnergy, actual.BassEnergy, 6);
+        Assert.Equal(expected.MidEnergy, actual.MidEnergy, 6);
+        Assert.Equal(expected.TrebleEnergy, actual.TrebleEnergy, 6);
+        Assert.Equal(expected.BeatIntensity, actual.BeatIntensity, 6);
+        Assert.True(actual.IsBeat);
+        Assert.Equal(0.72, outBands[4], 6);
     }
 }

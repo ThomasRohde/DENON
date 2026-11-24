@@ -216,4 +216,45 @@ public sealed class CastNowPlayingTests
     {
         Assert.Null(NowPlayingResolver.TryExtractAppleTvNowPlaying([Plugin("apple-tv", status)]));
     }
+
+    [Fact]
+    public void Apple_tv_live_program_marks_pause_unsupported_in_hero_and_cast()
+    {
+        var onMediaPlayer = OnTvAudio() with { InputSource = "MPLAY", SoundMode = "STEREO" };
+        var live = NowPlayingResolver.Resolve(onMediaPlayer, null,
+            [Plugin("apple-tv", "APPLE TV LIVE • Stue • DRTV • DR1")]);
+
+        Assert.Equal("DR1", live.Title);
+        Assert.Equal("Playing", live.PlayStateLabel);
+        Assert.False(live.CanPause);
+        Assert.NotNull(live.Cast);
+        Assert.True(live.Cast!.IsPlaying);
+        Assert.False(live.Cast.CanPause);
+
+        var onTvHdmi = NowPlayingResolver.Resolve(OnTvAudio(), null,
+        [
+            Plugin("smart-tv", "LIVE • 55UR73006LA • Apple TV (HDMI 2)"),
+            Plugin("apple-tv", "APPLE TV LIVE • Stue • DRTV • DR1"),
+        ]);
+        Assert.False(onTvHdmi.CanPause);
+        Assert.False(onTvHdmi.Cast!.CanPause);
+
+        // On-demand Apple TV and Chromecast default to CanPause = true.
+        var onDemand = NowPlayingResolver.Resolve(onMediaPlayer, null,
+            [Plugin("apple-tv", "APPLE TV • Stue • DRTV • Min ven, Putin")]);
+        Assert.True(onDemand.CanPause);
+        Assert.True(onDemand.Cast!.CanPause);
+    }
+
+    [Theory]
+    [InlineData("{\"canPause\":false}", false)]
+    [InlineData("{\"canPause\":true}", true)]
+    [InlineData("{\"title\":\"Show\"}", null)]
+    [InlineData("{\"canPause\":\"false\"}", null)]
+    [InlineData("not json", null)]
+    [InlineData(null, null)]
+    public void Can_pause_is_read_from_now_playing_json(string? json, bool? expected)
+    {
+        Assert.Equal(expected, NowPlayingResolver.TryReadCastCanPause(json));
+    }
 }

@@ -1,5 +1,6 @@
 using System.Windows.Media;
 using Denon.App.Desktop.Infrastructure;
+using Denon.App.Desktop.ViewModels;
 using Brush = System.Windows.Media.Brush;
 using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
@@ -18,6 +19,7 @@ public sealed record HelpPortRow(string ProtocolPort, string Service, string Pur
 
 public sealed class HelpGuideTopic : ObservableObject
 {
+    private readonly Color _accentColor;
     private bool _isSelected;
 
     public HelpGuideTopic(
@@ -40,7 +42,7 @@ public sealed class HelpGuideTopic : ObservableObject
         Id = id;
         Badge = badge;
         AccentHex = accentHex;
-        AccentBrush = CreateBrush(accentHex, "#00D4FF");
+        _accentColor = ParseColor(accentHex, "#00D4FF");
         Category = category;
         Title = title;
         Subtitle = subtitle;
@@ -73,7 +75,9 @@ public sealed class HelpGuideTopic : ObservableObject
 
     public string AccentHex { get; }
 
-    public Brush AccentBrush { get; }
+    public Brush AccentBrush => BadgeContrastHelper.CreateReadableAccentBrush(_accentColor);
+
+    public void RefreshThemeBrushes() => OnPropertyChanged(nameof(AccentBrush));
 
     public string Category { get; }
 
@@ -113,19 +117,15 @@ public sealed class HelpGuideTopic : ObservableObject
         set => SetProperty(ref _isSelected, value);
     }
 
-    private static Brush CreateBrush(string hex, string fallbackHex)
+    private static Color ParseColor(string hex, string fallbackHex)
     {
         try
         {
-            var b = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
-            b.Freeze();
-            return b;
+            return (Color)ColorConverter.ConvertFromString(hex);
         }
         catch
         {
-            var b = new SolidColorBrush((Color)ColorConverter.ConvertFromString(fallbackHex));
-            b.Freeze();
-            return b;
+            return (Color)ColorConverter.ConvertFromString(fallbackHex);
         }
     }
 }

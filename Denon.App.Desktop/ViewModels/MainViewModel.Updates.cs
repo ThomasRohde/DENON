@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -6,9 +7,32 @@ using Denon.App.Desktop.Services;
 
 namespace Denon.App.Desktop.ViewModels;
 
+public sealed record PluginUpdateItem(
+    string PluginId,
+    string PluginName,
+    string CurrentVersion,
+    string LatestVersionLabel,
+    string Tag,
+    string ReleaseNotesText,
+    string ReleaseUrl)
+{
+    public string VersionSummary => $"{CurrentVersion} → {LatestVersionLabel}";
+
+    public bool HasReleaseUrl => !string.IsNullOrWhiteSpace(ReleaseUrl);
+
+    public static PluginUpdateItem FromInfo(PluginUpdateInfo info) => new(
+        info.PluginId,
+        info.PluginName,
+        info.CurrentVersion,
+        info.LatestVersionLabel,
+        info.Tag,
+        UpdateService.PlainNotes(info.ReleaseNotes),
+        info.ReleaseUrl);
+}
+
 /// <summary>
 /// In-app updates: a daily check of GitHub (Settings → Check for updates), an Update button in the status line when
-/// a newer version is out, and a panel with what changed and "Download and install".
+/// a newer app or external plugin version is out, and a panel with what changed and "Download and install".
 /// </summary>
 public sealed partial class MainViewModel
 {
@@ -31,8 +55,11 @@ public sealed partial class MainViewModel
     private ICommand? _closeUpdatePanelCommand;
     private ICommand? _installUpdateCommand;
     private ICommand? _openUpdatePageCommand;
+    private ICommand? _openPluginUpdatePageCommand;
     private ICommand? _checkForUpdatesNowCommand;
     private ICommand? _cancelUpdateCommand;
+
+    public ObservableCollection<PluginUpdateItem> PluginUpdates { get; } = [];
 
     /// <summary>The app asks to exit after it started the update installer (App closes it).</summary>
     public event Action? ExitForUpdateRequested;
@@ -50,25 +77,72 @@ public sealed partial class MainViewModel
         {
             if (SetProperty(ref _availableUpdate, value))
             {
-                OnPropertyChanged(nameof(IsUpdateAvailable));
-                OnPropertyChanged(nameof(UpdateButtonText));
-                OnPropertyChanged(nameof(UpdatePanelTitle));
-                OnPropertyChanged(nameof(UpdateNotesText));
+                NotifyUpdateDisplayChanged();
             }
         }
     }
 
-    public bool IsUpdateAvailable => _availableUpdate is not null;
+    public bool HasAppUpdate => _availableUpdate is not null;
 
-    public string UpdateButtonText => _availableUpdate is null ? string.Empty : $"Update to {_availableUpdate.Label}";
+    public bool HasPluginUpdates => PluginUpdates.Count > 0;
 
-    public string UpdatePanelTitle => _availableUpdate is null ? string.Empty : $"Denon Desktop {_availableUpdate.Label} is available";
+    public bool IsUpdateAvailable => HasAppUpdate || HasPluginUpdates;
 
-    public string UpdateCurrentText => IsInstalledCopy
-        ? $"You have version {AppInfo.Version}. The update installs over it and keeps your settings. The app closes, updates and starts again."
-        : UpdateService.IsInstalled
-            ? $"You have version {AppInfo.Version}, started with a separate data folder (--data-root). Install the update from a normal start."
-            : $"You have version {AppInfo.Version}, the portable app or a copy outside the install folder. Download the new version from the release page.";
+    public bool CanInstallAppUpdate => HasAppUpdate && IsInstalledCopy;
+
+    public string UpdateButtonText
+    {
+        get
+        {
+            if (_availableUpdate is { } app)
+            {
+                return PluginUpdates.Count > 0
+                    ? $"Update to {app.Label} (+{PluginUpdates.Count} plugin{(PluginUpdates.Count == 1 ? string.Empty : "s")})"
+                    : $"Update to {app.Label}";
+            }
+
+            if (PluginUpdates.Count == 1)
+            {
+                var p = PluginUpdates[0];
+                return $"Plugin update: {p.PluginName} {p.LatestVersionLabel}";
+            }
+
+            return PluginUpdates.Count > 1
+                ? $"{PluginUpdates.Count} plugin updates"
+                : string.Empty;
+        }
+    }
+
+    public string UpdatePanelTitle
+    {
+        get
+        {
+            if (_availableUpdate is { } app)
+            {
+                return PluginUpdates.Count > 0
+                    ? $"Denon Desktop {app.Label} & plugin updates"
+                    : $"Denon Desktop {app.Label} is available";
+            }
+
+            if (PluginUpdates.Count == 1)
+            {
+                var p = PluginUpdates[0];
+                return $"{p.PluginName} {p.LatestVersionLabel} is available";
+            }
+
+            return PluginUpdates.Count > 1
+                ? $"{PluginUpdates.Count} plugin updates are available"
+                : string.Empty;
+        }
+    }
+
+    public string UpdateCurrentText => !HasAppUpdate && HasPluginUpdates
+        ? "External plugin updates are published on GitHub releases. Download the zip from the release page, extract it into your Plugins folder, and restart Denon Desktop."
+        : IsInstalledCopy
+            ? $"You have version {AppInfo.Version}. The update installs over it and keeps your settings. The app closes, updates and starts again."
+            : UpdateService.IsInstalled
+                ? $"You have version {AppInfo.Version}, started with a separate data folder (--data-root). Install the update from a normal start."
+                : $"You have version {AppInfo.Version}, the portable app or a copy outside the install folder. Download the new version from the release page.";
 
     public string UpdateNotesText => _availableUpdate is null ? string.Empty : UpdateService.PlainNotes(_availableUpdate.Notes);
 
@@ -84,6 +158,7 @@ public sealed partial class MainViewModel
             if (SetProperty(ref _canInstallInPlace, value))
             {
                 OnPropertyChanged(nameof(UpdateCurrentText));
+                OnPropertyChanged(nameof(CanInstallAppUpdate));
             }
         }
     }
@@ -126,7 +201,7 @@ public sealed partial class MainViewModel
     public ICommand OpenUpdatePanelCommand => _openUpdatePanelCommand ??= new RelayCommand(_ =>
     {
         UpdateProgressText = string.Empty;
-        IsUpdatePanelOpen = _availableUpdate is not null;
+        IsUpdatePanelOpen = IsUpdateAvailable;
     });
 
     public ICommand CloseUpdatePanelCommand => _closeUpdatePanelCommand ??= new RelayCommand(_ =>
@@ -144,14 +219,21 @@ public sealed partial class MainViewModel
             return;
         }
 
-        try
+        OpenReleaseUrl(release.PageUrl);
+    });
+
+    public ICommand OpenPluginUpdatePageCommand => _openPluginUpdatePageCommand ??= new RelayCommand(param =>
+    {
+        var url = param switch
         {
-            Process.Start(new ProcessStartInfo(release.PageUrl) { UseShellExecute = true });
-        }
-        catch (Exception exception)
+            PluginUpdateItem item => item.ReleaseUrl,
+            string raw => raw,
+            _ => string.Empty,
+        };
+
+        if (!string.IsNullOrWhiteSpace(url))
         {
-            _logStore.Warning($"Could not open the release page: {exception.Message}");
-            UpdateProgressText = $"Windows could not open the browser. Open this address yourself: {release.PageUrl}";
+            OpenReleaseUrl(url);
         }
     });
 
@@ -161,6 +243,42 @@ public sealed partial class MainViewModel
     public ICommand InstallUpdateCommand => _installUpdateCommand ??= new RelayCommand(_ => _ = InstallUpdateAsync());
 
     public ICommand CheckForUpdatesNowCommand => _checkForUpdatesNowCommand ??= new RelayCommand(_ => _ = CheckForUpdatesAsync(manual: true));
+
+    private void OpenReleaseUrl(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception exception)
+        {
+            _logStore.Warning($"Could not open the release page: {exception.Message}");
+            UpdateProgressText = $"Windows could not open the browser. Open this address yourself: {url}";
+        }
+    }
+
+    private void ApplyPluginUpdates(IReadOnlyList<PluginUpdateInfo> pluginUpdates)
+    {
+        PluginUpdates.Clear();
+        foreach (var info in pluginUpdates)
+        {
+            PluginUpdates.Add(PluginUpdateItem.FromInfo(info));
+        }
+
+        NotifyUpdateDisplayChanged();
+    }
+
+    private void NotifyUpdateDisplayChanged()
+    {
+        OnPropertyChanged(nameof(HasAppUpdate));
+        OnPropertyChanged(nameof(HasPluginUpdates));
+        OnPropertyChanged(nameof(IsUpdateAvailable));
+        OnPropertyChanged(nameof(CanInstallAppUpdate));
+        OnPropertyChanged(nameof(UpdateButtonText));
+        OnPropertyChanged(nameof(UpdatePanelTitle));
+        OnPropertyChanged(nameof(UpdateCurrentText));
+        OnPropertyChanged(nameof(UpdateNotesText));
+    }
 
     /// <summary>
     /// Starts the automatic checks (the app calls it once the main window shows; never in screenshot mode). Each
@@ -199,6 +317,7 @@ public sealed partial class MainViewModel
         _updateService = updateService;
         IsInstalledCopy = UpdateService.IsInstalled;
         var update = await updateService.FindUpdateAsync(asVersion);
+        ApplyPluginUpdates([]);
         AvailableUpdate = update;
         IsUpdatePanelOpen = update is not null;
         if (update is null)
@@ -230,14 +349,14 @@ public sealed partial class MainViewModel
                 StatusMessage = "Checking for updates…";
             }
 
-            var update = await _updateService.FindUpdateAsync();
-            AvailableUpdate = update;
+            var installedPlugins = _pluginHost?.GetPlugins();
+            var result = await _updateService.CheckForUpdatesAsync(installedPlugins);
+            AvailableUpdate = result.AppUpdate;
+            ApplyPluginUpdates(result.PluginUpdates);
             await _settingsStore.SaveUiStateAsync(ui => ui.LastUpdateCheck = DateTimeOffset.Now);
             if (manual)
             {
-                StatusMessage = update is null
-                    ? $"Denon Desktop {AppInfo.Version} is up to date."
-                    : $"Denon Desktop {update.Label} is available. Click Update in the status line.";
+                StatusMessage = BuildManualUpdateStatusMessage(result, installedPlugins);
             }
         }
         catch (Exception exception)
@@ -248,6 +367,37 @@ public sealed partial class MainViewModel
                 StatusMessage = $"Could not check for updates: {exception.Message}";
             }
         }
+    }
+
+    private static string BuildManualUpdateStatusMessage(
+        UpdateCheckResult result,
+        IReadOnlyList<Core.Plugins.PluginRecordSnapshot>? installedPlugins)
+    {
+        if (result.AppUpdate is { } app && result.PluginUpdates.Count > 0)
+        {
+            return $"Denon Desktop {app.Label} and {result.PluginUpdates.Count} plugin update{(result.PluginUpdates.Count == 1 ? string.Empty : "s")} available. Click Update in the status line.";
+        }
+
+        if (result.AppUpdate is { } appOnly)
+        {
+            return $"Denon Desktop {appOnly.Label} is available. Click Update in the status line.";
+        }
+
+        if (result.PluginUpdates.Count == 1)
+        {
+            var p = result.PluginUpdates[0];
+            return $"{p.PluginName} {p.LatestVersionLabel} is available. Click the update button in the status line.";
+        }
+
+        if (result.PluginUpdates.Count > 1)
+        {
+            return $"{result.PluginUpdates.Count} plugin updates are available. Click the update button in the status line.";
+        }
+
+        var hasTrackablePlugins = installedPlugins?.Any(p => UpdateService.IsTrackablePlugin(p.Id)) == true;
+        return hasTrackablePlugins
+            ? $"Denon Desktop {AppInfo.Version} and installed plugins are up to date."
+            : $"Denon Desktop {AppInfo.Version} is up to date.";
     }
 
     private async Task InstallUpdateAsync()

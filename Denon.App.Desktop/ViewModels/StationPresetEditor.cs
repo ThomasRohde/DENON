@@ -36,6 +36,7 @@ public sealed class StationPresetEditor : ObservableObject
             {
                 OnPropertyChanged(nameof(Monogram));
                 OnPropertyChanged(nameof(BadgeBrush));
+                OnPropertyChanged(nameof(BadgeForegroundBrush));
             }
         }
     }
@@ -49,6 +50,7 @@ public sealed class StationPresetEditor : ObservableObject
             {
                 OnPropertyChanged(nameof(Monogram));
                 OnPropertyChanged(nameof(BadgeBrush));
+                OnPropertyChanged(nameof(BadgeForegroundBrush));
             }
         }
     }
@@ -92,7 +94,24 @@ public sealed class StationPresetEditor : ObservableObject
 
     public string Monogram => BuildMonogram(DisplayName, Alias);
 
-    public Brush BadgeBrush => PickBadgeBrush(string.IsNullOrWhiteSpace(Alias) ? DisplayName : Alias);
+    public Brush BadgeBrush
+    {
+        get
+        {
+            var brush = new SolidColorBrush(PickBadgeColor(string.IsNullOrWhiteSpace(Alias) ? DisplayName : Alias));
+            brush.Freeze();
+            return brush;
+        }
+    }
+
+    public Brush BadgeForegroundBrush =>
+        BadgeContrastHelper.PickThemeForegroundBrush(PickBadgeColor(string.IsNullOrWhiteSpace(Alias) ? DisplayName : Alias));
+
+    public void RefreshThemeBrushes()
+    {
+        OnPropertyChanged(nameof(BadgeBrush));
+        OnPropertyChanged(nameof(BadgeForegroundBrush));
+    }
 
     public StationPreset ToModel() => new(Alias, DisplayName, Url);
 
@@ -132,7 +151,7 @@ public sealed class StationPresetEditor : ObservableObject
             : single.ToUpperInvariant();
     }
 
-    private static Brush PickBadgeBrush(string seed)
+    private static Color PickBadgeColor(string seed)
     {
         var hash = 17;
         foreach (var ch in seed)
@@ -141,8 +160,6 @@ public sealed class StationPresetEditor : ObservableObject
         }
 
         var index = Math.Abs(hash) % Palette.Length;
-        var brush = new SolidColorBrush(Palette[index]);
-        brush.Freeze();
-        return brush;
+        return Palette[index];
     }
 }

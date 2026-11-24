@@ -144,7 +144,7 @@
                                                         CornerRadius="{DynamicResource Radius03}"
                                                         Background="{Binding BadgeBrush}"
                                                         Margin="{skin:Space 0,0,10,0}">
-                                                    <TextBlock Text="{Binding Monogram}" FontSize="{DynamicResource FontSize06}" FontWeight="Black" Foreground="{DynamicResource TextOnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    <TextBlock Text="{Binding Monogram}" FontSize="{DynamicResource FontSize06}" FontWeight="Black" Foreground="{Binding BadgeForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                 </Border>
 
                                                 <TextBox Grid.Column="1" Text="{Binding Alias, UpdateSourceTrigger=PropertyChanged}" ToolTip="Alias" Padding="{skin:Space 8,6}" />

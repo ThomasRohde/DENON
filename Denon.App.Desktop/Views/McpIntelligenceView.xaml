@@ -295,10 +295,25 @@
                             </Border>
 
                             <Border Background="{DynamicResource Ink05Brush}" BorderBrush="{DynamicResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="{DynamicResource Radius04}" Padding="{skin:Space 12,9}">
-                                <StackPanel>
-                                    <TextBlock Text="LEARNED LOCAL PREFERENCES (100% ON-DEVICE)" FontSize="{DynamicResource FontSize01}" FontWeight="Bold" Foreground="{DynamicResource AccentCyanBrightBrush}" />
-                                    <TextBlock Text="{Binding LearnedHabitsSummary}" FontSize="{DynamicResource FontSize05}" Foreground="{DynamicResource AccentBlueTextSoftBrush}" TextWrapping="Wrap" Margin="{skin:Space 0,3,0,0}" />
-                                </StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="{skin:Size 10}" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="LEARNED LOCAL PREFERENCES (100% ON-DEVICE)" FontSize="{DynamicResource FontSize01}" FontWeight="Bold" Foreground="{DynamicResource AccentCyanBrightBrush}" />
+                                        <TextBlock Text="{Binding LearnedHabitsSummary}" FontSize="{DynamicResource FontSize05}" Foreground="{DynamicResource AccentBlueTextSoftBrush}" TextWrapping="Wrap" Margin="{skin:Space 0,3,0,0}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="2"
+                                            Content="Open Insights ↗"
+                                            Command="{Binding OpenInsightsCommand}"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Padding="{skin:Space 10,5}"
+                                            FontSize="{DynamicResource FontSize05}"
+                                            VerticalAlignment="Center"
+                                            ToolTip="Open your watch and listen statistics in the browser (this PC only)" />
+                                </Grid>
                             </Border>
                         </StackPanel>
                     </Border>

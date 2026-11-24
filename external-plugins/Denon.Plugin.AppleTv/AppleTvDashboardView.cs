@@ -294,7 +294,10 @@ internal sealed class AppleTvDashboardView : UserControl
 
             if (_playPause is not null)
             {
+                var pauseBlocked = state.IsPlaying && !state.NowPlaying.CanPause;
                 _playPause.Content = state.IsPlaying ? "Pause" : "Play";
+                _playPause.IsEnabled = !pauseBlocked;
+                _playPause.ToolTip = pauseBlocked ? "This program does not support pause." : null;
             }
         }
 

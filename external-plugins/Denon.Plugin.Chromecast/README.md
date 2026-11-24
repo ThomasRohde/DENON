@@ -76,6 +76,12 @@ are read-only (allowed in the Observer tier); `stop` and `quit-app` are destruct
 - The Denon Desktop release that matches this plugin release (same Plugin SDK).
 - The PC and the Cast devices must be on the same LAN. Windows Firewall must allow inbound UDP
   for Denon Desktop, or mDNS answers do not arrive. "Add by IP" works without mDNS.
+- **Windows Private vs. Public network (mDNS):** Windows often marks a Wi-Fi or Ethernet connection as a
+  **Public** network by default. On a Public profile, Windows Firewall blocks inbound mDNS (UDP 5353)
+  multicast replies unless an explicit inbound rule exists (the Denon Desktop installer adds one, but
+  portable or dev builds do not). If **Discover now** finds no devices, switch your home network to **Private**:
+  open **Settings → Network & internet → Wi-Fi** (or **Ethernet**) → select your network → set
+  **Network profile type** to **Private network**, then click **Discover now** again.
 
 ## Install
 

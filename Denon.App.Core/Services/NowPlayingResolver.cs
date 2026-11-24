@@ -10,7 +10,8 @@ public sealed record ResolvedNowPlaying(
     string ImageUrl,
     string PlayStateLabel,
     bool IsExternalLiveInput,
-    CastNowPlaying? Cast = null);
+    CastNowPlaying? Cast = null,
+    bool CanPause = true);
 
 public sealed record SmartTvNowShowing(
     string ModelName,
@@ -20,13 +21,16 @@ public sealed record SmartTvNowShowing(
 /// <summary>
 /// What a streamer plays, from its plugin's status text: a Chromecast ("chromecast" plugin) or an
 /// Apple TV ("apple-tv" plugin). <see cref="PluginId"/> is the plugin that takes play/pause and artwork requests.
+/// <see cref="CanPause"/> is false when the streamer explicitly reports that pause is not supported for the
+/// current program (for example a live stream on Apple TV).
 /// </summary>
 public sealed record CastNowPlaying(
     string DeviceName,
     string App,
     string? Title,
     bool IsPlaying,
-    string PluginId = NowPlayingResolver.ChromecastPluginId)
+    string PluginId = NowPlayingResolver.ChromecastPluginId,
+    bool CanPause = true)
 {
     public bool IsAppleTv => PluginId == NowPlayingResolver.AppleTvPluginId;
 }
@@ -93,7 +97,8 @@ public static class NowPlayingResolver
                         ImageUrl: string.Empty,
                         PlayStateLabel: cast.IsPlaying ? (cast.IsAppleTv ? "Playing" : "Casting") : "Paused",
                         IsExternalLiveInput: true,
-                        Cast: cast);
+                        Cast: cast,
+                        CanPause: cast.CanPause);
                 }
 
                 if (tvInfo is not null)
@@ -140,7 +145,8 @@ public static class NowPlayingResolver
                     ImageUrl: string.Empty,
                     PlayStateLabel: appleTv.IsPlaying ? "Playing" : "Paused",
                     IsExternalLiveInput: true,
-                    Cast: appleTv);
+                    Cast: appleTv,
+                    CanPause: appleTv.CanPause);
             }
 
             // Bluetooth / USB / external AVR inputs that still carry live HEOS/AVRCP track metadata
@@ -309,11 +315,12 @@ public static class NowPlayingResolver
         TryParseStreamerStatus(plugins, ChromecastPluginId, "CASTING", "CAST PAUSED");
 
     /// <summary>
-    /// Reads the Apple TV plugin status: "APPLE TV • &lt;device&gt; • &lt;app&gt;[ • &lt;title&gt;]" or "APPLE TV PAUSED • …".
+    /// Reads the Apple TV plugin status: "APPLE TV • &lt;device&gt; • &lt;app&gt;[ • &lt;title&gt;]",
+    /// "APPLE TV LIVE • …" (playing, pause unsupported), or "APPLE TV PAUSED • …".
     /// Null when the plugin is missing, stopped, or the Apple TV shows nothing.
     /// </summary>
     public static CastNowPlaying? TryExtractAppleTvNowPlaying(IReadOnlyList<PluginRecordSnapshot>? plugins) =>
-        TryParseStreamerStatus(plugins, AppleTvPluginId, "APPLE TV", "APPLE TV PAUSED");
+        TryParseStreamerStatus(plugins, AppleTvPluginId, "APPLE TV", "APPLE TV PAUSED", noPausePlayingTag: "APPLE TV LIVE");
 
     /// <summary>The Chromecast or Apple TV program for the hero: one that plays wins over a paused one; Chromecast first on a tie.</summary>
     public static CastNowPlaying? TryExtractStreamerNowPlaying(IReadOnlyList<PluginRecordSnapshot>? plugins)
@@ -326,7 +333,11 @@ public static class NowPlayingResolver
     }
 
     private static CastNowPlaying? TryParseStreamerStatus(
-        IReadOnlyList<PluginRecordSnapshot>? plugins, string pluginId, string playingTag, string pausedTag)
+        IReadOnlyList<PluginRecordSnapshot>? plugins,
+        string pluginId,
+        string playingTag,
+        string pausedTag,
+        string? noPausePlayingTag = null)
     {
         var plugin = plugins?.FirstOrDefault(p =>
             p.Id.Equals(pluginId, StringComparison.OrdinalIgnoreCase) && p.IsEnabled && p.IsStarted);
@@ -336,13 +347,68 @@ public static class NowPlayingResolver
         }
 
         var parts = plugin.StatusText.Split(" • ", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 3 || (parts[0] != playingTag && parts[0] != pausedTag))
+        if (parts.Length < 3)
+        {
+            return null;
+        }
+
+        bool isPlaying;
+        bool canPause;
+        if (parts[0] == playingTag)
+        {
+            isPlaying = true;
+            canPause = true;
+        }
+        else if (noPausePlayingTag is not null && parts[0] == noPausePlayingTag)
+        {
+            isPlaying = true;
+            canPause = false;
+        }
+        else if (parts[0] == pausedTag)
+        {
+            isPlaying = false;
+            canPause = true;
+        }
+        else
         {
             return null;
         }
 
         var title = parts.Length > 3 ? string.Join(" • ", parts.Skip(3)) : null;
-        return new CastNowPlaying(parts[1], parts[2], string.IsNullOrWhiteSpace(title) ? null : title, parts[0] == playingTag, pluginId);
+        return new CastNowPlaying(
+            parts[1],
+            parts[2],
+            string.IsNullOrWhiteSpace(title) ? null : title,
+            isPlaying,
+            pluginId,
+            canPause);
+    }
+
+    /// <summary>
+    /// Reads <c>"canPause"</c> from a streamer plugin's <c>now-playing</c> JSON data, or null when omitted/invalid.
+    /// </summary>
+    public static bool? TryReadCastCanPause(string? nowPlayingDataJson)
+    {
+        if (string.IsNullOrWhiteSpace(nowPlayingDataJson))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(nowPlayingDataJson);
+            if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object &&
+                doc.RootElement.TryGetProperty("canPause", out var value) &&
+                value.ValueKind is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False)
+            {
+                return value.GetBoolean();
+            }
+        }
+        catch (System.Text.Json.JsonException)
+        {
+        }
+
+        return null;
     }
 
     /// <summary>

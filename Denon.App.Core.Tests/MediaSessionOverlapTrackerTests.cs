@@ -176,4 +176,25 @@ public sealed class MediaSessionOverlapTrackerTests
         Assert.Equal(600, Int(end, "coveredSec"));
         Assert.Equal(300, Int(end, "exclusiveSec"));
     }
+
+    [Fact]
+    public void Late_written_end_uses_endedAt_for_the_interval()
+    {
+        var tracker = new MediaSessionOverlapTracker();
+        var atv = Started("appletv", "Min ven, Putin", ("appleTvDevice", "Stue"), ("receiverInput", "TV"));
+        tracker.Annotate("appletv", "session.started", atv, T0.AddSeconds(15));
+
+        // The plugin writes the end 40 s late (standby grace period), with the real end in "endedAt".
+        var atvEnd = Ended(atv, 600);
+        atvEnd["endedAt"] = T0.AddSeconds(600).ToString("o", System.Globalization.CultureInfo.InvariantCulture);
+        tracker.Annotate("appletv", "session.ended", atvEnd, T0.AddSeconds(640));
+
+        // A TV-input session that starts after the Apple TV stopped is not covered by it.
+        var avr = Started("avr_input", "TV Audio", ("input", "TV"));
+        tracker.Annotate("avr", "session.started", avr, T0.AddSeconds(625));
+        var avrEnd = tracker.Annotate("avr", "session.ended", Ended(avr, 90), T0.AddSeconds(700));
+
+        Assert.Equal(0, Int(avrEnd, "coveredSec"));
+        Assert.Equal(90, Int(avrEnd, "exclusiveSec"));
+    }
 }

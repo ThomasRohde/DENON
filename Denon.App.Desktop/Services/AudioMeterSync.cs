@@ -1,4 +1,8 @@
+using Denon.App.PluginSdk;
+
 namespace Denon.App.Desktop.Services;
+
+public sealed record AudioCaptureDeviceOption(string DeviceId, string FriendlyName, bool IsDefault);
 
 /// <summary>Where the VU meters and the 31-band RTA get their signal from.</summary>
 public enum AudioMeterSource
@@ -20,6 +24,9 @@ public enum AudioMeterSource
 
     /// <summary>The Denon is off or idle. Meters show the PC's own audio output (not the Denon).</summary>
     Pc,
+
+    /// <summary>Opt-in PC microphone / Line-In listening to the room while the Denon plays an untappable source (TV/ARC, HDMI, Chromecast…).</summary>
+    Room,
 }
 
 /// <summary>Snapshot of what the router needs, taken once per frame.</summary>
@@ -30,7 +37,8 @@ public readonly record struct AudioMeterInputs(
     bool IsMuted,
     bool IsPcCasting,
     bool HasPcSignal,
-    bool HasAppStreamFrame = false);
+    bool HasAppStreamFrame = false,
+    bool IsRoomMicActive = false);
 
 /// <summary>
 /// Picks the meter source from what the <b>Denon</b> plays, not from what the PC plays.
@@ -55,9 +63,16 @@ public static class AudioMeterSourceRouter
                 }
 
                 // DENON: the app streams this audio (PC Cast), or it streams a YouTube / jukebox track that is
-                // analyzed at the current playback position. Anything else on the Denon is simulated.
+                // analyzed at the current playback position.
                 var isAppStream = inputs.IsPcCasting || (inputs.IsHeosPlaying && inputs.HasAppStreamFrame);
-                return isNet && isAppStream ? AudioMeterSource.Denon : AudioMeterSource.Simulated;
+                if (isNet && isAppStream)
+                {
+                    return AudioMeterSource.Denon;
+                }
+
+                // Opt-in Room Mic listens to TV/ARC, HDMI, Chromecast, Spotify, etc. when enabled & active;
+                // otherwise fall back to volume-scaled simulation.
+                return inputs.IsRoomMicActive ? AudioMeterSource.Room : AudioMeterSource.Simulated;
             }
         }
 
@@ -68,6 +83,7 @@ public static class AudioMeterSourceRouter
     public static string BadgeText(AudioMeterSource source) => source switch
     {
         AudioMeterSource.Denon => "DENON",
+        AudioMeterSource.Room => "ROOM",
         AudioMeterSource.Simulated => "SIM",
         AudioMeterSource.Muted => "MUTED",
         AudioMeterSource.Pc => "PC",
@@ -78,6 +94,7 @@ public static class AudioMeterSourceRouter
     public static string RtaLabel(AudioMeterSource source) => source switch
     {
         AudioMeterSource.Denon => "DENON • SYNCED FFT",
+        AudioMeterSource.Room => "ROOM MIC FFT",
         AudioMeterSource.Simulated => "SIMULATED (VOL)",
         AudioMeterSource.Muted => "DENON MUTED",
         AudioMeterSource.Pc => "PC AUDIO (NOT DENON)",
@@ -138,6 +155,7 @@ public sealed class AudioFrameHistory
     private readonly double[] _left;
     private readonly double[] _right;
     private readonly bool[] _live;
+    private readonly PluginAudioFrame[] _frames;
     private readonly double[] _bands;
     private int _next;
     private int _count;
@@ -148,21 +166,26 @@ public sealed class AudioFrameHistory
         _left = new double[capacity];
         _right = new double[capacity];
         _live = new bool[capacity];
+        _frames = new PluginAudioFrame[capacity];
         _bands = new double[capacity * BandCount];
     }
 
     /// <summary>Max age of the found frame versus the target time; older means "no signal then".</summary>
     public long MaxGapMs { get; init; } = 400;
 
-    public void Add(long tickMs, double left, double right, bool isLive, ReadOnlySpan<double> bands = default)
+    public void Add(long tickMs, double left, double right, bool isLive, ReadOnlySpan<double> bands = default) =>
+        Add(new PluginAudioFrame(left, right, 0, 0, 0, 0, false, isLive, tickMs), bands);
+
+    public void Add(in PluginAudioFrame frame, ReadOnlySpan<double> bands = default)
     {
         lock (_sync)
         {
             var i = _next;
-            _ticks[i] = tickMs;
-            _left[i] = left;
-            _right[i] = right;
-            _live[i] = isLive;
+            _ticks[i] = frame.TimestampMs;
+            _left[i] = frame.LeftLevel;
+            _right[i] = frame.RightLevel;
+            _live[i] = frame.IsLiveSignal;
+            _frames[i] = frame;
             var dest = _bands.AsSpan(i * BandCount, BandCount);
             if (bands.Length >= BandCount)
             {
@@ -184,8 +207,25 @@ public sealed class AudioFrameHistory
     /// </summary>
     public bool TryGetAt(long targetTickMs, out double left, out double right, double[]? bandsDestination = null)
     {
-        left = 0;
-        right = 0;
+        if (!TryGetFrameAt(targetTickMs, out var frame, bandsDestination))
+        {
+            left = 0;
+            right = 0;
+            return false;
+        }
+
+        left = frame.LeftLevel;
+        right = frame.RightLevel;
+        return true;
+    }
+
+    /// <summary>
+    /// Finds the newest full <see cref="PluginAudioFrame"/> at or before <paramref name="targetTickMs"/>.
+    /// Returns false when there is none, it is older than <see cref="MaxGapMs"/>, or it was silent.
+    /// </summary>
+    public bool TryGetFrameAt(long targetTickMs, out PluginAudioFrame frame, double[]? bandsDestination = null)
+    {
+        frame = default;
         lock (_sync)
         {
             for (var n = 1; n <= _count; n++)
@@ -201,8 +241,7 @@ public sealed class AudioFrameHistory
                     return false;
                 }
 
-                left = _left[i];
-                right = _right[i];
+                frame = _frames[i];
                 if (bandsDestination is { Length: >= BandCount })
                 {
                     _bands.AsSpan(i * BandCount, BandCount).CopyTo(bandsDestination);
@@ -213,6 +252,41 @@ public sealed class AudioFrameHistory
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// True when a live frame with a beat lies in (<paramref name="afterTickMs"/>, <paramref name="upToTickMs"/>].
+    /// A consumer that samples at its own rate moves its cursor each time, so every beat is delivered once:
+    /// none lost between samples, none repeated.
+    /// </summary>
+    public bool TryGetBeatBetween(long afterTickMs, long upToTickMs, out double intensity)
+    {
+        intensity = 0;
+        var found = false;
+        lock (_sync)
+        {
+            for (var n = 1; n <= _count; n++)
+            {
+                var i = (_next - n + _ticks.Length) % _ticks.Length;
+                if (_ticks[i] > upToTickMs)
+                {
+                    continue;
+                }
+
+                if (_ticks[i] <= afterTickMs)
+                {
+                    break;
+                }
+
+                if (_live[i] && _frames[i].IsBeat)
+                {
+                    found = true;
+                    intensity = Math.Max(intensity, _frames[i].BeatIntensity);
+                }
+            }
+        }
+
+        return found;
     }
 
     public void Clear()

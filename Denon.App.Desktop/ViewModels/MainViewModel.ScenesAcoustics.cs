@@ -257,7 +257,7 @@ public sealed partial class MainViewModel
         ScenePresets.Clear();
         foreach (var scene in settings.Receiver.Scenes)
         {
-            ScenePresets.Add(ScenePresetEditor.FromModel(scene));
+            ScenePresets.Add(ScenePresetEditor.FromModel(scene, FindPluginActionParameters));
         }
 
         SelectedScene = ScenePresets.FirstOrDefault(s => string.Equals(s.Id, previousSelectedId, StringComparison.OrdinalIgnoreCase))
@@ -387,7 +387,7 @@ public sealed partial class MainViewModel
         var model = SelectedScene.ToModel();
         model.Id = $"{model.Id}-copy";
         model.Name = $"{model.Name} Copy";
-        var copy = ScenePresetEditor.FromModel(model);
+        var copy = ScenePresetEditor.FromModel(model, FindPluginActionParameters);
         ScenePresets.Add(copy);
         SelectedScene = copy;
         StatusMessage = $"Duplicated '{SelectedScene.Name}'. Click Save Scenes to persist.";

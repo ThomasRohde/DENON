@@ -129,4 +129,67 @@ public sealed class MrpPlaybackQueueTests
         Assert.False(tracker.ApplyQueueReply(reply));
         Assert.False(tracker.Current.HasMedia);
     }
+
+    private static ProtoWriter SupportedCommands(params (MrpCommand Command, bool Enabled)[] commands)
+    {
+        var list = new ProtoWriter();
+        foreach (var (command, enabled) in commands)
+        {
+            list.Message(1, new ProtoWriter().Uint(1, (ulong)command).Bool(2, enabled));
+        }
+
+        return list;
+    }
+
+    [Fact]
+    public void Supported_commands_tracks_whether_pause_is_supported()
+    {
+        var tracker = new MrpNowPlayingTracker();
+        tracker.Apply(SetClient("dk.dr.tv"));
+
+        // Before supportedCommands arrives, CanPause defaults to true.
+        var initial = State("item-1", "DR1 Live", MrpPlaybackState.Playing, Path("dk.dr.tv", "avkit-1"));
+        tracker.Apply(Message(MrpType.SetState, MrpExtension.SetState, initial));
+        Assert.True(tracker.Current.CanPause);
+
+        // Live DRTV: Play enabled, Pause disabled -> CanPause is false.
+        var liveCommands = new ProtoWriter()
+            .Message(2, SupportedCommands((MrpCommand.Play, true), (MrpCommand.Pause, false)))
+            .Message(9, Path("dk.dr.tv", "avkit-1"));
+        tracker.Apply(Message(MrpType.SetState, MrpExtension.SetState, liveCommands));
+        Assert.False(tracker.Current.CanPause);
+
+        // A subsequent SET_STATE without supportedCommands preserves CanPause = false.
+        var stateOnly = new ProtoWriter().Uint(6, (ulong)MrpPlaybackState.Playing).Message(9, Path("dk.dr.tv", "avkit-1"));
+        tracker.Apply(Message(MrpType.SetState, MrpExtension.SetState, stateOnly));
+        Assert.False(tracker.Current.CanPause);
+
+        // Only TogglePlayPause enabled -> CanPause is false: the app sends Pause, which this player does not list.
+        var toggleOnly = new ProtoWriter()
+            .Message(2, SupportedCommands((MrpCommand.TogglePlayPause, true)))
+            .Message(9, Path("dk.dr.tv", "avkit-1"));
+        tracker.Apply(Message(MrpType.SetState, MrpExtension.SetState, toggleOnly));
+        Assert.False(tracker.Current.CanPause);
+
+        // On-demand with Pause enabled -> CanPause is true.
+        var pauseOnDemand = new ProtoWriter()
+            .Message(2, SupportedCommands((MrpCommand.Pause, true)))
+            .Message(9, Path("dk.dr.tv", "avkit-1"));
+        tracker.Apply(Message(MrpType.SetState, MrpExtension.SetState, pauseOnDemand));
+        Assert.True(tracker.Current.CanPause);
+
+        // SupportedCommands with only Stop enabled (no Pause / TogglePlayPause) -> CanPause is false.
+        var stopOnly = new ProtoWriter()
+            .Message(2, SupportedCommands((MrpCommand.Stop, true)))
+            .Message(9, Path("dk.dr.tv", "avkit-1"));
+        tracker.Apply(Message(MrpType.SetState, MrpExtension.SetState, stopOnly));
+        Assert.False(tracker.Current.CanPause);
+
+        // Explicit Pause enabled -> CanPause is true again.
+        var pauseEnabled = new ProtoWriter()
+            .Message(2, SupportedCommands((MrpCommand.Pause, true)))
+            .Message(9, Path("dk.dr.tv", "avkit-1"));
+        tracker.Apply(Message(MrpType.SetState, MrpExtension.SetState, pauseEnabled));
+        Assert.True(tracker.Current.CanPause);
+    }
 }

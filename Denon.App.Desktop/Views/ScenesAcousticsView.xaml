@@ -112,9 +112,11 @@
                                                     Height="{skin:Size 44}"
                                                     CornerRadius="{DynamicResource Radius04}"
                                                     Background="{Binding AccentBrush}"
+                                                    BorderBrush="{DynamicResource BorderHairlineBrush}"
+                                                    BorderThickness="1"
                                                     Margin="{skin:Space 0,0,12,0}"
                                                     VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Badge}" FontSize="{DynamicResource FontSize04}" FontWeight="Black" Foreground="{DynamicResource TextOnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding Badge}" FontSize="{DynamicResource FontSize04}" FontWeight="Black" Foreground="{Binding BadgeForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             </Border>
 
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="{skin:Space 0,0,10,0}">
@@ -303,24 +305,128 @@
                                                 FontSize="{DynamicResource FontSize04}" />
                                     </Grid>
 
+                                    <!-- Declared action parameters for the selected action before adding (+ Step) -->
+                                    <Border Background="{DynamicResource CardBgBrush}"
+                                            BorderBrush="{DynamicResource Ink11Brush}"
+                                            BorderThickness="1"
+                                            CornerRadius="{DynamicResource Radius03}"
+                                            Padding="{skin:Space 8,6}"
+                                            Margin="{skin:Space 0,0,0,8}"
+                                            Visibility="{Binding DataContext.HasPendingSceneActionParameters, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}">
+                                        <StackPanel>
+                                            <TextBlock Text="ACTION PARAMETERS" FontSize="{DynamicResource FontSize01}" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,5}" />
+                                            <ItemsControl ItemsSource="{Binding DataContext.PendingSceneActionParameters, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Margin="{skin:Space 0,0,0,6}">
+                                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="{skin:Space 0,0,0,2}">
+                                                                <TextBlock Text="{Binding Name}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize03}" FontWeight="SemiBold" Foreground="{DynamicResource TextStrongBrush}" VerticalAlignment="Center" />
+                                                                <Border Background="{DynamicResource AccentAmberSubtleBgBrush}"
+                                                                        BorderBrush="{DynamicResource AccentAmberBrush}"
+                                                                        BorderThickness="1"
+                                                                        CornerRadius="{DynamicResource Radius01}"
+                                                                        Padding="{skin:Space 5,0.5}"
+                                                                        Margin="{skin:Space 6,0,0,0}"
+                                                                        VerticalAlignment="Center"
+                                                                        Visibility="{Binding Required, Converter={StaticResource BoolToVis}}">
+                                                                    <TextBlock Text="REQUIRED" FontSize="{DynamicResource FontSize00}" FontWeight="Bold" Foreground="{DynamicResource AccentAmberTextBrush}" />
+                                                                </Border>
+                                                            </StackPanel>
+                                                            <TextBlock Text="{Binding Description}"
+                                                                       FontSize="{DynamicResource FontSize02}"
+                                                                       Foreground="{DynamicResource TextMutedBrush}"
+                                                                       TextWrapping="Wrap"
+                                                                       Margin="{skin:Space 0,0,0,3}"
+                                                                       Visibility="{Binding HasDescription, Converter={StaticResource BoolToVis}}" />
+                                                            <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                                                     Tag="{Binding PlaceholderText}"
+                                                                     FontFamily="{DynamicResource MonoFont}"
+                                                                     Padding="{skin:Space 7,4}"
+                                                                     FontSize="{DynamicResource FontSize04}" />
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+
                                     <ItemsControl ItemsSource="{Binding PluginActions}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Background="{DynamicResource CardElevatedBrush}" BorderBrush="{DynamicResource Ink12Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 8,5}" Margin="{skin:Space 0,0,0,5}">
-                                                    <DockPanel>
-                                                        <Button DockPanel.Dock="Right"
-                                                                Content="✕"
-                                                                Command="{Binding DataContext.RemovePluginActionFromSceneCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                CommandParameter="{Binding}"
-                                                                Style="{StaticResource DangerButton}"
-                                                                Padding="{skin:Space 6,2}"
-                                                                FontSize="{DynamicResource FontSize02}" />
-                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                            <TextBlock Text="⚡ " Foreground="{DynamicResource AccentAmberBrush}" FontSize="{DynamicResource FontSize04}" />
-                                                            <TextBlock Text="{Binding DisplayName}" FontSize="{DynamicResource FontSize05}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                                                            <TextBlock Text="{Binding DelayMs, StringFormat=' (+{0}ms)'}" FontSize="{DynamicResource FontSize03}" Foreground="{DynamicResource TextMutedBrush}" />
-                                                        </StackPanel>
-                                                    </DockPanel>
+                                                <Border Background="{DynamicResource CardElevatedBrush}" BorderBrush="{DynamicResource Ink12Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 8,6}" Margin="{skin:Space 0,0,0,6}">
+                                                    <StackPanel>
+                                                        <DockPanel>
+                                                            <Button DockPanel.Dock="Right"
+                                                                    Content="✕"
+                                                                    Command="{Binding DataContext.RemovePluginActionFromSceneCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Style="{StaticResource DangerButton}"
+                                                                    Padding="{skin:Space 6,2}"
+                                                                    FontSize="{DynamicResource FontSize02}" />
+                                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <TextBlock Text="⚡ " Foreground="{DynamicResource AccentAmberBrush}" FontSize="{DynamicResource FontSize04}" />
+                                                                <TextBlock Text="{Binding DisplayName}" FontSize="{DynamicResource FontSize05}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                                                <TextBlock Text="{Binding DelayMs, StringFormat=' (+{0}ms)'}" FontSize="{DynamicResource FontSize03}" Foreground="{DynamicResource TextMutedBrush}" />
+                                                            </StackPanel>
+                                                        </DockPanel>
+
+                                                        <!-- Editable parameters persisted on this scene step -->
+                                                        <ItemsControl ItemsSource="{Binding Parameters}"
+                                                                      Margin="{skin:Space 0,6,0,0}"
+                                                                      Visibility="{Binding HasParameters, Converter={StaticResource BoolToVis}}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <StackPanel Margin="{skin:Space 0,0,0,5}">
+                                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="{skin:Space 0,0,0,2}">
+                                                                            <TextBlock Text="{Binding Name}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize02}" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                                                                            <Border CornerRadius="{DynamicResource Radius01}"
+                                                                                    BorderThickness="1"
+                                                                                    Padding="{skin:Space 5,0.5}"
+                                                                                    Margin="{skin:Space 6,0,0,0}"
+                                                                                    VerticalAlignment="Center"
+                                                                                    Visibility="{Binding Required, Converter={StaticResource BoolToVis}}">
+                                                                                <Border.Style>
+                                                                                    <Style TargetType="Border">
+                                                                                        <Setter Property="Background" Value="{DynamicResource AccentEmeraldSubtleBgBrush}" />
+                                                                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentEmeraldBorderBrush}" />
+                                                                                        <Style.Triggers>
+                                                                                            <DataTrigger Binding="{Binding IsMissingRequired}" Value="True">
+                                                                                                <Setter Property="Background" Value="{DynamicResource AccentCrimsonBgBrush}" />
+                                                                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentCrimsonBrush}" />
+                                                                                            </DataTrigger>
+                                                                                        </Style.Triggers>
+                                                                                    </Style>
+                                                                                </Border.Style>
+                                                                                <TextBlock Text="REQUIRED" FontSize="{DynamicResource FontSize00}" FontWeight="Bold">
+                                                                                    <TextBlock.Style>
+                                                                                        <Style TargetType="TextBlock">
+                                                                                            <Setter Property="Foreground" Value="{DynamicResource AccentEmeraldTextBrush}" />
+                                                                                            <Style.Triggers>
+                                                                                                <DataTrigger Binding="{Binding IsMissingRequired}" Value="True">
+                                                                                                    <Setter Property="Foreground" Value="{DynamicResource AccentCrimsonTextBrush}" />
+                                                                                                </DataTrigger>
+                                                                                            </Style.Triggers>
+                                                                                        </Style>
+                                                                                    </TextBlock.Style>
+                                                                                </TextBlock>
+                                                                            </Border>
+                                                                        </StackPanel>
+                                                                        <TextBlock Text="{Binding Description}"
+                                                                                   FontSize="{DynamicResource FontSize01}"
+                                                                                   Foreground="{DynamicResource TextMutedBrush}"
+                                                                                   TextWrapping="Wrap"
+                                                                                   Margin="{skin:Space 0,0,0,2}"
+                                                                                   Visibility="{Binding HasDescription, Converter={StaticResource BoolToVis}}" />
+                                                                        <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                                                                 Tag="{Binding PlaceholderText}"
+                                                                                 FontFamily="{DynamicResource MonoFont}"
+                                                                                 Padding="{skin:Space 7,4}"
+                                                                                 FontSize="{DynamicResource FontSize04}" />
+                                                                    </StackPanel>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
                                                 </Border>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
@@ -723,20 +829,122 @@
                                                     Padding="{skin:Space 10,5}"
                                                     FontSize="{DynamicResource FontSize04}" />
                                         </Grid>
+                                        <!-- Declared action parameters for the selected automation action -->
+                                        <Border Background="{DynamicResource CardBgBrush}"
+                                                BorderBrush="{DynamicResource Ink11Brush}"
+                                                BorderThickness="1"
+                                                CornerRadius="{DynamicResource Radius03}"
+                                                Padding="{skin:Space 8,6}"
+                                                Margin="{skin:Space 0,0,0,8}"
+                                                Visibility="{Binding DataContext.HasPendingRuleActionParameters, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}">
+                                            <StackPanel>
+                                                <TextBlock Text="ACTION PARAMETERS" FontSize="{DynamicResource FontSize01}" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,5}" />
+                                                <ItemsControl ItemsSource="{Binding DataContext.PendingRuleActionParameters, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <StackPanel Margin="{skin:Space 0,0,0,6}">
+                                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="{skin:Space 0,0,0,2}">
+                                                                    <TextBlock Text="{Binding Name}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize03}" FontWeight="SemiBold" Foreground="{DynamicResource TextStrongBrush}" VerticalAlignment="Center" />
+                                                                    <Border Background="{DynamicResource AccentAmberSubtleBgBrush}"
+                                                                            BorderBrush="{DynamicResource AccentAmberBrush}"
+                                                                            BorderThickness="1"
+                                                                            CornerRadius="{DynamicResource Radius01}"
+                                                                            Padding="{skin:Space 5,0.5}"
+                                                                            Margin="{skin:Space 6,0,0,0}"
+                                                                            VerticalAlignment="Center"
+                                                                            Visibility="{Binding Required, Converter={StaticResource BoolToVis}}">
+                                                                        <TextBlock Text="REQUIRED" FontSize="{DynamicResource FontSize00}" FontWeight="Bold" Foreground="{DynamicResource AccentAmberTextBrush}" />
+                                                                    </Border>
+                                                                </StackPanel>
+                                                                <TextBlock Text="{Binding Description}"
+                                                                           FontSize="{DynamicResource FontSize02}"
+                                                                           Foreground="{DynamicResource TextMutedBrush}"
+                                                                           TextWrapping="Wrap"
+                                                                           Margin="{skin:Space 0,0,0,3}"
+                                                                           Visibility="{Binding HasDescription, Converter={StaticResource BoolToVis}}" />
+                                                                <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                                                         Tag="{Binding PlaceholderText}"
+                                                                         FontFamily="{DynamicResource MonoFont}"
+                                                                         Padding="{skin:Space 7,4}"
+                                                                         FontSize="{DynamicResource FontSize04}" />
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+
                                         <ItemsControl ItemsSource="{Binding PluginActions}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Border Background="{DynamicResource CardElevatedBrush}" BorderBrush="{DynamicResource Ink12Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 8,5}" Margin="{skin:Space 0,0,0,5}">
-                                                        <DockPanel>
-                                                            <Button DockPanel.Dock="Right"
-                                                                    Content="✕"
-                                                                    Command="{Binding DataContext.RemovePluginActionFromRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                    CommandParameter="{Binding}"
-                                                                    Style="{StaticResource DangerButton}"
-                                                                    Padding="{skin:Space 6,2}"
-                                                                    FontSize="{DynamicResource FontSize02}" />
-                                                            <TextBlock Text="{Binding DisplayName}" FontSize="{DynamicResource FontSize05}" VerticalAlignment="Center" />
-                                                        </DockPanel>
+                                                    <Border Background="{DynamicResource CardElevatedBrush}" BorderBrush="{DynamicResource Ink12Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 8,6}" Margin="{skin:Space 0,0,0,6}">
+                                                        <StackPanel>
+                                                            <DockPanel>
+                                                                <Button DockPanel.Dock="Right"
+                                                                        Content="✕"
+                                                                        Command="{Binding DataContext.RemovePluginActionFromRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource DangerButton}"
+                                                                        Padding="{skin:Space 6,2}"
+                                                                        FontSize="{DynamicResource FontSize02}" />
+                                                                <TextBlock Text="{Binding DisplayName}" FontSize="{DynamicResource FontSize05}" VerticalAlignment="Center" />
+                                                            </DockPanel>
+                                                            <ItemsControl ItemsSource="{Binding Parameters}"
+                                                                          Margin="{skin:Space 0,6,0,0}"
+                                                                          Visibility="{Binding HasParameters, Converter={StaticResource BoolToVis}}">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate>
+                                                                        <StackPanel Margin="{skin:Space 0,0,0,5}">
+                                                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="{skin:Space 0,0,0,2}">
+                                                                                <TextBlock Text="{Binding Name}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize02}" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                                                                                <Border CornerRadius="{DynamicResource Radius01}"
+                                                                                        BorderThickness="1"
+                                                                                        Padding="{skin:Space 5,0.5}"
+                                                                                        Margin="{skin:Space 6,0,0,0}"
+                                                                                        VerticalAlignment="Center"
+                                                                                        Visibility="{Binding Required, Converter={StaticResource BoolToVis}}">
+                                                                                    <Border.Style>
+                                                                                        <Style TargetType="Border">
+                                                                                            <Setter Property="Background" Value="{DynamicResource AccentEmeraldSubtleBgBrush}" />
+                                                                                            <Setter Property="BorderBrush" Value="{DynamicResource AccentEmeraldBorderBrush}" />
+                                                                                            <Style.Triggers>
+                                                                                                <DataTrigger Binding="{Binding IsMissingRequired}" Value="True">
+                                                                                                    <Setter Property="Background" Value="{DynamicResource AccentCrimsonBgBrush}" />
+                                                                                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentCrimsonBrush}" />
+                                                                                                </DataTrigger>
+                                                                                            </Style.Triggers>
+                                                                                        </Style>
+                                                                                    </Border.Style>
+                                                                                    <TextBlock Text="REQUIRED" FontSize="{DynamicResource FontSize00}" FontWeight="Bold">
+                                                                                        <TextBlock.Style>
+                                                                                            <Style TargetType="TextBlock">
+                                                                                                <Setter Property="Foreground" Value="{DynamicResource AccentEmeraldTextBrush}" />
+                                                                                                <Style.Triggers>
+                                                                                                    <DataTrigger Binding="{Binding IsMissingRequired}" Value="True">
+                                                                                                        <Setter Property="Foreground" Value="{DynamicResource AccentCrimsonTextBrush}" />
+                                                                                                    </DataTrigger>
+                                                                                                </Style.Triggers>
+                                                                                            </Style>
+                                                                                        </TextBlock.Style>
+                                                                                    </TextBlock>
+                                                                                </Border>
+                                                                            </StackPanel>
+                                                                            <TextBlock Text="{Binding Description}"
+                                                                                       FontSize="{DynamicResource FontSize01}"
+                                                                                       Foreground="{DynamicResource TextMutedBrush}"
+                                                                                       TextWrapping="Wrap"
+                                                                                       Margin="{skin:Space 0,0,0,2}"
+                                                                                       Visibility="{Binding HasDescription, Converter={StaticResource BoolToVis}}" />
+                                                                            <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                                                                     Tag="{Binding PlaceholderText}"
+                                                                                     FontFamily="{DynamicResource MonoFont}"
+                                                                                     Padding="{skin:Space 7,4}"
+                                                                                     FontSize="{DynamicResource FontSize04}" />
+                                                                        </StackPanel>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                        </StackPanel>
                                                     </Border>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>

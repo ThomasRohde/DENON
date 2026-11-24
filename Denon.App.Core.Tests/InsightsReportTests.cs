@@ -157,4 +157,103 @@ public sealed class InsightsReportTests
         Assert.Equal("TV: HDMI 2", items[3].Text);
         Assert.Equal("TV", items[3].Device);
     }
+
+    [Fact]
+    public void Activity_marks_covered_receiver_input_sessions_quiet_once_they_end()
+    {
+        var start = Now.AddHours(-2);
+        var end = start.AddMinutes(45);
+
+        // 1. Fully covered Media Player session under Apple TV (exclusiveSec = 0) -> both start and end become quiet.
+        //    Pass newest-first (as QueryRecentEvents returns) to verify order-independence.
+        var newestFirst = new[]
+        {
+            Ev("media", "avr", "session.ended", "external", end, new
+            {
+                kind = "avr_input",
+                title = "Media Player",
+                input = "MPLAY",
+                durationSec = 2700,
+                coveredSec = 2700,
+                exclusiveSec = 0,
+                coveredBy = new[] { "appletv:Stuen" },
+            }),
+            Ended(end, "appletv", "Night Train", 2700, 2700, app: "DRTV"),
+            Ev("media", "appletv", "session.started", "external", start.AddSeconds(15), new
+            {
+                kind = "appletv",
+                title = "Night Train",
+                app = "DRTV",
+                dwellConfirmedSec = 15,
+            }),
+            Ev("media", "avr", "session.started", "external", start.AddSeconds(15), new
+            {
+                kind = "avr_input",
+                title = "Media Player",
+                input = "MPLAY",
+                dwellConfirmedSec = 15,
+            }),
+        };
+
+        var items = ActivityFeed.Describe(newestFirst);
+        Assert.True(items[0].Quiet); // Media Player session.ended
+        Assert.False(items[1].Quiet); // Apple TV session.ended
+        Assert.False(items[2].Quiet); // Apple TV session.started
+        Assert.True(items[3].Quiet); // Media Player session.started (covered once ended!)
+
+        // 2. Receiver TV Audio session predominantly covered by Chromecast (brief menu tail) -> both start & end quiet.
+        var castStart = Now.AddMinutes(-50);
+        var castEnd = castStart.AddMinutes(30);
+        var castCovered = ActivityFeed.Describe(new[]
+        {
+            Ev("media", "avr", "session.started", "external", castStart.AddSeconds(15), new
+            {
+                kind = "avr_input",
+                title = "TV Audio",
+                input = "TV",
+                dwellConfirmedSec = 15,
+            }),
+            Ev("media", "avr", "session.ended", "external", castEnd, new
+            {
+                kind = "avr_input",
+                title = "TV Audio",
+                input = "TV",
+                durationSec = 1830,
+                coveredSec = 1800,
+                exclusiveSec = 30,
+                coveredBy = new[] { "cast:Stuen 2" },
+            }),
+        });
+        Assert.True(castCovered[0].Quiet);
+        Assert.True(castCovered[1].Quiet);
+
+        // 3. Uncovered receiver session (Blu-ray) and a still-running receiver session stay visible (Quiet = false).
+        var activeAndUncovered = ActivityFeed.Describe(new[]
+        {
+            Ev("media", "avr", "session.started", "external", start.AddSeconds(15), new
+            {
+                kind = "avr_input",
+                title = "Blu-ray",
+                input = "BD",
+                dwellConfirmedSec = 15,
+            }),
+            Ev("media", "avr", "session.ended", "external", end, new
+            {
+                kind = "avr_input",
+                title = "Blu-ray",
+                input = "BD",
+                durationSec = 2700,
+                coveredSec = 0,
+                exclusiveSec = 2700,
+            }),
+            Ev("media", "avr", "session.started", "external", Now.AddMinutes(-5), new
+            {
+                kind = "avr_input",
+                title = "Media Player",
+                input = "MPLAY",
+                dwellConfirmedSec = 15,
+            }),
+        });
+        Assert.All(activeAndUncovered, item => Assert.False(item.Quiet));
+    }
 }

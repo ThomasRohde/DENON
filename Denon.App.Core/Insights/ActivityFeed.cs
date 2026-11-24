@@ -22,8 +22,42 @@ public static class ActivityFeed
         string Text,
         bool Quiet);
 
-    public static IReadOnlyList<Item> Describe(IEnumerable<JsonElement> events) =>
-        events.Select(Describe).Where(i => i is not null).Select(i => i!).ToList();
+    private sealed record CoveredSessionWindow(
+        string Kind,
+        string Device,
+        string PhysicalDevice,
+        string Input,
+        string Title,
+        DateTimeOffset Start,
+        DateTimeOffset End);
+
+    public static IReadOnlyList<Item> Describe(IEnumerable<JsonElement> events)
+    {
+        var list = events.ToList();
+        var coveredWindows = CollectCoveredEndedSessions(list);
+        var items = new List<Item>(list.Count);
+
+        foreach (var ev in list)
+        {
+            var item = Describe(ev);
+            if (item is null)
+            {
+                continue;
+            }
+
+            if (!item.Quiet &&
+                string.Equals(item.Event, "session.started", StringComparison.Ordinal) &&
+                coveredWindows.Count > 0 &&
+                MatchesCoveredEndedSession(ev, coveredWindows))
+            {
+                item = item with { Quiet = true };
+            }
+
+            items.Add(item);
+        }
+
+        return items;
+    }
 
     public static Item? Describe(JsonElement ev)
     {
@@ -72,7 +106,7 @@ public static class ActivityFeed
                     ? $"{label}: {WatchTimeReport.FormatDuration(seconds)}"
                     : $"{label} ended (counted under another session)";
                 icon = "stop";
-                quiet = seconds == 0;
+                quiet = seconds == 0 || (data.ValueKind == JsonValueKind.Object && IsCoveredReceiverInput(kind, data));
                 break;
             }
 
@@ -207,6 +241,164 @@ public static class ActivityFeed
         _ when stream == EventTelemetryLog.StreamAvr => device,
         _ => device,
     };
+
+    private static List<CoveredSessionWindow> CollectCoveredEndedSessions(List<JsonElement> events)
+    {
+        var windows = new List<CoveredSessionWindow>();
+        foreach (var ev in events)
+        {
+            if (ev.ValueKind != JsonValueKind.Object ||
+                !string.Equals(Str(ev, "event"), "session.ended", StringComparison.Ordinal) ||
+                !TryParseTs(ev, out var endTs) ||
+                !ev.TryGetProperty("data", out var data) ||
+                data.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            var kind = DataStr(data, "kind") ?? string.Empty;
+            if (!IsCoveredEndedSession(kind, data))
+            {
+                continue;
+            }
+
+            var duration = Math.Max(0, DataNum(data, "durationSec") ?? 0);
+            windows.Add(new CoveredSessionWindow(
+                kind,
+                Str(ev, "device") ?? string.Empty,
+                PhysicalDevice(data),
+                DataStr(data, "input") ?? string.Empty,
+                DataStr(data, "title") ?? string.Empty,
+                endTs.AddSeconds(-duration),
+                endTs));
+        }
+
+        return windows;
+    }
+
+    private static bool IsCoveredEndedSession(string kind, JsonElement data)
+    {
+        var exclusive = DataNum(data, "exclusiveSec");
+        if (exclusive is not null && (int)Math.Round(exclusive.Value) == 0)
+        {
+            return true;
+        }
+
+        return IsCoveredReceiverInput(kind, data);
+    }
+
+    /// <summary>
+    /// True when a receiver-input session (<c>avr_input</c>) was covered by a Chromecast or Apple TV session
+    /// for at least as long as its own uncovered remainder (suppressing brief menu/switch tails too).
+    /// </summary>
+    private static bool IsCoveredReceiverInput(string kind, JsonElement data)
+    {
+        if (!string.Equals(kind, "avr_input", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var covered = DataNum(data, "coveredSec") ?? 0;
+        if (covered <= 0 || !HasStreamerCoverer(data))
+        {
+            return false;
+        }
+
+        var duration = DataNum(data, "durationSec") ?? covered;
+        var exclusive = DataNum(data, "exclusiveSec") ?? Math.Max(0, duration - covered);
+        return covered >= exclusive;
+    }
+
+    private static bool HasStreamerCoverer(JsonElement data)
+    {
+        if (!data.TryGetProperty("coveredBy", out var el) || el.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        foreach (var entry in el.EnumerateArray())
+        {
+            if (entry.ValueKind == JsonValueKind.String && entry.GetString() is { } label &&
+                (label.StartsWith("cast:", StringComparison.OrdinalIgnoreCase) ||
+                 label.StartsWith("appletv:", StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool MatchesCoveredEndedSession(JsonElement ev, List<CoveredSessionWindow> windows)
+    {
+        if (!TryParseTs(ev, out var startTs) ||
+            !ev.TryGetProperty("data", out var data) ||
+            data.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        var kind = DataStr(data, "kind") ?? string.Empty;
+        var device = Str(ev, "device") ?? string.Empty;
+        var physical = PhysicalDevice(data);
+        var input = DataStr(data, "input") ?? string.Empty;
+        var title = DataStr(data, "title") ?? string.Empty;
+        var dwell = Math.Max(0, DataNum(data, "dwellConfirmedSec") ?? 0);
+        var effectiveStart = startTs.AddSeconds(-dwell);
+
+        foreach (var w in windows)
+        {
+            if (!string.Equals(w.Kind, kind, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (w.Device.Length > 0 && device.Length > 0 &&
+                !string.Equals(w.Device, device, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            // The envelope's device is the plugin id, shared by every Cast device or Apple TV it manages.
+            if (w.PhysicalDevice.Length > 0 && physical.Length > 0 &&
+                !string.Equals(w.PhysicalDevice, physical, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var sameTarget = string.Equals(kind, "avr_input", StringComparison.OrdinalIgnoreCase)
+                ? (w.Input.Length > 0 && input.Length > 0 && string.Equals(w.Input, input, StringComparison.OrdinalIgnoreCase)) ||
+                  (w.Title.Length > 0 && title.Length > 0 && string.Equals(w.Title, title, StringComparison.OrdinalIgnoreCase))
+                : w.Title.Length > 0 && title.Length > 0 && string.Equals(w.Title, title, StringComparison.OrdinalIgnoreCase);
+
+            if (!sameTarget)
+            {
+                continue;
+            }
+
+            if (startTs <= w.End.AddSeconds(5) &&
+                effectiveStart >= w.Start.AddSeconds(-10) &&
+                effectiveStart <= w.End.AddSeconds(5))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string PhysicalDevice(JsonElement data) =>
+        DataStr(data, "castDevice") ?? DataStr(data, "appleTvDevice") ?? string.Empty;
+
+    private static bool TryParseTs(JsonElement ev, out DateTimeOffset ts)
+    {
+        ts = default;
+        return Str(ev, "ts") is { } raw &&
+               DateTimeOffset.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out ts);
+    }
+
+    private static double? DataNum(JsonElement data, string name) =>
+        data.TryGetProperty(name, out var el) && el.ValueKind == JsonValueKind.Number && el.TryGetDouble(out var n) ? n : null;
 
     private static string Fmt(double? value) => value is { } v ? v.ToString("0.#", CultureInfo.InvariantCulture) : "?";
 

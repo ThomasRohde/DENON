@@ -610,7 +610,7 @@ public sealed partial class MainViewModel
             troubleshooting:
             [
                 new("An app trigger did not run a second time?", "A rule runs once when the program starts and then waits for its Cooldown (seconds). Click Test to check a rule at once."),
-                new("A plugin step fails with 'Missing … parameter'?", "The scene editor cannot set action parameters yet. Use an action that needs no parameter, or run the action from MCP."),
+                new("A plugin step fails with 'Missing … parameter'?", "Fill in the required action parameters shown under PLUGIN ACTION CHAIN (for example entityId for Home Assistant or roomId for Philips Hue) and click Save Scenes."),
                 new("Bass and Treble do not change?", "The receiver turns off tone control while Dynamic EQ is ON."),
             ],
             quickJumps:

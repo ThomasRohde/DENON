@@ -15,12 +15,20 @@ Phase 2 is done in 1.18.0: YouTube / YouTube Music and jukebox tracks are decode
       HEOS. Try 300–400 ms by ear. The same value times lyrics and the Cinema video. If one value cannot fit all,
       add a separate meter trim.
 - [ ] A seek inside a jukebox track is not tested (the app has no seek bar; a range read does not restart the clock).
-- [ ] **Phase 3: opt-in "ROOM" mode (PC microphone)** for TV/ARC, HDMI and Chromecast audio that the app cannot tap.
-      Needs AGC, a noise gate, a clear "mic on" badge and a setting (off by default).
-- [ ] **Philips Hue Music Sync** still reacts to the live PC output (`PluginHostService.PublishAudioFrame`).
-      Decide if it should follow the same router (and the HEOS delay during PC Cast).
+- [x] **Phase 3: opt-in "ROOM" mode (PC microphone)** for TV/ARC, HDMI and Chromecast audio that the app cannot tap.
+      Implemented (`RoomMicDspProcessor` 35 Hz HPF, adaptive noise floor + soft-knee noise gate, gated smooth AGC,
+      privacy-first `RoomMicGate` that releases the mic immediately on standby/mute/disconnect/hidden meters/opt-out,
+      `ROOM · MIC` / `ROOM MIC FFT` badges, and Settings toggle + capture device picker, off by default).
+- [x] **Philips Hue Music Sync** now follows the same meter router (`LiveAudioAnalyzerService` routed ~60 Hz
+      `PluginAudioFrame` publisher: HEOS-delayed PC Cast, synced YouTube/jukebox frames, active Room Mic, silence on
+      mute/simulated, and PC loopback fallback when the Denon is off or idle).
 - [ ] Verify live: the **DENON** badge during PC Cast (meters in sync with the speakers) and the **MUTED** badge.
-- [ ] RTA during PC Cast from a non-default output device falls back to SIM. Option: run the FFT on the cast capture itself.
+- [ ] Verify live: ROOM mode with a real microphone (only tested with synthetic audio): the mic opens and closes as
+      the hints say (no mic at a start in the tray; Hue Music Sync keeps it open with the meters hidden), the gate
+      and AGC on real TV audio, and Hue beats. Known limit: a perfectly steady sound (a test tone, a hum) for more
+      than ~8 s becomes the noise floor and closes the gate; program audio with normal dips stays open.
+- [x] RTA during PC Cast from a non-default output device no longer falls back to SIM: `PcCastAudioMeterPipeline` runs
+      a 512-pt 31-band FFT directly on the PC Cast capture stream (both default and non-default output devices).
 
 ## Habit telemetry
 
@@ -30,19 +38,20 @@ Phase 2 is done in 1.18.0: YouTube / YouTube Music and jukebox tracks are decode
 
 - [ ] Verify live on the installed app with the real event log (tested with the dev build on 40 days of made-up
       events, Dark/Hi-Fi and Light/Default, Today to 90 days, phone width).
-- [ ] The Open Insights button sits at the bottom of the Settings left column. Consider a second entry point (Brain
-      page, tray menu or the status line).
+- [x] Added two additional entry points to Open Insights: on the Brain page (`LEARNED LOCAL PREFERENCES` card) and in
+      the `MainWindow` bottom status line.
 - [ ] A website screenshot of Insights (needs made-up data, not the personal log).
-- [ ] The activity feed lists the receiver-input session start under a cast or Apple TV session ("Started Media
-      Player"). Consider marking covered sessions quiet once they end.
+- [x] Covered receiver-input sessions in the activity feed: `ActivityFeed.Describe` now marks both `session.started` and
+      `session.ended` quiet once a receiver-input session ends covered by a Chromecast or Apple TV session (uncovered
+      and still-running sessions stay visible).
 
 ## MCP: plugin tools
 
 The bridge returns JSON + images and uses declared parameters/hints since app 1.16.0 / SDK 1.16 (Chromecast plugin 0.2.0 uses it).
 
-- [ ] The **Smart Scene editor** cannot set action parameters. A scene step for an action with a required
-      parameter (for example `ha.trigger_entity` → `entityId`) fails with "Missing 'entityId' parameter". Add a
-      parameter editor driven by `PluginActionDescriptor.Parameters`.
+- [x] The **Smart Scene editor** (and Automation Rule editor) now includes a parameter editor driven by
+      `PluginActionDescriptor.Parameters` (`Name`, `Type`, `Description`, `Required`) when adding steps and inline on
+      existing steps, with live required-field indicators and persisted `Parameters`.
 - [ ] LG TV actions `tv.button`, `tv.launch_app`, `tv.type_text`, `tv.open_url` are implemented but not listed in
       `GetActions` (the curated `tv_computer` MCP tool covers them). Decide if they should be listed.
 
@@ -50,13 +59,14 @@ The bridge returns JSON + images and uses declared parameters/hints since app 1.
 
 - [ ] Only one Cast device (Stuen 2, 192.168.1.20) is online. The second device the user expects was not found by
       mDNS or by a port-8009 scan on 2026-11-23. Check if it is off, in deep standby, or on another network.
-- [ ] Windows marks the Wi-Fi as a **Public** network. mDNS works for the installed app (it has an inbound rule),
-      but consider documenting "set the network to Private".
+- [x] Documented Windows **Private vs. Public** network profile for mDNS in `external-plugins/Denon.Plugin.Chromecast/README.md`.
 - [ ] Speaker groups (`Google Cast Group`) are skipped.
 - [ ] Netflix shares only "Netflix" as the media title (no program or episode), so all Netflix viewing is one session
       per app run (`hasTitle: false` since plugin 0.1.1). It does report PLAYING/PAUSED, so `watchedSec` is right.
       Check if play/pause commands work for Netflix.
-- [ ] Extend `CastAppNames` with more app ids as they show up in the logs (for example TV 2 Play, Prime Video).
+- [x] Extended `CastAppNames` with verified Nordic and major Cast app IDs (YouTube Music, Prime Video, Viaplay, SVT Play,
+      NRK TV/Radio, Yle Areena, Twitch, Plex, Jellyfin, BBC iPlayer/Sounds, SoundCloud, etc.) plus display-name cleanup
+      for dynamic-ID services (TV 2 Play, Max, SkyShowtime, Apple TV+).
 
 ## Apple TV plugin
 
@@ -77,10 +87,17 @@ Native .NET (no Python), protocol logic ported from pyatv (MIT). See `external-p
       now playing in the dashboard and the hero (the Apple TV is on Denon input MPLAY), MRP play/pause (DRTV
       on-demand pauses; DRTV live answers "command failed"), watch sessions, `app_shutdown` on app exit, sleep
       detected and the now-playing link closed, no wake in 3.5 min of Companion polling while asleep.
-- [ ] Power button on the remote: the program ends ~30 s before tvOS reports Asleep, so the session ends with
-      `app_closed`, not `standby`. Consider a short grace period before the end reason is chosen.
-- [ ] Hide or grey out the hero's pause button when the app does not support pause (read `supportedCommands`
-      from SET_STATE).
+- [x] Power button on the remote: `AppleTvWatchLog` now uses a 35 s `StandbyGracePeriod` before finalizing `app_closed`
+      (freezing duration/watchedSec/avgVolume at stop time) so remote power-off logs `standby` when tvOS reports
+      `Asleep` within 35 s.
+- [x] Disable/grey out the pause button when the app does not support pause: `MrpNowPlaying` parses `supportedCommands`
+      from `SET_STATE`, exposes `canPause` / `"APPLE TV LIVE • …"`, disables Pause with tooltip on the Apple TV
+      dashboard, and gates the hero & tray flyout `PlayPauseCommand` via `CanPauseTransport`. Only an explicit
+      `Pause` command counts (the app sends Pause, not TogglePlayPause).
+- [ ] Release order: the next Apple TV plugin writes `APPLE TV LIVE • …`, which only an app newer than 2.4.1 reads.
+      An older app drops a live program from the hero. Release the app first, or both together.
+- [ ] Verify live: the 35 s standby grace (power button → `standby`), and that Pause is greyed out on DRTV live and
+      enabled on DRTV on-demand.
 - [ ] Verify live with the user's OK: Denon automations on wake/sleep, `key`, `launch-app`, `power-on/off`.
 - [ ] DRTV autoplay: when DRTV goes on to the next episode by itself, tvOS reports no player until the user
       pauses/resumes (seen 2026-11-23: "Løftet" -> "Straffen"; 7 stale paused avkit players, no now-playing client).
@@ -117,7 +134,9 @@ Design and decisions: `docs/theming.md` (branch `theming-2.0`).
       second monitor with another scale that the window opens there at the right size.
 - [ ] Check live in the installed app: tray flyout, YouTube cinema window, Chromecast and Apple TV pages in Light and
       in each skin (screenshot mode does not show them).
-- [ ] Help topic badges and scene colors are content colors (not themed): check that they read on Light.
+- [x] Help topic badges and scene colors on Light: added WCAG 2 luminance `BadgeContrastHelper` (>= 4.5:1 contrast) so
+      solid scene/station badges choose the highest-contrast theme ink with a subtle border, and Help/Plugin accent
+      badges adapt on Light surfaces while leaving Dark untouched (live refresh on `ThemeChanged`).
 - [ ] Decide user theme files (JSON tokens, validated on import; no loose XAML).
 - [ ] Semantic aliases (Success/Warning/Danger/Info/Accent) over the hue families, so a theme can recolor states.
 - [ ] Plugin SDK theme API (`ThemeChanged`, token list) if a plugin ever draws with theme colors in code.
@@ -136,15 +155,16 @@ Design and decisions: `docs/theming.md` (branch `theming-2.0`).
 
 ## Settings saves
 
-- [ ] Three more saves use the one-shot `_suppressNextSettingsReload` flag (`MainViewModel.cs` line ~237,
-      `MainViewModel.CastRemoteRadio.cs` ~464/475, `MainViewModel.StudioAndSync.cs` ~361). Two overlapping saves can
-      still reload the settings editor and drop unsaved edits, and each save reconnects HEOS events. Move them to
-      targeted saves like `SaveUiStateAsync` (the theme and skin chips were fixed this way after the Codex review).
+- [x] Eliminated all three `_suppressNextSettingsReload` sites: dB toggle now uses `SaveUiStateAsync`, and Phone Remote
+      toggle/token rotation plus acoustic lip-sync calibration use atomic `AppSettingsStore.UpdateQuietAsync`
+      (respecting corrupt-file recovery with no editor reloads or HEOS reconnects on overlapping saves).
 
 ## In-app updates
 
 - [x] Verify live: the first real update (2.3.0 → 2.4.0 on the user's PC, Update → Download and install) worked.
-- [ ] Plugin updates (Chromecast `chromecast-v*`, Apple TV `appletv-v*`) through the same check.
+- [x] Plugin updates (Chromecast `chromecast-v*`, Apple TV `appletv-v*`) through the same check (`UpdateService.CheckForUpdatesAsync`
+      checks app + external plugins in a single request and surfaces them with release notes and release-page links in
+      the status line and update panel).
 - [ ] Code signing would let the update check who made the installer, not only that it arrived intact.
 
 ## Release / build

@@ -99,6 +99,7 @@ public partial class AnalogVuMeterControl : UserControl
     public static Color SourceColor(AudioMeterSource source) => source switch
     {
         AudioMeterSource.Denon => MeterPalette.Current.SourceDenon,
+        AudioMeterSource.Room => MeterPalette.Current.SourceRoom,
         AudioMeterSource.Pc => MeterPalette.Current.SourcePc,
         AudioMeterSource.Muted => MeterPalette.Current.SourceMuted,
         AudioMeterSource.Simulated => MeterPalette.Current.SourceSimulated,
@@ -108,6 +109,7 @@ public partial class AnalogVuMeterControl : UserControl
     public static string SourceToolTip(AudioMeterSource source) => source switch
     {
         AudioMeterSource.Denon => "Real audio this app streams to the Denon (PC Cast, YouTube, jukebox), lined up with the speakers by the measured HEOS delay.",
+        AudioMeterSource.Room => "Listening via PC microphone / Line-In (opt-in Room mode) while the Denon plays an external source (TV, HDMI, Chromecast…).",
         AudioMeterSource.Simulated => "The Denon plays a source the app cannot hear (TV, HDMI, Spotify…). Simulated from the Denon volume.",
         AudioMeterSource.Muted => "The Denon is muted.",
         AudioMeterSource.Pc => "The Denon is off or idle. Showing this PC's own audio output, not the Denon.",
@@ -122,7 +124,12 @@ public partial class AnalogVuMeterControl : UserControl
         }
 
         _lastSource = source;
-        var text = source == AudioMeterSource.Denon ? "DENON · SYNCED" : AudioMeterSourceRouter.BadgeText(source);
+        var text = source switch
+        {
+            AudioMeterSource.Denon => "DENON · SYNCED",
+            AudioMeterSource.Room => "ROOM · MIC",
+            _ => AudioMeterSourceRouter.BadgeText(source),
+        };
         var color = SourceColor(source);
         LeftDial.SetSource(text, color);
         RightDial.SetSource(text, color);

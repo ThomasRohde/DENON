@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Denon.App.Core.Plugins;
 using Denon.App.Core.Services;
 using Denon.App.Desktop.Infrastructure;
 using Microsoft.Win32;
@@ -14,6 +15,42 @@ namespace Denon.App.Desktop.Services;
 public sealed record AppRelease(Version Version, string Tag, string Notes, string PageUrl, string? InstallerUrl, string? ChecksumsUrl)
 {
     public string Label => Version.ToString(3);
+}
+
+/// <summary>An external plugin release on GitHub: its plugin id, version, notes, release page and zip download link.</summary>
+public sealed record PluginRelease(
+    string PluginId,
+    Version Version,
+    string Tag,
+    string Notes,
+    string PageUrl,
+    string? ZipUrl,
+    string? ChecksumsUrl)
+{
+    public string Label => Version.ToString(3);
+}
+
+/// <summary>An available update for an installed external plugin.</summary>
+public sealed record PluginUpdateInfo(
+    string PluginId,
+    string PluginName,
+    string CurrentVersion,
+    Version LatestVersion,
+    string Tag,
+    string ReleaseNotes,
+    string ReleaseUrl,
+    string? ZipUrl,
+    string? ChecksumsUrl)
+{
+    public string LatestVersionLabel => LatestVersion.ToString(3);
+}
+
+/// <summary>Combined result of checking GitHub for both app and installed external plugin updates.</summary>
+public sealed record UpdateCheckResult(
+    AppRelease? AppUpdate,
+    IReadOnlyList<PluginUpdateInfo> PluginUpdates)
+{
+    public bool HasAnyUpdate => AppUpdate is not null || PluginUpdates.Count > 0;
 }
 
 /// <summary>
@@ -128,6 +165,93 @@ public sealed partial class UpdateService : IDisposable
     }
 
     /// <summary>
+    /// Checks GitHub for both a newer app release and newer external plugin releases (chromecast-v*, appletv-v*)
+    /// matching <paramref name="installedPlugins"/>, reusing a single releases request when external plugins are installed.
+    /// </summary>
+    public async Task<UpdateCheckResult> CheckForUpdatesAsync(
+        IEnumerable<PluginRecordSnapshot>? installedPlugins = null,
+        string? asAppVersion = null,
+        CancellationToken cancellationToken = default)
+    {
+        var plugins = installedPlugins?.Where(p => IsTrackablePlugin(p.Id)).ToList() ?? [];
+        if (plugins.Count == 0)
+        {
+            var appOnly = await FindUpdateAsync(asAppVersion, cancellationToken);
+            return new UpdateCheckResult(appOnly, []);
+        }
+
+        var (releasesJson, latestPlugins) = await FetchPluginReleasesAsync(plugins, cancellationToken);
+        var latestApp = PickLatest(releasesJson)
+                        ?? PickLatest($"[{await _http.GetStringAsync(LatestReleaseApi, cancellationToken)}]");
+        var appUpdate = latestApp is not null && IsNewer(latestApp.Version, asAppVersion ?? AppInfo.Version)
+            ? latestApp
+            : null;
+        var pluginUpdates = MatchPluginUpdates(latestPlugins, plugins);
+        return new UpdateCheckResult(appUpdate, pluginUpdates);
+    }
+
+    /// <summary>
+    /// Checks GitHub for newer releases of any installed external plugins (chromecast-v*, appletv-v*).
+    /// Makes no network request when no trackable external plugin is installed.
+    /// </summary>
+    public async Task<IReadOnlyList<PluginUpdateInfo>> FindPluginUpdatesAsync(
+        IEnumerable<PluginRecordSnapshot> installedPlugins,
+        CancellationToken cancellationToken = default)
+    {
+        var plugins = installedPlugins.Where(p => IsTrackablePlugin(p.Id)).ToList();
+        if (plugins.Count == 0)
+        {
+            return [];
+        }
+
+        var (_, latestPlugins) = await FetchPluginReleasesAsync(plugins, cancellationToken);
+        return MatchPluginUpdates(latestPlugins, plugins);
+    }
+
+    /// <summary>Most release pages read to find an installed plugin's newest release (100 releases a page).</summary>
+    public const int MaxReleasePages = 5;
+
+    /// <summary>
+    /// The first releases page, and the newest release per plugin. The app is released more often than the
+    /// plugins, so a plugin's newest release can be past the first 100: later pages are read while an installed
+    /// plugin is still missing and the page was full.
+    /// </summary>
+    private async Task<(string FirstPage, IReadOnlyDictionary<string, PluginRelease> LatestPlugins)> FetchPluginReleasesAsync(
+        IReadOnlyCollection<PluginRecordSnapshot> plugins,
+        CancellationToken cancellationToken)
+    {
+        var firstPage = await _http.GetStringAsync(ReleasesApi, cancellationToken);
+        var latest = new Dictionary<string, PluginRelease>(PickLatestPlugins(firstPage), StringComparer.OrdinalIgnoreCase);
+        var pageJson = firstPage;
+        for (var page = 2;
+             page <= MaxReleasePages && ReleaseCount(pageJson) >= 100 && plugins.Any(p => !latest.ContainsKey(p.Id));
+             page++)
+        {
+            pageJson = await _http.GetStringAsync($"{ReleasesApi}&page={page}", cancellationToken);
+            foreach (var (id, release) in PickLatestPlugins(pageJson))
+            {
+                if (!latest.TryGetValue(id, out var have) || release.Version > have.Version)
+                {
+                    latest[id] = release;
+                }
+            }
+        }
+
+        return (firstPage, latest);
+    }
+
+    private static int ReleaseCount(string releasesJson)
+    {
+        using var doc = JsonDocument.Parse(releasesJson);
+        return doc.RootElement.ValueKind == JsonValueKind.Array ? doc.RootElement.GetArrayLength() : 0;
+    }
+
+    /// <summary>True when <paramref name="pluginId"/> corresponds to an external plugin published in this repository's GitHub releases.</summary>
+    public static bool IsTrackablePlugin(string? pluginId) =>
+        string.Equals(pluginId, NowPlayingResolver.ChromecastPluginId, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(pluginId, NowPlayingResolver.AppleTvPluginId, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// The newest published app release in a GitHub releases list: tags vX.Y.Z only (the plugins have their own
     /// tags), no drafts and no pre-releases.
     /// </summary>
@@ -149,22 +273,99 @@ public sealed partial class UpdateService : IDisposable
                 continue;
             }
 
-            string? Asset(string name) => release.TryGetProperty("assets", out var assets)
-                ? assets.EnumerateArray()
-                    .FirstOrDefault(a => string.Equals(a.GetProperty("name").GetString(), name, StringComparison.OrdinalIgnoreCase))
-                    is { ValueKind: JsonValueKind.Object } a ? a.GetProperty("browser_download_url").GetString() : null
-                : null;
-
             best = new AppRelease(
                 version,
                 tag,
                 release.TryGetProperty("body", out var body) ? body.GetString() ?? string.Empty : string.Empty,
                 release.TryGetProperty("html_url", out var page) ? page.GetString() ?? string.Empty : string.Empty,
-                Asset(InstallerName),
-                Asset(ChecksumsName));
+                AssetUrl(release, InstallerName),
+                AssetUrl(release, ChecksumsName));
         }
 
         return best;
+    }
+
+    /// <summary>
+    /// The newest published release per external plugin in a GitHub releases list: tags <c>chromecast-vX.Y.Z</c>
+    /// and <c>appletv-vX.Y.Z</c>, skipping drafts and pre-releases.
+    /// </summary>
+    public static IReadOnlyDictionary<string, PluginRelease> PickLatestPlugins(string releasesJson)
+    {
+        using var doc = JsonDocument.Parse(releasesJson);
+        var bestByPlugin = new Dictionary<string, PluginRelease>(StringComparer.OrdinalIgnoreCase);
+        foreach (var release in doc.RootElement.EnumerateArray())
+        {
+            var tag = release.TryGetProperty("tag_name", out var tagProp) ? tagProp.GetString() ?? string.Empty : string.Empty;
+            if (Bool(release, "draft") || Bool(release, "prerelease") || !TryParsePluginTag(tag, out var pluginId, out var version))
+            {
+                continue;
+            }
+
+            if (bestByPlugin.TryGetValue(pluginId, out var existing) && version <= existing.Version)
+            {
+                continue;
+            }
+
+            bestByPlugin[pluginId] = new PluginRelease(
+                pluginId,
+                version,
+                tag,
+                release.TryGetProperty("body", out var body) ? body.GetString() ?? string.Empty : string.Empty,
+                release.TryGetProperty("html_url", out var page) ? page.GetString() ?? string.Empty : string.Empty,
+                AssetUrlEndingWith(release, ".zip"),
+                AssetUrl(release, ChecksumsName));
+        }
+
+        return bestByPlugin;
+    }
+
+    /// <summary>
+    /// Compares the latest plugin releases in <paramref name="releasesJson"/> against <paramref name="installedPlugins"/>
+    /// and returns every installed external plugin that has a strictly newer published release.
+    /// </summary>
+    public static IReadOnlyList<PluginUpdateInfo> MatchPluginUpdates(
+        string releasesJson,
+        IEnumerable<PluginRecordSnapshot> installedPlugins) =>
+        MatchPluginUpdates(PickLatestPlugins(releasesJson), installedPlugins);
+
+    /// <summary>Every installed external plugin with a strictly newer release in <paramref name="latestByPlugin"/>.</summary>
+    public static IReadOnlyList<PluginUpdateInfo> MatchPluginUpdates(
+        IReadOnlyDictionary<string, PluginRelease> latestByPlugin,
+        IEnumerable<PluginRecordSnapshot> installedPlugins)
+    {
+        if (latestByPlugin.Count == 0)
+        {
+            return [];
+        }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var updates = new List<PluginUpdateInfo>();
+        foreach (var plugin in installedPlugins)
+        {
+            if (string.IsNullOrWhiteSpace(plugin.Id) || !seen.Add(plugin.Id))
+            {
+                continue;
+            }
+
+            if (!latestByPlugin.TryGetValue(plugin.Id, out var release) || !IsNewer(release.Version, plugin.Version))
+            {
+                continue;
+            }
+
+            updates.Add(new PluginUpdateInfo(
+                PluginId: plugin.Id,
+                PluginName: string.IsNullOrWhiteSpace(plugin.Name) ? plugin.Id : plugin.Name,
+                CurrentVersion: plugin.Version,
+                LatestVersion: release.Version,
+                Tag: release.Tag,
+                ReleaseNotes: release.Notes,
+                ReleaseUrl: release.PageUrl,
+                ZipUrl: release.ZipUrl,
+                ChecksumsUrl: release.ChecksumsUrl));
+        }
+
+        updates.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.PluginName, b.PluginName));
+        return updates;
     }
 
     /// <summary>True when <paramref name="candidate"/> is newer than the running version (for example "2.2.2").</summary>
@@ -297,10 +498,81 @@ public sealed partial class UpdateService : IDisposable
 
     private static bool Bool(JsonElement e, string name) => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.True;
 
+    private static string? AssetUrl(JsonElement release, string name)
+    {
+        if (!release.TryGetProperty("assets", out var assets) || assets.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        foreach (var asset in assets.EnumerateArray())
+        {
+            if (asset.ValueKind == JsonValueKind.Object &&
+                asset.TryGetProperty("name", out var n) &&
+                string.Equals(n.GetString(), name, StringComparison.OrdinalIgnoreCase) &&
+                asset.TryGetProperty("browser_download_url", out var url))
+            {
+                return url.GetString();
+            }
+        }
+
+        return null;
+    }
+
+    private static string? AssetUrlEndingWith(JsonElement release, string suffix)
+    {
+        if (!release.TryGetProperty("assets", out var assets) || assets.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        foreach (var asset in assets.EnumerateArray())
+        {
+            if (asset.ValueKind == JsonValueKind.Object &&
+                asset.TryGetProperty("name", out var n) &&
+                n.GetString() is { } fileName &&
+                fileName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) &&
+                asset.TryGetProperty("browser_download_url", out var url))
+            {
+                return url.GetString();
+            }
+        }
+
+        return null;
+    }
+
+    private static bool TryParsePluginTag(string tag, out string pluginId, out Version version)
+    {
+        if (PluginTag().Match(tag) is { Success: true } match)
+        {
+            pluginId = match.Groups[1].Value.ToLowerInvariant() switch
+            {
+                "chromecast" => NowPlayingResolver.ChromecastPluginId,
+                "appletv" => NowPlayingResolver.AppleTvPluginId,
+                _ => string.Empty,
+            };
+            if (pluginId.Length > 0)
+            {
+                version = new Version(
+                    int.Parse(match.Groups[2].Value),
+                    int.Parse(match.Groups[3].Value),
+                    int.Parse(match.Groups[4].Value));
+                return true;
+            }
+        }
+
+        pluginId = string.Empty;
+        version = new Version(0, 0, 0);
+        return false;
+    }
+
     private static Version Normalize(Version v) => new(v.Major, v.Minor, Math.Max(0, v.Build));
 
     [GeneratedRegex(@"^v(\d+)\.(\d+)\.(\d+)$")]
     private static partial Regex AppTag();
+
+    [GeneratedRegex(@"^(chromecast|appletv)-v(\d+)\.(\d+)\.(\d+)$")]
+    private static partial Regex PluginTag();
 
     [GeneratedRegex(@"^([0-9a-fA-F]{64})\s+\*?(.+)$")]
     private static partial Regex SumLine();

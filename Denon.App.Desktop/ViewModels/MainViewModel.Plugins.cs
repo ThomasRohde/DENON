@@ -11,6 +11,7 @@ namespace Denon.App.Desktop.ViewModels;
 
 public sealed class PluginCardViewModel : ObservableObject
 {
+    private readonly Color _accentColor;
     private bool _isSelected;
     private bool _isEnabled;
     private bool _isStarted;
@@ -28,7 +29,7 @@ public sealed class PluginCardViewModel : ObservableObject
         Category = snapshot.Category;
         IconGlyph = snapshot.IconGlyph;
         AccentHex = snapshot.AccentHex;
-        AccentBrush = CreateBrush(snapshot.AccentHex, "#00D4FF");
+        _accentColor = ParseColor(snapshot.AccentHex, "#00D4FF");
         OriginLabel = snapshot.Origin == PluginOrigin.BuiltIn ? "BUILT-IN" : "EXTERNAL DLL";
         AssemblyPath = snapshot.AssemblyPath ?? "Bundled inside Denon Desktop";
         HasDashboardView = snapshot.HasDashboardView;
@@ -63,7 +64,9 @@ public sealed class PluginCardViewModel : ObservableObject
 
     public string AccentHex { get; }
 
-    public Brush AccentBrush { get; }
+    public Brush AccentBrush => BadgeContrastHelper.CreateReadableAccentBrush(_accentColor);
+
+    public void RefreshThemeBrushes() => OnPropertyChanged(nameof(AccentBrush));
 
     public string OriginLabel { get; }
 
@@ -167,19 +170,15 @@ public sealed class PluginCardViewModel : ObservableObject
         return list.Count > 0 ? string.Join(" • ", list) : "Extension";
     }
 
-    private static Brush CreateBrush(string hex, string fallbackHex)
+    private static Color ParseColor(string hex, string fallbackHex)
     {
         try
         {
-            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
-            brush.Freeze();
-            return brush;
+            return (Color)ColorConverter.ConvertFromString(hex);
         }
         catch
         {
-            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(fallbackHex));
-            brush.Freeze();
-            return brush;
+            return (Color)ColorConverter.ConvertFromString(fallbackHex);
         }
     }
 }

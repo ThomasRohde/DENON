@@ -39,6 +39,9 @@ public sealed class AppSettingsStore
 
     public AppSettings Current => _current.Clone();
 
+    /// <summary>The HEOS sync offset without cloning the settings (read by the audio paths many times a second).</summary>
+    public int CinemaSyncOffsetMs => Volatile.Read(ref _current).Media?.CinemaSyncOffsetMs ?? 1800;
+
     public string? LastLoadWarning { get; private set; }
 
     /// <summary>True when this run created the settings file (a first start on this PC).</summary>
@@ -144,6 +147,39 @@ public sealed class AppSettingsStore
             await SaveInternalAsync(draft, cancellationToken);
             _current = draft;
             return true;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Atomically applies a targeted field-level mutation (such as Phone Remote toggles/token rotations or
+    /// calibrated lip-sync offsets) without raising <see cref="SettingsChanged"/>, so overlapping saves never
+    /// reload the settings editor (dropping unsaved edits) or reconnect HEOS events.
+    /// Normalizes the updated snapshot and preserves recovery safety when <see cref="LastLoadWarning"/> is set.
+    /// </summary>
+    public async Task<(AppSettings Settings, bool SavedToDisk)> UpdateQuietAsync(
+        Action<AppSettings> mutator,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(mutator);
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var draft = _current.Clone();
+            mutator(draft);
+            var normalized = Normalize(draft, seedDefaultsIfEmpty: false);
+            if (LastLoadWarning is not null)
+            {
+                _current = normalized;
+                return (_current.Clone(), false);
+            }
+
+            await SaveInternalAsync(normalized, cancellationToken);
+            _current = normalized;
+            return (_current.Clone(), true);
         }
         finally
         {
@@ -380,6 +416,8 @@ public sealed class AppSettingsStore
         normalized.Receiver.VolumePresets = NormalizeVolumePresets(normalized.Receiver.VolumePresets);
         normalized.Receiver.Stations = NormalizeStations(normalized.Receiver.Stations, seedDefaultsIfEmpty);
         normalized.Receiver.Scenes = NormalizeScenes(normalized.Receiver.Scenes, seedDefaultsIfEmpty);
+        normalized.Ui ??= new UiSettings();
+        normalized.Ui.MeterMicDeviceId = normalized.Ui.MeterMicDeviceId?.Trim() ?? string.Empty;
         normalized.Media ??= new MediaRelaySettings();
         normalized.Media.RelayPort = normalized.Media.RelayPort is >= 1024 and <= 65535
             ? normalized.Media.RelayPort

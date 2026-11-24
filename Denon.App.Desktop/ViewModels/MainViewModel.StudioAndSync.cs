@@ -1,9 +1,13 @@
+using System.Collections.ObjectModel;
 using System.Windows.Threading;
+using Denon.App.Core.Models;
 using Denon.App.Core.Services;
 using Denon.App.Desktop.Infrastructure;
 using Denon.App.Desktop.Services;
 
 namespace Denon.App.Desktop.ViewModels;
+
+public sealed record RoomMicDeviceChoice(string DeviceId, string FriendlyName);
 
 public sealed partial class MainViewModel
 {
@@ -28,9 +32,20 @@ public sealed partial class MainViewModel
     private bool _isCalibratingSync;
     private string _acousticCalibrationStatus = "Play a 1,750 Hz chirp through your Denon AVR and measure exact speaker delay via PC mic.";
 
+    // Room Mic Meter (Phase 3 opt-in ROOM mode for TV/ARC, HDMI & Chromecast)
+    // False until the window reports that it is shown: a start in the tray must not open the microphone.
+    private bool _isWindowVisibleForMeters;
+    private bool _isLoadingRoomMicSettings;
+    private bool _settingsAllowRoomMicMeter;
+    private string _settingsMeterMicDeviceId = string.Empty;
+    private bool _isRoomMicListening;
+
+    public ObservableCollection<RoomMicDeviceChoice> RoomMicCaptureDevices { get; } = [];
+
     public RelayCommand CycleMeterDisplayModeCommand { get; private set; } = null!;
     public RelayCommand ToggleLiveLyricsCommand { get; private set; } = null!;
     public AsyncRelayCommand RunAcousticCalibrationCommand { get; private set; } = null!;
+    public RelayCommand RefreshRoomMicDevicesCommand { get; private set; } = null!;
 
     public string MeterDisplayMode
     {
@@ -43,8 +58,156 @@ public sealed partial class MainViewModel
                 OnPropertyChanged(nameof(ShowRtaSpectrum));
                 OnPropertyChanged(nameof(IsAnyAudioMeterVisible));
                 OnPropertyChanged(nameof(MeterModeButtonLabel));
-                _liveAudioAnalyzer?.SetVuCaptureRequested(IsAnyAudioMeterVisible);
+                UpdateMeterCaptureRequest();
             }
+        }
+    }
+
+    public bool SettingsAllowRoomMicMeter
+    {
+        get => _settingsAllowRoomMicMeter;
+        set
+        {
+            if (SetProperty(ref _settingsAllowRoomMicMeter, value))
+            {
+                OnPropertyChanged(nameof(RoomMicStatusHint));
+                if (!_isLoadingRoomMicSettings)
+                {
+                    _ = SaveRoomMicSettingAsync(ui => ui.AllowRoomMicMeter = value);
+                }
+            }
+        }
+    }
+
+    public string SettingsMeterMicDeviceId
+    {
+        get => _settingsMeterMicDeviceId;
+        set
+        {
+            var normalized = value ?? string.Empty;
+            if (SetProperty(ref _settingsMeterMicDeviceId, normalized) && !_isLoadingRoomMicSettings)
+            {
+                _ = SaveRoomMicSettingAsync(ui => ui.MeterMicDeviceId = normalized);
+            }
+        }
+    }
+
+    public bool IsRoomMicListening
+    {
+        get => _isRoomMicListening;
+        private set
+        {
+            if (SetProperty(ref _isRoomMicListening, value))
+            {
+                OnPropertyChanged(nameof(RoomMicStatusHint));
+            }
+        }
+    }
+
+    public string RoomMicStatusHint => !SettingsAllowRoomMicMeter
+        ? "Off by default. Turn on to drive VU & RTA meters (and Hue Music Sync) from a PC microphone or Line-In for TV, HDMI & Chromecast audio."
+        : IsRoomMicListening
+            ? "ROOM mode active: the microphone is listening now. It closes on standby, mute or PC audio, and when the meters are hidden unless Hue Music Sync is on."
+            : "ROOM mode armed: listens only on TV/HDMI/Cast sources while the meters are visible or Hue Music Sync is on. Closes at once on standby or mute.";
+
+    public void SetWindowVisibleForMeters(bool isVisible)
+    {
+        if (_isWindowVisibleForMeters == isVisible)
+        {
+            return;
+        }
+
+        _isWindowVisibleForMeters = isVisible;
+        UpdateMeterCaptureRequest();
+    }
+
+    internal void UpdateMeterCaptureRequest()
+    {
+        var shouldCapture = _isWindowVisibleForMeters &&
+                            IsAnyAudioMeterVisible &&
+                            string.Equals(ActiveSection, "Control", StringComparison.OrdinalIgnoreCase);
+        _liveAudioAnalyzer?.SetVuCaptureRequested(shouldCapture);
+    }
+
+    private void LoadRoomMicSettings(UiSettings ui)
+    {
+        _isLoadingRoomMicSettings = true;
+        try
+        {
+            SettingsAllowRoomMicMeter = ui.AllowRoomMicMeter;
+            SettingsMeterMicDeviceId = ui.MeterMicDeviceId ?? string.Empty;
+            _liveAudioAnalyzer?.SetRoomMicDeviceId(SettingsMeterMicDeviceId);
+            _liveAudioAnalyzer?.SetRoomMicEnabled(SettingsAllowRoomMicMeter);
+            EnsureSelectedRoomMicDeviceListed(SettingsMeterMicDeviceId);
+        }
+        finally
+        {
+            _isLoadingRoomMicSettings = false;
+        }
+    }
+
+    private void RefreshRoomMicCaptureDevices()
+    {
+        var selectedId = SettingsMeterMicDeviceId;
+
+        // Clearing the list makes the ComboBox write null back through its SelectedValue binding. Hold the
+        // setter's save while the list is rebuilt, then select the saved device again.
+        var wasLoading = _isLoadingRoomMicSettings;
+        _isLoadingRoomMicSettings = true;
+        try
+        {
+            RoomMicCaptureDevices.Clear();
+
+            if (_liveAudioAnalyzer is not null)
+            {
+                foreach (var device in _liveAudioAnalyzer.GetCaptureDevices())
+                {
+                    RoomMicCaptureDevices.Add(new RoomMicDeviceChoice(device.DeviceId, device.FriendlyName));
+                }
+            }
+
+            if (RoomMicCaptureDevices.Count == 0)
+            {
+                RoomMicCaptureDevices.Add(new RoomMicDeviceChoice(string.Empty, "Default Microphone / Line-In"));
+            }
+
+            EnsureSelectedRoomMicDeviceListed(selectedId);
+            _settingsMeterMicDeviceId = selectedId;
+            OnPropertyChanged(nameof(SettingsMeterMicDeviceId));
+        }
+        finally
+        {
+            _isLoadingRoomMicSettings = wasLoading;
+        }
+    }
+
+    private void EnsureSelectedRoomMicDeviceListed(string deviceId)
+    {
+        if (string.IsNullOrWhiteSpace(deviceId))
+        {
+            return;
+        }
+
+        if (!RoomMicCaptureDevices.Any(d => string.Equals(d.DeviceId, deviceId, StringComparison.OrdinalIgnoreCase)))
+        {
+            RoomMicCaptureDevices.Add(new RoomMicDeviceChoice(deviceId, $"Saved microphone ({deviceId[..Math.Min(12, deviceId.Length)]}…)"));
+        }
+    }
+
+    private async Task SaveRoomMicSettingAsync(Action<UiSettings> mutator)
+    {
+        try
+        {
+            _liveAudioAnalyzer?.SetRoomMicDeviceId(SettingsMeterMicDeviceId);
+            _liveAudioAnalyzer?.SetRoomMicEnabled(SettingsAllowRoomMicMeter);
+            if (!await _settingsStore.SaveUiStateAsync(mutator))
+            {
+                StatusMessage = "Room Mic setting updated in memory. It is saved with your next Save & Sync (the settings file is being recovered).";
+            }
+        }
+        catch (Exception exception)
+        {
+            LastError = $"Could not save Room Mic setting: {exception.Message}";
         }
     }
 
@@ -144,6 +307,17 @@ public sealed partial class MainViewModel
 
         ToggleLiveLyricsCommand = new RelayCommand(_ => ShowLiveLyrics = !ShowLiveLyrics);
         RunAcousticCalibrationCommand = new AsyncRelayCommand(_ => RunAcousticCalibrationAsync(), _ => !IsCalibratingSync && CanControlReceiver(null));
+        RefreshRoomMicDevicesCommand = new RelayCommand(_ => RefreshRoomMicCaptureDevices());
+        RefreshRoomMicCaptureDevices();
+
+        if (_liveAudioAnalyzer is not null)
+        {
+            _liveAudioAnalyzer.RoomMicActiveChanged += active => _ = _dispatcher.InvokeAsync(() =>
+            {
+                IsRoomMicListening = active;
+            });
+            IsRoomMicListening = _liveAudioAnalyzer.IsRoomMicActive;
+        }
 
         _lyricsSyncTimer = new DispatcherTimer
         {
@@ -171,6 +345,8 @@ public sealed partial class MainViewModel
             return AudioMeterSource.Denon;
         }
 
+        UpdateMeterCaptureRequest();
+
         var hasPcSignal = _liveAudioAnalyzer?.GetLatestFrame().IsLiveSignal ?? false;
         var hasStreamFrame = TryGetAppStreamMeterFrame(out _, out _, bandsBuffer);
         var source = ResolveMeterSource(hasPcSignal, hasStreamFrame);
@@ -182,22 +358,21 @@ public sealed partial class MainViewModel
                 return AudioMeterSource.Denon;
 
             case AudioMeterSource.Denon:
-                // The FFT reads the Windows default output. It matches the cast only when the cast captures that device.
-                if (_pcAudioCastService.IsCastingDefaultDevice &&
-                    _liveAudioAnalyzer is not null &&
-                    _liveAudioAnalyzer.TryGetDelayedFrame(HeosSyncDelayMs, out _, out _, bandsBuffer))
+                // PC Cast: 31-band FFT computed directly on the cast capture (works for both default and non-default output devices).
+                if (!_pcAudioCastService.TryGetDelayedFrame(HeosSyncDelayMs, out _, out _, bandsBuffer))
                 {
-                    return AudioMeterSource.Denon;
+                    Array.Clear(bandsBuffer, 0, 31); // Synced silence (pause in the cast or initial buffer fill).
                 }
 
-                if (_pcAudioCastService.IsCastingDefaultDevice)
+                return AudioMeterSource.Denon;
+
+            case AudioMeterSource.Room:
+                if (_liveAudioAnalyzer is null || !_liveAudioAnalyzer.CopyRoomMicSpectrumBands(bandsBuffer))
                 {
-                    Array.Clear(bandsBuffer, 0, 31); // Synced silence (pause in the cast).
-                    return AudioMeterSource.Denon;
+                    Array.Clear(bandsBuffer, 0, 31);
                 }
 
-                FillSimulatedSpectrum(bandsBuffer, deltaSeconds);
-                return AudioMeterSource.Simulated;
+                return AudioMeterSource.Room;
 
             case AudioMeterSource.Pc when _liveAudioAnalyzer is not null && _liveAudioAnalyzer.CopySpectrumBands(bandsBuffer):
                 return AudioMeterSource.Pc;
@@ -357,15 +532,12 @@ public sealed partial class MainViewModel
 
             if (result.Success)
             {
-                SettingsCinemaSyncOffsetMs = result.MeasuredOffsetMs.ToString();
-                _suppressNextSettingsReload = true;
-                try
+                var (updated, savedToDisk) = await _settingsStore.UpdateQuietAsync(
+                    s => s.Media.CinemaSyncOffsetMs = result.MeasuredOffsetMs);
+                SettingsCinemaSyncOffsetMs = updated.Media.CinemaSyncOffsetMs.ToString();
+                if (!savedToDisk)
                 {
-                    await _settingsStore.UpdateAsync(s => s.Media.CinemaSyncOffsetMs = result.MeasuredOffsetMs);
-                }
-                finally
-                {
-                    _suppressNextSettingsReload = false;
+                    StatusMessage += " It is saved with your next Save & Sync (the settings file is being recovered).";
                 }
             }
         }

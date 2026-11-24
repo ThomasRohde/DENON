@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- **ROOM mode (opt-in, off by default).** Settings → YouTube & Local Audio Relay can drive the VU and RTA meters (and Hue Music Sync) from a PC microphone or line-in for TV/ARC, HDMI and Cast audio the app cannot tap. The mic opens only on such a source with the receiver on and unmuted, while the meters are visible or Hue Music Sync is on, and closes at once otherwise. A selected device is never swapped for another microphone. The meters show **ROOM**.
+- **Hue Music Sync follows the meter router:** HEOS-delayed PC Cast audio, the synced YouTube/jukebox stream, ROOM mode, silence when muted. Each beat reaches Hue once.
+- **PC Cast RTA from any output device:** the FFT runs on the cast capture itself (the same stereo mix the cast sends, also on 5.1/7.1 outputs), so a non-default device no longer falls back to SIM.
+- **Plugin updates** (Chromecast, Apple TV) show in the update check with release notes and a release-page link.
+- **Smart Scene and Automation editors** have fields for plugin action parameters (for example `entityId`), with required-field marks.
+- **Open Insights** also from the Brain page and the status line.
+- Badge text on scene, station and Help badges keeps at least 4.5:1 contrast in Light and Dark.
+
+### Changed
+- The activity feed hides receiver-input sessions that a Cast or Apple TV session covered.
+- More Cast app names (YouTube Music, Prime Video, Viaplay, SVT Play, NRK, Yle Areena, Twitch, Plex and others).
+- The Phone Remote switch, token rotation and lip-sync calibration save on their own, without reloading the settings editor or reconnecting HEOS.
+- The update panel scrolls its notes between a fixed title and fixed buttons.
+
 ## [2.4.1] - 2026-11-24
 
 ### Fixed

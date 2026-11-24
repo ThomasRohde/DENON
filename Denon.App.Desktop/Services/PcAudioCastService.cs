@@ -4,12 +4,122 @@ using System.Text;
 using System.Threading.Channels;
 using Denon.App.Core.Models;
 using Denon.App.Core.Services;
+using Denon.App.Core.Services.Metering;
+using Denon.App.PluginSdk;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
 namespace Denon.App.Desktop.Services;
 
 public sealed record AudioOutputDeviceOption(string DeviceId, string FriendlyName, bool IsDefault);
+
+/// <summary>
+/// Real-time stereo level + 31-band FFT + beat-onset pipeline for <see cref="PcAudioCastService"/>.
+/// Runs on the cast capture packets directly so BOTH default and non-default Windows output devices
+/// produce accurate HEOS-delayed VU meters, 31-band RTA spectra, and Hue Music Sync frames.
+/// </summary>
+internal sealed class PcCastAudioMeterPipeline
+{
+    private readonly object _analyzeLock = new();
+    private readonly AudioSpectrumAnalyzer _spectrum = new();
+    private readonly double[] _bandsScratch = new double[AudioMeterMath.BandCount];
+    private readonly AudioFrameHistory _history;
+
+    public PcCastAudioMeterPipeline(int historyCapacity = 1024)
+    {
+        _history = new AudioFrameHistory(historyCapacity);
+    }
+
+    public PluginAudioFrame ProcessCaptureBuffer(byte[] buffer, int bytesRecorded, WaveFormat format, long timestampMs)
+    {
+        var channels = Math.Max(1, format.Channels);
+        var bytesPerSample = Math.Max(1, format.BitsPerSample / 8);
+        var frameSize = channels * bytesPerSample;
+        if (bytesRecorded < frameSize || frameSize <= 0)
+        {
+            return new PluginAudioFrame(0, 0, 0, 0, 0, 0, false, false, timestampMs);
+        }
+
+        var isFloat = RoomMicDspProcessor.IsFloatFormat(format);
+        var frames = bytesRecorded / frameSize;
+        if (frames <= 0)
+        {
+            return new PluginAudioFrame(0, 0, 0, 0, 0, 0, false, false, timestampMs);
+        }
+
+        lock (_analyzeLock)
+        {
+            double sumL = 0, sumR = 0, peakL = 0, peakR = 0;
+
+            // Measure the stereo mix the cast sends (center and surrounds folded in on 5.1/7.1 endpoints).
+            for (var f = 0; f < frames; f++)
+            {
+                PcAudioCastService.ReadStereoDownmix(buffer, f * frameSize, channels, bytesPerSample, isFloat, out var l, out var r);
+                if (!float.IsFinite(l)) l = 0f;
+                if (!float.IsFinite(r)) r = 0f;
+
+                var absL = Math.Abs(l);
+                var absR = Math.Abs(r);
+                if (absL > peakL) peakL = absL;
+                if (absR > peakR) peakR = absR;
+                sumL += l * l;
+                sumR += r * r;
+
+                _spectrum.PushMonoSample((l + r) * 0.5f);
+            }
+
+            var rmsL = Math.Sqrt(sumL / frames);
+            var rmsR = Math.Sqrt(sumR / frames);
+            var leftLevel = AudioMeterMath.ToNormalizedLevel(peakL, rmsL);
+            var rightLevel = AudioMeterMath.ToNormalizedLevel(peakR, rmsR);
+            var isLive = peakL > AudioMeterMath.SilencePeak || peakR > AudioMeterMath.SilencePeak;
+
+            PluginAudioFrame frame;
+            if (isLive)
+            {
+                frame = _spectrum.Analyze(format.SampleRate, leftLevel, rightLevel, isLive: true, timestampMs, _bandsScratch);
+            }
+            else
+            {
+                Array.Clear(_bandsScratch, 0, _bandsScratch.Length);
+                frame = new PluginAudioFrame(0, 0, 0, 0, 0, 0, false, false, timestampMs);
+            }
+
+            _history.Add(in frame, _bandsScratch);
+            return frame;
+        }
+    }
+
+    public PluginAudioFrame RecordSilence(long timestampMs)
+    {
+        var silent = new PluginAudioFrame(0, 0, 0, 0, 0, 0, false, false, timestampMs);
+        lock (_analyzeLock)
+        {
+            _history.Add(in silent);
+        }
+
+        return silent;
+    }
+
+    public void Reset()
+    {
+        lock (_analyzeLock)
+        {
+            _spectrum.Reset();
+            Array.Clear(_bandsScratch, 0, _bandsScratch.Length);
+            _history.Clear();
+        }
+    }
+
+    public bool TryGetDelayedFrameAt(long nowTickMs, int delayMs, out double left, out double right, double[]? bandsDestination = null) =>
+        _history.TryGetAt(nowTickMs - Math.Max(0, delayMs), out left, out right, bandsDestination);
+
+    public bool TryGetDelayedAudioFrameAt(long nowTickMs, int delayMs, out PluginAudioFrame frame, double[]? bandsDestination = null) =>
+        _history.TryGetFrameAt(nowTickMs - Math.Max(0, delayMs), out frame, bandsDestination);
+
+    public bool TryGetBeatBetween(long afterTickMs, long upToTickMs, out double intensity) =>
+        _history.TryGetBeatBetween(afterTickMs, upToTickMs, out intensity);
+}
 
 public sealed class PcAudioCastService : IDisposable
 {
@@ -29,7 +139,7 @@ public sealed class PcAudioCastService : IDisposable
     private double _liveLeft;
     private double _liveRight;
     private long _liveSampleTick;
-    private readonly AudioFrameHistory _meterHistory = new(capacity: 1024);
+    private readonly PcCastAudioMeterPipeline _meterPipeline = new(historyCapacity: 1024);
 
     public PcAudioCastService(
         LocalAudioRelayServer relayServer,
@@ -57,9 +167,27 @@ public sealed class PcAudioCastService : IDisposable
 
     /// <summary>The cast meter level from <paramref name="delayMs"/> ago: what the Denon plays now, after the HEOS buffer.</summary>
     public AudioMeterSample GetDelayedMeterSample(int delayMs) =>
-        _meterHistory.TryGetAt(Environment.TickCount64 - Math.Max(0, delayMs), out var left, out var right)
+        TryGetDelayedFrame(delayMs, out var left, out var right)
             ? new AudioMeterSample(left, right, IsLiveSignal: true)
             : new AudioMeterSample(0, 0, false);
+
+    /// <summary>
+    /// The cast meter level and 31-band FFT spectrum from <paramref name="delayMs"/> ago, computed directly on the
+    /// cast capture stream so both default and non-default Windows output devices have full synced RTA data.
+    /// </summary>
+    public bool TryGetDelayedFrame(int delayMs, out double left, out double right, double[]? bandsDestination = null) =>
+        _meterPipeline.TryGetDelayedFrameAt(Environment.TickCount64, delayMs, out left, out right, bandsDestination);
+
+    /// <summary>
+    /// Full <see cref="PluginAudioFrame"/> (levels, 3-band Bass/Mid/Treble, beat onset) and optional 31-band spectrum
+    /// from <paramref name="delayMs"/> ago for synced Hue Music Sync & RTA routing.
+    /// </summary>
+    public bool TryGetDelayedAudioFrame(int delayMs, out PluginAudioFrame frame, double[]? bandsDestination = null) =>
+        _meterPipeline.TryGetDelayedAudioFrameAt(Environment.TickCount64, delayMs, out frame, bandsDestination);
+
+    /// <summary>True when the cast capture had a beat in (<paramref name="afterTickMs"/>, <paramref name="upToTickMs"/>].</summary>
+    public bool TryGetBeatBetween(long afterTickMs, long upToTickMs, out double intensity) =>
+        _meterPipeline.TryGetBeatBetween(afterTickMs, upToTickMs, out intensity);
 
     public AudioMeterSample GetLatestMeterSample()
     {
@@ -180,7 +308,8 @@ public sealed class PcAudioCastService : IDisposable
         if (wasCasting)
         {
             _relayServer.CancelAllActiveStreams();
-            PublishMeter(0, 0, isLive: false);
+            _meterPipeline.Reset();
+            PublishSilenceMeter();
             CastStateChanged?.Invoke(false, "PC Audio Cast stopped.");
             _logStore.Info("Stopped PC Audio Cast.");
         }
@@ -226,6 +355,7 @@ public sealed class PcAudioCastService : IDisposable
             });
 
             var lastAudioTick = Environment.TickCount64;
+            _meterPipeline.Reset();
 
             capture.DataAvailable += (_, args) =>
             {
@@ -234,11 +364,13 @@ public sealed class PcAudioCastService : IDisposable
                     return;
                 }
 
-                lastAudioTick = Environment.TickCount64;
+                var now = Environment.TickCount64;
+                Volatile.Write(ref lastAudioTick, now);
 
-                // Zero-throttle, zero-allocation peak+RMS meter computation on every ~10ms WASAPI packet
-                var (left, right) = ComputeStereoLevels(args.Buffer, args.BytesRecorded, waveFormat);
-                PublishMeter(left, right, isLive: true);
+                // Compute stereo VU levels + 31-band FFT + beat onset directly on the cast capture packet
+                // so both default and non-default Windows output devices have synced RTA & Hue Music Sync data.
+                var frame = _meterPipeline.ProcessCaptureBuffer(args.Buffer, args.BytesRecorded, waveFormat, now);
+                PublishLiveMeterState(frame);
 
                 var copy = new byte[args.BytesRecorded];
                 Buffer.BlockCopy(args.Buffer, 0, copy, 0, args.BytesRecorded);
@@ -264,7 +396,7 @@ public sealed class PcAudioCastService : IDisposable
                         var idleMs = Environment.TickCount64 - Volatile.Read(ref lastAudioTick);
                         if (idleMs > 90)
                         {
-                            PublishMeter(0, 0, isLive: true);
+                            PublishSilenceMeter();
                         }
 
                         if (idleMs >= 150)
@@ -296,7 +428,7 @@ public sealed class PcAudioCastService : IDisposable
                 try { capture.StopRecording(); } catch { }
                 pcmChannel.Writer.TryComplete();
                 try { await silenceTask; } catch { }
-                PublishMeter(0, 0, isLive: false);
+                PublishSilenceMeter();
             }
         }
     }
@@ -460,25 +592,7 @@ public sealed class PcAudioCastService : IDisposable
 
         for (var f = 0; f < frames; f++)
         {
-            var frameOffset = f * frameSize;
-            float left = ReadNormalizedSample(chunk, frameOffset, bytesPerSample, isFloat);
-            float right = srcChannels > 1
-                ? ReadNormalizedSample(chunk, frameOffset + bytesPerSample, bytesPerSample, isFloat)
-                : left;
-
-            // Downmix extra surround/center channels cleanly into L/R when >2 channels
-            if (srcChannels > 2)
-            {
-                var center = ReadNormalizedSample(chunk, frameOffset + (2 * bytesPerSample), bytesPerSample, isFloat);
-                left = Math.Clamp(left + (center * 0.707f), -1f, 1f);
-                right = Math.Clamp(right + (center * 0.707f), -1f, 1f);
-                for (var ch = 3; ch < srcChannels; ch++)
-                {
-                    var extra = ReadNormalizedSample(chunk, frameOffset + (ch * bytesPerSample), bytesPerSample, isFloat) * 0.5f;
-                    if (ch % 2 == 0) left = Math.Clamp(left + extra, -1f, 1f);
-                    else right = Math.Clamp(right + extra, -1f, 1f);
-                }
-            }
+            ReadStereoDownmix(chunk, f * frameSize, srcChannels, bytesPerSample, isFloat, out var left, out var right);
 
             var l16 = (short)Math.Clamp(left * 32767f, -32768f, 32767f);
             var r16 = (short)Math.Clamp(right * 32767f, -32768f, 32767f);
@@ -490,6 +604,32 @@ public sealed class PcAudioCastService : IDisposable
         }
 
         return outBytes;
+    }
+
+    /// <summary>
+    /// One capture frame as the stereo pair the cast sends: L/R, plus center at −3 dB and the other surround
+    /// channels at −6 dB on alternate sides. The cast and its meter both use this, so they measure the same audio.
+    /// </summary>
+    internal static void ReadStereoDownmix(byte[] buffer, int frameOffset, int channels, int bytesPerSample, bool isFloat,
+        out float left, out float right)
+    {
+        left = ReadNormalizedSample(buffer, frameOffset, bytesPerSample, isFloat);
+        right = channels > 1
+            ? ReadNormalizedSample(buffer, frameOffset + bytesPerSample, bytesPerSample, isFloat)
+            : left;
+
+        if (channels > 2)
+        {
+            var center = ReadNormalizedSample(buffer, frameOffset + (2 * bytesPerSample), bytesPerSample, isFloat);
+            left = Math.Clamp(left + (center * 0.707f), -1f, 1f);
+            right = Math.Clamp(right + (center * 0.707f), -1f, 1f);
+            for (var ch = 3; ch < channels; ch++)
+            {
+                var extra = ReadNormalizedSample(buffer, frameOffset + (ch * bytesPerSample), bytesPerSample, isFloat) * 0.5f;
+                if (ch % 2 == 0) left = Math.Clamp(left + extra, -1f, 1f);
+                else right = Math.Clamp(right + extra, -1f, 1f);
+            }
+        }
     }
 
     private static float ReadNormalizedSample(byte[] buffer, int offset, int bytesPerSample, bool isFloat)
@@ -523,70 +663,18 @@ public sealed class PcAudioCastService : IDisposable
         return 0f;
     }
 
-    private void PublishMeter(double left, double right, bool isLive)
+    private void PublishLiveMeterState(in PluginAudioFrame frame)
     {
-        _meterHistory.Add(Environment.TickCount64, left, right, isLive);
-        Volatile.Write(ref _liveLeft, left);
-        Volatile.Write(ref _liveRight, right);
-        Volatile.Write(ref _liveSampleTick, isLive ? Environment.TickCount64 : 0);
-        AudioMeterUpdated?.Invoke(new AudioMeterSample(left, right, isLive));
+        Volatile.Write(ref _liveLeft, frame.LeftLevel);
+        Volatile.Write(ref _liveRight, frame.RightLevel);
+        Volatile.Write(ref _liveSampleTick, frame.IsLiveSignal ? frame.TimestampMs : 0);
+        AudioMeterUpdated?.Invoke(new AudioMeterSample(frame.LeftLevel, frame.RightLevel, frame.IsLiveSignal));
     }
 
-    private static (double Left, double Right) ComputeStereoLevels(byte[] buffer, int bytesRecorded, WaveFormat format)
+    private void PublishSilenceMeter()
     {
-        if (bytesRecorded < 8 || format.Encoding != WaveFormatEncoding.IeeeFloat)
-        {
-            return (0, 0);
-        }
-
-        var channels = Math.Max(1, format.Channels);
-        var floatCount = bytesRecorded / 4;
-        var frames = floatCount / channels;
-        if (frames <= 0)
-        {
-            return (0, 0);
-        }
-
-        double sumL = 0;
-        double sumR = 0;
-        double peakL = 0;
-        double peakR = 0;
-        var step = Math.Max(1, frames / 256);
-        var samples = 0;
-
-        for (var f = 0; f < frames; f += step)
-        {
-            var l = Math.Abs(BitConverter.ToSingle(buffer, (f * channels) * 4));
-            var r = channels > 1 ? Math.Abs(BitConverter.ToSingle(buffer, ((f * channels) + 1) * 4)) : l;
-            if (l > peakL) peakL = l;
-            if (r > peakR) peakR = r;
-            sumL += l * l;
-            sumR += r * r;
-            samples++;
-        }
-
-        if (samples == 0)
-        {
-            return (0, 0);
-        }
-
-        var rmsL = Math.Sqrt(sumL / samples);
-        var rmsR = Math.Sqrt(sumR / samples);
-
-        // Blend fast Peak transient with RMS loudness for instantaneous yet musical VU response
-        static double ToVu(double peak, double rms)
-        {
-            var blended = (peak * 0.58) + (rms * 0.42);
-            if (blended <= 0.0006)
-            {
-                return 0;
-            }
-
-            var db = 20.0 * Math.Log10(blended);
-            return Math.Clamp((db + 40.0) / 40.0, 0.0, 1.0);
-        }
-
-        return (ToVu(peakL, rmsL), ToVu(peakR, rmsR));
+        var silent = _meterPipeline.RecordSilence(Environment.TickCount64);
+        PublishLiveMeterState(in silent);
     }
 
     private void OnExternalSourceActivated()

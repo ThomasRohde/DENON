@@ -667,7 +667,7 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
 
         if (previous.Link != current.Link || previous.Power != current.Power || previous.HasMedia != current.HasMedia ||
             previous.IsPlaying != current.IsPlaying || previous.NowPlaying.Title != current.NowPlaying.Title ||
-            previous.AppName != current.AppName)
+            previous.AppName != current.AppName || previous.NowPlaying.CanPause != current.NowPlaying.CanPause)
         {
             ReportAggregateStatus();
         }
@@ -923,7 +923,8 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
 
     /// <summary>
     /// Status text read by the host's now-playing hero (keep the format stable):
-    /// "APPLE TV • &lt;device&gt; • &lt;app&gt;[ • &lt;title&gt;]" or "APPLE TV PAUSED • …".
+    /// "APPLE TV • &lt;device&gt; • &lt;app&gt;[ • &lt;title&gt;]", "APPLE TV LIVE • …" (playing, pause unsupported),
+    /// or "APPLE TV PAUSED • …".
     /// </summary>
     internal static string FormatPlayingStatus(string deviceName, AppleTvDeviceState state)
     {
@@ -931,7 +932,10 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
 
         var app = Clean(state.AppName ?? state.NowPlaying.AppBundleId);
         var title = Clean(state.NowPlaying.Title);
-        var parts = new List<string> { state.IsPlaying ? "APPLE TV" : "APPLE TV PAUSED", Clean(deviceName), app.Length > 0 ? app : "Apple TV app" };
+        var tag = !state.IsPlaying ? "APPLE TV PAUSED"
+            : state.NowPlaying.CanPause ? "APPLE TV"
+            : "APPLE TV LIVE";
+        var parts = new List<string> { tag, Clean(deviceName), app.Length > 0 ? app : "Apple TV app" };
         if (title.Length > 0 && !title.Equals(app, StringComparison.OrdinalIgnoreCase))
         {
             parts.Add(title);
@@ -1000,6 +1004,7 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
         app = state.AppName,
         appId = state.NowPlaying.AppBundleId,
         playbackState = state.NowPlaying.State.ToString(),
+        canPause = state.NowPlaying.CanPause,
         title = state.NowPlaying.Title,
         series = state.NowPlaying.SeriesName,
         season = state.NowPlaying.Season,

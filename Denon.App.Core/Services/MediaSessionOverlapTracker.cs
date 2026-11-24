@@ -58,7 +58,11 @@ public sealed class MediaSessionOverlapTracker
             }
 
             _open.Remove(key);
-            var self = SessionInterval.From(device, kind, data, now.AddSeconds(-durationSec), now);
+
+            // A source can write the end a little later than it happened (the Apple TV plugin waits up to 35 s to
+            // tell "standby" from "app_closed"); its "endedAt" is the real end, so the interval stays right.
+            var end = EndedAt(data, now);
+            var self = SessionInterval.From(device, kind, data, end.AddSeconds(-durationSec), end);
 
             var coverers = _open.Values.Concat(_closed).Where(c => Covers(c, self)).ToList();
             var covered = UnionSeconds(coverers.Select(c => (Start: Max(c.Start, self.Start), End: Min(c.End ?? now, self.End!.Value))));
@@ -162,6 +166,22 @@ public sealed class MediaSessionOverlapTracker
     private static DateTimeOffset Max(DateTimeOffset a, DateTimeOffset b) => a > b ? a : b;
 
     private static DateTimeOffset Min(DateTimeOffset a, DateTimeOffset b) => a < b ? a : b;
+
+    /// <summary>The session's real end: a valid "endedAt" from the last 5 minutes, otherwise <paramref name="now"/>.</summary>
+    private static DateTimeOffset EndedAt(IReadOnlyDictionary<string, object?> data, DateTimeOffset now)
+    {
+        var raw = data.TryGetValue("endedAt", out var value) ? value : null;
+        var endedAt = raw switch
+        {
+            DateTimeOffset dto => dto,
+            DateTime dt => new DateTimeOffset(dt),
+            string s when DateTimeOffset.TryParse(s, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.RoundtripKind, out var parsed) => parsed,
+            _ => (DateTimeOffset?)null,
+        };
+
+        return endedAt is { } e && e <= now && e >= now.AddMinutes(-5) ? e : now;
+    }
 
     private static string GetString(IReadOnlyDictionary<string, object?> data, string key) =>
         TryGetString(data, key, out var value) ? value : string.Empty;

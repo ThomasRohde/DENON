@@ -290,7 +290,7 @@
                               FontSize="{DynamicResource FontSize06}" />
 
                     <!-- 1-Click Acoustic Lip-Sync Auto-Calibration (PC Mic Chirp) -->
-                    <Border Background="{DynamicResource Ink03Brush}" BorderBrush="{DynamicResource Ink11Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius04}" Padding="{skin:Space 10,8}">
+                    <Border Background="{DynamicResource Ink03Brush}" BorderBrush="{DynamicResource Ink11Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius04}" Padding="{skin:Space 10,8}" Margin="{skin:Space 0,0,0,8}">
                         <DockPanel>
                             <Button DockPanel.Dock="Right"
                                     Content="{Binding CalibrateSyncButtonLabel}"
@@ -309,6 +309,41 @@
                                            Margin="{skin:Space 0,2,0,0}" />
                             </StackPanel>
                         </DockPanel>
+                    </Border>
+
+                    <!-- Phase 3 Opt-In Room Mic Meter (TV/ARC, HDMI & Chromecast) -->
+                    <Border Background="{DynamicResource Ink03Brush}" BorderBrush="{DynamicResource Ink11Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius04}" Padding="{skin:Space 10,8}">
+                        <StackPanel>
+                            <CheckBox Content="Listen via PC mic for TV, HDMI &amp; Cast meters (ROOM mode)"
+                                      IsChecked="{Binding SettingsAllowRoomMicMeter}"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      FontSize="{DynamicResource FontSize05}"
+                                      Margin="{skin:Space 0,0,0,6}" />
+                            <Grid Margin="{skin:Space 0,0,0,5}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="{skin:Size 6}" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox Grid.Column="0"
+                                          ItemsSource="{Binding RoomMicCaptureDevices}"
+                                          SelectedValuePath="DeviceId"
+                                          DisplayMemberPath="FriendlyName"
+                                          SelectedValue="{Binding SettingsMeterMicDeviceId, Mode=TwoWay}"
+                                          IsEnabled="{Binding SettingsAllowRoomMicMeter}"
+                                          FontSize="{DynamicResource FontSize04}" />
+                                <Button Grid.Column="2"
+                                        Content="Refresh"
+                                        Command="{Binding RefreshRoomMicDevicesCommand}"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Padding="{skin:Space 9,4}"
+                                        FontSize="{DynamicResource FontSize03}" />
+                            </Grid>
+                            <TextBlock Text="{Binding RoomMicStatusHint}"
+                                       FontSize="{DynamicResource FontSize02}"
+                                       Foreground="{DynamicResource TextMutedBrush}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
                     </Border>
                 </StackPanel>
             </Border>

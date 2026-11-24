@@ -24,13 +24,22 @@ internal sealed class AppleTvWatchLog
 
     public static readonly TimeSpan PauseTimeout = TimeSpan.FromMinutes(10);
 
+    /// <summary>
+    /// Grace window after an app closes while the Apple TV is still awake: pressing the remote's power button
+    /// stops playback ~30 s before tvOS reports <see cref="AttentionState.Asleep"/>, so deferring emission
+    /// briefly lets those sessions finalize with <c>"standby"</c> instead of <c>"app_closed"</c>.
+    /// </summary>
+    public static readonly TimeSpan StandbyGracePeriod = TimeSpan.FromSeconds(35);
+
     private readonly object _gate = new();
     private readonly Dictionary<string, DeviceSlot> _slots = new(StringComparer.OrdinalIgnoreCase);
     private readonly Action<string, Dictionary<string, object?>> _record;
+    private readonly TimeSpan _standbyGracePeriod;
 
-    public AppleTvWatchLog(Action<string, Dictionary<string, object?>> record)
+    public AppleTvWatchLog(Action<string, Dictionary<string, object?>> record, TimeSpan? standbyGracePeriod = null)
     {
         _record = record;
+        _standbyGracePeriod = standbyGracePeriod ?? StandbyGracePeriod;
     }
 
     /// <summary>Call on every device state change.</summary>
@@ -43,6 +52,8 @@ internal sealed class AppleTvWatchLog
             slot.IsPlaying = state.IsPlaying;
 
             var next = state.HasMedia ? BuildCandidate(state, receiver, now) : null;
+            CheckPendingEnds(slot, state, next is not null, now);
+
             var current = slot.Active?.Candidate ?? slot.Pending;
 
             if (current is not null && next is not null && current.AppKey == next.AppKey)
@@ -73,7 +84,15 @@ internal sealed class AppleTvWatchLog
 
             if (slot.Active is not null)
             {
-                EndSession(slot, now, next is not null ? "switched" : EndReason(state));
+                var reason = next is not null ? "switched" : EndReason(state);
+                if (reason == "app_closed" && _standbyGracePeriod > TimeSpan.Zero)
+                {
+                    DeferSessionEnd(slot, now);
+                }
+                else
+                {
+                    EndSession(slot, now, reason);
+                }
             }
 
             UpdateAppRun(slot, state, now, receiver);
@@ -85,7 +104,7 @@ internal sealed class AppleTvWatchLog
         }
     }
 
-    /// <summary>Call every few seconds: confirms the dwell, samples volume and play time.</summary>
+    /// <summary>Call every few seconds: confirms the dwell, flushes expired standby grace windows, samples volume and play time.</summary>
     public void Tick(Func<PluginReceiverSnapshot> receiver, DateTimeOffset now)
     {
         lock (_gate)
@@ -93,6 +112,7 @@ internal sealed class AppleTvWatchLog
             foreach (var slot in _slots.Values)
             {
                 slot.Accumulate(now);
+                CheckPendingEnds(slot, state: null, hasNextMedia: false, now);
 
                 if (slot.Active is null && slot.Pending is { WatchedSec: <= 0 } notStarted && !slot.IsPlaying)
                 {
@@ -130,7 +150,7 @@ internal sealed class AppleTvWatchLog
         }
     }
 
-    /// <summary>Closes every open session (plugin stop, device removed or disabled).</summary>
+    /// <summary>Closes every open and deferred session (app shutdown, plugin stop, device removed or disabled).</summary>
     public void EndAll(DateTimeOffset now, string reason, string? deviceId = null)
     {
         lock (_gate)
@@ -138,6 +158,7 @@ internal sealed class AppleTvWatchLog
             foreach (var slot in _slots.Values.Where(s => deviceId is null || s.DeviceId == deviceId))
             {
                 slot.Accumulate(now);
+                FlushPendingEnds(slot, "app_closed");
                 if (slot.Active is not null)
                 {
                     EndSession(slot, now, reason);
@@ -155,6 +176,45 @@ internal sealed class AppleTvWatchLog
         : state.Power is AttentionState.Asleep ? "standby"
         : "app_closed";
 
+    private void CheckPendingEnds(DeviceSlot slot, AppleTvDeviceState? state, bool hasNextMedia, DateTimeOffset now)
+    {
+        if (slot.PendingEnd is null && slot.PendingAppRunEnd is null)
+        {
+            return;
+        }
+
+        var endedUtc = slot.PendingEnd?.EndedUtc ?? slot.PendingAppRunEnd!.EndedUtc;
+        var elapsed = now - endedUtc;
+
+        if (state is { Link: AppleTvLink.Connected, Power: AttentionState.Asleep } && elapsed <= _standbyGracePeriod)
+        {
+            FlushPendingEnds(slot, "standby");
+            return;
+        }
+
+        if (elapsed >= _standbyGracePeriod || hasNextMedia || (state is not null && state.Link != AppleTvLink.Connected))
+        {
+            FlushPendingEnds(slot, "app_closed");
+        }
+    }
+
+    private void FlushPendingEnds(DeviceSlot slot, string reason)
+    {
+        if (slot.PendingEnd is { } pendingSession)
+        {
+            slot.PendingEnd = null;
+            pendingSession.SessionData["reason"] = reason;
+            _record("session.ended", pendingSession.SessionData);
+        }
+
+        if (slot.PendingAppRunEnd is { } pendingApp)
+        {
+            slot.PendingAppRunEnd = null;
+            pendingApp.AppRunData["reason"] = reason;
+            _record("appletv.app_ended", pendingApp.AppRunData);
+        }
+    }
+
     private void UpdateAppRun(DeviceSlot slot, AppleTvDeviceState state, DateTimeOffset now, PluginReceiverSnapshot receiver)
     {
         var runKey = state.HasMedia ? state.NowPlaying.AppBundleId : null;
@@ -163,28 +223,53 @@ internal sealed class AppleTvWatchLog
             return;
         }
 
-        EndAppRun(slot, now, state.HasMedia ? "switched" : EndReason(state));
+        var reason = state.HasMedia ? "switched" : EndReason(state);
+        if (reason == "app_closed" && _standbyGracePeriod > TimeSpan.Zero)
+        {
+            DeferAppRunEnd(slot, now);
+        }
+        else
+        {
+            EndAppRun(slot, now, reason);
+        }
+
         if (runKey is not null)
         {
             slot.AppRun = new AppRun(runKey, AppNameOf(state), now, receiver.IsPoweredOn ? receiver.InputSource : null);
         }
     }
 
+    private void DeferAppRunEnd(DeviceSlot slot, DateTimeOffset now)
+    {
+        if (BuildAppRunEndData(slot, now, "app_closed") is { } data)
+        {
+            slot.PendingAppRunEnd = new PendingAppRunEnd(now, data);
+        }
+    }
+
     private void EndAppRun(DeviceSlot slot, DateTimeOffset now, string reason)
+    {
+        if (BuildAppRunEndData(slot, now, reason) is { } data)
+        {
+            _record("appletv.app_ended", data);
+        }
+    }
+
+    private static Dictionary<string, object?>? BuildAppRunEndData(DeviceSlot slot, DateTimeOffset now, string reason)
     {
         if (slot.AppRun is not { } run)
         {
-            return;
+            return null;
         }
 
         slot.AppRun = null;
         var duration = (now - run.StartedUtc).TotalSeconds;
         if (duration < DwellSeconds)
         {
-            return;
+            return null;
         }
 
-        _record("appletv.app_ended", new Dictionary<string, object?>
+        return new Dictionary<string, object?>
         {
             ["appleTvDevice"] = slot.DeviceName,
             ["app"] = run.AppName,
@@ -194,10 +279,25 @@ internal sealed class AppleTvWatchLog
             ["titles"] = run.Titles.ToList(),
             ["receiverInput"] = run.ReceiverInput,
             ["reason"] = reason,
-        });
+        };
+    }
+
+    private void DeferSessionEnd(DeviceSlot slot, DateTimeOffset now)
+    {
+        var data = BuildSessionEndData(slot, now, "app_closed");
+
+        // The host writes the event when the grace period ends; "endedAt" keeps the real end for its overlap math.
+        data["endedAt"] = now.ToString("o", System.Globalization.CultureInfo.InvariantCulture);
+        slot.PendingEnd = new PendingSessionEnd(now, data);
     }
 
     private void EndSession(DeviceSlot slot, DateTimeOffset now, string reason)
+    {
+        var data = BuildSessionEndData(slot, now, reason);
+        _record("session.ended", data);
+    }
+
+    private static Dictionary<string, object?> BuildSessionEndData(DeviceSlot slot, DateTimeOffset now, string reason)
     {
         var active = slot.Active!;
         slot.Active = null;
@@ -210,7 +310,7 @@ internal sealed class AppleTvWatchLog
             data["avgVolume"] = Math.Round(volume, 1);
         }
 
-        _record("session.ended", data);
+        return data;
     }
 
     private static Dictionary<string, object?> Payload(DeviceSlot slot, Candidate c)
@@ -318,6 +418,10 @@ internal sealed class AppleTvWatchLog
 
         public AppRun? AppRun { get; set; }
 
+        public PendingSessionEnd? PendingEnd { get; set; }
+
+        public PendingAppRunEnd? PendingAppRunEnd { get; set; }
+
         public void Accumulate(DateTimeOffset now)
         {
             if (_lastTick is { } last && IsPlaying)
@@ -391,4 +495,8 @@ internal sealed class AppleTvWatchLog
 
         public HashSet<string> Titles { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
+
+    private sealed record PendingSessionEnd(DateTimeOffset EndedUtc, Dictionary<string, object?> SessionData);
+
+    private sealed record PendingAppRunEnd(DateTimeOffset EndedUtc, Dictionary<string, object?> AppRunData);
 }

@@ -43,7 +43,6 @@ public sealed partial class MainViewModel : ObservableObject
     private CancellationTokenSource? _volumeDebounceCts;
     private bool _isDraggingVolume;
     private bool _suppressVolumeSend;
-    private bool _suppressNextSettingsReload;
 
     // Navigation
     private string _activeSection = "Control";
@@ -215,7 +214,7 @@ public sealed partial class MainViewModel : ObservableObject
         RefreshCommand = new AsyncRelayCommand(_ => RefreshAsync(), CanControlReceiver);
         TogglePowerCommand = new AsyncRelayCommand(_ => TogglePowerAsync(), CanControlReceiver);
         ToggleZone2Command = new AsyncRelayCommand(_ => ToggleZone2Async(), CanControlReceiver);
-        PlayPauseCommand = new AsyncRelayCommand(_ => PlayPauseAsync(), CanControlReceiver);
+        PlayPauseCommand = new AsyncRelayCommand(_ => PlayPauseAsync(), p => CanControlReceiver(p) && (!IsTransportPlaying || CanPauseTransport));
         PlayCommand = new AsyncRelayCommand(_ => SetPlayStateAsync("play"), CanControlReceiver);
         PauseCommand = new AsyncRelayCommand(_ => SetPlayStateAsync("pause"), CanControlReceiver);
         StopCommand = new AsyncRelayCommand(_ => SetPlayStateAsync("stop"), CanControlReceiver);
@@ -234,15 +233,18 @@ public sealed partial class MainViewModel : ObservableObject
             DisplayVolumeInDb = !DisplayVolumeInDb;
             SettingsDisplayVolumeInDb = DisplayVolumeInDb;
             var newVal = DisplayVolumeInDb;
-            _suppressNextSettingsReload = true;
-            _ = _settingsStore.UpdateAsync(s => s.Ui.DisplayVolumeInDb = newVal);
+            _ = SaveVolumeDisplayModeAsync(newVal);
         });
 
         SelectInputCommand = new AsyncRelayCommand(SelectInputAsync, CanControlReceiver);
         SelectSoundModeCommand = new AsyncRelayCommand(SelectSoundModeAsync, CanControlReceiver);
         SetEcoModeCommand = new AsyncRelayCommand(SetEcoModeAsync, CanControlReceiver);
         SetSleepTimerCommand = new AsyncRelayCommand(SetSleepTimerAsync, CanControlReceiver);
-        ThemeManager.ThemeChanged += (_, _) => OnPropertyChanged(nameof(ThemeSummaryText)); // "Follow Windows" can change it
+        ThemeManager.ThemeChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(ThemeSummaryText)); // "Follow Windows" can change it
+            RefreshContentBadgeBrushes();
+        };
 
         // Stations & Streams
         PlayCustomStreamCommand = new AsyncRelayCommand(_ => PlayCustomStreamAsync(), CanControlReceiver);
@@ -303,7 +305,7 @@ public sealed partial class MainViewModel : ObservableObject
         InitializeStudioAndSync(lyricsService, calibrationService);
         InitializeMcpAndIntelligence(roomIntelligenceService, mcpServer);
         InitializeHelpGuide();
-        _liveAudioAnalyzer.SetVuCaptureRequested(IsAnyAudioMeterVisible);
+        UpdateMeterCaptureRequest();
 
         LoadSettings(_settingsStore.Current);
         if (!string.IsNullOrWhiteSpace(_settingsStore.LastLoadWarning))
@@ -319,16 +321,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         _stateStore.StateChanged += snapshot => _ = _dispatcher.InvokeAsync(() => ApplyStateSnapshot(snapshot));
-        _settingsStore.SettingsChanged += settings => _ = _dispatcher.InvokeAsync(() =>
-        {
-            if (_suppressNextSettingsReload)
-            {
-                _suppressNextSettingsReload = false;
-                return;
-            }
-
-            LoadSettings(settings);
-        });
+        _settingsStore.SettingsChanged += settings => _ = _dispatcher.InvokeAsync(() => LoadSettings(settings));
         _telemetryLog.StatsChanged += () => _ = _dispatcher.InvokeAsync(RefreshTelemetryStats);
         RefreshTelemetryStats();
         _logStore.EntryAdded += entry => _ = _dispatcher.InvokeAsync(() =>
@@ -416,10 +409,13 @@ public sealed partial class MainViewModel : ObservableObject
         get => _activeSection;
         set
         {
-            if (SetProperty(ref _activeSection, value) &&
-                string.Equals(value, "Acoustics", StringComparison.OrdinalIgnoreCase))
+            if (SetProperty(ref _activeSection, value))
             {
-                _ = SyncAcousticsIfNeededAsync();
+                UpdateMeterCaptureRequest();
+                if (string.Equals(value, "Acoustics", StringComparison.OrdinalIgnoreCase))
+                {
+                    _ = SyncAcousticsIfNeededAsync();
+                }
             }
         }
     }
@@ -1288,6 +1284,7 @@ public sealed partial class MainViewModel : ObservableObject
         SettingsDisplayVolumeInDb = settings.Ui.DisplayVolumeInDb;
         SettingsLaunchAtWindowsStartup = settings.Ui.LaunchAtWindowsStartup || _startupService.IsEnabled();
         SettingsCheckForUpdates = settings.Ui.CheckForUpdates;
+        LoadRoomMicSettings(settings.Ui);
         DisplayVolumeInDb = settings.Ui.DisplayVolumeInDb;
         MarkActiveTheme(settings.Ui.Theme);
         MarkActiveSkin(settings.Ui.Skin);
@@ -1850,6 +1847,8 @@ public sealed partial class MainViewModel : ObservableObject
                 DisplayVolumeInDb = SettingsDisplayVolumeInDb,
                 LaunchAtWindowsStartup = SettingsLaunchAtWindowsStartup,
                 CheckForUpdates = SettingsCheckForUpdates,
+                AllowRoomMicMeter = SettingsAllowRoomMicMeter,
+                MeterMicDeviceId = SettingsMeterMicDeviceId,
             };
             settings.Media = new MediaRelaySettings
             {
@@ -1884,6 +1883,41 @@ public sealed partial class MainViewModel : ObservableObject
         {
             LastError = exception.Message;
             StatusMessage = exception.Message;
+        }
+    }
+
+    private async Task SaveVolumeDisplayModeAsync(bool displayVolumeInDb)
+    {
+        try
+        {
+            await _settingsStore.SaveUiStateAsync(ui => ui.DisplayVolumeInDb = displayVolumeInDb);
+        }
+        catch (Exception exception)
+        {
+            LastError = $"Could not save volume display mode: {exception.Message}";
+        }
+    }
+
+    private void RefreshContentBadgeBrushes()
+    {
+        foreach (var scene in ScenePresets)
+        {
+            scene.RefreshThemeBrushes();
+        }
+
+        foreach (var station in StationPresets)
+        {
+            station.RefreshThemeBrushes();
+        }
+
+        foreach (var topic in _allHelpTopics)
+        {
+            topic.RefreshThemeBrushes();
+        }
+
+        foreach (var plugin in InstalledPlugins)
+        {
+            plugin.RefreshThemeBrushes();
         }
     }
 

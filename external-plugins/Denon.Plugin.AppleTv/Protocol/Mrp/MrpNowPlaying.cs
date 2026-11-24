@@ -20,11 +20,12 @@ internal sealed record NowPlayingSnapshot(
     string? ArtworkIdentifier,
     string? ItemIdentifier,
     int QueueLocation,
-    DateTimeOffset UpdatedUtc)
+    DateTimeOffset UpdatedUtc,
+    bool CanPause = true)
 {
     public static NowPlayingSnapshot Empty { get; } = new(
         null, null, MrpPlaybackState.Unknown, null, null, null, null, null, null, null, null, null, false, null, null, null, null, 0,
-        DateTimeOffset.MinValue);
+        DateTimeOffset.MinValue, true);
 
     public bool HasMedia => !string.IsNullOrEmpty(Title) || State is MrpPlaybackState.Playing or MrpPlaybackState.Paused;
 
@@ -189,7 +190,7 @@ internal sealed class MrpNowPlayingTracker
         }
     }
 
-    /// <summary>SetStateMessage: nowPlayingInfo (1), playbackQueue (3), displayName (5), playbackState (6), playerPath (9).</summary>
+    /// <summary>SetStateMessage: nowPlayingInfo (1), supportedCommands (2), playbackQueue (3), displayName (5), playbackState (6), playerPath (9).</summary>
     private bool ApplySetState(ProtoReader state, string bundle)
     {
         var path = state.Message(9);
@@ -205,6 +206,11 @@ internal sealed class MrpNowPlayingTracker
         if (state.Message(1) is { } info)
         {
             player.ApplyNowPlayingInfo(info);
+        }
+
+        if (state.Message(2) is { } supportedCommands)
+        {
+            player.ApplySupportedCommands(supportedCommands);
         }
 
         if (state.Message(3) is { } queue)
@@ -299,6 +305,7 @@ internal sealed class MrpNowPlayingTracker
         private string? _contentId;
         private string? _artworkId;
         private MrpPlaybackState _state;
+        private bool _canPause = true;
 
         public MrpPlaybackState State
         {
@@ -371,8 +378,31 @@ internal sealed class MrpNowPlayingTracker
             return true;
         }
 
+        /// <summary>
+        /// SupportedCommands: repeated CommandInfo (1), where each CommandInfo has command (1) and enabled (2).
+        /// Only an explicit Pause counts: the dashboard and the hero send <see cref="MrpCommand.Pause"/>, so a player
+        /// that lists only TogglePlayPause gets no Pause button. A missing enabled flag counts as enabled.
+        /// This does not touch <see cref="Updated"/>: a capability packet is not a sign that playback resumed.
+        /// </summary>
+        public void ApplySupportedCommands(ProtoReader supported)
+        {
+            var canPause = false;
+            foreach (var info in supported.Messages(1))
+            {
+                var command = (int)(info.Uint(1) ?? 0);
+                var enabled = info.Bool(2) ?? true;
+                if (enabled && command == (int)MrpCommand.Pause)
+                {
+                    canPause = true;
+                    break;
+                }
+            }
+
+            _canPause = canPause;
+        }
+
         public NowPlayingSnapshot Snapshot(string bundle, string? appName) => new(
             bundle, appName, State, _title, _subtitle, _artist, _album, _series, _season, _episode,
-            _duration, _elapsed, _artworkAvailable, _artworkUrl, _contentId, _artworkId, _itemId, QueueLocation, Updated);
+            _duration, _elapsed, _artworkAvailable, _artworkUrl, _contentId, _artworkId, _itemId, QueueLocation, Updated, _canPause);
     }
 }

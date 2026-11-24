@@ -126,6 +126,7 @@ public partial class SpectrumAnalyzerControl : System.Windows.Controls.UserContr
     private static Color PillColor(AudioMeterSource source) => source switch
     {
         AudioMeterSource.Denon => ThemeResources.Color("AccentEmeraldBright"),
+        AudioMeterSource.Room => ThemeResources.Color("AccentCyanBright"),
         AudioMeterSource.Pc => ThemeResources.Color("AccentAmberBright"),
         AudioMeterSource.Muted => ThemeResources.Color("AccentCrimsonBright"),
         AudioMeterSource.Simulated => ThemeResources.Color("TextMuted"),

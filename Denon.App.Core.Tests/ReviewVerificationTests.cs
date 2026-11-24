@@ -9,6 +9,8 @@ using Denon.App.Core.Models;
 using Denon.App.Core.Plugins;
 using Denon.App.Core.Services;
 using Denon.App.Desktop.Services;
+using Denon.App.Desktop.ViewModels;
+using Denon.App.PluginSdk;
 using NAudio.Wave;
 using Xunit;
 
@@ -662,6 +664,189 @@ public sealed class ReviewVerificationTests : IDisposable
         var bdResolved = NowPlayingResolver.Resolve(bdStatus, activeStationName: null, plugins: []);
         Assert.Equal("Blu-ray", bdResolved.Title);
         Assert.Equal("Active", bdResolved.PlayStateLabel);
+    }
+
+    [Fact]
+    public async Task SettingsStore_UpdateQuietAsync_UpdatesAtomicallyWithoutFiringSettingsChanged_AndRespectsRecovery()
+    {
+        var path = Path.Combine(_tempDir, "quiet-settings.json");
+        var log = CreateIsolatedLog("quiet.log");
+        var store = new AppSettingsStore(log, path);
+        await store.InitializeAsync();
+
+        var settingsChangedCount = 0;
+        store.SettingsChanged += _ => Interlocked.Increment(ref settingsChangedCount);
+
+        // Concurrent targeted saves (dB display, Phone Remote toggle/tokens, calibrated Cinema offset)
+        // must merge cleanly, normalize values, and NEVER fire SettingsChanged (no editor reload / HEOS reconnect).
+        var t1 = store.SaveUiStateAsync(ui => ui.DisplayVolumeInDb = true);
+        var t2 = store.UpdateQuietAsync(s => s.Remote.Enabled = false);
+        var t3 = store.UpdateQuietAsync(s =>
+        {
+            s.Remote.OwnerToken = "own_rotated_1234";
+            s.Remote.GuestToken = "gst_rotated_5678";
+        });
+        var t4 = store.UpdateQuietAsync(s => s.Media.CinemaSyncOffsetMs = 99999); // clamped to 8000
+        await Task.WhenAll(t1, t2, t3, t4);
+
+        Assert.Equal(0, Volatile.Read(ref settingsChangedCount));
+        Assert.True(await t1);
+        Assert.True((await t2).SavedToDisk);
+        Assert.True((await t3).SavedToDisk);
+        Assert.True((await t4).SavedToDisk);
+
+        var reloaded = await new AppSettingsStore(log, path).InitializeAsync();
+        Assert.True(reloaded.Ui.DisplayVolumeInDb);
+        Assert.False(reloaded.Remote.Enabled);
+        Assert.Equal("own_rotated_1234", reloaded.Remote.OwnerToken);
+        Assert.Equal("gst_rotated_5678", reloaded.Remote.GuestToken);
+        Assert.Equal(8000, reloaded.Media.CinemaSyncOffsetMs);
+
+        // While recovering from a corrupt file, UpdateQuietAsync keeps changes in memory without touching disk.
+        await File.WriteAllTextAsync(path, "{ broken json");
+        var corruptBytes = await File.ReadAllBytesAsync(path);
+        var recovering = new AppSettingsStore(log, path);
+        await recovering.InitializeAsync();
+        Assert.NotNull(recovering.LastLoadWarning);
+
+        var (inMem, savedToDisk) = await recovering.UpdateQuietAsync(s => s.Media.CinemaSyncOffsetMs = 350);
+        Assert.False(savedToDisk);
+        Assert.Equal(350, inMem.Media.CinemaSyncOffsetMs);
+        Assert.Equal(corruptBytes, await File.ReadAllBytesAsync(path));
+
+        await recovering.SaveEditorAsync(s => s.Receiver.PlayerName = "Recovered");
+        var afterSave = await new AppSettingsStore(log, path).InitializeAsync();
+        Assert.Equal(350, afterSave.Media.CinemaSyncOffsetMs);
+    }
+
+    [Fact]
+    public void UiSettings_RoomMicFields_DefaultOff_CloneAndApplyEditorFields()
+    {
+        var defaults = new UiSettings();
+        Assert.False(defaults.AllowRoomMicMeter);
+        Assert.Equal(string.Empty, defaults.MeterMicDeviceId);
+
+        var current = new UiSettings
+        {
+            Theme = "light",
+            Skin = "hifi",
+            AllowRoomMicMeter = false,
+            MeterMicDeviceId = string.Empty,
+        };
+        var editor = new UiSettings
+        {
+            AllowRoomMicMeter = true,
+            MeterMicDeviceId = "{0.0.1.00000000}.{mic-guid}",
+        };
+
+        current.ApplyEditorFields(editor);
+        var cloned = current.Clone();
+
+        Assert.True(cloned.AllowRoomMicMeter);
+        Assert.Equal("{0.0.1.00000000}.{mic-guid}", cloned.MeterMicDeviceId);
+        Assert.Equal("light", cloned.Theme);
+        Assert.Equal("hifi", cloned.Skin);
+    }
+
+    [Fact]
+    public void ScenePluginActionStepEditor_DrivesParametersFromDescriptors_AndPreservesSavedValues()
+    {
+        IReadOnlyList<PluginActionParameter> haParams =
+        [
+            new("entityId", "string", "Entity id, for example scene.movie_time.", Required: true),
+        ];
+        IReadOnlyList<PluginActionParameter> hueParams =
+        [
+            new("roomId", "string", "Optional Hue room ID.", Required: false),
+        ];
+
+        // 1. Required parameter starts missing, becomes valid once filled, and persists cleanly via ScenePresetEditor.
+        var haStep = ScenePluginActionStepEditor.FromModel(
+            new ScenePluginActionStep { PluginId = "home-assistant", ActionId = "ha.trigger_entity", DisplayName = "HA: Trigger Entity" },
+            haParams);
+        Assert.True(haStep.HasParameters);
+        Assert.True(haStep.HasMissingRequiredParameters);
+        Assert.True(haStep.Parameters[0].IsMissingRequired);
+
+        haStep.Parameters[0].Value = "  scene.movie_time  ";
+        Assert.False(haStep.HasMissingRequiredParameters);
+        var savedHa = haStep.ToModel();
+        Assert.NotNull(savedHa.Parameters);
+        Assert.Equal("scene.movie_time", savedHa.Parameters!["entityId"]);
+
+        // 2. Empty optional parameter produces null dictionary; populated optional parameter persists.
+        var hueStep = ScenePluginActionStepEditor.FromModel(
+            new ScenePluginActionStep { PluginId = "philips-hue", ActionId = "hue.movie_dim", DisplayName = "Hue: Cinema Dim" },
+            hueParams);
+        Assert.False(hueStep.HasMissingRequiredParameters);
+        Assert.Null(hueStep.ToModel().Parameters);
+
+        hueStep.Parameters[0].Value = "room-living";
+        Assert.Equal("room-living", hueStep.ToModel().Parameters!["roomId"]);
+
+        // 3. Saved parameters for an unloaded plugin survive round-trip and merge when descriptors arrive later.
+        var deferred = ScenePluginActionStepEditor.FromModel(
+            new ScenePluginActionStep
+            {
+                PluginId = "home-assistant",
+                ActionId = "ha.trigger_entity",
+                DisplayName = "HA: Trigger Entity",
+                Parameters = new Dictionary<string, string> { ["entityId"] = "script.dim_curtains", ["extra"] = "keep-me" },
+            },
+            descriptors: null);
+        Assert.Equal("script.dim_curtains", deferred.ToModel().Parameters!["entityId"]);
+        Assert.Equal("keep-me", deferred.ToModel().Parameters!["extra"]);
+
+        deferred.ApplyDescriptors(haParams);
+        Assert.Equal(2, deferred.Parameters.Count);
+        Assert.True(deferred.Parameters[0].Required);
+        Assert.Equal("script.dim_curtains", deferred.Parameters[0].Value);
+        Assert.Equal("keep-me", deferred.Parameters[1].Value);
+    }
+
+    [Fact]
+    public void BadgeContrastHelper_EnsuresWcagContrast_OnDarkAndLightThemes()
+    {
+        static System.Windows.Media.Color Parse(string hex) =>
+            (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex);
+
+        var darkSurface = Parse("#0E121B");
+        var lightSurface = Parse("#F2F4F7");
+        var darkInkA = Parse("#F1F5F9");
+        var darkInkB = Parse("#06121A");
+        var lightInkA = Parse("#0F172A");
+        var lightInkB = Parse("#FFFFFF");
+
+        // All default scene colors + dark & light custom hexes keep >= 4.5:1 contrast for badge text in both themes.
+        var sceneHexes = ScenePreset.CreateDefaultScenes()
+            .Select(s => s.AccentHex)
+            .Concat(["#38BDF8", "#1E3A8A", "#FEF9C3", "#000000", "#FFFFFF", "#777777", "#808080"]);
+        foreach (var hex in sceneHexes)
+        {
+            var bg = Parse(hex);
+            var fgDarkTheme = BadgeContrastHelper.PickReadableForeground(bg, darkInkA, darkInkB);
+            var fgLightTheme = BadgeContrastHelper.PickReadableForeground(bg, lightInkA, lightInkB);
+            Assert.True(BadgeContrastHelper.ContrastRatio(bg, fgDarkTheme) >= 4.5, $"Dark theme scene badge {hex} failed contrast");
+            Assert.True(BadgeContrastHelper.ContrastRatio(bg, fgLightTheme) >= 4.5, $"Light theme scene badge {hex} failed contrast");
+        }
+
+        // All Help topic badge accent colors achieve >= 4.5:1 contrast on both Dark and Light surfaces.
+        string[] helpAccents =
+        [
+            "#00D4FF", "#EC4899", "#14B8A6", "#38BDF8", "#EF4444", "#8B5CF6",
+            "#06B6D4", "#F59E0B", "#10B981", "#64748B", "#22D3EE", "#A855F7", "#F43F5E",
+        ];
+        foreach (var hex in helpAccents)
+        {
+            var raw = Parse(hex);
+            var onDark = BadgeContrastHelper.EnsureReadableOnSurface(raw, darkSurface);
+            var onLight = BadgeContrastHelper.EnsureReadableOnSurface(raw, lightSurface);
+            Assert.True(BadgeContrastHelper.ContrastRatio(onDark, darkSurface) >= 4.5, $"Help badge {hex} failed Dark contrast");
+            Assert.True(BadgeContrastHelper.ContrastRatio(onLight, lightSurface) >= 4.5, $"Help badge {hex} failed Light contrast");
+        }
+
+        // Already high-contrast colors on Dark (like #00D4FF) remain untouched.
+        Assert.Equal(Parse("#00D4FF"), BadgeContrastHelper.EnsureReadableOnSurface(Parse("#00D4FF"), darkSurface));
     }
 
     private sealed class SplitReadStream(byte[] data, int maxChunkBytes) : Stream

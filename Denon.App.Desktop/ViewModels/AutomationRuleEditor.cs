@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using Denon.App.Core.Models;
 using Denon.App.Desktop.Infrastructure;
+using Denon.App.PluginSdk;
 
 namespace Denon.App.Desktop.ViewModels;
 
@@ -9,7 +10,11 @@ public sealed record PluginActionChoice(
     string PluginName,
     string ActionId,
     string ActionName,
-    string FullLabel);
+    string FullLabel,
+    IReadOnlyList<PluginActionParameter>? Parameters = null)
+{
+    public IReadOnlyList<PluginActionParameter> DeclaredParameters => Parameters ?? [];
+}
 
 public sealed class AutomationRuleEditor : ObservableObject
 {
@@ -131,7 +136,7 @@ public sealed class AutomationRuleEditor : ObservableObject
         set => SetProperty(ref _isSelected, value);
     }
 
-    public ObservableCollection<ScenePluginActionStep> PluginActions { get; } = [];
+    public ObservableCollection<ScenePluginActionStepEditor> PluginActions { get; } = [];
 
     public bool HasPluginActions => PluginActions.Count > 0;
 
@@ -165,7 +170,9 @@ public sealed class AutomationRuleEditor : ObservableObject
         OnPropertyChanged(nameof(SummaryLine));
     }
 
-    public static AutomationRuleEditor FromModel(AutomationRule model)
+    public static AutomationRuleEditor FromModel(
+        AutomationRule model,
+        Func<string, string, IReadOnlyList<PluginActionParameter>?>? parameterLookup = null)
     {
         var editor = new AutomationRuleEditor
         {
@@ -184,7 +191,8 @@ public sealed class AutomationRuleEditor : ObservableObject
         {
             foreach (var step in model.PluginActions)
             {
-                editor.PluginActions.Add(step.Clone());
+                var descriptors = parameterLookup?.Invoke(step.PluginId, step.ActionId);
+                editor.PluginActions.Add(ScenePluginActionStepEditor.FromModel(step, descriptors));
             }
         }
 
@@ -202,7 +210,7 @@ public sealed class AutomationRuleEditor : ObservableObject
             ScheduleTime = string.IsNullOrWhiteSpace(ScheduleTime) ? "22:00" : ScheduleTime.Trim(),
             DaysFilter = string.IsNullOrWhiteSpace(DaysFilter) ? "Daily" : DaysFilter.Trim(),
             TargetSceneId = string.IsNullOrWhiteSpace(TargetSceneId) ? null : TargetSceneId.Trim(),
-            PluginActions = PluginActions.Select(static s => s.Clone()).ToList(),
+            PluginActions = PluginActions.Select(static s => s.ToModel()).ToList(),
             CooldownSeconds = int.TryParse(CooldownSecondsText, out var cd) ? Math.Clamp(cd, 10, 86400) : 120,
         };
 }

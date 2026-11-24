@@ -44,8 +44,18 @@ public partial class MainWindow : Window
                     System.Windows.Threading.DispatcherPriority.Input);
             }
         };
-        Loaded += (_, _) => CompositionTarget.Rendering += OnCompositionRendering;
-        Unloaded += (_, _) => CompositionTarget.Rendering -= OnCompositionRendering;
+        Loaded += (_, _) =>
+        {
+            CompositionTarget.Rendering += OnCompositionRendering;
+            _viewModel.SetWindowVisibleForMeters(IsVisible && WindowState != WindowState.Minimized);
+        };
+        Unloaded += (_, _) =>
+        {
+            CompositionTarget.Rendering -= OnCompositionRendering;
+            _viewModel.SetWindowVisibleForMeters(false);
+        };
+        IsVisibleChanged += (_, _) =>
+            _viewModel.SetWindowVisibleForMeters(IsVisible && WindowState != WindowState.Minimized);
         ApplyDwmStyling();
     }
 
@@ -97,6 +107,7 @@ public partial class MainWindow : Window
         WindowRootBorder.Padding = WindowState == WindowState.Maximized
             ? new Thickness(7)
             : new Thickness(0);
+        _viewModel.SetWindowVisibleForMeters(IsVisible && WindowState != WindowState.Minimized);
     }
 
     private void MinimizeButton_Click(object sender, RoutedEventArgs e) =>

@@ -59,6 +59,7 @@ public sealed record MeterPalette
         LeftAccent = Color.FromRgb(160, 72, 8),
         RightAccent = Color.FromRgb(14, 116, 144),
         SourceDenon = Color.FromRgb(4, 120, 87),
+        SourceRoom = Color.FromRgb(3, 105, 161),
         SourcePc = Color.FromRgb(160, 72, 8),
         SourceMuted = Color.FromRgb(185, 28, 28),
         SourceSimulated = Color.FromRgb(71, 85, 105),
@@ -141,6 +142,7 @@ public sealed record MeterPalette
 
     // The source printed under "VU" (what the needles show).
     public Color SourceDenon { get; init; } = Color.FromRgb(52, 211, 153);
+    public Color SourceRoom { get; init; } = Color.FromRgb(56, 189, 248);
     public Color SourcePc { get; init; } = Color.FromRgb(251, 191, 36);
     public Color SourceMuted { get; init; } = Color.FromRgb(248, 113, 113);
     public Color SourceSimulated { get; init; } = Color.FromRgb(142, 159, 179);

@@ -75,7 +75,8 @@
                                 Width="{skin:Size 38}"
                                 Height="{skin:Size 38}"
                                 Margin="{skin:Space 0,0,6,0}"
-                                ToolTip="Play / Pause">
+                                ToolTip="{Binding PlayPauseToolTip}"
+                                ToolTipService.ShowOnDisabled="True">
                             <Grid>
                                 <Path Data="{DynamicResource IconPlay}"
                                       Fill="{DynamicResource AccentCyanInkBrush}"
