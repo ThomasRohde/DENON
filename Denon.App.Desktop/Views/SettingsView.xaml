@@ -234,20 +234,24 @@
                             <CheckBox Content="Tray notifications" IsChecked="{Binding SettingsShowNotifications}" Style="{StaticResource ToggleSwitchStyle}" Margin="{skin:Space 0,4}" FontSize="{DynamicResource FontSize06}" />
                             <CheckBox Content="Primary dB readout" IsChecked="{Binding SettingsDisplayVolumeInDb}" Style="{StaticResource ToggleSwitchStyle}" Margin="{skin:Space 0,4}" FontSize="{DynamicResource FontSize06}" />
                             <CheckBox Content="Launch at startup" IsChecked="{Binding SettingsLaunchAtWindowsStartup}" Style="{StaticResource ToggleSwitchStyle}" Margin="{skin:Space 0,4}" FontSize="{DynamicResource FontSize06}" />
-                            <CheckBox Content="Check for updates"
-                                      ToolTip="Once a day, ask GitHub whether a newer Denon Desktop is out. Nothing installs without your click."
-                                      IsChecked="{Binding SettingsCheckForUpdates}"
-                                      Style="{StaticResource ToggleSwitchStyle}"
-                                      Margin="{skin:Space 0,4}"
-                                      FontSize="{DynamicResource FontSize06}" />
-                            <Button Content="Check now"
-                                    HorizontalAlignment="Right"
-                                    Style="{StaticResource SecondaryButton}"
-                                    Padding="{skin:Space 8,3}"
-                                    Margin="{skin:Space 0,2,0,0}"
-                                    FontSize="{DynamicResource FontSize03}"
-                                    ToolTip="Look for a newer Denon Desktop on GitHub now"
-                                    Command="{Binding CheckForUpdatesNowCommand}" />
+                            <!-- "Check now" sits in the same row, just left of the switch (switch 42 + gap 12). -->
+                            <Grid>
+                                <CheckBox Content="Check for updates"
+                                          ToolTip="Once a day, ask GitHub whether a newer Denon Desktop is out. Nothing installs without your click."
+                                          IsChecked="{Binding SettingsCheckForUpdates}"
+                                          Style="{StaticResource ToggleSwitchStyle}"
+                                          Margin="{skin:Space 0,4}"
+                                          FontSize="{DynamicResource FontSize06}" />
+                                <Button Content="Check now"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Padding="{skin:Space 8,2}"
+                                        Margin="{skin:Space 0,0,54,0}"
+                                        FontSize="{DynamicResource FontSize03}"
+                                        ToolTip="Look for a newer Denon Desktop on GitHub now"
+                                        Command="{Binding CheckForUpdatesNowCommand}" />
+                            </Grid>
                         </StackPanel>
                     </Grid>
                 </StackPanel>

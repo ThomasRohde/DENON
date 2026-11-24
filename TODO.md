@@ -143,8 +143,7 @@ Design and decisions: `docs/theming.md` (branch `theming-2.0`).
 
 ## In-app updates
 
-- [ ] Verify live: the first real update (the installed app on the previous version, Update → Download and install): the
-      installer closes the app, installs, and `/LAUNCHAFTER=1` starts the new version.
+- [x] Verify live: the first real update (2.3.0 → 2.4.0 on the user's PC, Update → Download and install) worked.
 - [ ] Plugin updates (Chromecast `chromecast-v*`, Apple TV `appletv-v*`) through the same check.
 - [ ] Code signing would let the update check who made the installer, not only that it arrived intact.
 
