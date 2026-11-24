@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-11-24
+
 ### Added
 - **In-app updates.** Once a day the app asks GitHub for the newest app release (plugin releases are skipped). When it is newer, an **Update to X** button shows in the status line. It opens a panel with what changed and **Download and install**: the app downloads the installer, checks its SHA-256 against the release's `SHA256SUMS.txt`, starts it silently and closes; the installer updates the app and starts it again (`/LAUNCHAFTER=1`). The portable exe, a copy outside the registered install folder, or a `--data-root` start gets **Open release page** instead. Settings → Desktop & Tray Behavior has **Check for updates** (on by default) and **Check now**; the daily check holds across restarts. Nothing installs without a click. The panel is modal (Escape closes it, shortcuts wait), a stalled download stops after 30 seconds and can be canceled, and old installer downloads are cleaned up. The installer relaunches the app as the user who started the update and leaves the Windows startup setting as the app has it.
 - **Website** at https://thomasrohde.github.io/DENON/ (Astro, in `site/`, deployed by `.github/workflows/pages.yml`). It uses the app's design system: the Dark and Light palettes, the type and radius scales, the icons and the meter materials are generated from the app's XAML on every build, and the guide is built from the in-app Help topics, so the site follows the app. The home page has live VU meters and the LED spectrum, a tour of every page, and the skins; it follows Windows' light or dark mode or a Dark/Light switch.
