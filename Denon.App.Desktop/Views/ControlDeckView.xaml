@@ -108,24 +108,22 @@
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="{skin:Space 0,0,16,0}">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <!-- Animated 5-bar Audio Visualizer when actively playing -->
-                            <StackPanel Orientation="Horizontal"
+                            <!-- Started and stopped by MainWindow.UpdateAnimations: it runs only while it shows on screen. -->
+                            <StackPanel x:Name="EqBars"
+                                        Orientation="Horizontal"
                                         Height="{skin:Size 16}"
                                         Margin="{skin:Space 0,0,10,0}"
                                         VerticalAlignment="Center"
                                         Visibility="{Binding IsActiveAndPlaying, Converter={StaticResource BoolToVis}}">
-                                <StackPanel.Triggers>
-                                    <EventTrigger RoutedEvent="Loaded">
-                                        <BeginStoryboard>
-                                            <Storyboard RepeatBehavior="Forever" AutoReverse="True">
-                                                <DoubleAnimation Storyboard.TargetName="Eq1" Storyboard.TargetProperty="Height" From="4" To="15" Duration="0:0:0.42" />
-                                                <DoubleAnimation Storyboard.TargetName="Eq2" Storyboard.TargetProperty="Height" From="13" To="5" Duration="0:0:0.35" />
-                                                <DoubleAnimation Storyboard.TargetName="Eq3" Storyboard.TargetProperty="Height" From="6" To="16" Duration="0:0:0.51" />
-                                                <DoubleAnimation Storyboard.TargetName="Eq4" Storyboard.TargetProperty="Height" From="14" To="4" Duration="0:0:0.38" />
-                                                <DoubleAnimation Storyboard.TargetName="Eq5" Storyboard.TargetProperty="Height" From="5" To="12" Duration="0:0:0.46" />
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </EventTrigger>
-                                </StackPanel.Triggers>
+                                <StackPanel.Resources>
+                                    <Storyboard x:Key="EqBarsStoryboard" RepeatBehavior="Forever" AutoReverse="True">
+                                        <DoubleAnimation Storyboard.TargetName="Eq1" Storyboard.TargetProperty="Height" From="4" To="15" Duration="0:0:0.42" />
+                                        <DoubleAnimation Storyboard.TargetName="Eq2" Storyboard.TargetProperty="Height" From="13" To="5" Duration="0:0:0.35" />
+                                        <DoubleAnimation Storyboard.TargetName="Eq3" Storyboard.TargetProperty="Height" From="6" To="16" Duration="0:0:0.51" />
+                                        <DoubleAnimation Storyboard.TargetName="Eq4" Storyboard.TargetProperty="Height" From="14" To="4" Duration="0:0:0.38" />
+                                        <DoubleAnimation Storyboard.TargetName="Eq5" Storyboard.TargetProperty="Height" From="5" To="12" Duration="0:0:0.46" />
+                                    </Storyboard>
+                                </StackPanel.Resources>
                                 <Border x:Name="Eq1" Style="{StaticResource EqBarStyle}" Height="{skin:Size 6}" />
                                 <Border x:Name="Eq2" Style="{StaticResource EqBarStyle}" Height="{skin:Size 12}" />
                                 <Border x:Name="Eq3" Style="{StaticResource EqBarStyle}" Height="{skin:Size 8}" />

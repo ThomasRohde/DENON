@@ -21,10 +21,17 @@ public partial class MainWindow : Window
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
+    /// <summary>
+    /// The meters draw at most this often. WPF raises CompositionTarget.Rendering at the screen's refresh rate (60 to
+    /// 144 Hz); a VU needle and the LED spectrum look smooth at 30 frames a second for half the GPU work or less.
+    /// </summary>
+    private const double MeterFramesPerSecond = 30;
+
     private readonly MainViewModel _viewModel;
     private readonly Stopwatch _vuStopwatch = Stopwatch.StartNew();
     private readonly double[] _spectrumBandsBuffer = new double[31];
     private double _lastVuFrameSeconds;
+    private bool _meterLoopAttached;
 
     public MainWindow(MainViewModel viewModel)
     {
@@ -43,32 +50,86 @@ public partial class MainWindow : Window
                     () => UpdatePanel.MoveFocus(new TraversalRequest(FocusNavigationDirection.First)),
                     System.Windows.Threading.DispatcherPriority.Input);
             }
+
+            if (args.PropertyName is nameof(MainViewModel.IsAnyAudioMeterVisible) or nameof(MainViewModel.ShowAnalogVu)
+                or nameof(MainViewModel.ShowRtaSpectrum) or nameof(MainViewModel.ActiveSection) or nameof(MainViewModel.IsActiveAndPlaying))
+            {
+                UpdateAnimations();
+            }
         };
-        Loaded += (_, _) =>
-        {
-            CompositionTarget.Rendering += OnCompositionRendering;
-            _viewModel.SetWindowVisibleForMeters(IsVisible && WindowState != WindowState.Minimized);
-        };
+        Loaded += (_, _) => UpdateAnimations();
         Unloaded += (_, _) =>
         {
-            CompositionTarget.Rendering -= OnCompositionRendering;
+            DetachMeterLoop();
+            ControlDeckPage.SetEqualizerRunning(false);
             _viewModel.SetWindowVisibleForMeters(false);
         };
-        IsVisibleChanged += (_, _) =>
-            _viewModel.SetWindowVisibleForMeters(IsVisible && WindowState != WindowState.Minimized);
+        IsVisibleChanged += (_, _) => UpdateAnimations();
         ApplyDwmStyling();
+    }
+
+    private bool IsShownOnScreen => IsLoaded && IsVisible && WindowState != WindowState.Minimized;
+
+    /// <summary>
+    /// Runs the meter frame loop and the small equalizer animation only while the Deck shows them in a window on
+    /// screen. Minimized, in the tray or on another page, the app asks WPF for no frames at all: a subscriber to
+    /// CompositionTarget.Rendering keeps WPF's render loop ticking at the screen's refresh rate even when it draws
+    /// nothing, and an endless storyboard ticks even while its element is hidden.
+    /// </summary>
+    private void UpdateAnimations()
+    {
+        var shown = IsShownOnScreen;
+        var deckShown = shown && _viewModel.ActiveSection == "Control";
+        _viewModel.SetWindowVisibleForMeters(shown);
+
+        if (deckShown && _viewModel.IsAnyAudioMeterVisible)
+        {
+            AttachMeterLoop();
+        }
+        else
+        {
+            DetachMeterLoop();
+        }
+
+        ControlDeckPage.SetEqualizerRunning(deckShown && _viewModel.IsActiveAndPlaying);
+    }
+
+    private void AttachMeterLoop()
+    {
+        if (_meterLoopAttached)
+        {
+            return;
+        }
+
+        _meterLoopAttached = true;
+        _lastVuFrameSeconds = _vuStopwatch.Elapsed.TotalSeconds;
+        CompositionTarget.Rendering += OnCompositionRendering;
+    }
+
+    private void DetachMeterLoop()
+    {
+        if (!_meterLoopAttached)
+        {
+            return;
+        }
+
+        _meterLoopAttached = false;
+        CompositionTarget.Rendering -= OnCompositionRendering;
     }
 
     private void OnCompositionRendering(object? sender, EventArgs e)
     {
-        if (!IsVisible || WindowState == WindowState.Minimized || !_viewModel.IsAnyAudioMeterVisible || _viewModel.ActiveSection != "Control")
+        var now = _vuStopwatch.Elapsed.TotalSeconds;
+        var dt = now - _lastVuFrameSeconds;
+
+        // At most MeterFramesPerSecond: skipped frames change nothing, so WPF has nothing to draw. The time of the
+        // skipped frames carries into the next step, so the needle ballistics stay true. The small margin keeps a
+        // 60 Hz screen at an even 30 frames.
+        if (dt < (1.0 / MeterFramesPerSecond) - 0.004)
         {
-            _lastVuFrameSeconds = _vuStopwatch.Elapsed.TotalSeconds;
             return;
         }
 
-        var now = _vuStopwatch.Elapsed.TotalSeconds;
-        var dt = now - _lastVuFrameSeconds;
         _lastVuFrameSeconds = now;
 
         if (_viewModel.ShowAnalogVu)
@@ -107,7 +168,7 @@ public partial class MainWindow : Window
         WindowRootBorder.Padding = WindowState == WindowState.Maximized
             ? new Thickness(7)
             : new Thickness(0);
-        _viewModel.SetWindowVisibleForMeters(IsVisible && WindowState != WindowState.Minimized);
+        UpdateAnimations();
     }
 
     private void MinimizeButton_Click(object sender, RoutedEventArgs e) =>

@@ -94,8 +94,8 @@ Native .NET (no Python), protocol logic ported from pyatv (MIT). See `external-p
       from `SET_STATE`, exposes `canPause` / `"APPLE TV LIVE • …"`, disables Pause with tooltip on the Apple TV
       dashboard, and gates the hero & tray flyout `PlayPauseCommand` via `CanPauseTransport`. Only an explicit
       `Pause` command counts (the app sends Pause, not TogglePlayPause).
-- [ ] Verify live: at a program boundary on Live TV the hero and the watch log move to the next program within about
-      20 s (the plugin asks the guide when the program ends), and a channel without guide data shows the channel only.
+- [ ] Verify live: a Live TV channel without guide data shows the channel only (the program boundary works: seen
+      2026-11-24, DR1 "TVA" 17:15 in the hero and as its own watch-log session with the logo).
 - [ ] Channel logos: 16 of the 92 channel names on the Danish cable list have no logo in tv-logos (Viaplay Sport 1–3,
       CNBC, Bloomberg, France 2, Rai 1, Discovery ID and local info channels). Pin them with `ChannelLogoOverrides`, or
       add more name rules if a pattern shows up. A UI to pin a logo is not built yet.
