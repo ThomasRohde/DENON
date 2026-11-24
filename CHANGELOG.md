@@ -4,7 +4,7 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.6.1] - 2026-11-24
 
 ### Changed
 - **The meters cost about half the GPU.** The VU needles and the LED spectrum draw at most 30 frames a second instead of at the screen's refresh rate (needle ballistics keep the real time). The frame loop is attached only while the Deck shows a meter in a window on screen; minimized, in the tray or on another page, the app asks WPF for no frames. The small equalizer next to the title animates only while it shows. Measured on the Deck with the VU meters: GPU 3D 5–6 % instead of 10–14 %, CPU 1.3–1.6 % instead of 2.3–2.4 %; minimized to the tray 0 % GPU, as before.
