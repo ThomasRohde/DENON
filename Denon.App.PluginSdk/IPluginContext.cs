@@ -74,4 +74,12 @@ public interface IPluginContext
     /// Publishes the plugin's live health state and human-readable status message to the Plugins UI.
     /// </summary>
     void ReportStatus(string statusText, PluginHealthState health);
+
+    /// <summary>
+    /// Like <see cref="ReportStatus(string, PluginHealthState)"/>, plus structured details the host reads instead of
+    /// parsing the status text (for example the TV channel and program: <c>channelName</c>, <c>programName</c>).
+    /// Each report replaces the previous details; <c>null</c> clears them. Keys and values are plain strings
+    /// (times as ISO 8601 round-trip text).
+    /// </summary>
+    void ReportStatus(string statusText, PluginHealthState health, IReadOnlyDictionary<string, string>? details);
 }

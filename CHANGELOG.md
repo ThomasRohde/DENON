@@ -4,6 +4,20 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Live TV shows the program and the channel logo.** On Live TV the now-playing hero shows the program from the LG TV's guide as the title, "DR1 • Ch 1 • 16:25–17:15" below it, and the channel's logo. The LG webOS TV plugin (2.3.0) reads the channel's TV and DVB IDs, asks the TV for its guide on a channel change and when a program ends, and corrects a guide that the TV dates a day wrong (seen live: one day ahead).
+- **Channel logos** come from the open tv-logos collection on GitHub: the plugin matches the names of the TV's whole channel list (folding "Ø" to "o", "TV3+" to "tv3-plus", "DR1 Synstolkning" to DR1 and a few more safe rules) and downloads them once into its data folder (about 2 MB for 125 Danish cable channels; 76 of 92 names matched), so GitHub never sees which channel plays. "Show channel logos" in the plugin turns it off; `ChannelLogoOverrides` in its config pins a logo per channel.
+- **Insights: LIVE TV CHANNELS** shows the time per channel with its logo. Logos also show in TOP APPS & INPUTS, MOST WATCHED, the activity feed and RIGHT NOW, which also has a progress bar for the program and the next program. Older Live TV sessions get their logo by channel name.
+- **Plugin SDK 2.1.0:** `IPluginContext.ReportStatus(text, health, details)` sends structured status details (string keys and values) that the host reads instead of parsing the status text. The host passes them on as `PluginRecordSnapshot.StatusDetails`.
+
+### Changed
+- **The watch log keeps one Live TV session per program**, titled by the program, with the channel name, number, TV and DVB IDs, the program times and the logo file in its data. Live TV counts per channel in the watch time ("DR1" instead of "Live TV"), also for older sessions ("Live TV (Ch 1 • DR1)" → DR1); those older texts no longer show as program titles.
+- The MCP room state (`nowPlaying.liveTv`) has the channel, its IDs, the current and next program and the logo file.
+- The plugin logs each program once ("Live TV: DR1 (Ch 1, DVB ONID 65024 / TSID 2190 / SID 101, Cable Digital TV): … 16:25–17:15; next 17:15 TVA; logo dr1-dk.png") and a summary of the logo matches; `channel.changed` events carry the channel's IDs and logo. The activity feed says "TV channel DR1 (Ch 1)".
+- Insights: the top channel gets its own observation unless it already leads all apps; LONGEST SITTING no longer repeats the channel name.
+
 ## [2.5.0] - 2026-11-24
 
 ### Added

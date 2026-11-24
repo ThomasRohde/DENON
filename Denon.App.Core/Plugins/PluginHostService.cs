@@ -50,7 +50,12 @@ public sealed class PluginRecordSnapshot
 
     public string StatusText { get; init; } = string.Empty;
 
+    /// <summary>Structured details from the plugin's last status report (empty when it sent none).</summary>
+    public IReadOnlyDictionary<string, string> StatusDetails { get; init; } = EmptyDetails;
+
     public string? LastError { get; init; }
+
+    internal static readonly IReadOnlyDictionary<string, string> EmptyDetails = new Dictionary<string, string>();
 
     public IReadOnlyList<PluginActionDescriptor> Actions { get; init; } = [];
 }
@@ -558,9 +563,12 @@ public sealed class PluginHostService : IAsyncDisposable
                 ? new PluginReceiverControlImpl(manifest.Id, _receiverController, _stateStore, _logStore)
                 : null,
             new PluginEventLoggerImpl(manifest.Id, _telemetry),
-            (statusText, health) =>
+            (statusText, health, details) =>
             {
                 entry.StatusText = statusText;
+                entry.StatusDetails = details is { Count: > 0 }
+                    ? new Dictionary<string, string>(details, StringComparer.Ordinal)
+                    : PluginRecordSnapshot.EmptyDetails;
                 entry.Health = entry.IsEnabled ? health : PluginHealthState.Disabled;
                 NotifyPluginsChanged();
             },
@@ -585,6 +593,7 @@ public sealed class PluginHostService : IAsyncDisposable
             {
                 entry.Health = PluginHealthState.Disabled;
                 entry.StatusText = "Disabled";
+                entry.StatusDetails = PluginRecordSnapshot.EmptyDetails;
             }
         }
         catch (Exception ex)
@@ -592,6 +601,7 @@ public sealed class PluginHostService : IAsyncDisposable
             entry.LastError = ex.Message;
             entry.Health = PluginHealthState.Error;
             entry.StatusText = $"Init failed: {ex.Message}";
+            entry.StatusDetails = PluginRecordSnapshot.EmptyDetails;
             _logStore.Error($"[Plugin:{manifest.Id}] Initialization failed.", ex);
         }
 
@@ -621,6 +631,7 @@ public sealed class PluginHostService : IAsyncDisposable
             entry.LastError = ex.Message;
             entry.Health = PluginHealthState.Error;
             entry.StatusText = $"Start failed: {ex.Message}";
+            entry.StatusDetails = PluginRecordSnapshot.EmptyDetails;
             _logStore.Error($"[Plugin:{entry.Manifest.Id}] Start failed.", ex);
         }
     }
@@ -633,6 +644,7 @@ public sealed class PluginHostService : IAsyncDisposable
             {
                 entry.Health = PluginHealthState.Disabled;
                 entry.StatusText = "Disabled";
+                entry.StatusDetails = PluginRecordSnapshot.EmptyDetails;
             }
 
             return;
@@ -653,6 +665,7 @@ public sealed class PluginHostService : IAsyncDisposable
             {
                 entry.Health = PluginHealthState.Disabled;
                 entry.StatusText = "Disabled";
+                entry.StatusDetails = PluginRecordSnapshot.EmptyDetails;
             }
         }
     }
@@ -775,6 +788,7 @@ public sealed class PluginHostService : IAsyncDisposable
             HasDashboardView = entry.Plugin is IPluginViewProvider,
             Health = entry.Health,
             StatusText = entry.StatusText,
+            StatusDetails = entry.StatusDetails,
             LastError = entry.LastError,
             Actions = entry.Actions,
         };
@@ -824,6 +838,8 @@ public sealed class PluginHostService : IAsyncDisposable
         public PluginHealthState Health { get; set; } = PluginHealthState.Idle;
 
         public string StatusText { get; set; } = string.Empty;
+
+        public IReadOnlyDictionary<string, string> StatusDetails { get; set; } = PluginRecordSnapshot.EmptyDetails;
 
         public string? LastError { get; set; }
 
@@ -1056,7 +1072,7 @@ public sealed class PluginHostService : IAsyncDisposable
         IPluginReceiverBridge receiver,
         IPluginReceiverControl? receiverControl,
         IPluginEventLogger events,
-        Action<string, PluginHealthState> reportStatus,
+        Action<string, PluginHealthState, IReadOnlyDictionary<string, string>?> reportStatus,
         Func<bool> isAppShuttingDown) : IPluginContext
     {
         public string PluginId { get; } = pluginId;
@@ -1109,7 +1125,10 @@ public sealed class PluginHostService : IAsyncDisposable
         }
 
         public void ReportStatus(string statusText, PluginHealthState health) =>
-            reportStatus(statusText, health);
+            reportStatus(statusText, health, null);
+
+        public void ReportStatus(string statusText, PluginHealthState health, IReadOnlyDictionary<string, string>? details) =>
+            reportStatus(statusText, health, details);
 
         internal static bool IsPrivateLanAddress(string host)
         {

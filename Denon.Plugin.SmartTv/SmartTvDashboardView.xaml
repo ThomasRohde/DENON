@@ -778,7 +778,9 @@
                         <CheckBox Content="Switch TV audio to HDMI ARC/eARC on Denon ON" IsChecked="{Binding SwitchToArcOnDenon}" Foreground="{DynamicResource TextStrongBrush}" Margin="{skin:Space 0,0,0,8}" />
                         <CheckBox Content="Mute internal TV speakers on Denon ON" IsChecked="{Binding MuteSpeakersOnDenon}" Foreground="{DynamicResource TextStrongBrush}" Margin="{skin:Space 0,0,0,8}" />
                         <CheckBox Content="Show on-screen TV toast on Smart Scenes" IsChecked="{Binding ShowSceneToast}" Foreground="{DynamicResource TextStrongBrush}" Margin="{skin:Space 0,0,0,8}" />
-                        <CheckBox Content="Turn TV screen off on Music / Listening scenes" IsChecked="{Binding ScreenOffOnMusicScene}" Foreground="{DynamicResource TextStrongBrush}" Margin="{skin:Space 0,0,0,10}" />
+                        <CheckBox Content="Turn TV screen off on Music / Listening scenes" IsChecked="{Binding ScreenOffOnMusicScene}" Foreground="{DynamicResource TextStrongBrush}" Margin="{skin:Space 0,0,0,8}" />
+                        <CheckBox Content="Show channel logos (downloaded once from tv-logos on GitHub)" IsChecked="{Binding ChannelLogos}" Foreground="{DynamicResource TextStrongBrush}" Margin="{skin:Space 0,0,0,10}"
+                                  ToolTip="Live TV shows the channel's logo in the now-playing hero and in Insights. The logos of the whole channel list are fetched in one go, so GitHub never sees which channel you watch." />
 
                         <TextBlock Text="Changes save automatically. All 24 Smart TV actions (Screen Off, eARC, HDMI 1–4, YouTube, Netflix, Plex, Play/Pause, Toasts) are also available in Smart Scenes 2.0, Global Hotkeys &amp; Couch Phone Remote!"
                                    FontSize="{DynamicResource FontSize04}"

@@ -60,6 +60,26 @@ const label = (text) => h("p", { class: "label" }, text.toUpperCase());
 const headline = (text) => h("h2", { class: "headline" }, text);
 const empty = (text) => h("p", { class: "empty" }, text);
 
+// A channel logo from the Smart TV plugin's cache, on a light plate so dark logos read in both themes. Without a
+// logo (or when it fails to load) the plate shows a short monogram of the channel name instead, if one is given.
+function logo(file, size = 28, name = "") {
+  const plate = h("span", { class: "logo", style: `--logo:${size}px`, "aria-hidden": name ? null : "true" });
+  const monogram = () => {
+    plate.classList.add("monogram");
+    plate.replaceChildren(name.replace(/\s+/g, "").slice(0, 4));
+  };
+  if (file) {
+    const img = h("img", { class: "logo-img", src: `/logo/${encodeURIComponent(file)}`, alt: name, decoding: "async" });
+    img.addEventListener("error", () => (name ? monogram() : plate.remove()));
+    plate.append(img);
+  } else if (name) {
+    monogram();
+  } else {
+    return null;
+  }
+  return plate;
+}
+
 function icon(name, size = 16, color = "currentColor") {
   const d = state.icons[name];
   if (!d) return null;
@@ -349,7 +369,10 @@ function renderNow() {
   const on = r.connected && r.powerOn;
   const np = r.nowPlaying;
   const title = on ? (np?.title || r.inputSource || "Receiver on") : r.connected ? "Receiver in standby" : "Receiver offline";
-  const detail = on ? [np?.detail || np?.artist, np?.service].filter(Boolean).join(" · ") : r.connected ? "Turn it on to see what plays." : (r.lastError || "Denon Desktop cannot reach the receiver.");
+  // Live TV names its channel and times in the detail; the HEOS service is stale then.
+  const detail = on
+    ? (np?.liveTv ? np.detail : [np?.detail || np?.artist, np?.service].filter(Boolean).join(" · "))
+    : r.connected ? "Turn it on to see what plays." : (r.lastError || "Denon Desktop cannot reach the receiver.");
 
   const volume = Number(r.volume) || 0;
   const leds = h("div", { class: "vol-leds", role: "img", "aria-label": `Volume ${volume} of 98` },
@@ -367,14 +390,18 @@ function renderNow() {
 
   const habits = state.live.habits;
   const learned = habits?.preferredVolumeByTimeBlock?.[habits.currentTimeBlock];
+  const tv = on ? np?.liveTv : null;
 
   fill("now",
     h("div", { class: "card-head" },
       label("Right now"),
       h("span", { class: "label mono" }, (r.name || r.model || "").toUpperCase())),
-    h("div", null,
-      h("p", { class: "now-title" }, title),
-      detail ? h("p", { class: "now-detail" }, detail) : null),
+    h("div", { class: tv ? "now-head" : null },
+      tv ? logo(tv.logo, 56, tv.channelName) : null,
+      h("div", null,
+        h("p", { class: "now-title" }, title),
+        detail ? h("p", { class: "now-detail" }, detail) : null)),
+    tv ? programBar(tv) : null,
     h("div", { class: "readings" },
       reading("Input", on ? r.inputSource || "—" : "—"),
       reading("Sound mode", on ? r.soundMode || "—" : "—"),
@@ -382,6 +409,27 @@ function renderNow() {
       reading("Usual now", learned ? `${Math.round(learned.averageVolume)} · ${learned.averageDb}` : "Learning…")),
     leds,
     check);
+}
+
+// How far the Live TV program has come, from the TV's guide, and what comes next.
+function programBar(tv) {
+  if (!tv.programStart || !tv.programEnd) return null;
+  const start = new Date(tv.programStart);
+  const end = new Date(tv.programEnd);
+  const now = Date.now();
+  const share = Math.min(1, Math.max(0, (now - start) / Math.max(1, end - start)));
+  const left = Math.max(0, Math.round((end - now) / 60000));
+  const bar = h("div", { class: "meter", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(Math.round(share * 100)), "aria-label": "Program progress" },
+    h("span", { style: `width:${share * 100}%;background:${kindColor("tv_channel")}` }));
+  return h("div", { class: "program" },
+    bar,
+    h("div", { class: "program-times" },
+      h("span", null, fmtTime(start)),
+      h("span", null, left > 0 ? `${left} min left` : "Ending"),
+      h("span", null, fmtTime(end))),
+    tv.nextProgramName
+      ? h("p", { class: "now-detail" }, `Next ${tv.nextProgramStart ? fmtTime(new Date(tv.nextProgramStart)) : ""}: ${tv.nextProgramName}`)
+      : null);
 }
 
 const reading = (name, value) => h("div", { class: "reading" }, h("span", { class: "label" }, name.toUpperCase()), h("span", { class: "value", title: value }, value));
@@ -591,11 +639,37 @@ function renderApps() {
   const max = watch.topApps[0].seconds || 1;
   host.append(h("ul", { class: "rows" }, watch.topApps.map((a) => {
     const row = h("li", { class: "row" },
-      h("span", { class: "row-name" }, a.label),
+      h("span", { class: "row-name" }, a.logo ? logo(a.logo, 22, a.label) : null, a.label),
       h("span", { class: "row-value" }, a.text),
       h("div", { class: "meter" }, h("span", { style: `width:${(a.seconds / max) * 100}%;background:${kindColor(a.kind)}` })));
     setTip(row, a.label, [["Time", a.text], ["Share", pct(a.share)], ["Sessions", a.sessions], ["Source", kindLabel(a.kind)]]);
     return row;
+  })));
+}
+
+// Live TV by channel: a logo tile per channel with its time.
+function renderChannels() {
+  const channels = state.report.watch.topChannels ?? [];
+  const el = document.getElementById("channels");
+  el.hidden = channels.length === 0;
+  if (!channels.length) {
+    el.replaceChildren();
+    return;
+  }
+  const total = channels.reduce((sum, c) => sum + c.seconds, 0);
+  const programs = channels.reduce((sum, c) => sum + c.sessions, 0);
+  const host = fill("channels",
+    label("Live TV channels"),
+    headline(`${channels[0].label} leads · ${duration(total)} of live TV in ${programs} ${programs === 1 ? "program" : "programs"}`));
+  const max = channels[0].seconds || 1;
+  host.append(h("ul", { class: "channels" }, channels.map((c) => {
+    const tile = h("li", { class: "channel" },
+      logo(c.logo, 56, c.label),
+      h("span", { class: "channel-name" }, c.label),
+      h("span", { class: "row-value" }, c.text),
+      h("div", { class: "meter" }, h("span", { style: `width:${(c.seconds / max) * 100}%;background:${kindColor("tv_channel")}` })));
+    setTip(tile, c.label, [["Time", c.text], ["Share of live TV", pct(c.share)], ["Programs", c.sessions]]);
+    return tile;
   })));
 }
 
@@ -612,7 +686,7 @@ function renderTitles() {
     return;
   }
   host.append(h("ol", { class: "rows" }, watch.topTitles.map((t) => h("li", { class: "row" },
-    h("span", { class: "row-name", title: t.label }, t.label),
+    h("span", { class: "row-name", title: t.label }, t.logo ? logo(t.logo, 22, t.detail ?? "") : null, t.label),
     h("span", { class: "row-value" }, t.text),
     h("span", { class: "row-sub" }, `${t.detail ?? ""} · ${t.sessions} ${t.sessions === 1 ? "session" : "sessions"}`)))));
 
@@ -620,7 +694,7 @@ function renderTitles() {
     const start = new Date(longest.start);
     host.append(h("p", { class: "sub-label label" }, "LONGEST SITTING"),
       h("p", { class: "row-name", style: "white-space:normal;margin:0" },
-        `${longest.title} · ${longest.app}, ${longest.text} on ${fmtDay(start, { weekday: "long" })} at ${fmtTime(start)}`));
+        `${longest.title === longest.app ? longest.title : `${longest.title} · ${longest.app}`}, ${longest.text} on ${fmtDay(start, { weekday: "long" })} at ${fmtTime(start)}`));
   }
 }
 
@@ -848,7 +922,7 @@ function renderActivity() {
     list.append(h("li", { class: "event" },
       h("time", { datetime: item.ts }, fmtTime(at)),
       h("span", { class: "dot", style: `background:${streamColor(item.stream)}` }),
-      h("span", { class: "event-text" }, item.text),
+      h("span", { class: "event-text" }, item.logo ? logo(item.logo, 20, "") : null, item.text),
       h("span", { class: "event-meta" }, item.device,
         h("span", { class: "origin", style: item.origin !== "external" ? `color:${originColor(item.origin)};border-color:currentColor` : null }, item.originLabel))));
   }
@@ -881,6 +955,7 @@ function renderReport() {
   renderKinds();
   renderRhythm();
   renderApps();
+  renderChannels();
   renderTitles();
   renderVolume();
   renderReceiver();

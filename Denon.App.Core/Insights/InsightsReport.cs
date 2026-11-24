@@ -16,7 +16,11 @@ public static class InsightsReport
 
     public sealed record Period(int Days, string From, string To, string PreviousFrom, string Label);
 
-    public sealed record Slice(string Key, string Label, string? Kind, int Seconds, string Text, int Sessions, double Share, string? Detail = null);
+    /// <summary>
+    /// A ranked row. <paramref name="Logo"/> is a channel logo's file name in the Smart TV plugin's channel-logos folder
+    /// (the page loads it from <c>/logo/&lt;file&gt;</c>).
+    /// </summary>
+    public sealed record Slice(string Key, string Label, string? Kind, int Seconds, string Text, int Sessions, double Share, string? Detail = null, string? Logo = null);
 
     public sealed record Day(string Date, string Weekday, int Seconds, string Text, IReadOnlyDictionary<string, int> ByKind);
 
@@ -38,7 +42,8 @@ public static class InsightsReport
         IReadOnlyList<Slice> TopApps,
         IReadOnlyList<Slice> TopTitles,
         LongestSession? Longest,
-        int StreakDays);
+        int StreakDays,
+        IReadOnlyList<Slice> TopChannels);
 
     public sealed record BlockShare(string Block, string Label, int Seconds, string Text, double Share);
 
@@ -99,7 +104,8 @@ public static class InsightsReport
         int Exclusive,
         int Duration,
         string? Input,
-        string? SoundMode);
+        string? SoundMode,
+        string? Logo);
 
     private static readonly HashSet<string> VideoKinds = new(StringComparer.Ordinal)
     {
@@ -108,9 +114,10 @@ public static class InsightsReport
 
     /// <summary>
     /// Builds the report for the <paramref name="days"/> days up to today. <paramref name="events"/> should cover the
-    /// period before it too (2 × days), so the change against that period can be shown.
+    /// period before it too (2 × days), so the change against that period can be shown. <paramref name="logoForChannel"/>
+    /// gives a cached logo file for a channel name, for Live TV sessions logged without one (older entries).
     /// </summary>
-    public static Report Build(IEnumerable<JsonElement> events, DateTimeOffset now, int days)
+    public static Report Build(IEnumerable<JsonElement> events, DateTimeOffset now, int days, Func<string, string?>? logoForChannel = null)
     {
         days = Math.Clamp(days, 1, 90);
         var today = DateOnly.FromDateTime(now.LocalDateTime.Date);
@@ -132,7 +139,7 @@ public static class InsightsReport
 
         var sessions = all
             .Where(e => Str(e.Ev, "stream") == EventTelemetryLog.StreamMedia && Str(e.Ev, "event") == "session.ended")
-            .Select(e => ToSession(e.Ts, e.Ev))
+            .Select(e => ToSession(e.Ts, e.Ev, logoForChannel))
             .Where(s => s is not null)
             .Select(s => s!)
             .ToList();
@@ -253,6 +260,8 @@ public static class InsightsReport
         }
 
         var longest = counted.MaxBy(s => s.Exclusive);
+        var liveTv = counted.Where(s => s.Kind == "tv_channel").ToList();
+        var liveTvTotal = liveTv.Sum(s => s.Exclusive);
 
         return new Watch(
             total,
@@ -269,7 +278,7 @@ public static class InsightsReport
             Slices(counted, s => s.Kind, s => KindLabel(s.Kind), s => s.Kind, total, int.MaxValue),
             Slices(counted, s => s.App, s => s.App, s => s.Kind, total, 8),
             Slices(
-                counted.Where(s => s.Title.Length > 0 && !s.Title.Equals(s.App, StringComparison.OrdinalIgnoreCase)),
+                counted.Where(s => WatchTimeReport.IsRealTitle(s.Title, s.App)),
                 s => s.Title,
                 s => s.Title,
                 s => s.Kind,
@@ -279,13 +288,15 @@ public static class InsightsReport
             longest is null
                 ? null
                 : new LongestSession(
-                    longest.Title.Length > 0 ? longest.Title : longest.App,
+                    WatchTimeReport.IsRealTitle(longest.Title, longest.App) ? longest.Title : longest.App,
                     longest.App,
                     longest.Kind,
                     longest.Exclusive,
                     WatchTimeReport.FormatDuration(longest.Exclusive),
                     longest.Start.ToString("O", CultureInfo.InvariantCulture)),
-            streak);
+            streak,
+            // Live TV by channel; the share is of all live TV time.
+            Slices(liveTv, s => s.App, s => s.App, s => s.Kind, liveTvTotal, 12));
     }
 
     private static List<Slice> Slices(
@@ -310,7 +321,8 @@ public static class InsightsReport
                     WatchTimeReport.FormatDuration(seconds),
                     g.Count(),
                     total > 0 ? Math.Round(seconds / (double)total, 4) : 0,
-                    detail?.Invoke(first));
+                    detail?.Invoke(first),
+                    g.OrderByDescending(s => s.Start).Select(s => s.Logo).FirstOrDefault(l => l is not null));
             })
             .OrderByDescending(s => s.Seconds)
             .Take(top)
@@ -532,11 +544,20 @@ public static class InsightsReport
                     $"{app.Text} in {app.Sessions} {(app.Sessions == 1 ? "session" : "sessions")}, {Percent(app.Share)} of the total."));
             }
 
+            // The top channel, unless it already leads all apps (then "X leads" says it).
+            if (watch.TopChannels.FirstOrDefault() is { } channel && channel.Seconds >= 30 * 60 && channel.Label != "Live TV" &&
+                watch.TopApps.FirstOrDefault()?.Label != channel.Label)
+            {
+                list.Add(new Insight("info", "tv", $"{channel.Label} is your channel",
+                    $"{channel.Text} of live TV in {channel.Sessions} {(channel.Sessions == 1 ? "program" : "programs")}, {Percent(channel.Share)} of your live TV."));
+            }
+
             if (watch.Longest is { } longest && longest.Seconds >= 20 * 60)
             {
                 var start = DateTimeOffset.Parse(longest.Start, CultureInfo.InvariantCulture);
+                var what = longest.Title.Equals(longest.App, StringComparison.OrdinalIgnoreCase) ? longest.Title : $"{longest.Title} ({longest.App})";
                 list.Add(new Insight("info", "film", "Longest sitting",
-                    $"{longest.Title} ({longest.App}) for {longest.Text}, {start.LocalDateTime.ToString("dddd HH:mm", CultureInfo.InvariantCulture)}."));
+                    $"{what} for {longest.Text}, {start.LocalDateTime.ToString("dddd HH:mm", CultureInfo.InvariantCulture)}."));
             }
 
             if (watch.StreakDays >= 3)
@@ -578,11 +599,11 @@ public static class InsightsReport
             .ToList();
     }
 
-    private static readonly string[] InsightOrder = ["clock", "trend-up", "trend-down", "play", "volume", "remote", "film", "flame", "bulb"];
+    private static readonly string[] InsightOrder = ["clock", "trend-up", "trend-down", "play", "tv", "volume", "remote", "film", "flame", "bulb"];
 
     // ---------------------------------------------------------------- helpers
 
-    private static Session? ToSession(DateTimeOffset end, JsonElement ev)
+    private static Session? ToSession(DateTimeOffset end, JsonElement ev, Func<string, string?>? logoForChannel)
     {
         if (!ev.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Object)
         {
@@ -594,15 +615,42 @@ public static class InsightsReport
         var exclusive = (int)Math.Round(Num(data, "exclusiveSec") ?? duration);
         var kind = DataStr(data, "kind") ?? "unknown";
         var title = DataStr(data, "title") ?? "";
+        var app = WatchTimeReport.AppLabel(kind, data, title);
+        var logo = LogoName(DataStr(data, "channelLogo")) ??
+                   (kind == "tv_channel" && logoForChannel is not null ? LogoName(logoForChannel(app)) : null);
         return new Session(
             end.AddSeconds(-duration),
             kind,
-            WatchTimeReport.AppLabel(kind, data, title),
+            app,
             title,
             Math.Max(0, exclusive),
             Math.Max(0, duration),
             DataStr(data, "input"),
-            DataStr(data, "soundMode"));
+            DataStr(data, "soundMode"),
+            logo);
+    }
+
+    /// <summary>A logo file name as the Smart TV plugin caches it ("dr1-dk.png"), or null for anything else.</summary>
+    public static string? LogoName(string? file)
+    {
+        if (string.IsNullOrEmpty(file) || file.Length > 120)
+        {
+            return null;
+        }
+
+        foreach (var c in file)
+        {
+            if (c is not (>= 'a' and <= 'z' or >= '0' and <= '9' or '-' or '_' or '.'))
+            {
+                return null;
+            }
+        }
+
+        return file.Contains("..", StringComparison.Ordinal) ||
+               !(file.EndsWith(".png", StringComparison.Ordinal) || file.EndsWith(".jpg", StringComparison.Ordinal) ||
+                 file.EndsWith(".jpeg", StringComparison.Ordinal) || file.EndsWith(".webp", StringComparison.Ordinal))
+            ? null
+            : file;
     }
 
     private static int DayIndex(DayOfWeek day) => ((int)day + 6) % 7;

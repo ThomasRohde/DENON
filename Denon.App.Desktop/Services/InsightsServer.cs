@@ -50,6 +50,7 @@ public sealed class InsightsServer : IAsyncDisposable
     private string _key = string.Empty;
     private (string Stamp, string Css) _theme = (string.Empty, string.Empty);
     private string _icons = "{}";
+    private (DateTime ReadUtc, IReadOnlyDictionary<string, string> Map)? _logoIndex;
 
     public InsightsServer(EventTelemetryLog telemetry, RoomIntelligenceService intelligence, AppLogStore log)
     {
@@ -254,12 +255,16 @@ public sealed class InsightsServer : IAsyncDisposable
                     var limit = Math.Clamp(int.TryParse(request.QueryString["limit"], out var l) ? l : 200, 1, 500);
                     var stream = request.QueryString["stream"] is { Length: > 0 } s ? s : "all";
                     var events = _telemetry.QueryRecentEvents(stream, hours, limit);
-                    await WriteJsonAsync(response, new { stream, hours, items = ActivityFeed.Describe(events) });
+                    await WriteJsonAsync(response, new { stream, hours, items = ActivityFeed.Describe(events, ChannelLogos()) });
                     break;
                 }
 
                 case "/api/live":
                     await WriteJsonAsync(response, await BuildLiveAsync());
+                    break;
+
+                case var logoPath when logoPath.StartsWith("/logo/", StringComparison.Ordinal):
+                    await WriteLogoAsync(response, logoPath["/logo/".Length..]);
                     break;
 
                 default:
@@ -286,13 +291,78 @@ public sealed class InsightsServer : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// A channel logo from the Smart TV plugin's cache (<c>channel-logos</c> in its data folder). Only plain file names
+    /// (<see cref="InsightsReport.LogoName"/>) of files in that folder.
+    /// </summary>
+    private static async Task WriteLogoAsync(HttpListenerResponse response, string name)
+    {
+        var file = InsightsReport.LogoName(Uri.UnescapeDataString(name));
+        var path = file is null ? null : Path.Combine(AppDataPaths.GetPluginDataDirectory("smart-tv"), "channel-logos", file);
+        if (path is null || !File.Exists(path))
+        {
+            await WriteAsync(response, 404, "text/plain; charset=utf-8", "Not found");
+            return;
+        }
+
+        var type = Path.GetExtension(path) switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".webp" => "image/webp",
+            _ => "image/png",
+        };
+        response.Headers["Cache-Control"] = "private, max-age=86400";
+        await WriteAsync(response, 200, type, await File.ReadAllBytesAsync(path));
+    }
+
     private InsightsReport.Report BuildReport(int days)
     {
         var now = DateTimeOffset.Now;
         // The period and the one before it, for the comparison.
         var since = WatchTimeReport.ReadFrom(now, 2 * days);
         var events = _telemetry.ListAvailableStreams().SelectMany(s => _telemetry.ReadEventsSince(s, since));
-        return InsightsReport.Build(events, now, days);
+        return InsightsReport.Build(events, now, days, ChannelLogos());
+    }
+
+    /// <summary>
+    /// Channel name → cached logo file, from the Smart TV plugin's logo index (<c>channel-logos/index.json</c>), so Live
+    /// TV sessions logged before their logo was cached show it too. Read at most once a minute.
+    /// </summary>
+    private Func<string, string?> ChannelLogos()
+    {
+        var now = DateTime.UtcNow;
+        if (_logoIndex is not { } index || now - index.ReadUtc > TimeSpan.FromMinutes(1))
+        {
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                var path = Path.Combine(AppDataPaths.GetPluginDataDirectory("smart-tv"), "channel-logos", "index.json");
+                if (File.Exists(path))
+                {
+                    using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
+                    if (doc.RootElement.TryGetProperty("Channels", out var channels) && channels.ValueKind == JsonValueKind.Object)
+                    {
+                        foreach (var channel in channels.EnumerateObject())
+                        {
+                            if (channel.Value.ValueKind == JsonValueKind.String && channel.Value.GetString() is { Length: > 0 } file)
+                            {
+                                map[channel.Name] = file;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception exception) when (exception is IOException or JsonException or UnauthorizedAccessException)
+            {
+                _log.Warning($"Insights page: the channel logo index could not be read: {exception.Message}");
+            }
+
+            index = (now, map);
+            _logoIndex = index;
+        }
+
+        var lookup = index.Map;
+        return name => lookup.TryGetValue(name, out var file) ? file : null;
     }
 
     private async Task<object> BuildLiveAsync()

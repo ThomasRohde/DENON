@@ -32,7 +32,9 @@ public sealed class WatchTimeReportTests
         Assert.Equal(1700 + 600 + 300, report.TotalSeconds);
         Assert.Equal("DR TV", report.ByApp[0].Key);
         Assert.Equal(1700, report.ByApp[0].Seconds);
-        Assert.Contains(report.ByApp, e => e.Key == "Live TV" && e.Seconds == 600);
+        // Live TV counts by channel; the channel of an older entry comes from its text.
+        Assert.Contains(report.ByApp, e => e.Key == "DR1" && e.Seconds == 600);
+        Assert.DoesNotContain(report.TopTitles, t => t.Key.StartsWith("Live TV", StringComparison.Ordinal));
         Assert.DoesNotContain(report.ByApp, e => e.Key == "TV Audio"); // 0 exclusive seconds: not listed
         Assert.Single(report.TopTitles, t => t.Key == "Spionhvalen" && t.App == "DR TV");
         Assert.DoesNotContain(report.TopTitles, t => t.Key == "Netflix");

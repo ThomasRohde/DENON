@@ -31,7 +31,24 @@ public sealed class SmartTvConfig
     public string LastModelName { get; set; } = string.Empty;
 
     public string LastWebOsVersion { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Downloads the logos of the TV's channels from the open tv-logos collection on GitHub (once, for the whole
+    /// channel list, then from the cache) and shows them in the now-playing hero and Insights.
+    /// </summary>
+    public bool ChannelLogos { get; set; } = true;
+
+    /// <summary>
+    /// Pins a logo per channel name: an https address or a local image file. The value "none" shows no logo.
+    /// </summary>
+    public Dictionary<string, string> ChannelLogoOverrides { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
+
+/// <summary>A program from the TV's guide (DVB EIT), in real time (any day shift in the TV's guide removed).</summary>
+public sealed record LgTvProgram(string Name, DateTimeOffset Start, DateTimeOffset End);
+
+/// <summary>A channel from the TV's channel list.</summary>
+public sealed record LgTvChannel(string Id, string Number, string Name, bool IsRadio);
 
 public sealed record LgTvAppInfo(
     string Id,
@@ -93,6 +110,21 @@ public sealed record LgTvLiveState
     public string CurrentChannelNumber { get; init; } = string.Empty;
 
     public string CurrentChannelName { get; init; } = string.Empty;
+
+    /// <summary>The TV's channel ID, for example "3_18_1_1_2190_101_65024" (source, physical channel, DVB IDs).</summary>
+    public string CurrentChannelId { get; init; } = string.Empty;
+
+    /// <summary>The DVB IDs as the TV writes them: "&lt;TSID&gt;_&lt;SID&gt;_&lt;ONID&gt;", for example "2190_101_65024".</summary>
+    public string SignalChannelId { get; init; } = string.Empty;
+
+    /// <summary>"Cable Digital TV", "Terrestrial Digital TV", "Satellite Digital TV" and so on.</summary>
+    public string ChannelTypeName { get; init; } = string.Empty;
+
+    public LgTvProgram? CurrentProgram { get; init; }
+
+    public LgTvProgram? NextProgram { get; init; }
+
+    public bool IsLiveTv => ForegroundAppId.Contains("livetv", StringComparison.OrdinalIgnoreCase);
 
     public int Volume { get; init; }
 

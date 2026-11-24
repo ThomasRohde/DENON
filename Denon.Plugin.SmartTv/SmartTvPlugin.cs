@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http;
 using System.Text.Json;
 using Denon.App.PluginSdk;
@@ -18,18 +19,23 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
     private SmartTvDashboardViewModel? _viewModel;
     private LgTvLiveState? _lastTelemetryState;
     private bool _isStarted;
+    private ChannelLogoCache? _logoCache;
+    private CancellationTokenSource? _logoCts;
+    private IReadOnlyList<LgTvChannel> _channels = [];
+    private string? _lastLoggedProgramKey;
 
     public SmartTvPlugin()
     {
         _client.StateChanged += OnTvStateChanged;
         _client.ClientKeyUpdated += OnClientKeyUpdated;
+        _client.ChannelListLoaded += OnChannelListLoaded;
         _client.DiagnosticLog += msg => _context?.Logger.Info($"[LG webOS] {msg}");
     }
 
     public PluginManifest Manifest { get; } = new(
         Id: "smart-tv",
         Name: "Smart TV Control (LG webOS)",
-        Version: "2.2.0",
+        Version: "2.3.0",
         Author: "Denon Desktop",
         Description: "Full persistent LG webOS SSAP (wss://:3001) controller: live TV state subscriptions, auto-discovered apps & HDMI inputs, Magic Remote D-Pad & keyboard, OLED Screen Off, eARC Audio Output switching, YouTube deep-link casting, SSDP/ARP auto-discovery, Wake-on-LAN, and Denon AVR coordination.",
         Category: "Home Theater TV",
@@ -49,6 +55,11 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
     {
         _context = context;
         _config = await context.Storage.LoadConfigAsync(static () => new SmartTvConfig(), cancellationToken);
+        _logoCache = new ChannelLogoCache(
+            context.Storage.PluginDataDirectory,
+            () => context.CreateHttpClient(timeout: TimeSpan.FromSeconds(20)),
+            context.Logger.Info,
+            context.Logger.Warning);
         _client.Configure(_config.TvIp, _config.ClientKey, _config.DemoMode, _config.LastModelName, _config.LastWebOsVersion);
         _viewModel = new SmartTvDashboardViewModel(this);
         _viewModel.SyncFromConfig(_config);
@@ -67,6 +78,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
         _isStarted = false;
+        _logoCts?.Cancel();
         await _client.StopBackgroundMonitorAsync();
         _context?.ReportStatus("Stopped", PluginHealthState.Disabled);
     }
@@ -503,7 +515,129 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
 
         _viewModel?.ApplyLiveState(state);
         EmitTvTelemetryDeltas(state);
+        LogProgramChange(state);
         UpdateHealthStatus();
+    }
+
+    /// <summary>Fetches the logos of the TV's channel list (once per list; see <see cref="ChannelLogoCache"/>).</summary>
+    private void OnChannelListLoaded(IReadOnlyList<LgTvChannel> channels)
+    {
+        _channels = channels;
+        RefreshChannelLogos();
+    }
+
+    internal void RefreshChannelLogos()
+    {
+        if (!_isStarted || !_config.ChannelLogos || _logoCache is not { } cache || _channels.Count == 0)
+        {
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        Interlocked.Exchange(ref _logoCts, cts)?.Cancel();
+        var token = cts.Token;
+        var names = _channels.Select(c => c.Name).ToList();
+        var overrides = new Dictionary<string, string>(_config.ChannelLogoOverrides, StringComparer.OrdinalIgnoreCase);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await cache.EnsureAsync(names, overrides, token);
+                UpdateHealthStatus();
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }, token);
+    }
+
+    /// <summary>Logs the channel and program once per program (Live TV only).</summary>
+    private void LogProgramChange(LgTvLiveState state)
+    {
+        if (state.IsDemo || !state.IsLiveTv || string.IsNullOrWhiteSpace(state.CurrentChannelName))
+        {
+            return;
+        }
+
+        var key = $"{state.CurrentChannelId}|{state.CurrentChannelName}|{state.CurrentProgram?.Name}|{state.CurrentProgram?.Start:O}";
+        if (key == _lastLoggedProgramKey)
+        {
+            return;
+        }
+
+        _lastLoggedProgramKey = key;
+        var dvb = DvbIds(state.SignalChannelId) is { } ids ? $", DVB {ids}" : string.Empty;
+        var type = string.IsNullOrWhiteSpace(state.ChannelTypeName) ? string.Empty : $", {state.ChannelTypeName}";
+        var channel = $"{state.CurrentChannelName} (Ch {state.CurrentChannelNumber}{dvb}{type})";
+        var program = state.CurrentProgram is { } p
+            ? $"{p.Name} {p.Start.LocalDateTime:HH:mm}–{p.End.LocalDateTime:HH:mm}" +
+              (state.NextProgram is { } n ? $"; next {n.Start.LocalDateTime:HH:mm} {n.Name}" : string.Empty)
+            : "no guide data yet";
+        var logo = _config.ChannelLogos && _logoCache?.TryGetLogoPath(state.CurrentChannelName) is { } path
+            ? $"; logo {System.IO.Path.GetFileName(path)}"
+            : string.Empty;
+        _context?.Logger.Info($"Live TV: {channel}: {program}{logo}.");
+    }
+
+    /// <summary>"2190_101_65024" (TSID_SID_ONID, as the TV writes it) as "ONID 65024 / TSID 2190 / SID 101".</summary>
+    internal static string? DvbIds(string? signalChannelId)
+    {
+        var parts = (signalChannelId ?? string.Empty).Split('_');
+        return parts.Length == 3 && parts.All(p => p.Length > 0 && p.All(char.IsDigit))
+            ? $"ONID {parts[2]} / TSID {parts[0]} / SID {parts[1]}"
+            : null;
+    }
+
+    /// <summary>
+    /// Structured now-showing details for the host (hero, watch log, Insights): the channel, its DVB IDs, the current
+    /// and next program and the cached logo while Live TV shows a channel; the app otherwise.
+    /// </summary>
+    internal Dictionary<string, string> BuildStatusDetails(LgTvLiveState live)
+    {
+        var details = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (live.IsLiveTv && (!string.IsNullOrWhiteSpace(live.CurrentChannelName) || !string.IsNullOrWhiteSpace(live.CurrentChannelNumber)))
+        {
+            details["kind"] = "live_tv";
+            Add(details, "channelName", live.CurrentChannelName);
+            Add(details, "channelNumber", live.CurrentChannelNumber);
+            Add(details, "channelId", live.CurrentChannelId);
+            Add(details, "signalChannelId", live.SignalChannelId);
+            Add(details, "channelType", live.ChannelTypeName);
+            if (live.CurrentProgram is { } p)
+            {
+                details["programName"] = p.Name;
+                details["programStart"] = p.Start.ToString("O", CultureInfo.InvariantCulture);
+                details["programEnd"] = p.End.ToString("O", CultureInfo.InvariantCulture);
+            }
+
+            if (live.NextProgram is { } n)
+            {
+                details["nextProgramName"] = n.Name;
+                details["nextProgramStart"] = n.Start.ToString("O", CultureInfo.InvariantCulture);
+                details["nextProgramEnd"] = n.End.ToString("O", CultureInfo.InvariantCulture);
+            }
+
+            if (_config.ChannelLogos && _logoCache?.TryGetLogoPath(live.CurrentChannelName) is { } logo)
+            {
+                details["channelLogo"] = logo;
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(live.ForegroundAppId))
+        {
+            details["kind"] = "app";
+            details["appId"] = live.ForegroundAppId;
+            Add(details, "appTitle", live.ForegroundAppTitle);
+        }
+
+        return details;
+
+        static void Add(Dictionary<string, string> d, string key, string? value)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                d[key] = value.Trim();
+            }
+        }
     }
 
     private void EmitTvTelemetryDeltas(LgTvLiveState state)
@@ -577,6 +711,12 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
                 {
                     ["channelNumber"] = state.CurrentChannelNumber,
                     ["channelName"] = state.CurrentChannelName,
+                    ["channelId"] = state.CurrentChannelId,
+                    ["signalChannelId"] = state.SignalChannelId,
+                    ["channelType"] = state.ChannelTypeName,
+                    ["channelLogo"] = _config.ChannelLogos && _logoCache?.TryGetLogoPath(state.CurrentChannelName) is { } logoPath
+                        ? System.IO.Path.GetFileName(logoPath)
+                        : null,
                     ["model"] = state.ModelName,
                 },
                 origin: "auto");
@@ -1073,7 +1213,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
         {
             var label = string.IsNullOrWhiteSpace(live.ModelName) ? _config.TvName : live.ModelName;
             var screenTag = live.IsScreenOff ? " • Screen Off" : string.Empty;
-            _context?.ReportStatus($"LIVE • {label} • {live.NowShowingSummary}{screenTag}", PluginHealthState.Connected);
+            _context?.ReportStatus($"LIVE • {label} • {live.NowShowingSummary}{screenTag}", PluginHealthState.Connected, BuildStatusDetails(live));
         }
         else if (!string.IsNullOrWhiteSpace(_config.TvIp) && !string.IsNullOrWhiteSpace(_config.ClientKey))
         {

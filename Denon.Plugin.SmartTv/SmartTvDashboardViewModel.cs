@@ -57,6 +57,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     private bool _wakeWithDenon;
     private bool _offWithStandby;
     private bool _showSceneToast = true;
+    private bool _channelLogos = true;
     private bool _switchToArcOnDenon;
     private bool _muteSpeakersOnDenon;
     private bool _screenOffOnMusicScene;
@@ -200,6 +201,12 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     {
         get => _showSceneToast;
         set { if (Set(ref _showSceneToast, value)) TriggerAutoSave(); }
+    }
+
+    public bool ChannelLogos
+    {
+        get => _channelLogos;
+        set { if (Set(ref _channelLogos, value)) TriggerAutoSave(); }
     }
 
     public bool SwitchToArcOnDenon
@@ -359,6 +366,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
                 WakeWithDenon = cfg.WakeWithDenonPowerOn;
                 OffWithStandby = cfg.TurnOffWithDenonStandby;
                 ShowSceneToast = cfg.ShowSceneToastOnTv;
+                ChannelLogos = cfg.ChannelLogos;
                 SwitchToArcOnDenon = cfg.SwitchToArcOnDenonPowerOn;
                 MuteSpeakersOnDenon = cfg.MuteTvSpeakersOnDenonPowerOn;
                 ScreenOffOnMusicScene = cfg.ScreenOffOnMusicScene;
@@ -643,6 +651,8 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
             WakeWithDenonPowerOn = WakeWithDenon,
             TurnOffWithDenonStandby = OffWithStandby,
             ShowSceneToastOnTv = ShowSceneToast,
+            ChannelLogos = ChannelLogos,
+            ChannelLogoOverrides = _plugin.Config.ChannelLogoOverrides,
             SwitchToArcOnDenonPowerOn = SwitchToArcOnDenon,
             MuteTvSpeakersOnDenonPowerOn = MuteSpeakersOnDenon,
             ScreenOffOnMusicScene = ScreenOffOnMusicScene,

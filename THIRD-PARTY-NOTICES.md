@@ -2,6 +2,14 @@
 
 Denon Desktop bundles the following third-party material.
 
+## TV channel logos (downloaded, not bundled)
+
+The LG webOS TV plugin downloads the logos of the TV's channel list from the tv-logos collection
+(https://github.com/tv-logo/tv-logos) and keeps them in its data folder, to show them on this PC only. The logos are
+trademarks of their owners; the collection offers them under Creative Commons ShareAlike licenses (CC BY-SA and
+CC BY-NC-SA). No logo is part of this repository or the installer. Turn the download off with "Show channel logos" in
+the plugin.
+
 ## Share Tech Mono (font)
 
 Used for numbers in the Hi-Fi skin (`Denon.App.Desktop/Themes/Fonts/ShareTechMono-Regular.ttf`, embedded in the

@@ -94,7 +94,7 @@ public static class WatchTimeReport
             ByDay: byDay,
             ByKind: Group(sessions, s => s.Kind, s => null, int.MaxValue),
             ByApp: Group(sessions, s => s.App, s => s.Kind, top),
-            TopTitles: Group(sessions.Where(s => s.Title.Length > 0 && !s.Title.Equals(s.App, StringComparison.OrdinalIgnoreCase)),
+            TopTitles: Group(sessions.Where(s => IsRealTitle(s.Title, s.App)),
                 s => s.Title, s => s.App, top),
             Note: "Seconds are exclusiveSec (no double counting of parallel cast/TV/receiver sessions; paused cast time " +
                   "excluded). Sessions count on the day they started; open sessions are not included.");
@@ -105,12 +105,33 @@ public static class WatchTimeReport
     {
         "cast" => GetString(data, "app") ?? GetString(data, "source") ?? "Cast",
         "appletv" => GetString(data, "app") ?? GetString(data, "source") ?? "Apple TV",
-        "tv_channel" => "Live TV",
+        "tv_channel" => GetString(data, "channelName") ?? ChannelFromShowing(title) ?? "Live TV",
         "tv_app" => title.Length > 0 ? title : "TV app",
         "avr_input" => title.Length > 0 ? title : GetString(data, "input") ?? "Receiver input",
         "youtube" => "YouTube",
         _ => GetString(data, "source") ?? kind,
     };
+
+    /// <summary>A program, episode or track title: not empty, not the app's own name, not "Live TV (Ch 1 • DR1)".</summary>
+    public static bool IsRealTitle(string title, string app) =>
+        title.Length > 0 && !title.Equals(app, StringComparison.OrdinalIgnoreCase) && ChannelFromShowing(title) is null;
+
+    /// <summary>
+    /// The channel in the Smart TV plugin's Live TV text: "Live TV (Ch 1 • DR1)" → "DR1", "Live TV (DR1)" → "DR1".
+    /// Null for other text (for example a program title).
+    /// </summary>
+    public static string? ChannelFromShowing(string? showing)
+    {
+        if (showing is null || !showing.StartsWith("Live TV (", StringComparison.OrdinalIgnoreCase) || !showing.EndsWith(')'))
+        {
+            return null;
+        }
+
+        var inner = showing["Live TV (".Length..^1];
+        var name = inner.Split(" • ", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .LastOrDefault(p => !p.StartsWith("Ch ", StringComparison.Ordinal));
+        return string.IsNullOrWhiteSpace(name) ? null : name;
+    }
 
     private static List<Entry> Group(IEnumerable<Session> sessions, Func<Session, string> key, Func<Session, string?> app, int top) =>
         sessions

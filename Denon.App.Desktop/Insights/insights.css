@@ -648,6 +648,97 @@ ol.rows .row-sub {
   grid-column: 2 / -1;
 }
 
+/* ------------------------------------------------------------ channel logos (Live TV) */
+.logo {
+  --logo: 28px;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--logo);
+  height: var(--logo);
+  padding: calc(var(--logo) * 0.08);
+  border-radius: var(--r-small);
+  /* A light plate in both themes: the logos are made for light backgrounds. */
+  background: #eef1f5;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.logo-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.logo.monogram {
+  font: 700 calc(var(--logo) * 0.3) / 1 var(--font-mono);
+  color: #1d2430;
+}
+
+.row-name .logo,
+.event-text .logo {
+  margin-right: 8px;
+}
+
+.now-head {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.program {
+  display: grid;
+  gap: 6px;
+}
+
+.program .meter {
+  height: 4px;
+}
+
+.program-times {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.channels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 12px;
+}
+
+.channel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-chip);
+  background: var(--raised);
+}
+
+.channel .logo {
+  grid-column: 1 / -1;
+}
+
+.channel-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
 /* ------------------------------------------------------------ rhythm: an LED matrix in the meter materials */
 .led-screen {
   background: var(--meter-led-screen, #05070b);

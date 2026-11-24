@@ -723,6 +723,22 @@ public sealed class RoomIntelligenceService
                     album = st.NowPlaying.IsPlaceholderUrlStream && !DenonCatalog.InputMatches(st.InputSource, "NET") ? string.Empty : st.NowPlaying.Album,
                     service = DenonCatalog.GetHeosSourceName(st.NowPlaying.SourceId),
                     type = st.NowPlaying.Type,
+                    // Live TV on the LG TV: the channel, its DVB IDs and the program from the TV's guide.
+                    liveTv = resolvedNowPlaying?.LiveTv is { } live
+                        ? new
+                        {
+                            channelName = live.ChannelName,
+                            channelNumber = live.ChannelNumber,
+                            channelId = live.ChannelId,
+                            signalChannelId = live.SignalChannelId,
+                            programName = live.ProgramName,
+                            programStart = live.ProgramStart?.ToString("O"),
+                            programEnd = live.ProgramEnd?.ToString("O"),
+                            nextProgramName = live.NextProgramName,
+                            nextProgramStart = live.NextProgramStart?.ToString("O"),
+                            logo = live.LogoFileName,
+                        }
+                        : null,
                 },
                 acoustics = acoustics is null ? null : new
                 {

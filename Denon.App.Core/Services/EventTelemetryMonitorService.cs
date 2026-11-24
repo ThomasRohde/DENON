@@ -632,6 +632,48 @@ public sealed class EventTelemetryMonitorService : BackgroundService
         var kind = showing.StartsWith("Live TV", StringComparison.OrdinalIgnoreCase) ? "tv_channel" : "tv_app";
         var origin = _telemetry.ResolveOrigin("tv");
 
+        // Live TV with the plugin's channel and guide details: one session per program, titled by the program.
+        if (kind == "tv_channel" && NowPlayingResolver.TryReadLiveTv(tv.StatusDetails) is { } live)
+        {
+            var extra = new Dictionary<string, object?>
+            {
+                ["tvModel"] = model,
+                ["showing"] = showing,
+                ["channelName"] = live.ChannelName,
+                ["channelNumber"] = live.ChannelNumber,
+                ["channelId"] = live.ChannelId,
+                ["signalChannelId"] = live.SignalChannelId,
+            };
+            if (tv.StatusDetails.TryGetValue("channelType", out var channelType))
+            {
+                extra["channelType"] = channelType;
+            }
+
+            if (live.ProgramName is not null)
+            {
+                extra["programName"] = live.ProgramName;
+                extra["programStart"] = live.ProgramStart?.ToString("O", CultureInfo.InvariantCulture);
+                extra["programEnd"] = live.ProgramEnd?.ToString("O", CultureInfo.InvariantCulture);
+            }
+
+            if (live.LogoFileName is { } logo)
+            {
+                extra["channelLogo"] = logo;
+            }
+
+            return new MediaCandidate(
+                Key: $"tv:ch:{(live.ChannelId ?? live.ChannelName).ToLowerInvariant()}|{live.ProgramName}|{live.ProgramStart:O}",
+                Kind: kind,
+                Title: live.ProgramName ?? showing,
+                Artist: null,
+                Album: null,
+                Source: "lg-webos",
+                Origin: origin,
+                StartedUtc: nowUtc,
+                InitialVolume: _lastAvr is { IsPoweredOn: true } ? Math.Round(GetEffectiveVolume(_lastAvr), 1) : null,
+                ExtraData: extra);
+        }
+
         return new MediaCandidate(
             Key: $"tv:{showing.ToLowerInvariant()}",
             Kind: kind,

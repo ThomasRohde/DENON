@@ -395,7 +395,7 @@ public sealed partial class MainViewModel
         HelpPortsReference.Add(new("TCP 8009 (TLS)", "Chromecast plugin: Cast v2", "Status and control of Chromecast and Google Cast devices"));
         HelpPortsReference.Add(new("UDP 5353", "mDNS / DNS-SD", "The Chromecast and Apple TV plugins find devices. Windows Firewall must let the answers in."));
         HelpPortsReference.Add(new("TCP (port from DNS-SD)", "Apple TV plugin: Companion and AirPlay", "Pairing, power, keys, apps and now playing. The Apple TV announces the ports (for example Companion 49153, AirPlay 7000)."));
-        HelpPortsReference.Add(new("HTTPS 443 (internet)", "Online services", "YouTube, the Radio Browser directory, LRCLIB lyrics, Hue cloud discovery and the daily update check (GitHub). Device control does not need the internet."));
+        HelpPortsReference.Add(new("HTTPS 443 (internet)", "Online services", "YouTube, the Radio Browser directory, LRCLIB lyrics, Hue cloud discovery, the daily update check and the TV channel logos (GitHub). Device control does not need the internet."));
     }
 
     private void SeedHelpTopics()
@@ -745,9 +745,11 @@ public sealed partial class MainViewModel
                 new("07", "Turn the screen off", "Click Screen Off to turn off the picture while the sound plays. Click Wake Screen to turn it on."),
                 new("08", "Choose the TV audio output", "In AUDIO OUTPUT, click HDMI ARC / eARC, TV Speakers, Optical Out or Bluetooth."),
                 new("09", "Link the TV to the receiver", "In DENON AVR COORDINATION, tick the actions you want, for example 'Wake TV (WoL) when Denon powers ON'. Changes save automatically."),
+                new("10", "See the program and channel logo", "On Live TV, the now-playing hero shows the program from the TV's guide as the title, the channel and the program times below it, and the channel logo. Insights counts Live TV per channel and per program."),
             ],
             proTips:
             [
+                "Channel logos come from the open tv-logos collection on GitHub. The plugin fetches the logos of your whole channel list once, so GitHub never sees which channel you watch. Turn it off with 'Show channel logos' in DENON AVR COORDINATION.",
                 "In LIVE TV SCREEN & VIRTUAL TRACKPAD, click Snap Now or Auto-Refresh to see the TV screen. Click on the image to click on the TV.",
                 "Press Enter in the YouTube, keyboard, toast or URL box to send without a click.",
                 "If remote buttons or apps fail with '401 insufficient permissions', open Setup ▾ and click Re-Pair (Full Permissions).",
@@ -757,6 +759,8 @@ public sealed partial class MainViewModel
                 new("Wake TV (WoL) does not turn the TV on?", "Check that the MAC ADDRESS is filled in (click Auto-MAC while the TV is on). Check that 'Turn on via Wi-Fi' is on in the TV."),
                 new("The badge shows PAIRED • STANDBY after the TV turns off?", "This is normal. The TV closes the connection in standby. Click Wake TV (WoL). The plugin connects again when webOS has started."),
                 new("Pairing fails with 'Could not connect'?", "Turn the TV on (not standby). Check that it is on the same subnet and that LG Connect Apps is on."),
+                new("A channel shows letters instead of its logo?", "The collection has no logo with that channel's name. To pin one, add the channel name and an https address or image file to ChannelLogoOverrides in the plugin's config.json (\"none\" shows no logo), then reconnect the TV."),
+                new("The hero shows the channel but no program?", "The TV has no guide data for this channel. The plugin asks again every 2 minutes and after each program."),
             ],
             quickJumps:
             [
@@ -927,7 +931,7 @@ public sealed partial class MainViewModel
                 new("02", "Choose a period", "Click Today, 7 days, 30 days or 90 days at the top. The display shows the watch and listen time and the change against the period before."),
                 new("03", "Read the observations", "The cards under the display tell you your prime time, the top app, the longest sitting, volume differences and who made most changes."),
                 new("04", "Find your rhythm", "In WEEKLY RHYTHM, each light is one hour of one weekday. The brighter it glows, the more played then. The outlined light is now."),
-                new("05", "See what played", "TIME PER DAY, BY SOURCE, TOP APPS & INPUTS and MOST WATCHED show where the time went. Point at a bar or a slice for the numbers."),
+                new("05", "See what played", "TIME PER DAY, BY SOURCE, TOP APPS & INPUTS and MOST WATCHED show where the time went. LIVE TV CHANNELS shows the time per channel with its logo. Point at a bar or a slice for the numbers."),
                 new("06", "Check volume and control", "VOLUME shows each volume change and the average for each time of day. WHO'S IN CONTROL splits the changes between remotes and devices, Denon Desktop, the phone remote, automations and an AI agent."),
                 new("07", "Look back at the activity", "ACTIVITY lists the events, newest first. Filter by Media, Receiver, TV, Lighting or Control. Tick Connection events to also see connects and disconnects."),
             ],

@@ -20,7 +20,8 @@ public static class ActivityFeed
         string OriginLabel,
         string Icon,
         string Text,
-        bool Quiet);
+        bool Quiet,
+        string? Logo = null);
 
     private sealed record CoveredSessionWindow(
         string Kind,
@@ -31,7 +32,8 @@ public static class ActivityFeed
         DateTimeOffset Start,
         DateTimeOffset End);
 
-    public static IReadOnlyList<Item> Describe(IEnumerable<JsonElement> events)
+    /// <param name="logoForChannel">A cached logo file for a channel name, for Live TV entries logged without one.</param>
+    public static IReadOnlyList<Item> Describe(IEnumerable<JsonElement> events, Func<string, string?>? logoForChannel = null)
     {
         var list = events.ToList();
         var coveredWindows = CollectCoveredEndedSessions(list);
@@ -39,7 +41,7 @@ public static class ActivityFeed
 
         foreach (var ev in list)
         {
-            var item = Describe(ev);
+            var item = Describe(ev, logoForChannel);
             if (item is null)
             {
                 continue;
@@ -59,7 +61,7 @@ public static class ActivityFeed
         return items;
     }
 
-    public static Item? Describe(JsonElement ev)
+    public static Item? Describe(JsonElement ev, Func<string, string?>? logoForChannel = null)
     {
         if (ev.ValueKind != JsonValueKind.Object || Str(ev, "ts") is not { } ts || Str(ev, "event") is not { } name)
         {
@@ -156,6 +158,13 @@ public static class ActivityFeed
                 icon = "tv";
                 break;
 
+            case "channel.changed":
+                text = Get("channelName") is { } channelName
+                    ? $"TV channel {channelName}{(Get("channelNumber") is { } number ? $" (Ch {number})" : "")}"
+                    : $"TV channel {Get("channelNumber") ?? "changed"}";
+                icon = "tv";
+                break;
+
             case "audio_output.changed":
                 text = $"TV sound → {Get("label") ?? Get("to") ?? "?"}";
                 icon = "speaker";
@@ -227,7 +236,23 @@ public static class ActivityFeed
                 break;
         }
 
-        return new Item(ts, stream, who, name, origin, InsightsReport.OriginLabel(origin), icon, text, quiet);
+        // A Live TV session or channel change shows the channel's logo (a file in the Smart TV plugin's cache).
+        string? logo = null;
+        if (name is "session.started" or "session.ended" or "channel.changed")
+        {
+            logo = InsightsReport.LogoName(Get("channelLogo"));
+            var channel = name == "channel.changed"
+                ? Get("channelName")
+                : Get("kind") == "tv_channel" && data.ValueKind == JsonValueKind.Object
+                    ? WatchTimeReport.AppLabel("tv_channel", data, Get("title") ?? "")
+                    : null;
+            if (logo is null && channel is not null && logoForChannel is not null)
+            {
+                logo = InsightsReport.LogoName(logoForChannel(channel));
+            }
+        }
+
+        return new Item(ts, stream, who, name, origin, InsightsReport.OriginLabel(origin), icon, text, quiet, logo);
     }
 
     public static string DeviceLabel(string stream, string device) => device switch

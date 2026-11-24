@@ -114,7 +114,16 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
 
     private LgTvLiveState _state = new();
 
+    // Program guide: asked on a channel change, when the program ends, and every few minutes while none is known.
+    private bool _programQueryDue;
+    private string _programChannelId = string.Empty;
+    private DateTimeOffset _lastProgramQueryUtc = DateTimeOffset.MinValue;
+    private int _loggedGuideDayShift;
+
     public event Action<LgTvLiveState>? StateChanged;
+
+    /// <summary>The TV's channel list, read once per connection (the plugin fetches the channels' logos from it).</summary>
+    public event Action<IReadOnlyList<LgTvChannel>>? ChannelListLoaded;
 
     public event Action<string>? ClientKeyUpdated;
 
@@ -1310,6 +1319,11 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
                             await TryQueryAsync("ssap://tv/getCurrentChannel", HandleCurrentChannelUpdate, ct);
                         }
                     }
+
+                    if (_ws is { State: WebSocketState.Open })
+                    {
+                        await RefreshProgramIfDueAsync(ct);
+                    }
                 }
             }
             catch (OperationCanceledException)
@@ -1654,6 +1668,93 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
         await TryQueryAsync("ssap://system/getSystemInfo", HandleSystemInfo, ct);
         await TryQueryAsync("ssap://com.webos.service.update/getCurrentSWInformation", HandleSwInfo, ct);
         await TryQueryAsync("ssap://com.webos.applicationManager/listLaunchPoints", HandleLaunchPoints, ct);
+        await TryQueryAsync("ssap://tv/getChannelList", HandleChannelList, ct);
+        _programQueryDue = true;
+    }
+
+    /// <summary>
+    /// Asks the TV for the current channel's guide when Live TV shows a channel and: the channel changed, the program
+    /// ended, or no program is known (then every 2 minutes; a channel without a guide stays without one).
+    /// </summary>
+    private async Task RefreshProgramIfDueAsync(CancellationToken ct)
+    {
+        var state = CurrentState;
+        if (!state.IsLiveTv || string.IsNullOrEmpty(state.CurrentChannelId))
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.Now;
+        var sinceLast = now - _lastProgramQueryUtc;
+        var channelChanged = !string.Equals(_programChannelId, state.CurrentChannelId, StringComparison.Ordinal);
+        var due = channelChanged || _programQueryDue
+            ? sinceLast >= TimeSpan.FromSeconds(2)
+            : state.CurrentProgram is { } program
+                ? now >= program.End && sinceLast >= TimeSpan.FromSeconds(20)
+                : sinceLast >= TimeSpan.FromMinutes(2);
+        if (!due)
+        {
+            return;
+        }
+
+        _programQueryDue = false;
+        _lastProgramQueryUtc = now;
+        _programChannelId = state.CurrentChannelId;
+        await TryQueryAsync("ssap://tv/getChannelProgramInfo", HandleProgramInfo, ct);
+    }
+
+    private void HandleProgramInfo(JsonElement payload)
+    {
+        // The guide belongs to the channel it names; the user may have zapped on while we asked.
+        var channelId = payload.TryGetProperty("channel", out var channel) ? GetStringProp(channel, "channelId") : string.Empty;
+        var state = CurrentState;
+        if (!string.IsNullOrEmpty(channelId) && !string.Equals(channelId, state.CurrentChannelId, StringComparison.Ordinal))
+        {
+            _programQueryDue = true;
+            return;
+        }
+
+        var pick = LgTvProgramGuide.PickCurrent(LgTvProgramGuide.Parse(payload), DateTimeOffset.Now);
+        if (pick.DayShift != 0 && Interlocked.Exchange(ref _loggedGuideDayShift, 1) == 0)
+        {
+            DiagnosticLog?.Invoke($"The TV's program guide is dated {Math.Abs(pick.DayShift)} day(s) {(pick.DayShift > 0 ? "ahead" : "behind")}; the times are corrected.");
+        }
+
+        if (state.CurrentProgram != pick.Current || state.NextProgram != pick.Next)
+        {
+            UpdateState(s => s with { CurrentProgram = pick.Current, NextProgram = pick.Next });
+        }
+    }
+
+    private void HandleChannelList(JsonElement payload)
+    {
+        if (!payload.TryGetProperty("channelList", out var list) || list.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        var channels = new List<LgTvChannel>();
+        foreach (var c in list.EnumerateArray())
+        {
+            var name = GetStringProp(c, "channelName");
+            if (string.IsNullOrWhiteSpace(name) ||
+                (c.TryGetProperty("Invisible", out var invisible) && invisible.ValueKind == JsonValueKind.True))
+            {
+                continue;
+            }
+
+            channels.Add(new LgTvChannel(
+                GetStringProp(c, "channelId"),
+                GetStringProp(c, "channelNumber"),
+                name.Trim(),
+                c.TryGetProperty("Radio", out var radio) && radio.ValueKind == JsonValueKind.True));
+        }
+
+        DiagnosticLog?.Invoke($"Channel list: {channels.Count} channels ({channels.Count(c => c.IsRadio)} radio).");
+        if (channels.Count > 0)
+        {
+            ChannelListLoaded?.Invoke(channels);
+        }
     }
 
     private async Task QueryForegroundAppOnceAsync(CancellationToken ct)
@@ -1800,12 +1901,23 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
     {
         var num = GetStringProp(payload, "channelNumber");
         var name = GetStringProp(payload, "channelName");
+        var id = GetStringProp(payload, "channelId");
         if (!string.IsNullOrWhiteSpace(num) || !string.IsNullOrWhiteSpace(name))
         {
-            UpdateState(s => s with
+            UpdateState(s =>
             {
-                CurrentChannelNumber = num,
-                CurrentChannelName = name,
+                var sameChannel = string.Equals(s.CurrentChannelId, id, StringComparison.Ordinal) &&
+                                  string.Equals(s.CurrentChannelName, name, StringComparison.Ordinal);
+                return s with
+                {
+                    CurrentChannelNumber = num,
+                    CurrentChannelName = name,
+                    CurrentChannelId = id,
+                    SignalChannelId = GetStringProp(payload, "signalChannelId"),
+                    ChannelTypeName = GetStringProp(payload, "channelTypeName"),
+                    CurrentProgram = sameChannel ? s.CurrentProgram : null,
+                    NextProgram = sameChannel ? s.NextProgram : null,
+                };
             });
         }
     }

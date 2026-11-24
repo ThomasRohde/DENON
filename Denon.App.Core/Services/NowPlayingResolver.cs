@@ -1,3 +1,5 @@
+using System.Globalization;
+using Denon.App.Core.Infrastructure;
 using Denon.App.Core.Models;
 using Denon.App.Core.Plugins;
 using Denon.App.PluginSdk;
@@ -11,12 +13,42 @@ public sealed record ResolvedNowPlaying(
     string PlayStateLabel,
     bool IsExternalLiveInput,
     CastNowPlaying? Cast = null,
-    bool CanPause = true);
+    bool CanPause = true,
+    LiveTvShowing? LiveTv = null);
 
 public sealed record SmartTvNowShowing(
     string ModelName,
     string Showing,
-    bool IsScreenOff);
+    bool IsScreenOff,
+    LiveTvShowing? LiveTv = null);
+
+/// <summary>
+/// The channel and program Live TV shows, from the Smart TV plugin's status details: the channel, its TV and DVB IDs,
+/// the current and next program from the TV's guide, and the cached channel logo (a file in the plugin data folder).
+/// </summary>
+public sealed record LiveTvShowing(
+    string ChannelName,
+    string? ChannelNumber,
+    string? ChannelId,
+    string? SignalChannelId,
+    string? ProgramName,
+    DateTimeOffset? ProgramStart,
+    DateTimeOffset? ProgramEnd,
+    string? NextProgramName,
+    DateTimeOffset? NextProgramStart,
+    string? LogoPath)
+{
+    /// <summary>The logo's file name in the plugin's channel-logos folder ("dr1-dk.png"), or null.</summary>
+    public string? LogoFileName => LogoPath is null ? null : Path.GetFileName(LogoPath);
+
+    /// <summary>"DR1 • Ch 1" (or the name alone).</summary>
+    public string ChannelLabel => string.IsNullOrWhiteSpace(ChannelNumber) ? ChannelName : $"{ChannelName} • Ch {ChannelNumber}";
+
+    /// <summary>"16:25–17:15" in local time, or null without a program.</summary>
+    public string? ProgramTimes => ProgramStart is { } s && ProgramEnd is { } e
+        ? $"{s.ToLocalTime():HH:mm}–{e.ToLocalTime():HH:mm}"
+        : null;
+}
 
 /// <summary>
 /// What a streamer plays, from its plugin's status text: a Chromecast ("chromecast" plugin) or an
@@ -99,6 +131,34 @@ public static class NowPlayingResolver
                         IsExternalLiveInput: true,
                         Cast: cast,
                         CanPause: cast.CanPause);
+                }
+
+                if (tvInfo is { LiveTv: { } live })
+                {
+                    // Live TV with the channel (and the program, from the TV's guide): the program is the title.
+                    var liveParts = new List<string> { live.ChannelLabel };
+                    if (live.ProgramTimes is { } times)
+                    {
+                        liveParts.Add(times);
+                    }
+
+                    if (tvInfo.IsScreenOff)
+                    {
+                        liveParts.Add("Screen Off");
+                    }
+
+                    if (soundMode != "—")
+                    {
+                        liveParts.Add(soundMode);
+                    }
+
+                    return new ResolvedNowPlaying(
+                        Title: live.ProgramName ?? live.ChannelName,
+                        Detail: string.Join(" • ", liveParts),
+                        ImageUrl: live.LogoPath is { } logo ? new Uri(logo).AbsoluteUri : string.Empty,
+                        PlayStateLabel: tvInfo.IsScreenOff ? "Screen Off" : "Live TV",
+                        IsExternalLiveInput: true,
+                        LiveTv: live);
                 }
 
                 if (tvInfo is not null)
@@ -304,7 +364,44 @@ public static class NowPlayingResolver
             return null;
         }
 
-        return new SmartTvNowShowing(model, showing, isScreenOff);
+        return new SmartTvNowShowing(model, showing, isScreenOff, TryReadLiveTv(tv.StatusDetails));
+    }
+
+    /// <summary>
+    /// The Live TV channel and program from the Smart TV plugin's status details (kind "live_tv"), or null. A logo path
+    /// counts only inside <paramref name="smartTvDataDirectory"/> (default: the plugin's data folder).
+    /// </summary>
+    public static LiveTvShowing? TryReadLiveTv(IReadOnlyDictionary<string, string>? details, string? smartTvDataDirectory = null)
+    {
+        if (details is null || !details.TryGetValue("kind", out var kind) || kind != "live_tv" ||
+            Get("channelName") is not { } channelName)
+        {
+            return null;
+        }
+
+        var logo = Get("channelLogo") is { } path &&
+                   Uri.TryCreate(path, UriKind.Absolute, out var uri) &&
+                   IsFileInside(uri, smartTvDataDirectory ?? AppDataPaths.GetPluginDataDirectory("smart-tv")) &&
+                   File.Exists(uri.LocalPath)
+            ? uri.LocalPath
+            : null;
+
+        return new LiveTvShowing(
+            channelName,
+            Get("channelNumber"),
+            Get("channelId"),
+            Get("signalChannelId"),
+            Get("programName"),
+            Time("programStart"),
+            Time("programEnd"),
+            Get("nextProgramName"),
+            Time("nextProgramStart"),
+            logo);
+
+        string? Get(string key) => details.TryGetValue(key, out var v) && !string.IsNullOrWhiteSpace(v) ? v.Trim() : null;
+
+        DateTimeOffset? Time(string key) =>
+            Get(key) is { } text && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var t) ? t : null;
     }
 
     /// <summary>
