@@ -894,7 +894,7 @@ function lanesForDay() {
 }
 function renderTimeline() {
   const host = $("#tl"); host.textContent = "";
-  const W = Math.max(320, host.clientWidth), narrow = W < 600, LW = narrow ? 96 : 150, RP = 12;
+  const W = Math.max(320, host.clientWidth), narrow = W < 600, PL = 12, LW = PL + (narrow ? 96 : 150), RP = 14;
   const [v0, v1] = R.view = computeView();
   const X = (t) => LW + ((t - v0) / (v1 - v0)) * (W - LW - RP);
   const T = (x) => v0 + ((x - LW) / (W - LW - RP)) * (v1 - v0);
@@ -931,8 +931,8 @@ function renderTimeline() {
     const base = laneBase(L.id), color = `var(${LANE_META[base]?.color || "--l-other"})`;
     svg.append(sv("line", { class: "lane-sep", x1: 0, x2: W, y1: L.y, y2: L.y }));
     const sub = laneSub(L.id);
-    svg.append(sv("text", { class: "lane-name", x: 0, y: L.y + (sub ? 15 : Math.min(L.h / 2 + 4, 19)) }, LANE_META[base]?.name || base));
-    if (sub) svg.append(sv("text", { class: "lane-sub", x: 0, y: L.y + 29 }, sub.length > (narrow ? 12 : 20) ? sub.slice(0, narrow ? 11 : 19) + "…" : sub));
+    svg.append(sv("text", { class: "lane-name", x: PL, y: L.y + (sub ? 15 : Math.min(L.h / 2 + 4, 19)) }, LANE_META[base]?.name || base));
+    if (sub) svg.append(sv("text", { class: "lane-sub", x: PL, y: L.y + 29 }, sub.length > (narrow ? 12 : 20) ? sub.slice(0, narrow ? 11 : 19) + "…" : sub));
     for (const [a, b] of powerSpans(L.id, v0, v1)) {
       const x1 = Math.max(LW, X(a)), x2 = Math.min(W - RP, X(b));
       if (x2 > x1) svg.append(sv("rect", { x: x1, y: L.y + 1, width: x2 - x1, height: L.h - 2, fill: "var(--off)" }, sv("title", {}, `${LANE_META[base].name} off or asleep ${hhmm(a)}–${hhmm(b)}`)));
