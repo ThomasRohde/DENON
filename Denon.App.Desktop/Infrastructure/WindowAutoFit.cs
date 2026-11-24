@@ -7,11 +7,14 @@ namespace Denon.App.Desktop.Infrastructure;
 /// <summary>
 /// Keeps a fitted main window fitted: when the Control Deck grows (the receiver connects, inputs and meters
 /// appear) the window grows with it, on its monitor. It stops for good once the user moves or resizes the window,
-/// so their own size is never undone.
+/// so their own size is never undone. The window's minimum size always follows the monitor it is on (after a move
+/// or a DPI change), so a window moved to a small, high-scaled screen can still be made to fit it.
 /// </summary>
 public sealed class WindowAutoFit
 {
     private const int WmEnterSizeMove = 0x0231;
+    private const int WmExitSizeMove = 0x0232;
+    private const int WmDpiChanged = 0x02E0;
 
     private readonly Window _window;
     private readonly FrameworkElement _deck;
@@ -56,6 +59,15 @@ public sealed class WindowAutoFit
         {
             UserSized = true;
             _timer.Stop();
+        }
+
+        // Moved (perhaps to another monitor) or new DPI: the minimums follow the work area, after WPF has
+        // handled the message.
+        if (msg is WmExitSizeMove or WmDpiChanged)
+        {
+            _window.Dispatcher.BeginInvoke(
+                () => WindowFitter.ApplyMinimums(_window, WindowFitter.MonitorOf(_window).WorkArea),
+                DispatcherPriority.Background);
         }
 
         return IntPtr.Zero;

@@ -78,36 +78,56 @@ public sealed class AppSettingsStore
 
     public string SettingsFilePath => _settingsFilePath;
 
+    /// <summary>
+    /// Replaces the settings (MCP, plugins, automations). While the settings file is being recovered
+    /// (<see cref="LastLoadWarning"/> is set) the change stays in memory: only the user's Save &amp; Sync
+    /// (<see cref="SaveEditorAsync"/>) or an import writes the recovered settings and ends the recovery.
+    /// </summary>
     public async Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
-        var normalized = Normalize(settings, seedDefaultsIfEmpty: false);
-        await _gate.WaitAsync(cancellationToken);
-        try
-        {
-            // Persist to disk FIRST; only publish in-memory state if replacement succeeds.
-            await SaveInternalAsync(normalized, cancellationToken);
-            _current = normalized;
-            LastLoadWarning = null;
-        }
-        finally
-        {
-            _gate.Release();
-        }
-
+        await CommitAsync(Normalize(settings, seedDefaultsIfEmpty: false), endsRecovery: false, cancellationToken);
         _logStore.Info("Settings saved.");
         SettingsChanged?.Invoke(_current.Clone());
     }
 
     /// <summary>
-    /// Atomically applies a targeted field-level mutation to the latest persisted settings inside
-    /// the store lock so concurrent/independent writers (discovery, volume unit, remote toggles,
-    /// calibration, settings editor) never clobber each other's changes.
+    /// Writes <paramref name="next"/> and publishes it, or during a recovery keeps it in memory unless
+    /// <paramref name="endsRecovery"/> (the user's own save of the whole settings). Call without holding the lock.
     /// </summary>
+    private async Task CommitAsync(AppSettings next, bool endsRecovery, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            await CommitLockedAsync(next, endsRecovery, cancellationToken);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async Task CommitLockedAsync(AppSettings next, bool endsRecovery, CancellationToken cancellationToken)
+    {
+        if (endsRecovery || LastLoadWarning is null)
+        {
+            // Persist to disk FIRST; only publish in-memory state if replacement succeeds.
+            await SaveInternalAsync(next, cancellationToken);
+            LastLoadWarning = null;
+        }
+
+        _current = next;
+    }
+
     /// <summary>
-    /// Saves window and splash state (<see cref="UiSettings.Window"/>, <see cref="UiSettings.SplashShownFor"/>)
-    /// without <see cref="SettingsChanged"/>: listeners such as the HEOS connection must not react to a moved window.
+    /// Saves UI state that the app or the Appearance chips set (window placement, splash marker, theme, skin)
+    /// without <see cref="SettingsChanged"/>: listeners such as the settings editor and the HEOS connection must not
+    /// react to a moved window or a new theme.
+    /// While the store runs on recovered settings (<see cref="LastLoadWarning"/> is set) the change stays in memory
+    /// and the file on disk is not touched: it is written with the user's next explicit save. Returns whether the
+    /// change was written.
     /// </summary>
-    public async Task SaveWindowStateAsync(Action<UiSettings> mutator, CancellationToken cancellationToken = default)
+    public async Task<bool> SaveUiStateAsync(Action<UiSettings> mutator, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(mutator);
         await _gate.WaitAsync(cancellationToken);
@@ -115,8 +135,15 @@ public sealed class AppSettingsStore
         {
             var draft = _current.Clone();
             mutator(draft.Ui);
+            if (LastLoadWarning is not null)
+            {
+                _current = draft;
+                return false;
+            }
+
             await SaveInternalAsync(draft, cancellationToken);
             _current = draft;
+            return true;
         }
         finally
         {
@@ -124,7 +151,23 @@ public sealed class AppSettingsStore
         }
     }
 
-    public async Task<AppSettings> UpdateAsync(Action<AppSettings> mutator, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Atomically applies a targeted field-level mutation to the latest persisted settings inside
+    /// the store lock so concurrent/independent writers (discovery, volume unit, remote toggles,
+    /// calibration) never clobber each other's changes. While the settings file is being recovered the change stays
+    /// in memory (see <see cref="SaveAsync"/>); <see cref="SettingsChanged"/> is raised either way.
+    /// </summary>
+    public Task<AppSettings> UpdateAsync(Action<AppSettings> mutator, CancellationToken cancellationToken = default) =>
+        UpdateCoreAsync(mutator, endsRecovery: false, cancellationToken);
+
+    /// <summary>
+    /// The user's Save &amp; Sync: like <see cref="UpdateAsync"/>, and it writes the recovered settings and ends a
+    /// settings recovery.
+    /// </summary>
+    public Task<AppSettings> SaveEditorAsync(Action<AppSettings> mutator, CancellationToken cancellationToken = default) =>
+        UpdateCoreAsync(mutator, endsRecovery: true, cancellationToken);
+
+    private async Task<AppSettings> UpdateCoreAsync(Action<AppSettings> mutator, bool endsRecovery, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(mutator);
         await _gate.WaitAsync(cancellationToken);
@@ -132,10 +175,7 @@ public sealed class AppSettingsStore
         {
             var draft = _current.Clone();
             mutator(draft);
-            var normalized = Normalize(draft, seedDefaultsIfEmpty: false);
-            await SaveInternalAsync(normalized, cancellationToken);
-            _current = normalized;
-            LastLoadWarning = null;
+            await CommitLockedAsync(Normalize(draft, seedDefaultsIfEmpty: false), endsRecovery, cancellationToken);
         }
         finally
         {
@@ -181,7 +221,10 @@ public sealed class AppSettingsStore
             parsed.Remote.GuestToken = existing.Remote.GuestToken;
         }
 
-        await SaveAsync(parsed, cancellationToken);
+        // An import replaces the whole settings on purpose: it is written and ends a recovery.
+        await CommitAsync(Normalize(parsed, seedDefaultsIfEmpty: false), endsRecovery: true, cancellationToken);
+        _logStore.Info("Settings imported.");
+        SettingsChanged?.Invoke(_current.Clone());
         return _current.Clone();
     }
 

@@ -1840,7 +1840,7 @@ public sealed partial class MainViewModel : ObservableObject
                 Stations = StationPresets.Select(static station => station.ToModel()).ToList(),
                 Scenes = ScenePresets.Select(static scene => scene.ToModel()).ToList(),
             };
-            settings.Ui = new UiSettings
+            var editorUi = new UiSettings
             {
                 StartMinimizedToTray = SettingsStartMinimizedToTray,
                 MinimizeToTray = SettingsMinimizeToTray,
@@ -1848,8 +1848,6 @@ public sealed partial class MainViewModel : ObservableObject
                 ShowNotifications = SettingsShowNotifications,
                 DisplayVolumeInDb = SettingsDisplayVolumeInDb,
                 LaunchAtWindowsStartup = SettingsLaunchAtWindowsStartup,
-                Theme = settings.Ui.Theme, // set live from Appearance, not by Save
-                Skin = settings.Ui.Skin,
             };
             settings.Media = new MediaRelaySettings
             {
@@ -1868,10 +1866,10 @@ public sealed partial class MainViewModel : ObservableObject
 
             _startupService.SetEnabled(SettingsLaunchAtWindowsStartup, SettingsStartMinimizedToTray ? true : null);
             _receiverController.ResetConnections();
-            await _settingsStore.UpdateAsync(s =>
+            await _settingsStore.SaveEditorAsync(s =>
             {
                 s.Receiver = settings.Receiver;
-                s.Ui = settings.Ui;
+                s.Ui.ApplyEditorFields(editorUi); // the latest theme, skin, placement and splash marker stay
                 s.Media = settings.Media;
                 s.Shortcuts = settings.Shortcuts;
                 s.Telemetry = settings.Telemetry;

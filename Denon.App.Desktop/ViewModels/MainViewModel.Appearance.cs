@@ -56,11 +56,10 @@ public sealed partial class MainViewModel
 
         ThemeManager.ApplyTheme(option.Id);
         MarkActiveTheme(option.Id);
-        _suppressNextSettingsReload = true;
-        _ = _settingsStore.UpdateAsync(s => s.Ui.Theme = option.Id);
         StatusMessage = option.Id == ThemeManager.SystemThemeId
             ? $"Theme follows Windows (now {ThemeManager.Current.Name})."
             : $"{option.Label} theme.";
+        _ = SaveAppearanceAsync(ui => ui.Theme = option.Id);
     });
 
     public ICommand SetSkinCommand => _setSkinCommand ??= new RelayCommand(parameter =>
@@ -72,10 +71,28 @@ public sealed partial class MainViewModel
 
         ThemeManager.ApplySkin(option.Id);
         MarkActiveSkin(option.Id);
-        _suppressNextSettingsReload = true;
-        _ = _settingsStore.UpdateAsync(s => s.Ui.Skin = option.Id);
         StatusMessage = $"{option.Label} skin.";
+        _ = SaveAppearanceAsync(ui => ui.Skin = option.Id);
     });
+
+    /// <summary>
+    /// Saves a theme or skin choice on its own: no reload of the settings editor (unsaved edits stay) and no
+    /// reconnect of the HEOS events. A failed save is reported.
+    /// </summary>
+    private async Task SaveAppearanceAsync(Action<Denon.App.Core.Models.UiSettings> change)
+    {
+        try
+        {
+            if (!await _settingsStore.SaveUiStateAsync(change))
+            {
+                StatusMessage += " It is saved with your next Save & Sync (the settings file is being recovered).";
+            }
+        }
+        catch (Exception exception)
+        {
+            LastError = $"Could not save the appearance: {exception.Message}";
+        }
+    }
 
     /// <summary>
     /// On the first start the window picked a skin that fits the screen (App.PlaceMainWindow): mark it and say so.

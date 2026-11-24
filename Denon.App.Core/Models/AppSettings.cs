@@ -144,6 +144,21 @@ public sealed class UiSettings
     /// <summary>The install the splash screen was last shown for (version and exe time); a new install shows it again.</summary>
     public string? SplashShownFor { get; set; }
 
+    /// <summary>
+    /// Copies the fields the Settings editor owns (tray, notification, dB and startup choices) from
+    /// <paramref name="editor"/>. Theme, skin, window placement and the splash marker stay: the app and the
+    /// Appearance chips set them, and Save &amp; Sync must not overwrite them with an older copy.
+    /// </summary>
+    public void ApplyEditorFields(UiSettings editor)
+    {
+        StartMinimizedToTray = editor.StartMinimizedToTray;
+        MinimizeToTray = editor.MinimizeToTray;
+        CloseToTray = editor.CloseToTray;
+        ShowNotifications = editor.ShowNotifications;
+        DisplayVolumeInDb = editor.DisplayVolumeInDb;
+        LaunchAtWindowsStartup = editor.LaunchAtWindowsStartup;
+    }
+
     public UiSettings Clone() =>
         new()
         {

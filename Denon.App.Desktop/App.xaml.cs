@@ -51,10 +51,25 @@ public partial class App : System.Windows.Application
         var captureDir = captureIndex >= 0 && captureIndex + 1 < e.Args.Length ? e.Args[captureIndex + 1] : null;
         var isScreenshotMode = !string.IsNullOrWhiteSpace(captureDir);
 
+        // --data-root <folder>: a separate settings, logs and plugins folder (tests a first start). Read before the
+        // single-instance check, so a test start never opens the running app with the normal settings.
+        var requestedDataRoot = isScreenshotMode ? null : ArgValue(e.Args, "--data-root");
+
         if (!isScreenshotMode)
         {
             // Enforce single instance: if already running, signal the running instance to surface its window
             _singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var createdNew);
+            if (!createdNew && requestedDataRoot is not null)
+            {
+                System.Windows.MessageBox.Show(
+                    "Denon Desktop is already running with your normal settings. Exit it (tray icon → Exit) before you start it with --data-root.",
+                    "Denon Desktop",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                Shutdown();
+                return;
+            }
+
             if (!createdNew)
             {
                 try
@@ -85,10 +100,9 @@ public partial class App : System.Windows.Application
 
             AppDataPaths.UseRootDirectory(showcaseRoot);
         }
-        else if (ArgValue(e.Args, "--data-root") is { } dataRoot)
+        else if (requestedDataRoot is not null)
         {
-            // A separate settings, logs and plugins folder: tests a first start without touching the real one.
-            AppDataPaths.UseRootDirectory(dataRoot);
+            AppDataPaths.UseRootDirectory(requestedDataRoot);
         }
 
         AppDataPaths.EnsureCreated();
@@ -345,8 +359,24 @@ public partial class App : System.Windows.Application
 
         var splash = new SplashWindow(shownKind);
         splash.Show();
-        await settingsStore.SaveWindowStateAsync(ui => ui.SplashShownFor = AppInfo.InstallStamp);
+
+        // The marker must never stop the start: if it cannot be saved now, the splash shows again next time.
+        await TrySaveUiStateAsync(settingsStore, ui => ui.SplashShownFor = AppInfo.InstallStamp, "splash marker");
         return splash;
+    }
+
+    /// <summary>Saves UI state (window, splash, picked skin); a failure is logged and the app goes on.</summary>
+    private static async Task TrySaveUiStateAsync(AppSettingsStore store, Action<Denon.App.Core.Models.UiSettings> change, string what)
+    {
+        try
+        {
+            await store.SaveUiStateAsync(change);
+        }
+        catch (Exception exception)
+        {
+            Current?.Dispatcher.Invoke(() =>
+                (Current as App)?._host?.Services.GetService<AppLogStore>()?.Warning($"Could not save the {what}: {exception.Message}"));
+        }
     }
 
     /// <summary>
@@ -398,7 +428,7 @@ public partial class App : System.Windows.Application
                 fit = betterFit;
                 picked = $", picked skin {better.Id}";
                 vm.ReportSkinPickedForScreen(better);
-                _ = settingsStore.SaveWindowStateAsync(u => u.Skin = better.Id);
+                _ = TrySaveUiStateAsync(settingsStore, u => u.Skin = better.Id, "picked skin");
             }
         }
 
@@ -416,7 +446,7 @@ public partial class App : System.Windows.Application
 
         var placement = WindowFitter.Capture(window);
         placement.UserSized = _windowAutoFit?.UserSized == true;
-        await store.SaveWindowStateAsync(ui => ui.Window = placement);
+        await TrySaveUiStateAsync(store, ui => ui.Window = placement, "window placement");
     }
 
     private static async Task CaptureSplashAsync(string outputDir)
@@ -537,7 +567,7 @@ public partial class App : System.Windows.Application
             placement.UserSized = _windowAutoFit?.UserSized == true;
             try
             {
-                Task.Run(() => store.SaveWindowStateAsync(ui => ui.Window = placement)).Wait(TimeSpan.FromSeconds(1));
+                Task.Run(() => store.SaveUiStateAsync(ui => ui.Window = placement)).Wait(TimeSpan.FromSeconds(1));
             }
             catch
             {

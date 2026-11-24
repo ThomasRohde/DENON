@@ -93,7 +93,10 @@ and centers the window. It measures before the window shows (after the deck's bi
 frame has the final size. On the first start with the Default skin it picks Compact when Default would scroll,
 and Large when the work area is at least 2200 × 1400 DIPs and Large fits. `WindowAutoFit` grows the window when the
 deck grows until the user moves or resizes it; a skin switch refits it. The placement is saved in
-`Ui.Window` (`SaveWindowStateAsync`, which does not raise `SettingsChanged`).
+`Ui.Window` with `SaveUiStateAsync`, which also saves the splash marker, theme and skin. It does not raise
+`SettingsChanged` (no editor reload, no HEOS reconnect), and while the settings file is being recovered it keeps the
+change in memory until the user's next explicit save. On a screen smaller than the window's own minimum
+(960 × 580 DIPs, for example 1366 × 768 at 150 %) the minimum shrinks to the work area.
 
 ## Palette contract
 

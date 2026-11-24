@@ -21,6 +21,11 @@ public static class WindowFitter
     /// <summary>Width of the Default skin's layout (the README screenshots); other skins scale it.</summary>
     public const double DesignWidth = 1360;
 
+    /// <summary>The main window's own minimum size (MainWindow.xaml), used where the monitor has room for it.</summary>
+    public const double MinWindowWidth = 960;
+
+    public const double MinWindowHeight = 580;
+
     /// <summary>Free room around the window on its monitor, in DIPs.</summary>
     private const double ScreenMargin = 24;
 
@@ -53,8 +58,7 @@ public static class WindowFitter
     /// </summary>
     public static Fit Measure(Window window, FrameworkElement deck, Rect workArea)
     {
-        var maxWidth = Math.Max(window.MinWidth, workArea.Width - (2 * ScreenMargin));
-        var maxHeight = Math.Max(window.MinHeight, workArea.Height - (2 * ScreenMargin));
+        var (_, minHeight, maxWidth, maxHeight) = Limits(workArea);
         var width = Math.Min(maxWidth, Math.Round(DesignWidth * SkinMetrics.Current.SizeScale));
 
         // The deck may be hidden behind another page (a skin switch in Settings): show it for the measure only.
@@ -65,7 +69,7 @@ public static class WindowFitter
         }
 
         // Binary search for the smallest height without scroll bars (to 4 DIPs).
-        double low = window.MinHeight, high = maxHeight;
+        double low = minHeight, high = maxHeight;
         if (ShowsWithoutScroll(window, deck, width, low))
         {
             high = low;
@@ -105,11 +109,34 @@ public static class WindowFitter
         }
     }
 
+    /// <summary>
+    /// The window's size limits on a work area: its own minimums where the monitor has room for them (a small,
+    /// high-scaled screen gets smaller ones, so the title bar and buttons stay on screen), and the work area less
+    /// a margin as the maximum.
+    /// </summary>
+    public static (double MinWidth, double MinHeight, double MaxWidth, double MaxHeight) Limits(Rect workArea)
+    {
+        var minWidth = Math.Min(MinWindowWidth, workArea.Width);
+        var minHeight = Math.Min(MinWindowHeight, workArea.Height);
+        return (minWidth, minHeight,
+            Math.Max(minWidth, workArea.Width - (2 * ScreenMargin)),
+            Math.Max(minHeight, workArea.Height - (2 * ScreenMargin)));
+    }
+
+    /// <summary>Sets the window's minimum size for its monitor (see <see cref="Limits"/>).</summary>
+    public static void ApplyMinimums(Window window, Rect workArea)
+    {
+        var (minWidth, minHeight, _, _) = Limits(workArea);
+        window.MinWidth = minWidth;
+        window.MinHeight = minHeight;
+    }
+
     /// <summary>Gives the window a size and centers it in the work area (normal state).</summary>
     public static void Place(Window window, Monitor monitor, double width, double height)
     {
         MoveOnto(window, monitor);
         var area = monitor.WorkArea;
+        ApplyMinimums(window, area);
         window.WindowStartupLocation = WindowStartupLocation.Manual;
         window.Width = width;
         window.Height = height;
@@ -131,6 +158,7 @@ public static class WindowFitter
 
         var monitor = MonitorOf(window);
         var area = monitor.WorkArea;
+        ApplyMinimums(window, area);
         var fit = Measure(window, deck, area);
         if (growOnly && fit.Height <= window.ActualHeight + 1)
         {
@@ -193,6 +221,7 @@ public static class WindowFitter
 
         MoveOnto(window, monitor);
         var area = monitor.WorkArea;
+        ApplyMinimums(window, area);
         window.WindowStartupLocation = WindowStartupLocation.Manual;
         window.Width = Math.Min(Math.Max(window.MinWidth, savedPx.Width / monitor.Scale), area.Width);
         window.Height = Math.Min(Math.Max(window.MinHeight, savedPx.Height / monitor.Scale), area.Height);

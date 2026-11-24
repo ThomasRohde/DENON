@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+From a Codex adversarial review of 2.x:
+- **Settings recovery is safe again.** When `settings.json` could not be read, saving the splash marker or the window placement wrote the recovered settings over it before you chose to save. Now only Save & Sync and Import write the file during a recovery. Every other save (window, splash marker, theme, skin, a receiver found by discovery, the dB display, plugin and MCP settings) stays in memory until then. A test checks that the file stays byte for byte.
+- **A settings file that cannot be written no longer stops the start.** If the splash marker cannot be saved (for example, another program locks the file), the app logs it and opens; the splash shows again next time.
+- **Save & Sync keeps the window placement, the splash marker, the theme and the skin.** It changed the whole UI section from an older copy, so the next start said "Updated" again and lost the window size.
+- **Theme and skin chips no longer reset unsaved settings edits or reconnect HEOS.** They save the choice on their own and report a failed save.
+- **`--data-root` never opens the running app with your normal settings.** When the normal app runs, a message says so and the test start ends.
+- **The window fits small, high-scaled screens.** On a screen smaller than the window's minimum size (for example 1366 × 768 at 150 %) the minimum shrinks to the screen, so the title bar and buttons stay visible. The minimum also follows the window when you move it to another monitor.
+
 ## [2.2.1] - 2026-11-24
 
 ### Fixed

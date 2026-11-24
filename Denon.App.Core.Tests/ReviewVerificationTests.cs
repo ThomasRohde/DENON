@@ -94,7 +94,7 @@ public sealed class ReviewVerificationTests : IDisposable
         Assert.True(Directory.GetFiles(_tempDir, "settings.json.corrupt-*").Length >= 1);
 
         // Saving after recovery must NOT overwrite the valid .bak with the corrupt primary file!
-        await recoveryStore.UpdateAsync(s => s.Receiver.PlayerName = "Recovered Living Room");
+        await recoveryStore.SaveEditorAsync(s => s.Receiver.PlayerName = "Recovered Living Room");
 
         var bakPath = path + ".bak";
         Assert.True(File.Exists(bakPath));
@@ -104,6 +104,82 @@ public sealed class ReviewVerificationTests : IDisposable
         using var backupDoc = JsonDocument.Parse(backupJson);
         Assert.Contains("Recovered Living Room", primaryJson);
         Assert.Contains("192.168.1.99", backupJson);
+    }
+
+    [Fact]
+    public async Task SettingsStore_UiStateSaves_DoNotTouchTheFile_WhileRecovering()
+    {
+        var path = Path.Combine(_tempDir, "recovering-settings.json");
+        var log = CreateIsolatedLog();
+        var store = new AppSettingsStore(log, path);
+        await store.InitializeAsync();
+        await File.WriteAllTextAsync(path, "{ invalid json !!!");
+        var corrupt = await File.ReadAllBytesAsync(path);
+
+        var recovering = new AppSettingsStore(log, path);
+        await recovering.InitializeAsync();
+        Assert.NotNull(recovering.LastLoadWarning);
+
+        // Splash marker, window placement, theme and skin: kept in memory, the primary file stays byte-for-byte.
+        Assert.False(await recovering.SaveUiStateAsync(ui => ui.SplashShownFor = "9.9.9|1"));
+        Assert.False(await recovering.SaveUiStateAsync(ui => ui.Window = new WindowPlacementSettings { Width = 1200, Height = 900, Scale = 1 }));
+        Assert.False(await recovering.SaveUiStateAsync(ui => ui.Theme = "light"));
+
+        // Receiver discovery, a one-field toggle (dB display), a plugin switch (whole-settings save): none of them
+        // ends the recovery or touches the file.
+        await recovering.UpdateAsync(s => s.Receiver.Host = "192.168.1.50");
+        await recovering.UpdateAsync(s => s.Ui.DisplayVolumeInDb = true);
+        var plugins = recovering.Current.Clone();
+        plugins.Plugins.DisabledPluginIds = ["smart-tv"];
+        await recovering.SaveAsync(plugins);
+        Assert.Equal("192.168.1.50", recovering.Current.Receiver.Host);
+        Assert.True(recovering.Current.Ui.DisplayVolumeInDb);
+        Assert.Contains("smart-tv", recovering.Current.Plugins.DisabledPluginIds);
+        Assert.NotNull(recovering.LastLoadWarning);
+        Assert.Equal(corrupt, await File.ReadAllBytesAsync(path));
+        Assert.Equal("9.9.9|1", recovering.Current.Ui.SplashShownFor);
+        Assert.Equal(1200, recovering.Current.Ui.Window!.Width);
+
+        // The user's Save & Sync ends the recovery and writes the kept changes too; later saves are written.
+        await recovering.SaveEditorAsync(s => s.Receiver.PlayerName = "Saved by the user");
+        var saved = await File.ReadAllTextAsync(path);
+        Assert.Contains("9.9.9|1", saved);
+        Assert.True(await recovering.SaveUiStateAsync(ui => ui.Skin = "compact"));
+        Assert.Contains("\"compact\"", await File.ReadAllTextAsync(path));
+    }
+
+    [Fact]
+    public void SaveAndSync_UiFields_KeepThemeSkinPlacementAndSplashMarker()
+    {
+        var current = new UiSettings
+        {
+            Theme = "light",
+            Skin = "hifi",
+            SplashShownFor = "2.2.1|5",
+            Window = new WindowPlacementSettings { Left = 10, Top = 20, Width = 1300, Height = 1000, Scale = 1.5 },
+        };
+        var editor = new UiSettings
+        {
+            StartMinimizedToTray = true,
+            MinimizeToTray = false,
+            CloseToTray = false,
+            ShowNotifications = false,
+            DisplayVolumeInDb = true,
+            LaunchAtWindowsStartup = true,
+        };
+
+        current.ApplyEditorFields(editor);
+
+        Assert.True(current.StartMinimizedToTray);
+        Assert.False(current.MinimizeToTray);
+        Assert.False(current.CloseToTray);
+        Assert.False(current.ShowNotifications);
+        Assert.True(current.DisplayVolumeInDb);
+        Assert.True(current.LaunchAtWindowsStartup);
+        Assert.Equal("light", current.Theme);
+        Assert.Equal("hifi", current.Skin);
+        Assert.Equal("2.2.1|5", current.SplashShownFor);
+        Assert.Equal(1300, current.Window!.Width);
     }
 
     [Fact]

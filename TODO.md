@@ -124,6 +124,13 @@ Design and decisions: `docs/theming.md` (branch `theming-2.0`).
       need them).
 - [x] Icon set in `Themes/Icons.xaml`: 21 named geometries (sidebar, title bar, transport, chevrons, tick), 25 uses.
 
+## Settings saves
+
+- [ ] Three more saves use the one-shot `_suppressNextSettingsReload` flag (`MainViewModel.cs` line ~237,
+      `MainViewModel.CastRemoteRadio.cs` ~464/475, `MainViewModel.StudioAndSync.cs` ~361). Two overlapping saves can
+      still reload the settings editor and drop unsaved edits, and each save reconnects HEOS events. Move them to
+      targeted saves like `SaveUiStateAsync` (the theme and skin chips were fixed this way after the Codex review).
+
 ## Release / build
 
 - [ ] The installer and exe are unsigned (SmartScreen warning). Consider code signing.
