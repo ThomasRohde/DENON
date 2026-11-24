@@ -14,7 +14,9 @@ const shim = `<script>
 (() => {
   const T = ${JSON.stringify(token)};
   const rpc = async (op, ...args) => {
-    const r = await fetch("/rpc", { method: "POST", headers: { "x-t": T, "content-type": "application/json" }, body: JSON.stringify({ op, args }) });
+    let r;
+    try { r = await fetch("/rpc", { method: "POST", headers: { "x-t": T, "content-type": "application/json" }, body: JSON.stringify({ op, args }) }); }
+    catch { throw new Error("The test harness is not running (this is the harness page, not the installed app). Start harness.mjs again and reload."); }
     const j = await r.json(); if (j.error) throw new Error(j.error); return j.value;
   };
   const ok = async () => {};
