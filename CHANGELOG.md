@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-11-24
+
+### Fixed
+- Settings → Desktop & Tray Behavior: **Check now** sits in the **Check for updates** row, next to the switch, instead of on a loose row of its own.
+
 ## [2.4.0] - 2026-11-24
 
 ### Added
