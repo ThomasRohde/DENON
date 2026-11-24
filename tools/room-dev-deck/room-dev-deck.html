@@ -230,6 +230,31 @@ table.t tr:last-child td { border-bottom: 0; }
 .lines li { margin: 2px 0; }
 .files { font: 12.5px/1.6 var(--mono); padding: 8px 12px; margin: 0; white-space: pre-wrap; max-height: 220px; overflow: auto; }
 
+/* ---------- todo ---------- */
+.todo-grid { grid-template-columns: minmax(280px, 400px) 1fr; }
+.todo-list { max-height: 76vh; overflow: auto; padding-bottom: 6px; }
+.todo-list h3 { margin: 0; padding: 9px 12px 5px; font-size: 13px; font-weight: 600; color: var(--muted); position: sticky; top: 0;
+  background: var(--panel); display: flex; gap: 8px; z-index: 1; }
+.todo-list h3 span { color: var(--faint); font-weight: 400; }
+.todo-list button { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line-2); background: none;
+  padding: 7px 12px; cursor: pointer; font-size: 14.5px; line-height: 1.3; }
+.todo-list button:hover { background: var(--panel-2); }
+.todo-list button[aria-current="true"] { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.todo-list button.done { color: var(--faint); text-decoration: line-through; }
+.todo-list button small { display: block; color: var(--faint); font-size: 12.5px; margin-top: 2px; text-decoration: none; }
+.todo-list button small .tag { margin-left: 4px; }
+.todo-head { padding: 12px 14px 4px; }
+.todo-head .sel-title { font-size: 21px; }
+.md { font-size: 15.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.md p { margin: 0 0 9px; } .md ul { margin: 0 0 9px; padding-left: 20px; } .md li { margin: 3px 0; }
+.md code { font: 13px var(--mono); background: var(--sunk); border-radius: 4px; padding: 0 4px; }
+.md h4 { margin: 12px 0 6px; font-size: 15.5px; }
+.about { margin: 0 14px 12px; padding: 8px 10px; border-left: 3px solid var(--line); color: var(--muted); font-size: 14px; }
+.launch { border-top: 1px solid var(--line-2); padding: 12px 14px 14px; display: grid; gap: 10px; }
+.launch h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.launch textarea { min-height: 200px; font: 13px/1.5 var(--mono); }
+.launch .note { font-size: 13.5px; color: var(--muted); }
+
 /* ---------- ask drawer ---------- */
 .drawer { position: fixed; z-index: 40; top: 0; right: 0; bottom: 0; width: min(520px, 100vw); background: var(--panel);
   border-left: 1px solid var(--line); box-shadow: -10px 0 30px rgba(0,0,0,.14); display: flex; flex-direction: column;
@@ -268,6 +293,7 @@ table.t tr:last-child td { border-bottom: 0; }
       <button role="tab" data-mode="mcp" aria-selected="false">MCP<kbd>2</kbd></button>
       <button role="tab" data-mode="lan" aria-selected="false">LAN<kbd>3</kbd></button>
       <button role="tab" data-mode="release" aria-selected="false">Release<kbd>4</kbd></button>
+      <button role="tab" data-mode="todo" aria-selected="false">TODO<kbd>5</kbd></button>
     </div>
     <div class="leds">
       <span class="led" id="led-app" title="Is Denon Desktop running?"><i></i><span>App</span></span>
@@ -383,6 +409,22 @@ table.t tr:last-child td { border-bottom: 0; }
         <div class="card"><header><h2>Unreleased in CHANGELOG</h2></header><div id="rel-unrel"></div></div>
         <div class="card"><header><h2>Check a release</h2><span class="sub">Download the assets and compare SHA-256</span></header><div id="rel-verify" class="pad"></div></div>
         <div class="card"><header><h2>Open in TODO.md</h2><span class="sub" id="todo-sub"></span></header><div id="rel-todo"></div></div>
+      </div>
+    </section>
+
+    <!-- TODO -->
+    <section id="mode-todo" class="hidden">
+      <div class="room-bar">
+        <input type="search" id="todo-q" placeholder="Find an item" aria-label="Find an item" style="flex:0 1 280px">
+        <label class="row muted" style="font-size:14px"><input type="checkbox" id="todo-done"> Show done items</label>
+        <span class="muted" id="todo-stat"></span>
+        <span style="flex:1"></span>
+        <button class="btn" id="todo-open">Open TODO.md</button>
+        <button class="btn" id="todo-reload">Reload</button>
+      </div>
+      <div class="mcp-grid todo-grid">
+        <div class="card"><div class="todo-list" id="todo-list"></div></div>
+        <div class="card" id="todo-card"><div class="empty">Pick an item on the left. Then start a Claude Code session on it, with a prompt you can edit first.</div></div>
       </div>
     </section>
   </main>
@@ -1121,8 +1163,10 @@ function openAsk(ctx, question) {
   $("#ask-q").value = question; $("#ask-out").textContent = "";
   $("#ask").classList.remove("hidden"); $("#ask-q").focus();
 }
-function renderAnswer(text) {
-  const out = $("#ask-out"); out.textContent = "";
+function renderAnswer(text) { renderMd(text, $("#ask-out")); }
+function renderMd(text, out) {
+  // A small, safe Markdown subset: paragraphs, bullets, headings, `code` and **bold**. Text only, never markup.
+  out.textContent = "";
   const inline = (s, parent) => {
     const parts = s.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
     for (const p of parts) {
@@ -1147,7 +1191,8 @@ async function askGo() {
   ASK.ctl?.abort(); const ctl = ASK.ctl = new AbortController();
   $("#ask-go").disabled = true; $("#ask-stop").disabled = false;
   $("#ask-out").textContent = "Thinking…";
-  const prompt = `${ROOM_FACTS}\n\n${ASK.ctx.text}\n\nQuestion: ${$("#ask-q").value.trim() || "What happened here?"}\n\nAnswer in short, plain English. Say what happened (in time order where it helps), what looks wrong and the most likely cause, and quote the times of the lines that show it. Use short paragraphs or bullets. No preamble.`;
+  const rule = ASK.ctx.rule || "Answer in short, plain English. Say what happened (in time order where it helps), what looks wrong and the most likely cause, and quote the times of the lines that show it. Use short paragraphs or bullets. No preamble.";
+  const prompt = `${ASK.ctx.facts || ROOM_FACTS}\n\n${ASK.ctx.text}\n\nQuestion: ${$("#ask-q").value.trim() || "What happened here?"}\n\n${rule}`;
   try {
     const { truncated } = await P.sample(prompt, { signal: ctl.signal, onText: ({ text }) => renderAnswer(text) });
     if (truncated) $("#ask-out").append(el("p", { class: "muted", text: "The answer was cut short. Pick a shorter span and ask again." }));
@@ -1477,17 +1522,190 @@ async function relUnreleased() {
   else box.append(el("ul", { class: "lines" }, lines.slice(0, 20).map((l) => el("li", { text: l.length > 220 ? l.slice(0, 220) + "…" : l }))));
 }
 async function relTodo() {
-  const txt = await readText(repoPath() + "\\TODO.md").catch(() => "");
-  const items = []; let section = "";
-  for (const line of txt.split(/\r?\n/)) {
-    const h = /^##+\s+(.*)/.exec(line); if (h) { section = h[1]; continue; }
-    const t = /^\s*- \[ \]\s+(.*)/.exec(line); if (t) items.push({ section, text: t[1].replace(/\*\*/g, "") });
-  }
+  await todoLoad();
+  const items = TD.items.filter((i) => !i.done);
   $("#todo-sub").textContent = `${items.length} open`;
   const box = $("#rel-todo"); box.textContent = "";
   if (!items.length) { box.append(el("div", { class: "pad muted", text: "Nothing open." })); return; }
-  box.append(el("ul", { class: "lines" }, items.slice(0, 14).map((i) => el("li", {}, el("span", { class: "faint", text: i.section + ": " }), i.text.length > 160 ? i.text.slice(0, 160) + "…" : i.text))));
-  if (items.length > 14) box.append(el("div", { class: "pad faint", style: "padding-top:0", text: `And ${items.length - 14} more in TODO.md.` }));
+  box.append(el("ul", { class: "lines" }, items.slice(0, 10).map((i) => el("li", {},
+    el("span", { class: "faint", text: i.section + ": " }), el("a", { href: "#", text: i.title, onclick: (e) => { e.preventDefault(); setMode("todo"); todoSelect(i.id); } })))));
+  box.append(el("div", { class: "pad", style: "padding-top:0" }, el("button", { class: "btn small", text: `Open all ${items.length} in TODO mode`, onclick: () => setMode("todo") })));
+}
+
+// =====================================================================
+// TODO mode: pick an item in TODO.md and start Claude Code on it
+// =====================================================================
+const TD = { items: [], sections: [], sel: store.get("todoSel", null), q: "", showDone: false, sig: "", started: store.get("todoStarted", {}), drafts: {} };
+const todoPath = () => repoPath() + "\\TODO.md";
+function hashId(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
+function parseTodo(txt) {
+  // Sections are "## " headings; an item is "- [ ]" or "- [x]" plus the lines indented under it.
+  const lines = txt.split(/\r?\n/), items = [], sections = [];
+  let sec = null, cur = null;
+  const close = () => {
+    if (!cur) return;
+    const out = []; // wrapped lines join their paragraph; a sub-bullet starts a new line
+    for (const l of cur.lines) { if (out.length && !/^([-*•]|\d+\.)\s/.test(l)) out[out.length - 1] += " " + l; else out.push(l); }
+    cur.text = out.join("\n").trim(); delete cur.lines; items.push(cur); cur = null;
+  };
+  lines.forEach((line, i) => {
+    const h = /^(#{2,4})\s+(.*)$/.exec(line);
+    if (h) { close(); sec = { name: h[2].trim(), intro: [], line: i + 1 }; sections.push(sec); return; }
+    const m = /^(\s*)- \[([ xX])\]\s+(.*)$/.exec(line);
+    if (m && (!cur || m[1].length <= cur.indent)) {
+      close();
+      cur = { section: sec?.name || "(top)", line: i + 1, done: m[2] !== " ", indent: m[1].length, lines: [m[3]] };
+      return;
+    }
+    if (cur) {
+      if (!line.trim()) { close(); return; }
+      const ind = /^\s*/.exec(line)[0].length;
+      if (ind > cur.indent) { cur.lines.push(line.trim()); return; }
+      close();
+    }
+    if (sec && line.trim() && !/^\s*- /.test(line)) sec.intro.push(line.trim());
+  });
+  close();
+  for (const it of items) {
+    const bold = /^\*\*(.+?)\*\*/.exec(it.text);
+    const first = it.text.replace(/\*\*/g, "").replace(/`/g, "").split(/\n/)[0];
+    it.title = bold ? bold[1].replace(/[:.]$/, "") : (/^(.{20,140}?[.:])(\s|$)/.exec(first)?.[1] || first.slice(0, 140) + (first.length > 140 ? "…" : ""));
+    it.id = hashId(it.section + "|" + it.text.slice(0, 160));
+    it.about = (sections.find((s) => s.name === it.section)?.intro || []).join(" ");
+  }
+  return { items, sections };
+}
+async function todoLoad(force) {
+  let sig = "";
+  try { const st = await P.fs.stat(todoPath()); sig = st.size + ":" + st.mtimeMs; } catch { sig = "missing"; }
+  if (!force && sig === TD.sig && TD.items.length) return false;
+  TD.sig = sig;
+  const txt = sig === "missing" ? "" : await readText(todoPath()).catch(() => "");
+  Object.assign(TD, parseTodo(txt));
+  return true;
+}
+async function todoRefresh(force) {
+  const changed = await todoLoad(force);
+  if (changed || force || !$("#todo-list").childElementCount) { renderTodoList(); renderTodoCard(); }
+}
+function todoMatches() {
+  const q = TD.q.trim().toLowerCase();
+  return TD.items.filter((i) => (TD.showDone || !i.done) && (!q || i.text.toLowerCase().includes(q) || i.section.toLowerCase().includes(q)));
+}
+function renderTodoList() {
+  const box = $("#todo-list"); box.textContent = "";
+  const open = TD.items.filter((i) => !i.done).length;
+  $("#todo-stat").textContent = TD.sig === "missing" ? "No TODO.md in the repository folder." : `${open} open, ${TD.items.length - open} done`;
+  const list = todoMatches();
+  const bySection = new Map(); for (const i of list) { if (!bySection.has(i.section)) bySection.set(i.section, []); bySection.get(i.section).push(i); }
+  for (const [name, items] of bySection) {
+    box.append(el("h3", {}, name, el("span", { text: String(items.length) })));
+    for (const i of items) {
+      const started = TD.started[i.id];
+      box.append(el("button", { class: i.done ? "done" : "", "aria-current": String(TD.sel === i.id), onclick: () => todoSelect(i.id) },
+        i.title, el("small", {}, `Line ${i.line}`, started ? el("span", { class: "tag info", text: "Started " + hhmm(started) }) : null)));
+    }
+  }
+  if (!list.length) box.append(el("div", { class: "empty", text: TD.items.length ? "No item matches." : "TODO.md has no items." }));
+}
+function todoSelect(id) {
+  TD.sel = id; store.set("todoSel", id);
+  renderTodoList(); renderTodoCard();
+  $("#todo-list [aria-current='true']")?.scrollIntoView({ block: "nearest" });
+}
+function todoPrompt(i) {
+  return [
+    `Work on this open item from TODO.md in this repository.`,
+    ``,
+    `Section: ${i.section}`,
+    `TODO.md line ${i.line}:`,
+    ``,
+    i.text,
+    i.about ? `\nAbout this section: ${i.about}` : null,
+    ``,
+    `When you are done:`,
+    `- Update TODO.md: tick or remove the item, and add an entry to the right CHANGELOG, as the top of TODO.md says.`,
+    `- Run the tests that cover the change.`,
+    `- Do not commit or push. Tell me what changed and what is not verified.`,
+  ].filter((x) => x != null).join("\n");
+}
+const LAUNCH_MODES = [
+  ["plan", "Plan first", "Claude reads the code and proposes a plan. It edits nothing until you approve."],
+  ["default", "Ask before edits", "Claude asks before each edit and command."],
+  ["acceptEdits", "Accept edits", "Claude edits files without asking; commands still ask."],
+];
+function renderTodoCard() {
+  const card = $("#todo-card"); card.textContent = "";
+  const i = TD.items.find((x) => x.id === TD.sel);
+  if (!i) { card.append(el("div", { class: "empty", text: TD.sel ? "That item is no longer in TODO.md. It was done, removed or reworded." : "Pick an item on the left. Then start a Claude Code session on it, with a prompt you can edit first." })); return; }
+  const started = TD.started[i.id];
+  card.append(el("div", { class: "todo-head" },
+    el("div", { class: "muted", style: "font-size:13.5px", text: `${i.section} · TODO.md line ${i.line} · ${i.done ? "done" : "open"}` }),
+    el("p", { class: "sel-title", text: i.title })));
+  const body = el("div", { class: "md", style: "padding:4px 14px 6px" }); renderMd(i.text, body); card.append(body);
+  if (i.about) card.append(el("div", { class: "about" }, el("b", { text: "About this section: " }), i.about));
+  const prompt = el("textarea", { "aria-label": "Prompt for Claude Code", spellcheck: "false" });
+  prompt.value = TD.drafts[i.id] ?? todoPrompt(i);
+  prompt.addEventListener("input", () => { TD.drafts[i.id] = prompt.value; });
+  const modeSel = store.get("launchMode", "plan");
+  const modes = el("div", { class: "seg", role: "radiogroup", "aria-label": "How Claude Code starts" },
+    LAUNCH_MODES.map(([v, label, tip]) => el("button", { "aria-pressed": String(v === modeSel), title: tip, onclick: (e) => {
+      store.set("launchMode", v); e.currentTarget.parentElement.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === e.currentTarget)));
+      hint.textContent = tip;
+    } }, label)));
+  const hint = el("span", { class: "note", text: LAUNCH_MODES.find(([v]) => v === modeSel)?.[2] || "" });
+  const go = el("button", { class: "btn primary", text: "Start in Claude Code" });
+  go.addEventListener("click", async () => {
+    go.disabled = true;
+    try {
+      await launchClaude(i, prompt.value, store.get("launchMode", "plan"));
+      TD.started[i.id] = Date.now(); store.set("todoStarted", TD.started);
+      toast("Claude Code is starting in a new terminal window.");
+      renderTodoList(); renderTodoCard();
+    } catch (e) { toast("Could not start Claude Code: " + errText(e)); go.disabled = false; }
+  });
+  card.append(el("div", { class: "launch" },
+    el("h3", { text: "Ask Claude Code to work on it" }),
+    prompt,
+    el("div", { class: "row" }, modes, hint),
+    el("div", { class: "row" }, go,
+      el("button", { class: "btn", text: "Copy prompt", onclick: () => navigator.clipboard.writeText(prompt.value).then(() => toast("Copied."), () => toast("Copy failed.")) }),
+      el("button", { class: "btn", text: "Reset prompt", onclick: () => { delete TD.drafts[i.id]; prompt.value = todoPrompt(i); } }),
+      P.sample ? el("button", { class: "btn", text: "Quick take from Claude", onclick: () => openAsk({
+        label: "TODO: " + i.title, summary: "one item from TODO.md",
+        facts: "You help the developer of Denon Desktop: a .NET 10 WPF app for Denon AV receivers, with plugins for an LG webOS TV, Philips Hue, Home Assistant, Apple TV, Chromecast and HomePods, an MCP server and an Insights web page. You cannot see the code.",
+        text: `An open item from TODO.md (section "${i.section}"):\n\n${i.text}${i.about ? "\n\nAbout this section: " + i.about : ""}`,
+        rule: "Answer in short, plain English: what the item asks, a likely approach, open questions to settle first, and what to test. Use short bullets. No preamble.",
+      }, "How would you approach this item?") }) : null),
+    el("div", { class: "note", text: started
+      ? `Started in Claude Code at ${hhmm(started)}. Starting again opens a second session.`
+      : `Opens Windows Terminal in ${repoPath()} with a new Claude Code session. The session works on your files, not on a copy.` })));
+}
+async function launchClaude(item, prompt, mode) {
+  // The prompt goes through a file, so quotes and new lines reach Claude Code unchanged.
+  const dir = `${P.env.TEMP}\\room-dev-deck-todo`, id = Date.now().toString(36);
+  await P.fs.mkdir(dir, { recursive: true });
+  const promptFile = `${dir}\\prompt-${id}.txt`, script = `${dir}\\start-${id}.ps1`;
+  await P.fs.writeFile(promptFile, prompt, "utf8");
+  const flag = mode && mode !== "default" ? `--permission-mode ${mode} ` : "";
+  const hasPwsh = (await sh("where pwsh", { timeout: 10000 }).catch(() => ({ code: 1 }))).code === 0;
+  const hasWt = (await sh("where wt", { timeout: 10000 }).catch(() => ({ code: 1 }))).code === 0;
+  const hasClaude = (await sh("where claude", { timeout: 10000 }).catch(() => ({ code: 1 }))).code === 0;
+  if (!hasClaude) throw new Error("The claude command is not on PATH. Install Claude Code first.");
+  // Windows PowerShell 5.1 breaks double quotes inside native arguments; pwsh 7 passes them as they are.
+  const promptExpr = hasPwsh ? "$prompt" : "($prompt -replace '\"', \"'\")";
+  await P.fs.writeFile(script, "﻿" + [
+    `$Host.UI.RawUI.WindowTitle = ${psq("Claude Code: " + item.title.slice(0, 50))}`,
+    `Set-Location -LiteralPath ${psq(repoPath())}`,
+    `$prompt = Get-Content -Raw -Encoding UTF8 -LiteralPath ${psq(promptFile)}`,
+    `& claude ${flag}${promptExpr}`,
+  ].join("\r\n") + "\r\n", "utf8");
+  const shell = hasPwsh ? "pwsh" : "powershell";
+  const cmd = hasWt
+    ? `start "" wt -w new -d "${repoPath()}" ${shell} -NoExit -NoProfile -ExecutionPolicy Bypass -File "${script}"`
+    : `start "" ${shell} -NoExit -NoProfile -ExecutionPolicy Bypass -File "${script}"`;
+  const r = await sh(cmd, { cwd: repoPath(), timeout: 20000 });
+  if (r.code !== 0) throw new Error((r.stderr || "start failed").trim());
 }
 async function relRuns(fromTimer) {
   try {
@@ -1624,7 +1842,7 @@ async function updateTray() {
       icon: drawTray(st), iconIsTemplate: false, title: "Room Dev Deck", toolTip: tip.slice(0, 100),
       menu: [
         { label: "Show Room Dev Deck", click: show() }, { type: "separator" },
-        { label: "Room", click: show("room") }, { label: "MCP", click: show("mcp") }, { label: "LAN", click: show("lan") }, { label: "Release", click: show("release") },
+        { label: "Room", click: show("room") }, { label: "MCP", click: show("mcp") }, { label: "LAN", click: show("lan") }, { label: "Release", click: show("release") }, { label: "TODO", click: show("todo") },
         { type: "separator" },
         { label: "Alerts for errors and runs", type: "checkbox", checked: TRAY.alerts, click: () => { TRAY.alerts = !TRAY.alerts; store.set("alerts", TRAY.alerts); TRAY.key = ""; updateTray(); } },
       ],
@@ -1666,11 +1884,13 @@ function startTray() { if (P.perms["menu-bar"] === "granted" && !TRAY.on) { TRAY
 // Modes and wiring
 // =====================================================================
 let mode = null;
+const MODES = ["room", "mcp", "lan", "release", "todo"];
 function setMode(m) {
-  if (!["room", "mcp", "lan", "release"].includes(m)) m = "room";
+  if (!MODES.includes(m)) m = "room";
   mode = m; store.set("mode", m);
   $$(".modes button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.mode === m)));
-  for (const k of ["room", "mcp", "lan", "release"]) $("#mode-" + k).classList.toggle("hidden", k !== m);
+  for (const k of MODES) $("#mode-" + k).classList.toggle("hidden", k !== m);
+  if (m === "todo") todoRefresh();
   if (m === "room") renderTimeline();
   if (m === "mcp" && !M.loaded) mcpLoad();
   if (m === "lan" && !L.devs.length) lanInit();
@@ -1681,8 +1901,9 @@ function wire() {
   document.addEventListener("keydown", (e) => {
     if (e.target.closest("input, textarea, select")) { if (e.key === "Escape") e.target.blur(); return; }
     if (e.key === "Escape") { $("#ask").classList.add("hidden"); return; }
-    const i = ["1", "2", "3", "4"].indexOf(e.key); if (i >= 0 && !e.ctrlKey && !e.metaKey && !e.altKey) { setMode(["room", "mcp", "lan", "release"][i]); return; }
+    const i = ["1", "2", "3", "4", "5"].indexOf(e.key); if (i >= 0 && !e.ctrlKey && !e.metaKey && !e.altKey) { setMode(MODES[i]); return; }
     if (e.key === "/" && mode === "room") { e.preventDefault(); $("#f-q").focus(); }
+    if (e.key === "/" && mode === "todo") { e.preventDefault(); $("#todo-q").focus(); }
   });
   $("#day-pick").addEventListener("change", (e) => goDay(e.target.value));
   $("#day-prev").addEventListener("click", () => { const i = D.days.indexOf(D.day); if (i < D.days.length - 1) goDay(D.days[i + 1]); });
@@ -1709,7 +1930,13 @@ function wire() {
   $("#con-ask").addEventListener("click", () => openAsk({ label: "LAN console", summary: `${L.out.length.toLocaleString()} characters of probe output`, text: "Output of developer probes (atvprobe and MCP reads) on the home LAN:\n" + L.out.slice(-100000) }, "Explain this probe output. Does anything look wrong?"));
   $("#rel-refresh").addEventListener("click", relRefresh);
   $("#runs-refresh").addEventListener("click", () => relRuns());
-  $("#repo").addEventListener("change", (e) => { store.set("repo", e.target.value.trim()); L.probe = null; relRefresh(); });
+  $("#repo").addEventListener("change", (e) => { store.set("repo", e.target.value.trim()); L.probe = null; TD.sig = ""; relRefresh(); });
+  let tq; $("#todo-q").addEventListener("input", (e) => { clearTimeout(tq); tq = setTimeout(() => { TD.q = e.target.value; renderTodoList(); }, 120); });
+  $("#todo-done").addEventListener("change", (e) => { TD.showDone = e.target.checked; renderTodoList(); });
+  $("#todo-reload").addEventListener("click", () => todoRefresh(true));
+  $("#todo-open").addEventListener("click", () => P.desktop.shell.openPath(todoPath()).catch((e) => toast("Cannot open TODO.md: " + errText(e))));
+  // TODO.md changes while Claude Code works on it: follow it when the deck is in TODO mode.
+  setInterval(() => { if (mode === "todo") todoRefresh().catch(() => {}); }, 5000);
   new ResizeObserver(() => { if (mode === "room") renderTimeline(); }).observe($("#tl"));
 }
 async function goDay(day) { D.followToday = day === dateKey(new Date()); R.sel = null; R.range = null; R.zoom = store.get("zoom", "fit"); if (R.zoom === "span") R.zoom = "fit"; await loadDay(day); }
@@ -1758,7 +1985,8 @@ function showGate(kind) {
       el("li", {}, el("b", { text: "Room" }), el("span", { text: "A timeline of sessions per device, a live feed of app.log and events, checks for broken sessions and flapping links, and Ask Claude about a span." })),
       el("li", {}, el("b", { text: "MCP" }), el("span", { text: "Every tool on the app's MCP server, a form for its arguments, the JSON result and a history." })),
       el("li", {}, el("b", { text: "LAN" }), el("span", { text: "Port checks for each device, and read-only probes for Apple TV and HomePod now playing." })),
-      el("li", {}, el("b", { text: "Release" }), el("span", { text: "Versions against tags, GitHub Actions runs with alerts, the unreleased changelog, and a checksum check of a release." }))));
+      el("li", {}, el("b", { text: "Release" }), el("span", { text: "Versions against tags, GitHub Actions runs with alerts, the unreleased changelog, and a checksum check of a release." })),
+      el("li", {}, el("b", { text: "TODO" }), el("span", { text: "Every item in TODO.md. Pick one and start a Claude Code session on it, with a prompt you can edit first." }))));
   const act = el("div", { class: "act" });
   if (kind === "install") {
     const b = el("button", { class: "btn primary", text: "Install as app" });

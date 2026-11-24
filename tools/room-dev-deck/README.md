@@ -18,6 +18,14 @@ Published copy (private): https://claude.ai/artifact/Dw8Q9LHFajrqLbUKnAwnjU
   It does not open the receiver's Telnet port 23: the receiver takes one Telnet client, and the app holds it.
 - **Release:** versions in the projects against the newest tags, the working tree, GitHub Actions runs (with an alert
   when one finishes), the `[Unreleased]` changelog, open TODO items, and a SHA-256 check of a release.
+- **TODO:** the items in `TODO.md`, by section, with search. Pick one to see its full text, then **Start in Claude
+  Code**: it opens Windows Terminal in the repository with a new `claude` session and a prompt you can edit first
+  (the item, its line and section, and "update TODO.md and the CHANGELOG, run the tests, do not commit"). Choose how
+  the session starts: **Plan first** (`--permission-mode plan`, the default), **Ask before edits** or **Accept edits**.
+  The list follows `TODO.md` while you work, so a ticked or removed item shows at once.
+
+`TODO.md` stays Markdown. The deck reads it as it is: a `## ` heading is a section, and `- [ ]` / `- [x]` with the
+lines indented under it is an item. An item's ID is a hash of its section and text, so keep that format.
 
 The tray icon shows green (quiet), blue (a GitHub run is going), amber (warnings in the last 30 min) or red (errors).
 
@@ -33,7 +41,8 @@ The tray icon shows green (quiet), blue (a GitHub run is going), amber (warnings
 
 ## What it needs
 
-The **full-access** permission (it reads files and runs `git`, `gh`, `curl.exe`, `powershell` and `atvprobe`). It
+The **full-access** permission (it reads files and runs `git`, `gh`, `curl.exe`, `powershell`, `atvprobe`, and `wt` with
+`claude` for TODO mode). It
 reads the MCP bearer token from `settings.json` for each call and writes it only to a temporary header file that it
 deletes after the call. It never reads or shows pairing keys from the plugin configs.
 

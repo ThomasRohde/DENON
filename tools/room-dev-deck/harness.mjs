@@ -26,10 +26,10 @@ const shim = `<script>
     app: { dock: { setIcon: async (u) => { window.__deckIcon = u; return { written: false }; } } },
     tray: { set: async (o) => { window.__deckTray = o; window.__deckLog.push(["tray", o.toolTip]); return true; }, remove: ok },
     notification: { show: async (o) => { window.__deckLog.push(["notify", o.body]); } },
-    shell: { showItemInFolder: async (p) => window.__deckLog.push(["show", p]) },
+    shell: { showItemInFolder: async (p) => window.__deckLog.push(["show", p]), openPath: async (p) => window.__deckLog.push(["open", p]) },
     fs: {
       readFile: (p, e) => rpc("readFile", p, e), writeFile: (p, d, e) => rpc("writeFile", p, d, e), stat: (p) => rpc("stat", p),
-      readdir: (p) => rpc("readdir", p), exists: (p) => rpc("exists", p), rm: (p, o) => rpc("rm", p, o),
+      readdir: (p) => rpc("readdir", p), exists: (p) => rpc("exists", p), rm: (p, o) => rpc("rm", p, o), mkdir: (p, o) => rpc("mkdir", p, o),
     },
     childProcess: {
       exec: (c, o) => rpc("exec", c, o),
@@ -53,6 +53,7 @@ const ops = {
   readdir: (p) => fs.readdirSync(p, { withFileTypes: true }).map((d) => ({ name: d.name, isFile: d.isFile(), isDirectory: d.isDirectory(), isSymbolicLink: false })),
   exists: (p) => fs.existsSync(p),
   rm: (p, o) => { fs.rmSync(p, { force: !!o?.force }); return null; },
+  mkdir: (p, o) => { fs.mkdirSync(p, { recursive: !!o?.recursive }); return null; },
   exec: (c, o) => new Promise((res) => exec(c, { cwd: o?.cwd, timeout: o?.timeout ?? 60000, maxBuffer: 64 << 20, encoding: "utf8" },
     (err, stdout, stderr) => res({ stdout, stderr, code: err ? (typeof err.code === "number" ? err.code : 1) : 0, signal: null, truncated: false }))),
   spawn: (cmd, args, o) => new Promise((res, rej) => {
