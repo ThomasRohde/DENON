@@ -21,7 +21,7 @@ public sealed partial class ThemeTokenGuardTests
     /// </summary>
     private static readonly Dictionary<string, string> AllowedCodeColors = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["Denon.App.Desktop/Controls/MeterPalette.cs"] = "meter material colors (a future skin supplies another palette)",
+        ["Denon.App.Desktop/Controls/MeterPalette.cs"] = "meter material colors (each skin has a dark and a light set)",
         ["Denon.App.Desktop/ViewModels/MainViewModel.Help.cs"] = "help section identity colors (content)",
         ["Denon.App.Desktop/Models/HelpGuideModels.cs"] = "fallback for a help section color (content)",
         ["Denon.App.Desktop/ViewModels/MainViewModel.ScenesAcoustics.cs"] = "default scene accent colors (user data)",

@@ -96,6 +96,8 @@ Design and decisions: `docs/theming.md` (branch `theming-2.0`).
 - [x] Skins, live: Default, Hi-Fi (Bahnschrift + bundled Share Tech Mono, amber VU, teal fluorescent LEDs), Compact,
       Large. Skin tokens in `Themes/Skins/*.xaml`; spacing and sizes via `{skin:Space}`/`{skin:Size}` (two scales over
       Default pixels); `SkinChanged` redraws the meters; skin chips in Settings → Appearance; `SkinTests`.
+- [x] Light meters: each skin has a dark and a light meter set (cream VU faces, light LED screen); the theme picks
+      it, live (`MeterPaletteTests`).
 - [x] Plugin pages follow the skin (`HostSkin` in each plugin; `HostSkin.Follow` for the code-built Chromecast and
       Apple TV pages). Screenshots checked for every skin in Dark and Large in Light, start and live switch.
 - [x] Released Chromecast plugin 0.5.0 and Apple TV plugin 0.4.0 (theme brushes read at each use, `HostSkin`).

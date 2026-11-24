@@ -13,8 +13,10 @@ live from Settings → Appearance, and any skin works with any theme.
 A theme never changes shapes or sizes; a skin never sets a UI color. A skin draws with the theme's tokens, so
 every skin works with every theme. The meters are the one exception: their dial faces, printed ink and LEDs are
 physical materials (`Controls/MeterPalette.cs`: dial faces, printed ink, needles, the LED screen), so they belong
-to the skin and look the same in every theme, like the display of a real receiver. Labels around them (the panel,
-the source pill) sit on the themed panel and take theme colors.
+to the skin. Each skin has two sets, like two models of a real meter: dark faces for dark themes, and light faces
+for light themes (cream dials with black print and needles, a light LED screen with darker segments). The theme
+picks the set (`SkinInfo.MetersFor`). Labels around the meters (the panel, the source pill) sit on the themed
+panel and take theme colors.
 
 Control templates and page layouts are the same in every skin (decision 1 below): `Themes/Styles.xaml` and
 `Themes/Icons.xaml` are shared.
@@ -47,7 +49,8 @@ can bind to it by name.
      models keep a token name, never a brush instance;
    - gives an element that holds an old theme brush as a plain value (code that assigned `Foreground = …`, for
      example the Chromecast and Apple TV pages, which are built in code) a live reference to the same token.
-4. Code that draws with theme colors listens to `ThemeManager.ThemeChanged` (tray menu, spectrum source pill).
+4. `ThemeManager` sets `MeterPalette.Current` to the skin's set for the new theme. Code that draws with theme
+   colors or meter materials listens to `ThemeManager.ThemeChanged` (tray menu, VU dials, LED spectrum).
 5. Plugins need no Plugin SDK change: built-in plugins use the same XAML rules; code-built pages read
    `HostTheme.Brush(…)` at each use (never cache a brush in a static field) or bind with `HostTheme.Bind`
    (`SetResourceReference`).
@@ -55,7 +58,7 @@ can bind to it by name.
 ## How a live skin switch reaches every pixel
 
 1. `ThemeManager.ApplySkin` puts the skin's dictionary in slot 2, sets `MeterPalette.Current` to the skin's meter
-   materials, updates `SkinMetrics` and raises `ThemeManager.SkinChanged`.
+   materials for the current theme, updates `SkinMetrics` and raises `ThemeManager.SkinChanged`.
 2. XAML refers to the skin tokens with `DynamicResource`: `FontSizeNN`, `RadiusNN`, `DisplayFont`, `UiFont`,
    `MonoFont` and the `Icon*` geometries. A guard test fails on a `StaticResource` reference to them.
 3. Spacing and sizes are written in Default-skin pixels with two markup extensions
@@ -98,20 +101,23 @@ A start in a theme or skin and a live switch to it give the same pixels; only th
 - Every skin defines exactly the keys of `Skins/Default.xaml` (test: `SkinTests`).
 - The type scale rises from `FontSize00` to `FontSize14`, and `FontSize00` is at least 8.5 px.
 - `SpaceScale` and `SizeScale` are between 0.5 and 2. Compact is not larger than Default, and Large is not smaller.
-- A skin sets no colors. Its meter materials are a `MeterPalette` in code (`MeterPalette.Default`,
-  `MeterPalette.HiFi`), registered with the skin in `ThemeManager.Skins`.
+- A skin sets no colors. Its meter materials are two `MeterPalette` sets in code, one for dark themes and one for
+  light themes (`MeterPalette.Default` and `DefaultLight`, `HiFi` and `HiFiLight`), registered with the skin in
+  `ThemeManager.Skins`. Dark sets have dark faces and LED screens, light sets light ones; the print keeps its
+  contrast on its face: ink 7:1, channel accents and red-zone numbers 4.5:1, source tags and LED labels 3:1
+  (test: `MeterPaletteTests`).
 - A bundled font is an embedded resource in `Themes/Fonts/` with its license file, and is listed in
   `THIRD-PARTY-NOTICES.md` (the installer copies it).
 
 To add a skin: copy `Skins/Default.xaml`, change the values, register it in `ThemeManager.Skins` (id, name,
-hint, file, meter palette), and capture all pages with `--skin <id> --all-pages` in Dark and Light.
+hint, file, dark and light meter palettes), and capture all pages with `--skin <id> --all-pages` in Dark and Light.
 
 ## Skins
 
 | Skin | Type and spacing | Corners | Fonts | Meters |
 |---|---|---|---|---|
-| `default` | Default scale | Rounded | Segoe UI Variable, Cascadia Mono | Dark faces, amber and cyan channels, cyan-to-red LEDs |
-| `hifi` (Hi-Fi) | Default scale | Nearly square | Bahnschrift (Windows), Share Tech Mono for numbers (bundled, OFL) | Amber-backlit dials, teal fluorescent-display LEDs |
+| `default` | Default scale | Rounded | Segoe UI Variable, Cascadia Mono | Dark: dark faces, amber and cyan channels, cyan-to-red LEDs. Light: cream faces, black print, deep blue-to-red LEDs on a light screen |
+| `hifi` (Hi-Fi) | Default scale | Nearly square | Bahnschrift (Windows), Share Tech Mono for numbers (bundled, OFL) | Dark: amber-backlit dials, teal fluorescent-display LEDs. Light: ivory dials with an amber lamp, deep teal LEDs on a pale LCD-style screen |
 | `compact` | Type about 0.9×, spacing 0.75×, sizes 0.88× | Smaller | Default | Default |
 | `large` (living room) | Type about 1.2×, spacing 1.25×, sizes 1.2× | Larger | Default | Default |
 
@@ -132,6 +138,8 @@ hint, file, meter palette), and capture all pages with `--skin <id> --all-pages`
 5. **Any skin with any theme.** Skin and theme are two choices in Settings → Appearance.
 6. **All plugin pages follow the skin**, with no Plugin SDK change (`HostSkin`).
 7. **Fonts:** a skin may bundle an open font (SIL Open Font License), listed in the third-party notices.
+8. **Light meters (2026-11-24).** In light themes the VU dials have cream faces and the spectrum a light screen
+   (both a second material set per skin), so the meters do not sit as dark blocks on a light page.
 
 ## Not in scope now (noted for later)
 

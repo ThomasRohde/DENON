@@ -267,8 +267,8 @@ public sealed class VuDial : FrameworkElement
             GradientStops =
             {
                 new GradientStop(P.FaceTop, 0.0),
-                new GradientStop(Blend(P.FaceMiddle, Accent, 0.05), 0.55),
-                new GradientStop(Blend(P.FaceBottom, Accent, 0.16), 1.0),
+                new GradientStop(Blend(P.FaceMiddle, Accent, 0.05 * P.FaceAccentTint), 0.55),
+                new GradientStop(Blend(P.FaceBottom, Accent, 0.16 * P.FaceAccentTint), 1.0),
             },
         };
         face.Freeze();
@@ -286,6 +286,7 @@ public sealed class VuDial : FrameworkElement
     private void DrawLamp()
     {
         using var dc = _lamp.RenderOpen();
+        var lamp = P.Backlight ?? Accent;
         var glow = new RadialGradientBrush
         {
             MappingMode = BrushMappingMode.Absolute,
@@ -295,9 +296,9 @@ public sealed class VuDial : FrameworkElement
             RadiusY = DesignHeight * 1.05,
             GradientStops =
             {
-                new GradientStop(WithAlpha(Accent, 120), 0.0),
-                new GradientStop(WithAlpha(Accent, 46), 0.45),
-                new GradientStop(WithAlpha(Accent, 0), 1.0),
+                new GradientStop(WithAlpha(lamp, P.BacklightAlpha), 0.0),
+                new GradientStop(WithAlpha(lamp, (byte)(P.BacklightAlpha * 46 / 120)), 0.45),
+                new GradientStop(WithAlpha(lamp, 0), 1.0),
             },
         };
         glow.Freeze();
@@ -482,7 +483,11 @@ public sealed class VuDial : FrameworkElement
 
         using (var dc = _needle.RenderOpen())
         {
-            dc.DrawGeometry(Frozen(new SolidColorBrush(WithAlpha(Accent, 70))), null, glow);
+            if (P.NeedleGlowAlpha > 0)
+            {
+                dc.DrawGeometry(Frozen(new SolidColorBrush(WithAlpha(Accent, P.NeedleGlowAlpha))), null, glow);
+            }
+
             var body = new LinearGradientBrush(P.NeedleTip, Blend(P.NeedleBase, Accent, 0.25), new Point(0.5, 0), new Point(0.5, 1));
             body.Freeze();
             dc.DrawGeometry(body, null, needle);

@@ -14,9 +14,13 @@ public sealed record ThemeInfo(string Id, string Name, bool IsDark, Uri PaletteU
 
 /// <summary>
 /// A skin (docs/theming.md): its token dictionary (fonts, type scale, radii, spacing and size scales) and its meter
-/// materials. Applied live; any skin works with any theme.
+/// materials, one set for dark themes and one for light themes. Applied live; any skin works with any theme.
 /// </summary>
-public sealed record SkinInfo(string Id, string Name, string Hint, Uri TokensUri, MeterPalette Meters);
+public sealed record SkinInfo(string Id, string Name, string Hint, Uri TokensUri, MeterPalette Meters, MeterPalette LightMeters)
+{
+    /// <summary>The meter materials for a theme.</summary>
+    public MeterPalette MetersFor(ThemeInfo theme) => theme.IsDark ? Meters : LightMeters;
+}
 
 /// <summary>
 /// Applies themes and skins live by replacing slots of the theme stack in <c>App.xaml</c>:
@@ -47,10 +51,10 @@ public static class ThemeManager
 
     public static IReadOnlyList<SkinInfo> Skins { get; } =
     [
-        new(DefaultSkinId, "Default", "The standard look", Pack("Themes/Skins/Default.xaml"), MeterPalette.Default),
-        new("hifi", "Hi-Fi", "Rack receiver: square corners, display type, backlit meters", Pack("Themes/Skins/HiFi.xaml"), MeterPalette.HiFi),
-        new("compact", "Compact", "Smaller type and spacing: more fits on screen", Pack("Themes/Skins/Compact.xaml"), MeterPalette.Default),
-        new("large", "Large", "Larger type, icons and spacing: readable from the sofa", Pack("Themes/Skins/Large.xaml"), MeterPalette.Default),
+        new(DefaultSkinId, "Default", "The standard look", Pack("Themes/Skins/Default.xaml"), MeterPalette.Default, MeterPalette.DefaultLight),
+        new("hifi", "Hi-Fi", "Rack receiver: square corners, display type, backlit meters", Pack("Themes/Skins/HiFi.xaml"), MeterPalette.HiFi, MeterPalette.HiFiLight),
+        new("compact", "Compact", "Smaller type and spacing: more fits on screen", Pack("Themes/Skins/Compact.xaml"), MeterPalette.Default, MeterPalette.DefaultLight),
+        new("large", "Large", "Larger type, icons and spacing: readable from the sofa", Pack("Themes/Skins/Large.xaml"), MeterPalette.Default, MeterPalette.DefaultLight),
     ];
 
     /// <summary>The theme on screen now (App.xaml starts with Dark).</summary>
@@ -58,7 +62,9 @@ public static class ThemeManager
 
     public static SkinInfo CurrentSkin { get; private set; } = Skins[0];
 
-    /// <summary>After a theme switch, on the UI thread. Code that draws with theme colors redraws here.</summary>
+    /// <summary>
+    /// After a theme switch, on the UI thread. Code that draws with theme colors or meter materials redraws here.
+    /// </summary>
     public static event EventHandler? ThemeChanged;
 
     /// <summary>After a skin switch, on the UI thread. Code that draws with skin fonts or meter materials redraws here.</summary>
@@ -106,7 +112,7 @@ public static class ThemeManager
         }
 
         app.Resources.MergedDictionaries[SkinSlot] = new ResourceDictionary { Source = skin.TokensUri };
-        MeterPalette.Current = skin.Meters;
+        MeterPalette.Current = skin.MetersFor(Current);
         CurrentSkin = skin;
         SkinMetrics.Current.Reload();
         SkinChanged?.Invoke(null, EventArgs.Empty);
@@ -126,6 +132,7 @@ public static class ThemeManager
         merged[PaletteSlot] = new ResourceDictionary { Source = theme.PaletteUri };
         merged[BrushesSlot] = new ResourceDictionary { Source = BrushesUri };
         Current = theme;
+        MeterPalette.Current = CurrentSkin.MetersFor(theme);
 
         foreach (Window window in app.Windows)
         {

@@ -187,7 +187,7 @@ public sealed class SpectrumLedView : FrameworkElement
         _barBrush = gradient;
 
         var ghost = gradient.Clone();
-        ghost.Opacity = 0.075;
+        ghost.Opacity = P.LedGhostOpacity;
         ghost.Freeze();
         _ghostBrush = ghost;
 
@@ -195,7 +195,9 @@ public sealed class SpectrumLedView : FrameworkElement
         for (var r = 1; r <= _rows; r++)
         {
             var c = PaletteAt((double)r / _rows);
-            var hot = Color.FromRgb((byte)(c.R + ((255 - c.R) * 0.55)), (byte)(c.G + ((255 - c.G) * 0.55)), (byte)(c.B + ((255 - c.B) * 0.55)));
+            var m = P.PeakMix;
+            var k = P.PeakMixAmount;
+            var hot = Color.FromRgb((byte)(c.R + ((m.R - c.R) * k)), (byte)(c.G + ((m.G - c.G) * k)), (byte)(c.B + ((m.B - c.B) * k)));
             var b = new SolidColorBrush(hot);
             b.Freeze();
             _peakBrushes[r - 1] = b;

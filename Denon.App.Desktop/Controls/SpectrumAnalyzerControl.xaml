@@ -39,7 +39,7 @@
                 </Border>
             </DockPanel>
 
-            <!-- Recessed LED screen: meter material (MeterPalette), dark in every theme like the VU dials. -->
+            <!-- Recessed LED screen: meter material (MeterPalette), the skin's dark or light set like the VU dials. -->
             <Border x:Name="LedScreen" Grid.Row="1" CornerRadius="{DynamicResource Radius04}" BorderThickness="1" Padding="{skin:Space 9,7,9,2}" ClipToBounds="True">
                 <Grid>
                     <controls:SpectrumLedView x:Name="BarsView" />

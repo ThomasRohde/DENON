@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-24
+
+### Changed
+- **Light meters in Light.** In a light theme the VU dials have cream faces with black print and a black needle, and the spectrum has a light screen with deep blue to red segments. Hi-Fi gets ivory dials with an amber lamp and deep teal segments. Dark is unchanged. The meters switch live with the theme. A test keeps the print on each dial readable.
+
 ## [2.0.1] - 2026-11-24
 
 ### Fixed

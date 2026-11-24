@@ -26,17 +26,17 @@ public partial class SpectrumAnalyzerControl : System.Windows.Controls.UserContr
         GlowView.State = _state;
         ApplySource(AudioMeterSource.Off);
 
-        // The pill takes theme colors: repaint it on the next frame after a theme switch.
-        // The LED screen is a skin material: a skin switch gives a new screen and segments.
+        // The LED screen is a meter material (the skin's set for the theme) and the pill takes theme colors:
+        // both a theme and a skin switch give a new screen, segments and pill.
         Loaded += (_, _) =>
         {
-            ThemeManager.ThemeChanged += OnThemeChanged;
-            ThemeManager.SkinChanged += OnSkinChanged;
+            ThemeManager.ThemeChanged += OnMaterialsChanged;
+            ThemeManager.SkinChanged += OnMaterialsChanged;
         };
         Unloaded += (_, _) =>
         {
-            ThemeManager.ThemeChanged -= OnThemeChanged;
-            ThemeManager.SkinChanged -= OnSkinChanged;
+            ThemeManager.ThemeChanged -= OnMaterialsChanged;
+            ThemeManager.SkinChanged -= OnMaterialsChanged;
         };
     }
 
@@ -44,18 +44,14 @@ public partial class SpectrumAnalyzerControl : System.Windows.Controls.UserContr
     {
         LedScreen.Background = Frozen(new SolidColorBrush(MeterPalette.Current.LedScreen));
         LedScreen.BorderBrush = Frozen(new SolidColorBrush(MeterPalette.Current.LedScreenEdge));
+        GlowView.Opacity = MeterPalette.Current.LedBloom;
     }
 
-    private void OnSkinChanged(object? sender, EventArgs e)
+    private void OnMaterialsChanged(object? sender, EventArgs e)
     {
         ApplyMaterials();
         BarsView.Restyle();
         GlowView.Restyle();
-        OnThemeChanged(sender, e);
-    }
-
-    private void OnThemeChanged(object? sender, EventArgs e)
-    {
         var source = _lastSource ?? AudioMeterSource.Off;
         _lastSource = null;
         ApplySource(source);

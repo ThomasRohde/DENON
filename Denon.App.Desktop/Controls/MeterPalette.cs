@@ -6,9 +6,10 @@ namespace Denon.App.Desktop.Controls;
 
 /// <summary>
 /// Material colors of the drawn meters (VU dials and the LED spectrum): dial face, printed ink, needle, glass and
-/// LEDs. These describe physical parts, so they are not theme tokens: the dials look the same in every theme, like
-/// the display of a real receiver. Each skin has its palette (docs/theming.md).
-/// Alpha values for shading stay in the drawing code; <see cref="Shade"/> and <see cref="Glint"/> are their bases.
+/// LEDs. These describe physical parts, so they are not theme tokens. Each skin has two sets, like two models of a
+/// real meter: dark faces for dark themes and light faces (cream dials, a light LED screen) for light themes
+/// (docs/theming.md). Alpha values for shading stay in the drawing code; <see cref="Shade"/> and
+/// <see cref="Glint"/> are their bases.
 /// </summary>
 public sealed record MeterPalette
 {
@@ -48,7 +49,89 @@ public sealed record MeterPalette
         ],
     };
 
-    /// <summary>The palette the meters use now (the skin's; <c>ThemeManager.ApplySkin</c> sets it).</summary>
+    /// <summary>
+    /// The Default skin's meters in light themes: cream dials with black print and needles, a warm lamp, and a light
+    /// LED screen with deep blue to red segments.
+    /// </summary>
+    public static MeterPalette DefaultLight { get; } = new()
+    {
+        DefaultAccent = Color.FromRgb(160, 72, 8),
+        LeftAccent = Color.FromRgb(160, 72, 8),
+        RightAccent = Color.FromRgb(14, 116, 144),
+        SourceDenon = Color.FromRgb(4, 120, 87),
+        SourcePc = Color.FromRgb(160, 72, 8),
+        SourceMuted = Color.FromRgb(185, 28, 28),
+        SourceSimulated = Color.FromRgb(71, 85, 105),
+        SourceIdle = Color.FromRgb(87, 83, 78),
+        IdleSource = Color.FromRgb(87, 83, 78),
+        FaceTop = Color.FromRgb(251, 247, 236),
+        FaceMiddle = Color.FromRgb(245, 238, 220),
+        FaceBottom = Color.FromRgb(236, 226, 202),
+        PaperInk = Color.FromRgb(36, 31, 26),
+        RedZone = Color.FromRgb(220, 38, 38),
+        RedZoneInk = Color.FromRgb(185, 28, 28),
+        PeakLampUnlitCenter = Color.FromRgb(150, 70, 66),
+        PeakLampUnlitEdge = Color.FromRgb(110, 46, 44),
+        NeedleTip = Color.FromRgb(24, 22, 20),
+        NeedleBase = Color.FromRgb(58, 50, 42),
+        NeedleGlowAlpha = 0,
+        FaceAccentTint = 0,
+        HoodCenter = Color.FromRgb(28, 25, 22),
+        HoodMiddle = Color.FromRgb(42, 37, 32),
+        HoodEdge = Color.FromRgb(78, 68, 58),
+        Backlight = Color.FromRgb(255, 206, 128),
+        BacklightAlpha = 70,
+        Shade = Color.FromRgb(120, 96, 64),
+        LedScreen = Color.FromRgb(232, 236, 241),
+        LedScreenEdge = Color.FromRgb(196, 204, 214),
+        LedLabel = Color.FromRgb(84, 96, 112),
+        LedFloorGlow = Color.FromRgb(3, 105, 161),
+        LedGhostOpacity = 0.11,
+        LedBloom = 0.18,
+        PeakMix = Colors.Black,
+        PeakMixAmount = 0.3,
+        LedHeat =
+        [
+            (0.00, Color.FromRgb(30, 64, 175)),
+            (0.40, Color.FromRgb(3, 105, 161)),
+            (0.64, Color.FromRgb(8, 145, 178)),
+            (0.78, Color.FromRgb(217, 119, 6)),
+            (0.90, Color.FromRgb(234, 88, 12)),
+            (1.00, Color.FromRgb(220, 38, 38)),
+        ],
+    };
+
+    /// <summary>
+    /// The Hi-Fi skin's meters in light themes: ivory dials with an amber lamp and brown print, and a pale LCD-style
+    /// spectrum with deep teal segments.
+    /// </summary>
+    public static MeterPalette HiFiLight { get; } = DefaultLight with
+    {
+        DefaultAccent = Color.FromRgb(161, 84, 6),
+        LeftAccent = Color.FromRgb(161, 84, 6),
+        RightAccent = Color.FromRgb(161, 84, 6),
+        FaceTop = Color.FromRgb(253, 244, 222),
+        FaceMiddle = Color.FromRgb(248, 234, 202),
+        FaceBottom = Color.FromRgb(240, 220, 178),
+        PaperInk = Color.FromRgb(58, 38, 18),
+        Backlight = Color.FromRgb(255, 178, 80),
+        BacklightAlpha = 80,
+        LedScreen = Color.FromRgb(224, 232, 226),
+        LedScreenEdge = Color.FromRgb(184, 200, 190),
+        LedLabel = Color.FromRgb(56, 98, 86),
+        LedFloorGlow = Color.FromRgb(13, 110, 92),
+        LedHeat =
+        [
+            (0.00, Color.FromRgb(10, 92, 78)),
+            (0.40, Color.FromRgb(13, 118, 100)),
+            (0.64, Color.FromRgb(15, 140, 118)),
+            (0.78, Color.FromRgb(22, 160, 135)),
+            (0.90, Color.FromRgb(217, 119, 6)),
+            (1.00, Color.FromRgb(220, 38, 38)),
+        ],
+    };
+
+    /// <summary>The palette the meters use now: the skin's set for the theme (<c>ThemeManager</c> sets it).</summary>
     public static MeterPalette Current { get; set; } = Default;
 
     // VU dial
@@ -78,6 +161,18 @@ public sealed record MeterPalette
     public Color HoodMiddle { get; init; } = Color.FromRgb(13, 15, 21);
     public Color HoodEdge { get; init; } = Color.FromRgb(28, 32, 43);
 
+    /// <summary>The lamp behind the dial; null lights it in the channel's accent.</summary>
+    public Color? Backlight { get; init; }
+
+    /// <summary>Lamp strength at full glow (alpha at the lamp's center).</summary>
+    public byte BacklightAlpha { get; init; } = 120;
+
+    /// <summary>How much the face takes the channel's accent (1 = a tinted lamp; 0 = both dials the same paper).</summary>
+    public double FaceAccentTint { get; init; } = 1;
+
+    /// <summary>Glow around the needle (alpha of the accent); 0 for a plain printed needle.</summary>
+    public byte NeedleGlowAlpha { get; init; } = 70;
+
     /// <summary>Base of shadows, bezel and vignette (used with alpha).</summary>
     public Color Shade { get; init; } = Colors.Black;
 
@@ -89,6 +184,17 @@ public sealed record MeterPalette
     public Color LedScreenEdge { get; init; } = Color.FromRgb(13, 22, 34);
     public Color LedLabel { get; init; } = Color.FromRgb(91, 107, 130);
     public Color LedFloorGlow { get; init; } = Color.FromRgb(34, 211, 238);
+
+    /// <summary>How much the unlit segments show.</summary>
+    public double LedGhostOpacity { get; init; } = 0.075;
+
+    /// <summary>Opacity of the blurred bloom over the lit segments.</summary>
+    public double LedBloom { get; init; } = 0.5;
+
+    /// <summary>Peak caps are the segment color mixed toward this color (lighter on a dark screen, darker on a light one).</summary>
+    public Color PeakMix { get; init; } = Colors.White;
+
+    public double PeakMixAmount { get; init; } = 0.55;
 
     /// <summary>LED color by bar height (0 = bottom, 1 = top).</summary>
     public IReadOnlyList<(double Offset, Color Color)> LedHeat { get; init; } =

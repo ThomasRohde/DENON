@@ -36,12 +36,21 @@ public partial class AnalogVuMeterControl : UserControl
         InitializeComponent();
         ApplyMaterials();
 
-        // The dials are skin materials: a skin switch gives new accents, print and fonts.
-        Loaded += (_, _) => ThemeManager.SkinChanged += OnSkinChanged;
-        Unloaded += (_, _) => ThemeManager.SkinChanged -= OnSkinChanged;
+        // The dials are meter materials (the skin's set for the theme): a skin or theme switch gives new faces,
+        // accents, print and fonts.
+        Loaded += (_, _) =>
+        {
+            ThemeManager.SkinChanged += OnMaterialsChanged;
+            ThemeManager.ThemeChanged += OnMaterialsChanged;
+        };
+        Unloaded += (_, _) =>
+        {
+            ThemeManager.SkinChanged -= OnMaterialsChanged;
+            ThemeManager.ThemeChanged -= OnMaterialsChanged;
+        };
     }
 
-    private void OnSkinChanged(object? sender, EventArgs e)
+    private void OnMaterialsChanged(object? sender, EventArgs e)
     {
         ApplyMaterials();
         var source = _lastSource ?? AudioMeterSource.Off;
@@ -86,7 +95,7 @@ public partial class AnalogVuMeterControl : UserControl
         set => SetValue(IsLiveSignalProperty, value);
     }
 
-    /// <summary>Color of the source print under "VU" (meter material: the same in every theme).</summary>
+    /// <summary>Color of the source print under "VU" (meter material: the skin's set for the theme).</summary>
     public static Color SourceColor(AudioMeterSource source) => source switch
     {
         AudioMeterSource.Denon => MeterPalette.Current.SourceDenon,
