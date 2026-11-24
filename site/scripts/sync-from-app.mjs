@@ -180,6 +180,7 @@ writeFileSync(
       app: version(join(app, "Denon.App.Desktop.csproj")),
       chromecast: version(join(repo, "external-plugins", "Denon.Plugin.Chromecast", "Denon.Plugin.Chromecast.csproj")),
       appleTv: version(join(repo, "external-plugins", "Denon.Plugin.AppleTv", "Denon.Plugin.AppleTv.csproj")),
+      homePod: version(join(repo, "external-plugins", "Denon.Plugin.HomePod", "Denon.Plugin.HomePod.csproj")),
     },
     null,
     2,

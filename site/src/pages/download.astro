@@ -21,10 +21,19 @@ const plugins = [
     guide: "plugin-apple-tv",
     text: "Pairs with your Apple TV once, then shows what plays and lets you pause it. It can switch the receiver when the Apple TV wakes.",
   },
+  {
+    name: "HomePod",
+    version: versions.homePod,
+    href: links.homePod,
+    folder: "HomePod",
+    page: "HomePod",
+    guide: "plugin-homepod",
+    text: "Finds your HomePods, a stereo pair as one speaker, and shows what each plays with play, pause and skip. No PIN. Listening time shows in Insights.",
+  },
 ];
 ---
 
-<Base title="Download" description={`Download Denon Desktop ${versions.app} for Windows 10 and 11, and the Chromecast and Apple TV plugins.`} current="download">
+<Base title="Download" description={`Download Denon Desktop ${versions.app} for Windows 10 and 11, and the Chromecast, Apple TV and HomePod plugins.`} current="download">
   <div class="wrap page">
     <header class="intro">
       <h1>Download</h1>
@@ -71,7 +80,7 @@ const plugins = [
 
     <section class="plugins" aria-labelledby="plugins">
       <h2 id="plugins">Plugins</h2>
-      <p class="muted">Philips Hue, LG webOS TV and Home Assistant are built in. These two are separate downloads.</p>
+      <p class="muted">Philips Hue, LG webOS TV and Home Assistant are built in. These three are separate downloads.</p>
       <div class="plugin-grid">
         {plugins.map((p) => (
           <div class="plugin">

@@ -17,6 +17,7 @@ export const links = {
   issues: `${repo}/issues`,
   chromecast: `${repo}/releases/download/chromecast-v${versions.chromecast}/Denon.Plugin.Chromecast-${versions.chromecast}.zip`,
   appleTv: `${repo}/releases/download/appletv-v${versions.appleTv}/Denon.Plugin.AppleTv-${versions.appleTv}.zip`,
+  homePod: `${repo}/releases/download/homepod-v${versions.homePod}/Denon.Plugin.HomePod-${versions.homePod}.zip`,
 };
 
 export { versions };
@@ -75,7 +76,7 @@ export const tour = [
     shot: "12-plugin-philips-hue",
     guide: "plugin-hue",
     title: "Lights, TV and the smart home",
-    text: "Philips Hue, LG webOS TVs and Home Assistant are built in. Chromecast and Apple TV come as plugins you can add.",
+    text: "Philips Hue, LG webOS TVs and Home Assistant are built in. Chromecast, Apple TV and HomePod come as plugins you can add.",
   },
   {
     id: "brain",
