@@ -44,23 +44,23 @@ public sealed partial class ThemeTokenGuardTests
     public void Xaml_has_no_hex_colors_outside_the_theme_color_files()
     {
         var offenders = XamlFiles()
-            .Where(f => !Path.GetFileName(f).StartsWith("Colors.", StringComparison.OrdinalIgnoreCase))
+            .Where(f => !IsPalette(f))
             .SelectMany(f => Lines(f).Where(l => XamlHexColor().IsMatch(l.Text)).Select(l => $"{Rel(f)}:{l.Number}: {l.Text.Trim()}"))
             .ToList();
 
-        Assert.True(offenders.Count == 0, "Use a theme token ({StaticResource …Brush}) instead of a hex color:\n" + string.Join("\n", offenders));
+        Assert.True(offenders.Count == 0, "Use a theme token ({DynamicResource …Brush}) instead of a hex color:\n" + string.Join("\n", offenders));
     }
 
     [Fact]
     public void Xaml_has_no_literal_font_sizes_radii_or_font_names_outside_the_typography_file()
     {
         var offenders = XamlFiles()
-            .Where(f => Path.GetFileName(f) is not ("Typography.xaml" or "Colors.Dark.xaml"))
+            .Where(f => !IsSkin(f) && !IsPalette(f))
             .SelectMany(f => Lines(f).Where(l => XamlTypographyLiteral().IsMatch(l.Text)).Select(l => $"{Rel(f)}:{l.Number}: {l.Text.Trim()}"))
             .ToList();
 
         Assert.True(offenders.Count == 0,
-            "Use FontSizeNN, RadiusNN or the font tokens from Themes/Typography.xaml instead of literal values:\n" + string.Join("\n", offenders));
+            "Use FontSizeNN, RadiusNN or the font tokens from Themes/Skins/*.xaml instead of literal values:\n" + string.Join("\n", offenders));
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public sealed partial class ThemeTokenGuardTests
             .SelectMany(f => Lines(f).Where(l => XamlInlineGeometry().IsMatch(l.Text)).Select(l => $"{Rel(f)}:{l.Number}: {l.Text.Trim()}"))
             .ToList();
 
-        Assert.True(offenders.Count == 0, "Add the icon to Themes/Icons.xaml and use {StaticResource IconName}:\n" + string.Join("\n", offenders));
+        Assert.True(offenders.Count == 0, "Add the icon to Themes/Icons.xaml and use {DynamicResource IconName}:\n" + string.Join("\n", offenders));
     }
 
     [Fact]
@@ -109,17 +109,17 @@ public sealed partial class ThemeTokenGuardTests
     {
         var themes = Path.Combine(Root, "Denon.App.Desktop", "Themes");
         var brushes = XKey().Matches(File.ReadAllText(Path.Combine(themes, "Brushes.xaml"))).Select(m => m.Groups[1].Value).ToHashSet();
-        var colors = XKey().Matches(File.ReadAllText(Path.Combine(themes, "Colors.Dark.xaml"))).Select(m => m.Groups[1].Value).ToHashSet();
-        var styles = XKey().Matches(File.ReadAllText(Path.Combine(themes, "DenonTheme.xaml"))).Select(m => m.Groups[1].Value).ToHashSet();
-        var typography = XKey().Matches(File.ReadAllText(Path.Combine(themes, "Typography.xaml"))).Select(m => m.Groups[1].Value).ToHashSet();
+        var colors = XKey().Matches(File.ReadAllText(Path.Combine(themes, "Palettes", "Dark.xaml"))).Select(m => m.Groups[1].Value).ToHashSet();
+        var styles = XKey().Matches(File.ReadAllText(Path.Combine(themes, "Styles.xaml"))).Select(m => m.Groups[1].Value).ToHashSet();
+        var typography = XKey().Matches(File.ReadAllText(Path.Combine(themes, "Skins", "Default.xaml"))).Select(m => m.Groups[1].Value).ToHashSet();
 
         var missing = CodeFiles()
             .SelectMany(f => TokenRead().Matches(File.ReadAllText(f)).Select(m => (File: Rel(f), Kind: m.Groups[1].Value, Token: m.Groups[2].Value)))
             .Where(r => r.Kind switch
             {
-                "Brush" => !brushes.Contains(r.Token + "Brush"),
+                "Brush" or "Bind" => !brushes.Contains(r.Token + "Brush"),
                 "Style" => !styles.Contains(r.Token),
-                "Font" or "FontSize" or "Radius" => !typography.Contains(r.Token),
+                "Font" or "FontSize" or "Radius" or "Token" => !typography.Contains(r.Token),
                 _ => !colors.Contains(r.Token + "Color"),
             })
             .Select(r => $"{r.File}: {r.Kind}(\"{r.Token}\")")
@@ -132,7 +132,7 @@ public sealed partial class ThemeTokenGuardTests
     public void Every_color_token_has_a_brush_and_every_brush_has_a_color()
     {
         var themes = Path.Combine(Root, "Denon.App.Desktop", "Themes");
-        var colors = XKey().Matches(File.ReadAllText(Path.Combine(themes, "Colors.Dark.xaml")))
+        var colors = XKey().Matches(File.ReadAllText(Path.Combine(themes, "Palettes", "Dark.xaml")))
             .Select(m => m.Groups[1].Value).Where(k => k.EndsWith("Color", StringComparison.Ordinal))
             .Select(k => k[..^"Color".Length]).ToHashSet();
         var brushText = File.ReadAllText(Path.Combine(themes, "Brushes.xaml"));
@@ -143,6 +143,14 @@ public sealed partial class ThemeTokenGuardTests
     }
 
     private static IEnumerable<string> XamlFiles() => SourceFiles("*.xaml");
+
+    /// <summary>A skin file (Themes/Skins/*.xaml): the only place for literal type sizes, radii and fonts.</summary>
+    private static bool IsSkin(string file) =>
+        Path.GetFileName(Path.GetDirectoryName(file)) == "Skins";
+
+    /// <summary>A palette file (Themes/Palettes/*.xaml): the only place for literal colors in XAML.</summary>
+    private static bool IsPalette(string file) =>
+        Path.GetFileName(Path.GetDirectoryName(file)) == "Palettes";
 
     private static IEnumerable<string> CodeFiles() => SourceFiles("*.cs");
 
@@ -193,7 +201,7 @@ public sealed partial class ThemeTokenGuardTests
     [GeneratedRegex(@"\{(?:Static|Dynamic)Resource\s+([A-Za-z_][\w.]*)\s*\}")]
     private static partial Regex ResourceReference();
 
-    [GeneratedRegex("""(?:ThemeResources|HostTheme)\.(Brush|Color|DrawingColor|Hex|Style|Font|FontSize|Radius)\("(\w+)"\)""")]
+    [GeneratedRegex("""(?:ThemeResources\.|HostTheme\.|\.)(Brush|Color|DrawingColor|Hex|Style|Font|FontSize|Radius|Bind|Token)\((?:[^"()]*,\s*)?"(\w+)"\)""")]
     private static partial Regex TokenRead();
 
     [GeneratedRegex(@"<SolidColorBrush[^>]*x:Key=""(\w+Brush)""[^>]*Color=""\{StaticResource (\w+Color)\}""")]

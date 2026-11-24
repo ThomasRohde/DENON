@@ -82,9 +82,9 @@
     <SolidColorBrush po:Freeze="True" x:Key="AccentPinkTextBrush" Color="{StaticResource AccentPinkTextColor}" />
     <SolidColorBrush po:Freeze="True" x:Key="AccentPinkSubtleBgBrush" Color="{StaticResource AccentPinkSubtleBgColor}" />
     <SolidColorBrush po:Freeze="True" x:Key="AccentTealBrush" Color="{StaticResource AccentTealColor}" />
-    <SolidColorBrush po:Freeze="True" x:Key="OverlayWhiteClearBrush" Color="{StaticResource OverlayWhiteClearColor}" />
-    <SolidColorBrush po:Freeze="True" x:Key="OverlayWhiteFaintBrush" Color="{StaticResource OverlayWhiteFaintColor}" />
-    <SolidColorBrush po:Freeze="True" x:Key="OverlayWhiteSoftBrush" Color="{StaticResource OverlayWhiteSoftColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="OverlayHighlightClearBrush" Color="{StaticResource OverlayHighlightClearColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="OverlayHighlightFaintBrush" Color="{StaticResource OverlayHighlightFaintColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="OverlayHighlightSoftBrush" Color="{StaticResource OverlayHighlightSoftColor}" />
     <SolidColorBrush po:Freeze="True" x:Key="OverlayScrimBrush" Color="{StaticResource OverlayScrimColor}" />
     <SolidColorBrush po:Freeze="True" x:Key="AccentCyanGlowBrush" Color="{StaticResource AccentCyanGlowColor}" />
     <SolidColorBrush po:Freeze="True" x:Key="AccentEmeraldBrightBrush" Color="{StaticResource AccentEmeraldBrightColor}" />
@@ -113,6 +113,24 @@
     <LinearGradientBrush po:Freeze="True" x:Key="CyanAccentGradient" StartPoint="0,0" EndPoint="1,0">
         <GradientStop Color="{StaticResource AccentSkyDeepColor}" Offset="0" />
         <GradientStop Color="{StaticResource AccentCyanColor}" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- Meter panels (VU and spectrum): the panel behind the drawn meters, its top bevel, and the screen glass. -->
+    <LinearGradientBrush po:Freeze="True" x:Key="MeterPanelGradient" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource Ink06Color}" Offset="0" />
+        <GradientStop Color="{StaticResource Ink02Color}" Offset="0.5" />
+        <GradientStop Color="{StaticResource Ink01Color}" Offset="1" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush po:Freeze="True" x:Key="BevelHighlightGradient" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="{StaticResource OverlayHighlightClearColor}" Offset="0" />
+        <GradientStop Color="{StaticResource OverlayHighlightSoftColor}" Offset="0.5" />
+        <GradientStop Color="{StaticResource OverlayHighlightClearColor}" Offset="1" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush po:Freeze="True" x:Key="ScreenSheenGradient" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource OverlayHighlightFaintColor}" Offset="0" />
+        <GradientStop Color="{StaticResource OverlayHighlightClearColor}" Offset="0.35" />
     </LinearGradientBrush>
 
     <LinearGradientBrush po:Freeze="True" x:Key="VolumeTrackGradient" StartPoint="0,0" EndPoint="1,0">

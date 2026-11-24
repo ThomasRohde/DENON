@@ -1,13 +1,14 @@
 <UserControl x:Class="Denon.App.Desktop.Views.HelpGuideView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:skin="clr-namespace:Denon.App.Desktop.Infrastructure.Theming"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Foreground="{StaticResource TextPrimaryBrush}"
-             FontFamily="{StaticResource DisplayFont}">
+             Foreground="{DynamicResource TextPrimaryBrush}"
+             FontFamily="{DynamicResource DisplayFont}">
     <UserControl.Resources>
         <Style x:Key="HelpFilterChip" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-            <Setter Property="Padding" Value="10,4.5" />
-            <Setter Property="FontSize" Value="{StaticResource FontSize05}" />
-            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Padding" Value="{skin:Space 10,4.5}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSize05}" />
+            <Setter Property="Margin" Value="{skin:Space 0,0,6,0}" />
         </Style>
     </UserControl.Resources>
 
@@ -19,33 +20,33 @@
         </Grid.RowDefinitions>
 
         <!-- ======================== ROW 0: HERO SEARCH & CATEGORY BAR ======================== -->
-        <Border Grid.Row="0" Style="{StaticResource SurfaceCard}" Padding="16,12" Margin="0,0,0,12">
+        <Border Grid.Row="0" Style="{StaticResource SurfaceCard}" Padding="{skin:Space 16,12}" Margin="{skin:Space 0,0,0,12}">
             <StackPanel>
-                <Grid Margin="0,0,0,10">
+                <Grid Margin="{skin:Space 0,0,0,10}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="310" />
+                        <ColumnDefinition Width="{skin:Size 12}" />
+                        <ColumnDefinition Width="{skin:Size 310}" />
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <WrapPanel VerticalAlignment="Center">
-                            <TextBlock Text="Help &amp; Interactive Guide" FontSize="{StaticResource FontSize11}" FontWeight="Bold" VerticalAlignment="Center" />
-                            <Border Background="{StaticResource AccentCyanSubtleBgDeepBrush}" BorderBrush="{StaticResource AccentSkyDeepBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="7,1.5" Margin="10,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="F1 CONTEXT HELP" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
+                            <TextBlock Text="Help &amp; Interactive Guide" FontSize="{DynamicResource FontSize11}" FontWeight="Bold" VerticalAlignment="Center" />
+                            <Border Background="{DynamicResource AccentCyanSubtleBgDeepBrush}" BorderBrush="{DynamicResource AccentSkyDeepBrush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 7,1.5}" Margin="{skin:Space 10,0,0,0}" VerticalAlignment="Center">
+                                <TextBlock Text="F1 CONTEXT HELP" FontSize="{DynamicResource FontSize01}" FontWeight="Bold" Foreground="{DynamicResource AccentCyanBrightBrush}" />
                             </Border>
                             <Button Content="{Binding HelpReturnLabel}"
                                     Command="{Binding ReturnFromHelpCommand}"
                                     Style="{StaticResource SecondaryButton}"
-                                    Padding="9,3"
-                                    FontSize="{StaticResource FontSize04}"
-                                    Margin="10,0,0,0"
+                                    Padding="{skin:Space 9,3}"
+                                    FontSize="{DynamicResource FontSize04}"
+                                    Margin="{skin:Space 10,0,0,0}"
                                     Visibility="{Binding HasHelpReturnSection, Converter={StaticResource BoolToVis}}" />
                         </WrapPanel>
                         <TextBlock Text="Step-by-step setup guides, live readiness checklist, keyboard shortcuts, network ports &amp; troubleshooting."
-                                   FontSize="{StaticResource FontSize05}"
-                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                   Margin="0,3,0,0"
+                                   FontSize="{DynamicResource FontSize05}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Margin="{skin:Space 0,3,0,0}"
                                    TextWrapping="Wrap" />
                     </StackPanel>
 
@@ -56,16 +57,16 @@
                         </Grid.ColumnDefinitions>
                         <TextBox Grid.Column="0"
                                  Text="{Binding HelpSearchQuery, UpdateSourceTrigger=PropertyChanged}"
-                                 Padding="10,6"
-                                 FontSize="{StaticResource FontSize06}"
+                                 Padding="{skin:Space 10,6}"
+                                 FontSize="{DynamicResource FontSize06}"
                                  Tag="Search Hue, LG TV, eARC, lyrics, ports, keys..." />
                         <Button Grid.Column="1"
                                 Content="✕"
                                 Command="{Binding ClearHelpSearchCommand}"
                                 Style="{StaticResource SecondaryButton}"
-                                Padding="8,5"
-                                FontSize="{StaticResource FontSize04}"
-                                Margin="6,0,0,0"
+                                Padding="{skin:Space 8,5}"
+                                FontSize="{DynamicResource FontSize04}"
+                                Margin="{skin:Space 6,0,0,0}"
                                 Visibility="{Binding HasHelpSearchQuery, Converter={StaticResource BoolToVis}}"
                                 ToolTip="Clear search" />
                     </Grid>
@@ -78,9 +79,9 @@
                             <Style TargetType="Button" BasedOn="{StaticResource HelpFilterChip}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding HelpCategoryFilter}" Value="All">
-                                        <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
-                                        <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
-                                        <Setter Property="Foreground" Value="{StaticResource AccentCyanBrightBrush}" />
+                                        <Setter Property="Background" Value="{DynamicResource AccentCyanSubtleBgBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentCyanBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentCyanBrightBrush}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -91,9 +92,9 @@
                             <Style TargetType="Button" BasedOn="{StaticResource HelpFilterChip}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding HelpCategoryFilter}" Value="Getting Started">
-                                        <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
-                                        <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
-                                        <Setter Property="Foreground" Value="{StaticResource AccentCyanBrightBrush}" />
+                                        <Setter Property="Background" Value="{DynamicResource AccentCyanSubtleBgBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentCyanBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentCyanBrightBrush}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -104,9 +105,9 @@
                             <Style TargetType="Button" BasedOn="{StaticResource HelpFilterChip}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding HelpCategoryFilter}" Value="Audio &amp; Media">
-                                        <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
-                                        <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
-                                        <Setter Property="Foreground" Value="{StaticResource AccentCyanBrightBrush}" />
+                                        <Setter Property="Background" Value="{DynamicResource AccentCyanSubtleBgBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentCyanBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentCyanBrightBrush}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -117,9 +118,9 @@
                             <Style TargetType="Button" BasedOn="{StaticResource HelpFilterChip}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding HelpCategoryFilter}" Value="Scenes &amp; Acoustics">
-                                        <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
-                                        <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
-                                        <Setter Property="Foreground" Value="{StaticResource AccentCyanBrightBrush}" />
+                                        <Setter Property="Background" Value="{DynamicResource AccentCyanSubtleBgBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentCyanBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentCyanBrightBrush}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -130,9 +131,9 @@
                             <Style TargetType="Button" BasedOn="{StaticResource HelpFilterChip}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding HelpCategoryFilter}" Value="Plugins">
-                                        <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
-                                        <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
-                                        <Setter Property="Foreground" Value="{StaticResource AccentCyanBrightBrush}" />
+                                        <Setter Property="Background" Value="{DynamicResource AccentCyanSubtleBgBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentCyanBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentCyanBrightBrush}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -143,9 +144,9 @@
                             <Style TargetType="Button" BasedOn="{StaticResource HelpFilterChip}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding HelpCategoryFilter}" Value="Reference">
-                                        <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
-                                        <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
-                                        <Setter Property="Foreground" Value="{StaticResource AccentCyanBrightBrush}" />
+                                        <Setter Property="Background" Value="{DynamicResource AccentCyanSubtleBgBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentCyanBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentCyanBrightBrush}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -156,9 +157,9 @@
                             <Style TargetType="Button" BasedOn="{StaticResource HelpFilterChip}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding HelpCategoryFilter}" Value="Troubleshooting">
-                                        <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
-                                        <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
-                                        <Setter Property="Foreground" Value="{StaticResource AccentCyanBrightBrush}" />
+                                        <Setter Property="Background" Value="{DynamicResource AccentCyanSubtleBgBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentCyanBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentCyanBrightBrush}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -169,26 +170,26 @@
         </Border>
 
         <!-- ======================== ROW 1: LIVE SETUP READINESS CHECKLIST ======================== -->
-        <Border Grid.Row="1" Style="{StaticResource SurfaceCard}" Padding="14,10" Margin="0,0,0,12">
+        <Border Grid.Row="1" Style="{StaticResource SurfaceCard}" Padding="{skin:Space 14,10}" Margin="{skin:Space 0,0,0,12}">
             <StackPanel>
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="150" />
-                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="{skin:Size 12}" />
+                        <ColumnDefinition Width="{skin:Size 150}" />
+                        <ColumnDefinition Width="{skin:Size 10}" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <TextBlock Grid.Column="0" Text="LIVE SETUP CHECKLIST" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                    <ProgressBar Grid.Column="2" Height="7" Minimum="0" Maximum="100" Value="{Binding SetupChecklistPercent, Mode=OneWay}" Foreground="{StaticResource AccentEmeraldBrush}" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="4" Text="{Binding SetupChecklistProgressText}" FontSize="{StaticResource FontSize04}" FontWeight="Bold" Foreground="{StaticResource AccentEmeraldBrush}" VerticalAlignment="Center" />
-                    <Button Grid.Column="5" Content="{Binding SetupChecklistToggleLabel}" Command="{Binding ToggleSetupChecklistCommand}" Style="{StaticResource SecondaryButton}" Padding="9,3.5" FontSize="{StaticResource FontSize04}" />
+                    <ProgressBar Grid.Column="2" Height="{skin:Size 7}" Minimum="0" Maximum="100" Value="{Binding SetupChecklistPercent, Mode=OneWay}" Foreground="{DynamicResource AccentEmeraldBrush}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="4" Text="{Binding SetupChecklistProgressText}" FontSize="{DynamicResource FontSize04}" FontWeight="Bold" Foreground="{DynamicResource AccentEmeraldBrush}" VerticalAlignment="Center" />
+                    <Button Grid.Column="5" Content="{Binding SetupChecklistToggleLabel}" Command="{Binding ToggleSetupChecklistCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,3.5}" FontSize="{DynamicResource FontSize04}" />
                 </Grid>
 
                 <ItemsControl ItemsSource="{Binding SetupChecklistItems}"
-                              Margin="0,10,0,0"
+                              Margin="{skin:Space 0,10,0,0}"
                               Visibility="{Binding IsSetupChecklistExpanded, Converter={StaticResource BoolToVis}}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -199,12 +200,12 @@
                         <DataTemplate>
                             <Button Command="{Binding DataContext.ExecuteHelpJumpCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                     CommandParameter="{Binding JumpTarget}"
-                                    Margin="0,0,8,8"
+                                    Margin="{skin:Space 0,0,8,8}"
                                     HorizontalContentAlignment="Stretch"
                                     Cursor="Hand">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
-                                        <Border x:Name="ChkBd" Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius03}" Padding="10,7">
+                                        <Border x:Name="ChkBd" Background="{DynamicResource Ink03Brush}" BorderBrush="{DynamicResource Ink11Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius03}" Padding="{skin:Space 10,7}">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
@@ -212,28 +213,28 @@
                                                 </Grid.ColumnDefinitions>
                                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <Ellipse x:Name="Dot" Width="7" Height="7" Fill="{StaticResource AccentAmberBrush}" Margin="0,0,7,0" VerticalAlignment="Center" />
-                                                        <TextBlock Text="{Binding Title}" FontSize="{StaticResource FontSize06}" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                        <Ellipse x:Name="Dot" Width="{skin:Size 7}" Height="{skin:Size 7}" Fill="{DynamicResource AccentAmberBrush}" Margin="{skin:Space 0,0,7,0}" VerticalAlignment="Center" />
+                                                        <TextBlock Text="{Binding Title}" FontSize="{DynamicResource FontSize06}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
                                                     </StackPanel>
-                                                    <TextBlock Text="{Binding StatusSummary}" FontSize="{StaticResource FontSize02}" Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis" Margin="14,2,0,0" />
+                                                    <TextBlock Text="{Binding StatusSummary}" FontSize="{DynamicResource FontSize02}" Foreground="{DynamicResource TextMutedBrush}" TextTrimming="CharacterEllipsis" Margin="{skin:Space 14,2,0,0}" />
                                                 </StackPanel>
-                                                <Border x:Name="Pill" Grid.Column="1" Background="{StaticResource AccentAmberSubtleBgDeepBrush}" BorderBrush="{StaticResource AccentAmberBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="7,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                                                    <TextBlock x:Name="PillTxt" Text="{Binding ActionLabel}" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource AccentAmberTextBrush}" />
+                                                <Border x:Name="Pill" Grid.Column="1" Background="{DynamicResource AccentAmberSubtleBgDeepBrush}" BorderBrush="{DynamicResource AccentAmberBrush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 7,2}" Margin="{skin:Space 8,0,0,0}" VerticalAlignment="Center">
+                                                    <TextBlock x:Name="PillTxt" Text="{Binding ActionLabel}" FontSize="{DynamicResource FontSize01}" FontWeight="Bold" Foreground="{DynamicResource AccentAmberTextBrush}" />
                                                 </Border>
                                             </Grid>
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <DataTrigger Binding="{Binding IsComplete}" Value="True">
-                                                <Setter TargetName="Dot" Property="Fill" Value="{StaticResource AccentEmeraldBrush}" />
-                                                <Setter TargetName="ChkBd" Property="BorderBrush" Value="{StaticResource AccentEmeraldBorderBrush}" />
-                                                <Setter TargetName="Pill" Property="Background" Value="{StaticResource AccentEmeraldSubtleBgBrush}" />
-                                                <Setter TargetName="Pill" Property="BorderBrush" Value="{StaticResource AccentEmeraldBrush}" />
+                                                <Setter TargetName="Dot" Property="Fill" Value="{DynamicResource AccentEmeraldBrush}" />
+                                                <Setter TargetName="ChkBd" Property="BorderBrush" Value="{DynamicResource AccentEmeraldBorderBrush}" />
+                                                <Setter TargetName="Pill" Property="Background" Value="{DynamicResource AccentEmeraldSubtleBgBrush}" />
+                                                <Setter TargetName="Pill" Property="BorderBrush" Value="{DynamicResource AccentEmeraldBrush}" />
                                                 <Setter TargetName="PillTxt" Property="Text" Value="✓ READY" />
-                                                <Setter TargetName="PillTxt" Property="Foreground" Value="{StaticResource AccentEmeraldTextBrush}" />
+                                                <Setter TargetName="PillTxt" Property="Foreground" Value="{DynamicResource AccentEmeraldTextBrush}" />
                                             </DataTrigger>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="ChkBd" Property="Background" Value="{StaticResource ControlBgBrush}" />
-                                                <Setter TargetName="ChkBd" Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                <Setter TargetName="ChkBd" Property="Background" Value="{DynamicResource ControlBgBrush}" />
+                                                <Setter TargetName="ChkBd" Property="BorderBrush" Value="{DynamicResource AccentCyanBrush}" />
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -248,29 +249,29 @@
         <!-- ======================== ROW 2: 2-COLUMN GUIDE READER ======================== -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="290" />
-                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="{skin:Size 290}" />
+                <ColumnDefinition Width="{skin:Size 14}" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
             <!-- Left Rail: Guide Topics List -->
-            <Border Grid.Column="0" Style="{StaticResource SurfaceCard}" Padding="10">
+            <Border Grid.Column="0" Style="{StaticResource SurfaceCard}" Padding="{skin:Space 10}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
-                        <TextBlock Text="TOPICS &amp; GUIDES" Style="{StaticResource SectionLabelStyle}" Margin="6,2,0,8" />
+                        <TextBlock Text="TOPICS &amp; GUIDES" Style="{StaticResource SectionLabelStyle}" Margin="{skin:Space 6,2,0,8}" />
 
                         <ItemsControl ItemsSource="{Binding FilteredHelpTopics}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Button Command="{Binding DataContext.SelectHelpTopicCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding}"
-                                            Margin="0,0,0,6"
+                                            Margin="{skin:Space 0,0,0,6}"
                                             HorizontalContentAlignment="Stretch"
                                             Cursor="Hand">
                                         <Button.Style>
                                             <Style TargetType="Button">
-                                                <Setter Property="Background" Value="{StaticResource CardBgBrush}" />
-                                                <Setter Property="BorderBrush" Value="{StaticResource Ink11Brush}" />
+                                                <Setter Property="Background" Value="{DynamicResource CardBgBrush}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource Ink11Brush}" />
                                                 <Setter Property="BorderThickness" Value="1" />
                                                 <Setter Property="Template">
                                                     <Setter.Value>
@@ -279,14 +280,14 @@
                                                                     Background="{TemplateBinding Background}"
                                                                     BorderBrush="{TemplateBinding BorderBrush}"
                                                                     BorderThickness="{TemplateBinding BorderThickness}"
-                                                                    CornerRadius="{StaticResource Radius04}"
-                                                                    Padding="10,8">
+                                                                    CornerRadius="{DynamicResource Radius04}"
+                                                                    Padding="{skin:Space 10,8}">
                                                                 <ContentPresenter />
                                                             </Border>
                                                             <ControlTemplate.Triggers>
                                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                                    <Setter TargetName="ItemBd" Property="Background" Value="{StaticResource Ink08Brush}" />
-                                                                    <Setter TargetName="ItemBd" Property="BorderBrush" Value="{StaticResource Ink15Brush}" />
+                                                                    <Setter TargetName="ItemBd" Property="Background" Value="{DynamicResource Ink08Brush}" />
+                                                                    <Setter TargetName="ItemBd" Property="BorderBrush" Value="{DynamicResource Ink15Brush}" />
                                                                 </Trigger>
                                                             </ControlTemplate.Triggers>
                                                         </ControlTemplate>
@@ -294,8 +295,8 @@
                                                 </Setter>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                        <Setter Property="Background" Value="{StaticResource Ink08Brush}" />
-                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                        <Setter Property="Background" Value="{DynamicResource Ink08Brush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentCyanBrush}" />
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -307,19 +308,19 @@
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
                                             <Border Grid.Column="0"
-                                                    Width="44"
-                                                    Height="24"
-                                                    CornerRadius="{StaticResource Radius02}"
-                                                    Background="{StaticResource SidebarBgBrush}"
+                                                    Width="{skin:Size 44}"
+                                                    Height="{skin:Size 24}"
+                                                    CornerRadius="{DynamicResource Radius02}"
+                                                    Background="{DynamicResource SidebarBgBrush}"
                                                     BorderBrush="{Binding AccentBrush}"
                                                     BorderThickness="1"
-                                                    Margin="0,0,9,0"
+                                                    Margin="{skin:Space 0,0,9,0}"
                                                     VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Badge}" FontSize="{StaticResource FontSize00}" FontWeight="Black" Foreground="{Binding AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding Badge}" FontSize="{DynamicResource FontSize00}" FontWeight="Black" Foreground="{Binding AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             </Border>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Title}" FontSize="{StaticResource FontSize06}" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding Category}" FontSize="{StaticResource FontSize02}" Foreground="{StaticResource TextMutedBrush}" />
+                                                <TextBlock Text="{Binding Title}" FontSize="{DynamicResource FontSize06}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Category}" FontSize="{DynamicResource FontSize02}" Foreground="{DynamicResource TextMutedBrush}" />
                                             </StackPanel>
                                         </Grid>
                                     </Button>
@@ -327,7 +328,7 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius03}" Padding="12" Margin="0,4,0,0">
+                        <Border Background="{DynamicResource Ink03Brush}" BorderBrush="{DynamicResource Ink11Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius03}" Padding="{skin:Space 12}" Margin="{skin:Space 0,4,0,0}">
                             <Border.Style>
                                 <Style TargetType="Border">
                                     <Setter Property="Visibility" Value="Collapsed" />
@@ -339,8 +340,8 @@
                                 </Style>
                             </Border.Style>
                             <StackPanel>
-                                <TextBlock Text="No guides matched your search." FontSize="{StaticResource FontSize06}" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" />
-                                <Button Content="Reset Search &amp; Filters" Command="{Binding ClearHelpSearchCommand}" Style="{StaticResource SecondaryButton}" Padding="10,4" FontSize="{StaticResource FontSize04}" HorizontalAlignment="Left" Margin="0,8,0,0" />
+                                <TextBlock Text="No guides matched your search." FontSize="{DynamicResource FontSize06}" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <Button Content="Reset Search &amp; Filters" Command="{Binding ClearHelpSearchCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 10,4}" FontSize="{DynamicResource FontSize04}" HorizontalAlignment="Left" Margin="{skin:Space 0,8,0,0}" />
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -349,23 +350,23 @@
 
             <!-- Right Reading Canvas -->
             <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
-                <StackPanel DataContext="{Binding SelectedHelpTopic}" Margin="0,0,4,16">
+                <StackPanel DataContext="{Binding SelectedHelpTopic}" Margin="{skin:Space 0,0,4,16}">
 
                     <!-- Topic Hero Card -->
-                    <Border Style="{StaticResource SurfaceCard}" Padding="18,15" Margin="0,0,0,12">
+                    <Border Style="{StaticResource SurfaceCard}" Padding="{skin:Space 18,15}" Margin="{skin:Space 0,0,0,12}">
                         <StackPanel>
-                            <WrapPanel Margin="0,0,0,6" VerticalAlignment="Center">
-                                <Border Background="{StaticResource Ink03Brush}" BorderBrush="{Binding AccentBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="8,2" Margin="0,0,10,0" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Badge}" FontSize="{StaticResource FontSize02}" FontWeight="Black" Foreground="{Binding AccentBrush}" />
+                            <WrapPanel Margin="{skin:Space 0,0,0,6}" VerticalAlignment="Center">
+                                <Border Background="{DynamicResource Ink03Brush}" BorderBrush="{Binding AccentBrush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 8,2}" Margin="{skin:Space 0,0,10,0}" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Badge}" FontSize="{DynamicResource FontSize02}" FontWeight="Black" Foreground="{Binding AccentBrush}" />
                                 </Border>
-                                <TextBlock Text="{Binding Category}" FontSize="{StaticResource FontSize04}" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Category}" FontSize="{DynamicResource FontSize04}" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
                             </WrapPanel>
-                            <TextBlock Text="{Binding Title}" FontSize="{StaticResource FontSize12}" FontWeight="Bold" TextWrapping="Wrap" />
-                            <TextBlock Text="{Binding Subtitle}" FontSize="{StaticResource FontSize07}" Foreground="{StaticResource AccentCyanBrightBrush}" TextWrapping="Wrap" Margin="0,4,0,10" />
-                            <TextBlock Text="{Binding Overview}" FontSize="{StaticResource FontSize07}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" LineHeight="20" />
+                            <TextBlock Text="{Binding Title}" FontSize="{DynamicResource FontSize12}" FontWeight="Bold" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding Subtitle}" FontSize="{DynamicResource FontSize07}" Foreground="{DynamicResource AccentCyanBrightBrush}" TextWrapping="Wrap" Margin="{skin:Space 0,4,0,10}" />
+                            <TextBlock Text="{Binding Overview}" FontSize="{DynamicResource FontSize07}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" LineHeight="20" />
 
                             <!-- 1-Click Quick-Jump Buttons -->
-                            <ItemsControl ItemsSource="{Binding QuickJumps}" Margin="0,12,0,0" Visibility="{Binding HasQuickJumps, Converter={StaticResource BoolToVis}}">
+                            <ItemsControl ItemsSource="{Binding QuickJumps}" Margin="{skin:Space 0,12,0,0}" Visibility="{Binding HasQuickJumps, Converter={StaticResource BoolToVis}}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <WrapPanel />
@@ -377,9 +378,9 @@
                                                 Command="{Binding DataContext.ExecuteHelpJumpCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
                                                 Style="{StaticResource PrimaryButton}"
-                                                Padding="12,5.5"
-                                                FontSize="{StaticResource FontSize05}"
-                                                Margin="0,0,8,4" />
+                                                Padding="{skin:Space 12,5.5}"
+                                                FontSize="{DynamicResource FontSize05}"
+                                                Margin="{skin:Space 0,0,8,4}" />
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -387,24 +388,24 @@
                     </Border>
 
                     <!-- Step-by-Step Guide Cards -->
-                    <Border Style="{StaticResource SurfaceCard}" Padding="18,15" Margin="0,0,0,12">
+                    <Border Style="{StaticResource SurfaceCard}" Padding="{skin:Space 18,15}" Margin="{skin:Space 0,0,0,12}">
                         <StackPanel>
-                            <TextBlock Text="STEP-BY-STEP GUIDE" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,10" />
+                            <TextBlock Text="STEP-BY-STEP GUIDE" Style="{StaticResource SectionLabelStyle}" Margin="{skin:Space 0,0,0,10}" />
                             <ItemsControl ItemsSource="{Binding Steps}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="12,10" Margin="0,0,0,8">
+                                        <Border Background="{DynamicResource Ink03Brush}" BorderBrush="{DynamicResource Ink11Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius04}" Padding="{skin:Space 12,10}" Margin="{skin:Space 0,0,0,8}">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto" />
                                                     <ColumnDefinition Width="*" />
                                                 </Grid.ColumnDefinitions>
-                                                <Border Grid.Column="0" Width="30" Height="30" CornerRadius="{StaticResource Radius03}" Background="{StaticResource AccentCyanSubtleBgDeepBrush}" BorderBrush="{StaticResource AccentSkyDeepBrush}" BorderThickness="1" Margin="0,0,12,0" VerticalAlignment="Top">
-                                                    <TextBlock Text="{Binding StepNumber}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource FontSize05}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                <Border Grid.Column="0" Width="{skin:Size 30}" Height="{skin:Size 30}" CornerRadius="{DynamicResource Radius03}" Background="{DynamicResource AccentCyanSubtleBgDeepBrush}" BorderBrush="{DynamicResource AccentSkyDeepBrush}" BorderThickness="1" Margin="{skin:Space 0,0,12,0}" VerticalAlignment="Top">
+                                                    <TextBlock Text="{Binding StepNumber}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize05}" FontWeight="Bold" Foreground="{DynamicResource AccentCyanBrightBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                 </Border>
                                                 <StackPanel Grid.Column="1">
-                                                    <TextBlock Text="{Binding Title}" FontSize="{StaticResource FontSize08}" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
-                                                    <TextBlock Text="{Binding Description}" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" LineHeight="19" Margin="0,3,0,0" />
+                                                    <TextBlock Text="{Binding Title}" FontSize="{DynamicResource FontSize08}" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                                    <TextBlock Text="{Binding Description}" FontSize="{DynamicResource FontSize06}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" LineHeight="19" Margin="{skin:Space 0,3,0,0}" />
                                                 </StackPanel>
                                             </Grid>
                                         </Border>
@@ -415,24 +416,24 @@
                     </Border>
 
                     <!-- Keyboard Shortcuts Reference Table (shown on Shortcuts guide) -->
-                    <Border Style="{StaticResource SurfaceCard}" Padding="18,15" Margin="0,0,0,12" Visibility="{Binding ShowShortcutsTable, Converter={StaticResource BoolToVis}}">
+                    <Border Style="{StaticResource SurfaceCard}" Padding="{skin:Space 18,15}" Margin="{skin:Space 0,0,0,12}" Visibility="{Binding ShowShortcutsTable, Converter={StaticResource BoolToVis}}">
                         <StackPanel>
-                            <TextBlock Text="COMPLETE KEYBOARD &amp; GLOBAL HOTKEY REFERENCE" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,10" />
+                            <TextBlock Text="COMPLETE KEYBOARD &amp; GLOBAL HOTKEY REFERENCE" Style="{StaticResource SectionLabelStyle}" Margin="{skin:Space 0,0,0,10}" />
                             <ItemsControl ItemsSource="{Binding DataContext.HelpShortcutsReference, RelativeSource={RelativeSource AncestorType=UserControl}}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink08Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius03}" Padding="10,7" Margin="0,0,0,5">
+                                        <Border Background="{DynamicResource Ink03Brush}" BorderBrush="{DynamicResource Ink08Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius03}" Padding="{skin:Space 10,7}" Margin="{skin:Space 0,0,0,5}">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="155" />
-                                                    <ColumnDefinition Width="120" />
+                                                    <ColumnDefinition Width="{skin:Size 155}" />
+                                                    <ColumnDefinition Width="{skin:Size 120}" />
                                                     <ColumnDefinition Width="*" />
                                                 </Grid.ColumnDefinitions>
-                                                <Border Grid.Column="0" Background="{StaticResource Ink08Brush}" BorderBrush="{StaticResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="8,2.5" HorizontalAlignment="Left" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding Keys}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource FontSize04}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" />
+                                                <Border Grid.Column="0" Background="{DynamicResource Ink08Brush}" BorderBrush="{DynamicResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 8,2.5}" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Keys}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize04}" FontWeight="Bold" Foreground="{DynamicResource AccentCyanBrightBrush}" />
                                                 </Border>
-                                                <TextBlock Grid.Column="1" Text="{Binding Scope}" FontSize="{StaticResource FontSize04}" FontWeight="SemiBold" Foreground="{StaticResource AccentAmberBrush}" VerticalAlignment="Center" />
-                                                <TextBlock Grid.Column="2" Text="{Binding Action}" FontSize="{StaticResource FontSize05}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Scope}" FontSize="{DynamicResource FontSize04}" FontWeight="SemiBold" Foreground="{DynamicResource AccentAmberBrush}" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2" Text="{Binding Action}" FontSize="{DynamicResource FontSize05}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" VerticalAlignment="Center" />
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
@@ -442,24 +443,24 @@
                     </Border>
 
                     <!-- LAN Network Ports Reference Table (shown on Troubleshooting guide) -->
-                    <Border Style="{StaticResource SurfaceCard}" Padding="18,15" Margin="0,0,0,12" Visibility="{Binding ShowPortsTable, Converter={StaticResource BoolToVis}}">
+                    <Border Style="{StaticResource SurfaceCard}" Padding="{skin:Space 18,15}" Margin="{skin:Space 0,0,0,12}" Visibility="{Binding ShowPortsTable, Converter={StaticResource BoolToVis}}">
                         <StackPanel>
-                            <TextBlock Text="LOCAL NETWORK PORTS &amp; PROTOCOLS REFERENCE" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,10" />
+                            <TextBlock Text="LOCAL NETWORK PORTS &amp; PROTOCOLS REFERENCE" Style="{StaticResource SectionLabelStyle}" Margin="{skin:Space 0,0,0,10}" />
                             <ItemsControl ItemsSource="{Binding DataContext.HelpPortsReference, RelativeSource={RelativeSource AncestorType=UserControl}}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink08Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius03}" Padding="10,7" Margin="0,0,0,5">
+                                        <Border Background="{DynamicResource Ink03Brush}" BorderBrush="{DynamicResource Ink08Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius03}" Padding="{skin:Space 10,7}" Margin="{skin:Space 0,0,0,5}">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="145" />
-                                                    <ColumnDefinition Width="190" />
+                                                    <ColumnDefinition Width="{skin:Size 145}" />
+                                                    <ColumnDefinition Width="{skin:Size 190}" />
                                                     <ColumnDefinition Width="*" />
                                                 </Grid.ColumnDefinitions>
-                                                <Border Grid.Column="0" Background="{StaticResource AccentVioletSubtleBgBrush}" BorderBrush="{StaticResource AccentVioletBorderBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius02}" Padding="8,2.5" HorizontalAlignment="Left" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding ProtocolPort}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource FontSize03}" FontWeight="Bold" Foreground="{StaticResource AccentVioletTextBrush}" />
+                                                <Border Grid.Column="0" Background="{DynamicResource AccentVioletSubtleBgBrush}" BorderBrush="{DynamicResource AccentVioletBorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 8,2.5}" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding ProtocolPort}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize03}" FontWeight="Bold" Foreground="{DynamicResource AccentVioletTextBrush}" />
                                                 </Border>
-                                                <TextBlock Grid.Column="1" Text="{Binding Service}" FontSize="{StaticResource FontSize05}" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                                <TextBlock Grid.Column="2" Text="{Binding Purpose}" FontSize="{StaticResource FontSize05}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Service}" FontSize="{DynamicResource FontSize05}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="{skin:Space 0,0,8,0}" />
+                                                <TextBlock Grid.Column="2" Text="{Binding Purpose}" FontSize="{DynamicResource FontSize05}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" VerticalAlignment="Center" />
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
@@ -469,15 +470,15 @@
                     </Border>
 
                     <!-- Pro Tips Callout -->
-                    <Border Background="{StaticResource Ink05Brush}" BorderBrush="{StaticResource AccentCyanBorderBrush}" BorderThickness="1" CornerRadius="{StaticResource Radius06}" Padding="16,13" Margin="0,0,0,12" Visibility="{Binding HasProTips, Converter={StaticResource BoolToVis}}">
+                    <Border Background="{DynamicResource Ink05Brush}" BorderBrush="{DynamicResource AccentCyanBorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource Radius06}" Padding="{skin:Space 16,13}" Margin="{skin:Space 0,0,0,12}" Visibility="{Binding HasProTips, Converter={StaticResource BoolToVis}}">
                         <StackPanel>
-                            <TextBlock Text="PRO TIPS" FontSize="{StaticResource FontSize03}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrightBrush}" Margin="0,0,0,8" />
+                            <TextBlock Text="PRO TIPS" FontSize="{DynamicResource FontSize03}" FontWeight="Bold" Foreground="{DynamicResource AccentCyanBrightBrush}" Margin="{skin:Space 0,0,0,8}" />
                             <ItemsControl ItemsSource="{Binding ProTips}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                            <TextBlock Text="✦ " Foreground="{StaticResource AccentCyanBrush}" FontWeight="Bold" Margin="0,0,6,0" />
-                                            <TextBlock Text="{Binding}" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource AccentBlueTextSoftBrush}" TextWrapping="Wrap" MaxWidth="760" />
+                                        <StackPanel Orientation="Horizontal" Margin="{skin:Space 0,0,0,6}">
+                                            <TextBlock Text="✦ " Foreground="{DynamicResource AccentCyanBrush}" FontWeight="Bold" Margin="{skin:Space 0,0,6,0}" />
+                                            <TextBlock Text="{Binding}" FontSize="{DynamicResource FontSize06}" Foreground="{DynamicResource AccentBlueTextSoftBrush}" TextWrapping="Wrap" MaxWidth="{skin:Size 760}" />
                                         </StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -486,16 +487,16 @@
                     </Border>
 
                     <!-- Troubleshooting & FAQ -->
-                    <Border Style="{StaticResource SurfaceCard}" Padding="18,15" Visibility="{Binding HasTroubleshooting, Converter={StaticResource BoolToVis}}">
+                    <Border Style="{StaticResource SurfaceCard}" Padding="{skin:Space 18,15}" Visibility="{Binding HasTroubleshooting, Converter={StaticResource BoolToVis}}">
                         <StackPanel>
-                            <TextBlock Text="COMMON QUESTIONS &amp; TROUBLESHOOTING" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,10" />
+                            <TextBlock Text="COMMON QUESTIONS &amp; TROUBLESHOOTING" Style="{StaticResource SectionLabelStyle}" Margin="{skin:Space 0,0,0,10}" />
                             <ItemsControl ItemsSource="{Binding Troubleshooting}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="12,10" Margin="0,0,0,8">
+                                        <Border Background="{DynamicResource Ink03Brush}" BorderBrush="{DynamicResource Ink11Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius04}" Padding="{skin:Space 12,10}" Margin="{skin:Space 0,0,0,8}">
                                             <StackPanel>
-                                                <TextBlock Text="{Binding Question}" FontSize="{StaticResource FontSize07}" FontWeight="Bold" Foreground="{StaticResource AccentAmberBrush}" TextWrapping="Wrap" />
-                                                <TextBlock Text="{Binding Answer}" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" LineHeight="19" Margin="0,4,0,0" />
+                                                <TextBlock Text="{Binding Question}" FontSize="{DynamicResource FontSize07}" FontWeight="Bold" Foreground="{DynamicResource AccentAmberBrush}" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Answer}" FontSize="{DynamicResource FontSize06}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" LineHeight="19" Margin="{skin:Space 0,4,0,0}" />
                                             </StackPanel>
                                         </Border>
                                     </DataTemplate>

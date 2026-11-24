@@ -68,6 +68,7 @@ Auto-detect receiver IP & model name, configure LAN relay / FFmpeg / Cinema A/V 
 - **Cast Any PC Audio (WASAPI Loopback)**: Wirelessly stream Windows audio from your default output or any specific playback device to your Denon AVR in **MP3 320 kbps** or **Lossless WAV** with silence keepalive so HEOS never drops between tracks.
 - **Drag-and-Drop Local Hi-Res FLAC Jukebox**: Drop `.flac`, `.wav`, `.mp3`, `.m4a`, `.aac`, `.ogg`, or `.opus` files/folders directly onto the app for bit-perfect HTTP Range streaming over LAN.
 - **Smart Scenes & Deep Audyssey / Acoustic Tuning**: Customize multi-step hardware macros with smooth volume ramping, snapshot your current AVR state in 1 click, and tune Audyssey MultEQ, Dynamic EQ, Dynamic Volume, Audio Restorer, Front Panel Dimmer (`Bright`/`Dim`/`Dark`/`Off`), Subwoofer & Dialog trims (`-12..+12 dB`), and Bass/Treble.
+- **Themes & Skins**: *Dark*, *Light* or *Follow Windows*, and four skins: *Default*, *Hi-Fi* (rack-receiver look with amber-backlit VU dials and a fluorescent-display spectrum), *Compact* and *Large* (for the sofa or a touch screen). Any skin works with any theme, and both switch live in Settings → Appearance, plugin pages included.
 - **System Tray Companion & Shortcuts**: Single-click floating taskbar mini-flyout, dark-themed tray menu with Quick Scenes & Stations, single-instance guard, optional launch at Windows startup, and keyboard shortcuts (`Space`, `M`, `Ctrl+↑/↓`, `F5`, `Ctrl+1..7`).
 
 ---

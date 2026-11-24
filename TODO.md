@@ -86,12 +86,27 @@ Preparation done on branch `theming-prep`: every UI color is a token in `Denon.A
 styles stay in `Themes/DenonTheme.xaml`. Code reads tokens through `ThemeResources` (app) and `HostTheme` (built-in
 plugins); the meters read `MeterPalette`. `ThemeTokenGuardTests` blocks new hex colors and unknown keys.
 
-- [ ] Decide the scope: themes only, or skins too (meter faces, layouts)?
-- [ ] Decide live switching (`DynamicResource`, ~900 references) or switch on restart (no view changes).
-- [ ] Decide user theme files (JSON tokens, validated on import) and skins from plugins.
+Design and decisions: `docs/theming.md` (branch `theming-2.0`).
+
+- [x] Themes: Dark, Light and Follow Windows, live switch (`DynamicResource` everywhere, ~900 references; bindings and
+      code-assigned theme brushes are refreshed by `ThemeManager`). Settings → Appearance.
+- [x] Palette contract tests (same keys, contrast floors) and a guard against `StaticResource` theme references.
+- [x] Skin decisions (2026-11-23, `docs/theming.md`): tokens only (type, radii, spacing, icons, meter materials),
+      live switch, built-in skins only, any skin with any theme, all plugin pages follow, bundled open fonts allowed.
+- [x] Skins, live: Default, Hi-Fi (Bahnschrift + bundled Share Tech Mono, amber VU, teal fluorescent LEDs), Compact,
+      Large. Skin tokens in `Themes/Skins/*.xaml`; spacing and sizes via `{skin:Space}`/`{skin:Size}` (two scales over
+      Default pixels); `SkinChanged` redraws the meters; skin chips in Settings → Appearance; `SkinTests`.
+- [x] Plugin pages follow the skin (`HostSkin` in each plugin; `HostSkin.Follow` for the code-built Chromecast and
+      Apple TV pages). Screenshots checked for every skin in Dark and Large in Light, start and live switch.
+- [ ] Release the Chromecast and Apple TV plugins (theme brushes read at each use, `HostSkin`; done in code,
+      unreleased). With the current releases, their pages keep the theme colors live but not the skin sizes.
+- [ ] Check live in the installed app: tray flyout, YouTube cinema window, Chromecast and Apple TV pages in Light and
+      in each skin (screenshot mode does not show them).
+- [ ] Refresh README screenshot 06 (Settings now has the Appearance card).
+- [ ] Help topic badges and scene colors are content colors (not themed): check that they read on Light.
+- [ ] Decide user theme files (JSON tokens, validated on import; no loose XAML).
 - [ ] Semantic aliases (Success/Warning/Danger/Info/Accent) over the hue families, so a theme can recolor states.
-- [ ] Plugin SDK theme API (tokens + `ThemeChanged`). Until then the Chromecast and Apple TV dashboards read the
-      host tokens by name through their own `HostTheme`.
+- [ ] Plugin SDK theme API (`ThemeChanged`, token list) if a plugin ever draws with theme colors in code.
 - [x] Split `MainWindow.xaml` (4,500 lines) into one view per page (`Views/*View.xaml`); the window keeps the
       title bar, sidebar and page wrappers.
 - [x] Built-in plugins (Hue, Smart TV, Home Assistant): use the app's card and button styles (sizes stay local).
@@ -101,7 +116,8 @@ plugins); the meters read `MeterPalette`. `ThemeTokenGuardTests` blocks new hex 
 - [x] Typography and shape tokens in `Themes/Typography.xaml`: type scale `FontSize00`–`FontSize14`, radius scale
       `Radius00`–`Radius09`, fonts `DisplayFont`/`UiFont`/`MonoFont` (610 sizes, 175 radii, 64 font names replaced).
 - [x] Chromecast and Apple TV pages read font sizes and corner radii from the host tokens (`HostTheme.FontSize`/`Radius`).
-- [ ] The meters' drawn text sizes are still literal: they belong in `MeterPalette` if skins may change the meters.
+- [ ] The meters' drawn text sizes are still literal (the dials scale as a whole with their height, so skins do not
+      need them).
 - [x] Icon set in `Themes/Icons.xaml`: 21 named geometries (sidebar, title bar, transport, chevrons, tick), 25 uses.
 
 ## Release / build

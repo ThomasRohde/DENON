@@ -36,7 +36,7 @@ public sealed class SpectrumLedView : FrameworkElement
     private const double MaxFrequency = 16000.0;
 
 
-    private static readonly Typeface LabelTypeface = new(ThemeResources.Font("MonoFont"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
+    private static Typeface LabelTypeface => new(ThemeResources.Font("MonoFont"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
     private static MeterPalette P => MeterPalette.Current;
 
     private static IReadOnlyList<(double Offset, Color Color)> Palette => P.LedHeat;
@@ -62,6 +62,13 @@ public sealed class SpectrumLedView : FrameworkElement
     public bool GlowOnly { get; set; }
 
     public SpectrumState? State { get; set; }
+
+    /// <summary>Rebuilds the cached brushes and labels with the current skin's materials and fonts.</summary>
+    public void Restyle()
+    {
+        _laidOutFor = default;
+        InvalidateVisual();
+    }
 
     protected override void OnRender(DrawingContext dc)
     {

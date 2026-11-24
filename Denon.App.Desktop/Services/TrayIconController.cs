@@ -3,6 +3,7 @@ using System.Windows;
 using Denon.App.Core.Models;
 using Denon.App.Core.Services;
 using Denon.App.Desktop.Infrastructure;
+using Denon.App.Desktop.Infrastructure.Theming;
 using Forms = System.Windows.Forms;
 
 namespace Denon.App.Desktop.Services;
@@ -89,6 +90,14 @@ public sealed class TrayIconController : IDisposable
 
         RebuildMenu();
         UpdateFromSnapshot(_stateStore.Snapshot);
+        ThemeManager.ThemeChanged += OnThemeChanged;
+    }
+
+    /// <summary>The WinForms menu cannot follow WPF resources: rebuild it with the new theme's colors.</summary>
+    private void OnThemeChanged(object? sender, EventArgs e)
+    {
+        RebuildMenu();
+        UpdateFromSnapshot(_stateStore.Snapshot);
     }
 
     public void ShowBalloon(string title, string message)
@@ -131,6 +140,7 @@ public sealed class TrayIconController : IDisposable
 
     public void Dispose()
     {
+        ThemeManager.ThemeChanged -= OnThemeChanged;
         _stateStore.StateChanged -= _stateChangedHandler;
         _settingsStore.SettingsChanged -= _settingsChangedHandler;
 
@@ -157,7 +167,7 @@ public sealed class TrayIconController : IDisposable
 
         var menu = new Forms.ContextMenuStrip
         {
-            Renderer = new DarkTrayMenuRenderer(),
+            Renderer = new TrayMenuRenderer(),
             BackColor = ThemeResources.DrawingColor("Ink04"),
             ForeColor = ThemeResources.DrawingColor("TextPrimary"),
             ShowImageMargin = false,
@@ -242,7 +252,7 @@ public sealed class TrayIconController : IDisposable
             dropDown.ShowImageMargin = false;
             dropDown.BackColor = ThemeResources.DrawingColor("Ink04");
             dropDown.ForeColor = ThemeResources.DrawingColor("TextPrimary");
-            dropDown.Renderer = new DarkTrayMenuRenderer();
+            dropDown.Renderer = new TrayMenuRenderer();
         }
     }
 
@@ -376,7 +386,7 @@ public sealed class TrayIconController : IDisposable
     private static string Truncate(string text, int length) =>
         text.Length <= length ? text : text[..Math.Max(0, length - 3)] + "...";
 
-    private sealed class DarkTrayMenuRenderer : Forms.ToolStripProfessionalRenderer
+    private sealed class TrayMenuRenderer : Forms.ToolStripProfessionalRenderer
     {
         private static Color BgColor => ThemeResources.DrawingColor("Ink03");
         private static Color HoverFillColor => ThemeResources.DrawingColor("AccentCyanDim");
@@ -386,7 +396,7 @@ public sealed class TrayIconController : IDisposable
         private static Color HoverTextColor => ThemeResources.DrawingColor("TextPrimary");
         private static Color HeaderTextColor => ThemeResources.DrawingColor("TextMuted");
 
-        public DarkTrayMenuRenderer() : base(new DarkColorTable())
+        public TrayMenuRenderer() : base(new DarkColorTable())
         {
             RoundedEdges = false;
         }

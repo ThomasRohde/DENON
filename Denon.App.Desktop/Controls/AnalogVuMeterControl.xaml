@@ -1,51 +1,39 @@
 <UserControl x:Class="Denon.App.Desktop.Controls.AnalogVuMeterControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:skin="clr-namespace:Denon.App.Desktop.Infrastructure.Theming"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:Denon.App.Desktop.Controls"
-             Height="136"
+             Height="{skin:Size 136}"
              UseLayoutRounding="True">
     <!-- Machined deck panel holding two backlit VU windows (left amber, right cyan). -->
-    <Border CornerRadius="{StaticResource Radius06}"
-            BorderBrush="{StaticResource Ink11Brush}"
+    <Border CornerRadius="{DynamicResource Radius06}"
+            BorderBrush="{DynamicResource Ink11Brush}"
+            Background="{DynamicResource MeterPanelGradient}"
             BorderThickness="1"
-            Padding="6">
-        <Border.Background>
-            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                <GradientStop Color="{StaticResource Ink06Color}" Offset="0" />
-                <GradientStop Color="{StaticResource Ink02Color}" Offset="0.5" />
-                <GradientStop Color="{StaticResource Ink01Color}" Offset="1" />
-            </LinearGradientBrush>
-        </Border.Background>
+            Padding="{skin:Space 6}">
 
         <Grid>
             <!-- Top bevel highlight of the panel -->
-            <Border CornerRadius="{StaticResource Radius04}" BorderThickness="0,1,0,0" Margin="-5,-5,-5,0" IsHitTestVisible="False">
-                <Border.BorderBrush>
-                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                        <GradientStop Color="{StaticResource OverlayWhiteClearColor}" Offset="0" />
-                        <GradientStop Color="{StaticResource OverlayWhiteSoftColor}" Offset="0.5" />
-                        <GradientStop Color="{StaticResource OverlayWhiteClearColor}" Offset="1" />
-                    </LinearGradientBrush>
-                </Border.BorderBrush>
-            </Border>
+            <Border CornerRadius="{DynamicResource Radius04}" BorderThickness="0,1,0,0" Margin="{skin:Space -5,-5,-5,0}" IsHitTestVisible="False"
+                    BorderBrush="{DynamicResource BevelHighlightGradient}" />
 
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="8" />
+                    <ColumnDefinition Width="{skin:Size 8}" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
                 <!-- Recessed window wells give the glass a seat in the panel -->
-                <Border Grid.Column="0" CornerRadius="{StaticResource Radius05}" Background="{StaticResource OledBgBrush}" Padding="1.5" VerticalAlignment="Center">
-                    <controls:VuDial x:Name="LeftDial" Accent="{StaticResource AccentAmberColor}" Channel="L" ChannelName="LEFT" />
+                <Border Grid.Column="0" CornerRadius="{DynamicResource Radius05}" Background="{DynamicResource OledBgBrush}" Padding="{skin:Space 1.5}" VerticalAlignment="Center">
+                    <controls:VuDial x:Name="LeftDial" Channel="L" ChannelName="LEFT" />
                 </Border>
 
                 <!-- Center seam: a fine vertical groove between the windows -->
-                <Rectangle Grid.Column="1" Width="1" Margin="0,10" Fill="{StaticResource Ink08Brush}" HorizontalAlignment="Center" />
+                <Rectangle Grid.Column="1" Width="1" Margin="{skin:Space 0,10}" Fill="{DynamicResource Ink08Brush}" HorizontalAlignment="Center" />
 
-                <Border Grid.Column="2" CornerRadius="{StaticResource Radius05}" Background="{StaticResource OledBgBrush}" Padding="1.5" VerticalAlignment="Center">
-                    <controls:VuDial x:Name="RightDial" Accent="{StaticResource AccentTealColor}" Channel="R" ChannelName="RIGHT" />
+                <Border Grid.Column="2" CornerRadius="{DynamicResource Radius05}" Background="{DynamicResource OledBgBrush}" Padding="{skin:Space 1.5}" VerticalAlignment="Center">
+                    <controls:VuDial x:Name="RightDial" Channel="R" ChannelName="RIGHT" />
                 </Border>
             </Grid>
         </Grid>

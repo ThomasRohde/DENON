@@ -4,12 +4,15 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Order matters: colors (the theme), brushes built from them, typography and shape tokens, icons, then styles. -->
-                <ResourceDictionary Source="Themes/Colors.Dark.xaml" />
+                <!--
+                    The theme stack (docs/theming.md). The slot order is a contract: ThemeManager replaces a slot by index.
+                    0 palette and 1 brushes (theme, live), 2 skin tokens (live), 3 icons, 4 control styles (shared by all skins).
+                -->
+                <ResourceDictionary Source="Themes/Palettes/Dark.xaml" />
                 <ResourceDictionary Source="Themes/Brushes.xaml" />
-                <ResourceDictionary Source="Themes/Typography.xaml" />
+                <ResourceDictionary Source="Themes/Skins/Default.xaml" />
                 <ResourceDictionary Source="Themes/Icons.xaml" />
-                <ResourceDictionary Source="Themes/DenonTheme.xaml" />
+                <ResourceDictionary Source="Themes/Styles.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

@@ -2,6 +2,12 @@
 
 Released separately from Denon Desktop with tags `appletv-vX.Y.Z`.
 
+## [Unreleased]
+
+### Changed
+- **Follows live theme switches** (Denon Desktop 2.0): the page reads theme brushes at each use instead of caching them, so elements made after a switch get the new theme's colors.
+- **Follows the host skin** (Denon Desktop 2.0: Default, Hi-Fi, Compact, Large): font sizes and corner radii are live references to the host tokens, and margins, padding and sizes scale with the skin (`HostSkin`). No Plugin SDK change.
+
 ## [0.3.0] - 2026-11-23
 
 Needs Denon Desktop **1.22.0** or later to show the artwork.

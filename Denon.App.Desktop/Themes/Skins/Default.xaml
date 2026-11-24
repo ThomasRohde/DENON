@@ -1,7 +1,12 @@
 <!--
-    Typography and shape tokens: the type scale (FontSize00 smallest ... FontSize14 largest), the corner-radius
-    scale (Radius00 ... Radius09) and the font families. Views use these instead of literal numbers, so a skin
-    can change the look (for example a larger type scale) without touching the views.
+    Default skin: the skin tokens (docs/theming.md). Every skin in Themes/Skins defines exactly these keys
+    (test: SkinTests). Views use the tokens instead of literal numbers, so a skin changes the look live:
+    - fonts: DisplayFont, UiFont, MonoFont;
+    - the type scale FontSize00 (smallest) ... FontSize14 (largest);
+    - the corner-radius scale Radius00 ... Radius09;
+    - SpaceScale and SizeScale: views write margins, padding and sizes in Default pixels with {skin:Space} and
+      {skin:Size}, and the skin multiplies them.
+    The meter materials of a skin are in code (Controls/MeterPalette.cs).
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -40,5 +45,9 @@
     <CornerRadius x:Key="Radius07">16</CornerRadius>
     <CornerRadius x:Key="Radius08">20</CornerRadius>
     <CornerRadius x:Key="Radius09">27</CornerRadius>
+
+    <!-- Spacing and size scales (multiply the Default pixels in the views) -->
+    <sys:Double x:Key="SpaceScale">1</sys:Double>
+    <sys:Double x:Key="SizeScale">1</sys:Double>
 
 </ResourceDictionary>

@@ -1,22 +1,17 @@
 <UserControl x:Class="Denon.App.Desktop.Controls.SpectrumAnalyzerControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:skin="clr-namespace:Denon.App.Desktop.Infrastructure.Theming"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:Denon.App.Desktop.Controls"
-             Height="138"
-             MinWidth="260"
+             Height="{skin:Size 138}"
+             MinWidth="{skin:Size 260}"
              UseLayoutRounding="True">
     <!-- Same machined deck panel as the VU pair, holding a recessed LED screen. -->
-    <Border CornerRadius="{StaticResource Radius06}"
-            BorderBrush="{StaticResource Ink11Brush}"
+    <Border CornerRadius="{DynamicResource Radius06}"
+            BorderBrush="{DynamicResource Ink11Brush}"
+            Background="{DynamicResource MeterPanelGradient}"
             BorderThickness="1"
-            Padding="10,6,10,6">
-        <Border.Background>
-            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                <GradientStop Color="{StaticResource Ink06Color}" Offset="0" />
-                <GradientStop Color="{StaticResource Ink02Color}" Offset="0.5" />
-                <GradientStop Color="{StaticResource Ink01Color}" Offset="1" />
-            </LinearGradientBrush>
-        </Border.Background>
+            Padding="{skin:Space 10,6,10,6}">
 
         <Grid>
             <Grid.RowDefinitions>
@@ -24,28 +19,28 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <DockPanel Grid.Row="0" Margin="2,0,2,5" LastChildFill="False">
+            <DockPanel Grid.Row="0" Margin="{skin:Space 2,0,2,5}" LastChildFill="False">
                 <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="SPECTRUM" FontSize="{StaticResource FontSize01}" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" />
-                    <TextBlock Text="  31-BAND RTA  ·  25 Hz – 16 kHz" FontSize="{StaticResource FontSize00}" FontWeight="SemiBold" Foreground="{StaticResource TextDisabledBrush}" />
+                    <TextBlock Text="SPECTRUM" FontSize="{DynamicResource FontSize01}" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" />
+                    <TextBlock Text="  31-BAND RTA  ·  25 Hz – 16 kHz" FontSize="{DynamicResource FontSize00}" FontWeight="SemiBold" Foreground="{DynamicResource TextDisabledBrush}" />
                 </StackPanel>
 
                 <Border x:Name="SourcePill"
                         DockPanel.Dock="Right"
-                        CornerRadius="{StaticResource Radius02}"
+                        CornerRadius="{DynamicResource Radius02}"
                         BorderThickness="1"
-                        Padding="7,1,7,1"
+                        Padding="{skin:Space 7,1,7,1}"
                         VerticalAlignment="Center">
                     <TextBlock x:Name="SignalModeLabel"
                                Text="STANDBY"
-                               FontFamily="{StaticResource MonoFont}"
-                               FontSize="{StaticResource FontSize00}"
+                               FontFamily="{DynamicResource MonoFont}"
+                               FontSize="{DynamicResource FontSize00}"
                                FontWeight="Bold" />
                 </Border>
             </DockPanel>
 
-            <!-- Recessed LED screen -->
-            <Border Grid.Row="1" CornerRadius="{StaticResource Radius04}" Background="{StaticResource OledBgBrush}" BorderBrush="{StaticResource Ink05Brush}" BorderThickness="1" Padding="9,7,9,2" ClipToBounds="True">
+            <!-- Recessed LED screen: meter material (MeterPalette), dark in every theme like the VU dials. -->
+            <Border x:Name="LedScreen" Grid.Row="1" CornerRadius="{DynamicResource Radius04}" BorderThickness="1" Padding="{skin:Space 9,7,9,2}" ClipToBounds="True">
                 <Grid>
                     <controls:SpectrumLedView x:Name="BarsView" />
                     <!-- Bloom: the lit segments again, blurred, over the grille. -->
@@ -55,14 +50,8 @@
                         </controls:SpectrumLedView.Effect>
                     </controls:SpectrumLedView>
                     <!-- Screen glass: soft top sheen -->
-                    <Border IsHitTestVisible="False" CornerRadius="{StaticResource Radius03}" Margin="-9,-7,-9,-2">
-                        <Border.Background>
-                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                <GradientStop Color="{StaticResource OverlayWhiteFaintColor}" Offset="0" />
-                                <GradientStop Color="{StaticResource OverlayWhiteClearColor}" Offset="0.35" />
-                            </LinearGradientBrush>
-                        </Border.Background>
-                    </Border>
+                    <Border IsHitTestVisible="False" CornerRadius="{DynamicResource Radius03}" Margin="{skin:Space -9,-7,-9,-2}"
+                            Background="{DynamicResource ScreenSheenGradient}" />
                 </Grid>
             </Border>
         </Grid>

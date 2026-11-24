@@ -7,6 +7,7 @@ using Denon.App.Core.Mcp;
 using Denon.App.Core.Plugins;
 using Denon.App.Core.Services;
 using Denon.App.Core.Services.Metering;
+using Denon.App.Desktop.Infrastructure.Theming;
 using Denon.App.Desktop.Services;
 using Denon.App.Desktop.ViewModels;
 using Denon.App.PluginSdk;
@@ -136,6 +137,13 @@ public partial class App : System.Windows.Application
             var settingsStore = _host.Services.GetRequiredService<AppSettingsStore>();
             await settingsStore.InitializeAsync();
 
+            // Skin and theme before the first window (docs/theming.md). Screenshots are Default and Dark unless
+            // --skin and --theme say otherwise, so README images do not depend on the settings of the PC that makes them.
+            var themeArg = ArgValue(e.Args, "--theme");
+            var skinArg = ArgValue(e.Args, "--skin");
+            ThemeManager.ApplySkin(skinArg ?? (isScreenshotMode ? ThemeManager.DefaultSkinId : settingsStore.Current.Ui.Skin));
+            ThemeManager.ApplyTheme(themeArg ?? (isScreenshotMode ? "dark" : settingsStore.Current.Ui.Theme));
+
             var pluginHost = _host.Services.GetRequiredService<PluginHostService>();
             await pluginHost.InitializeAndStartAsync();
 
@@ -185,7 +193,23 @@ public partial class App : System.Windows.Application
                 window.Height = 920;
                 window.ShowActivated = false;
                 window.Show();
-                await CaptureScreenshotsAsync(window, vm, captureDir!);
+
+                // --switch-theme <id> and --switch-skin <id>: switch live with the window open (tests the live path).
+                if (ArgValue(e.Args, "--switch-theme") is { } switchTheme)
+                {
+                    await Task.Delay(400);
+                    ThemeManager.ApplyTheme(switchTheme);
+                }
+
+                if (ArgValue(e.Args, "--switch-skin") is { } switchSkin)
+                {
+                    await Task.Delay(400);
+                    ThemeManager.ApplySkin(switchSkin);
+                }
+
+                // --all-pages: also the pages the README does not show (checks a theme on every page).
+                var allPages = e.Args.Any(a => string.Equals(a, "--all-pages", StringComparison.OrdinalIgnoreCase));
+                await CaptureScreenshotsAsync(window, vm, captureDir!, allPages);
                 await ExitApplicationAsync();
                 return;
             }
@@ -251,23 +275,45 @@ public partial class App : System.Windows.Application
         }
     }
 
-    private static async Task CaptureScreenshotsAsync(MainWindow window, MainViewModel vm, string outputDir)
+    /// <summary>The value after a command-line option (<c>--theme light</c>), or null.</summary>
+    private static string? ArgValue(string[] args, string option)
+    {
+        var index = Array.FindIndex(args, a => string.Equals(a, option, StringComparison.OrdinalIgnoreCase));
+        return index >= 0 && index + 1 < args.Length ? args[index + 1] : null;
+    }
+
+    private static async Task CaptureScreenshotsAsync(MainWindow window, MainViewModel vm, string outputDir, bool allPages)
     {
         System.IO.Directory.CreateDirectory(outputDir);
 
-        (string Section, string? StationsTab, string FileName)[] shots =
+        List<(string Section, string? StationsTab, string FileName, PluginCardViewModel? Plugin)> shots =
         [
-            ("Control", null, "01-control-deck.png"),
-            ("YouTube", null, "02-youtube-music.png"),
-            ("Acoustics", null, "03-scenes-acoustics.png"),
-            ("CastRemote", null, "04-cast-phone-remote.png"),
-            ("Stations", "Explorer", "05-global-radio-explorer.png"),
-            ("Settings", null, "06-settings-shortcuts.png"),
+            ("Control", null, "01-control-deck.png", null),
+            ("YouTube", null, "02-youtube-music.png", null),
+            ("Acoustics", null, "03-scenes-acoustics.png", null),
+            ("CastRemote", null, "04-cast-phone-remote.png", null),
+            ("Stations", "Explorer", "05-global-radio-explorer.png", null),
+            ("Settings", null, "06-settings-shortcuts.png", null),
         ];
 
-        foreach (var (section, stationsTab, fileName) in shots)
+        if (allPages)
+        {
+            shots.Add(("Stations", "Presets", "07-stations-presets.png", null));
+            shots.Add(("Mcp", null, "08-brain.png", null));
+            shots.Add(("Diagnostics", null, "09-health.png", null));
+            shots.Add(("Help", null, "10-help.png", null));
+            shots.Add(("Plugins", null, "11-plugins.png", null));
+            shots.AddRange(vm.InstalledPlugins.Select((p, i) => ("Plugins", (string?)null, $"{12 + i}-plugin-{p.Id}.png", (PluginCardViewModel?)p)));
+        }
+
+        foreach (var (section, stationsTab, fileName, plugin) in shots)
         {
             vm.ActiveSection = section;
+            if (plugin is not null)
+            {
+                vm.OpenPluginCommand.Execute(plugin);
+            }
+
             if (!string.IsNullOrWhiteSpace(stationsTab))
             {
                 vm.StationsSubTab = stationsTab;

@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- **Themes**: Settings → Appearance has *Follow Windows* (the default: light or dark as Windows apps are set), *Dark* and *Light*. The theme switches live, with no restart, and is saved at once. The VU dials and the LED spectrum screen stay dark in every theme, like the display of a real receiver.
+- **Skins**: Settings → Appearance → Skin has *Default*, *Hi-Fi* (rack-receiver look: nearly square corners, Bahnschrift headings, Share Tech Mono numbers, amber-backlit VU dials and a teal fluorescent-display spectrum), *Compact* (smaller type and tighter spacing) and *Large* (larger type, controls and spacing, for the sofa or a touch screen). A skin switches live, works with every theme, and also reaches the plugin pages.
+- **Screenshot mode options** for theme and skin work: `--theme <id>`, `--skin <id>`, `--switch-theme <id>` and `--switch-skin <id>` (switch live with the window open, to test the live path) and `--all-pages` (also Brain, Health, Help, Plugins and each plugin page).
+- **Third-party notices** (`THIRD-PARTY-NOTICES.md`, installed next to the app) for the bundled Share Tech Mono font (SIL Open Font License).
+
+### Changed
+- **Theme files** are in layers (see `docs/theming.md`): palettes in `Themes/Palettes/` (Dark, Light), brushes built from them in `Themes/Brushes.xaml`, skin tokens in `Themes/Skins/` (one file per skin), and the shared `Themes/Icons.xaml` and `Themes/Styles.xaml`. Views refer to theme brushes and skin tokens with `DynamicResource`; tests block `StaticResource` for them.
+- **Spacing and sizes in the views** are written in Default-skin pixels with `{skin:Space …}` and `{skin:Size …}` (about 1,140 margins and paddings and 350 sizes), which the skin scales live. A test blocks literal values. The Default skin looks exactly as before.
+- **Skin contract tests**: every skin has the same tokens, the type scale rises and stays at 8.5 px or more, and Compact and Large stay smaller and larger than Default.
+- **Plugin pages follow the skin** with no Plugin SDK change: each plugin has a `HostSkin` helper that binds to the host's skin scales by name (built-in plugins in XAML; the Chromecast and Apple TV pages built in code).
+- **Palette contract tests**: every palette has the same tokens, and text keeps a minimum contrast on every surface (primary 7:1, secondary and muted 4.5:1, faint 3:1; accent text 4.5:1).
+- **Overlay tokens** are named by role: `OverlayWhite*` → `OverlayHighlight*`.
+- **Meter materials**: the VU dial accents and source print, and the LED spectrum screen, come from `MeterPalette` (skin), not from the theme. The meters redraw on a skin switch.
+- **Built-in plugins** (Hue, Smart TV) keep a token name instead of a brush for their connection badge, so it follows a theme switch.
+
 ## [1.22.0] - 2026-11-23
 
 ### Changed

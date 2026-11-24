@@ -8,11 +8,12 @@ namespace Denon.App.Desktop.ViewModels;
 
 public sealed class ShortcutItemEditor : ObservableObject
 {
-    private static Brush OkBrush => ThemeResources.Brush("AccentEmerald");
-    private static Brush ConflictBrush => ThemeResources.Brush("AccentCrimson");
-    private static Brush WarningBrush => ThemeResources.Brush("AccentAmber");
-    private static Brush RecordingBrush => ThemeResources.Brush("AccentCyan");
-    private static Brush MutedBrush => ThemeResources.Brush("TextFaint");
+    // Tokens, not brushes: a theme switch rebuilds the brush from the token (docs/theming.md).
+    private const string OkTone = "AccentEmerald";
+    private const string ConflictTone = "AccentCrimson";
+    private const string WarningTone = "AccentAmber";
+    private const string RecordingTone = "AccentCyan";
+    private const string MutedTone = "TextFaint";
 
     private string _gesture = string.Empty;
     private bool _isRecording;
@@ -20,7 +21,7 @@ public sealed class ShortcutItemEditor : ObservableObject
     private bool _isWarningOnly;
     private string _collisionMessage = string.Empty;
     private string _statusLabel = "OK";
-    private Brush _statusBrush = OkBrush;
+    private string _statusTone = OkTone;
 
     public ShortcutItemEditor(string actionId, string label, bool isGlobal, string gesture)
     {
@@ -66,7 +67,7 @@ public sealed class ShortcutItemEditor : ObservableObject
                 if (value)
                 {
                     StatusLabel = "LISTENING";
-                    StatusBrush = RecordingBrush;
+                    StatusTone = RecordingTone;
                 }
             }
         }
@@ -98,10 +99,18 @@ public sealed class ShortcutItemEditor : ObservableObject
         private set => SetProperty(ref _statusLabel, value);
     }
 
-    public Brush StatusBrush
+    public Brush StatusBrush => ThemeResources.Brush(_statusTone);
+
+    private string StatusTone
     {
-        get => _statusBrush;
-        private set => SetProperty(ref _statusBrush, value);
+        set
+        {
+            if (_statusTone != value)
+            {
+                _statusTone = value;
+                OnPropertyChanged(nameof(StatusBrush));
+            }
+        }
     }
 
     public void SetValidationResult(bool hasError, bool isWarning, string? message, string badge)
@@ -110,11 +119,11 @@ public sealed class ShortcutItemEditor : ObservableObject
         IsWarningOnly = isWarning;
         CollisionMessage = message ?? string.Empty;
         StatusLabel = badge;
-        StatusBrush = hasError
-            ? ConflictBrush
+        StatusTone = hasError
+            ? ConflictTone
             : (isWarning
-                ? WarningBrush
-                : (string.IsNullOrWhiteSpace(Gesture) ? MutedBrush : OkBrush));
+                ? WarningTone
+                : (string.IsNullOrWhiteSpace(Gesture) ? MutedTone : OkTone));
     }
 
     public ShortcutBinding ToModel() => new(ActionId, Label, IsGlobal, Gesture.Trim());

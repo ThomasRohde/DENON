@@ -4,6 +4,7 @@ using Denon.App.Desktop.Services;
 using Color = System.Windows.Media.Color;
 using UserControl = System.Windows.Controls.UserControl;
 using Denon.App.Desktop.Infrastructure;
+using Denon.App.Desktop.Infrastructure.Theming;
 
 namespace Denon.App.Desktop.Controls;
 
@@ -33,6 +34,27 @@ public partial class AnalogVuMeterControl : UserControl
     public AnalogVuMeterControl()
     {
         InitializeComponent();
+        ApplyMaterials();
+
+        // The dials are skin materials: a skin switch gives new accents, print and fonts.
+        Loaded += (_, _) => ThemeManager.SkinChanged += OnSkinChanged;
+        Unloaded += (_, _) => ThemeManager.SkinChanged -= OnSkinChanged;
+    }
+
+    private void OnSkinChanged(object? sender, EventArgs e)
+    {
+        ApplyMaterials();
+        var source = _lastSource ?? AudioMeterSource.Off;
+        _lastSource = null;
+        ApplySource(source);
+        LeftDial.Restyle();
+        RightDial.Restyle();
+    }
+
+    private void ApplyMaterials()
+    {
+        LeftDial.Accent = MeterPalette.Current.LeftAccent;
+        RightDial.Accent = MeterPalette.Current.RightAccent;
     }
 
     /// <summary>
@@ -64,14 +86,14 @@ public partial class AnalogVuMeterControl : UserControl
         set => SetValue(IsLiveSignalProperty, value);
     }
 
-    /// <summary>Color of the source print under "VU".</summary>
+    /// <summary>Color of the source print under "VU" (meter material: the same in every theme).</summary>
     public static Color SourceColor(AudioMeterSource source) => source switch
     {
-        AudioMeterSource.Denon => ThemeResources.Color("AccentEmeraldBright"),
-        AudioMeterSource.Pc => ThemeResources.Color("AccentAmberBright"),
-        AudioMeterSource.Muted => ThemeResources.Color("AccentCrimsonBright"),
-        AudioMeterSource.Simulated => ThemeResources.Color("TextMuted"),
-        _ => ThemeResources.Color("TextFaint"),
+        AudioMeterSource.Denon => MeterPalette.Current.SourceDenon,
+        AudioMeterSource.Pc => MeterPalette.Current.SourcePc,
+        AudioMeterSource.Muted => MeterPalette.Current.SourceMuted,
+        AudioMeterSource.Simulated => MeterPalette.Current.SourceSimulated,
+        _ => MeterPalette.Current.SourceIdle,
     };
 
     public static string SourceToolTip(AudioMeterSource source) => source switch

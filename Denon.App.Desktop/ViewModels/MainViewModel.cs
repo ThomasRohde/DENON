@@ -13,6 +13,7 @@ using Denon.App.Core.Plugins;
 using Denon.App.Core.Services;
 using Denon.App.Core.Services.Metering;
 using Denon.App.Desktop.Infrastructure;
+using Denon.App.Desktop.Infrastructure.Theming;
 using Denon.App.Desktop.Services;
 using Brush = System.Windows.Media.Brush;
 using Color = System.Windows.Media.Color;
@@ -21,9 +22,10 @@ namespace Denon.App.Desktop.ViewModels;
 
 public sealed partial class MainViewModel : ObservableObject
 {
-    private static Brush OnlineBrush => ThemeResources.Brush("AccentEmerald");
-    private static Brush StandbyBrush => ThemeResources.Brush("AccentAmber");
-    private static Brush OfflineBrush => ThemeResources.Brush("AccentCrimson");
+    // Tokens, not brushes: a theme switch rebuilds the brush from the token (docs/theming.md).
+    private const string OnlineTone = "AccentEmerald";
+    private const string StandbyTone = "AccentAmber";
+    private const string OfflineTone = "AccentCrimson";
 
     private readonly ReceiverController _receiverController;
     private readonly AppSettingsStore _settingsStore;
@@ -56,7 +58,7 @@ public sealed partial class MainViewModel : ObservableObject
     private bool _isMuted;
     private bool _isBusy;
     private string _connectionBadgeText = "OFFLINE";
-    private Brush _connectionBadgeBrush = OfflineBrush;
+    private string _connectionBadgeTone = OfflineTone;
     private string _statusMessage = "Discovering receiver on local network...";
     private string _receiverTitle = "Denon / Marantz AVR";
     private string _detectedModelName = string.Empty;
@@ -122,7 +124,7 @@ public sealed partial class MainViewModel : ObservableObject
     private bool _isRunningConsoleCommand;
     private bool _isRunningHealthCheck;
     private string _healthSummaryText = "Click 'Run Health Check' to test your receiver connection, audio readiness, and internet radio streams.";
-    private Brush _healthSummaryBrush = ThemeResources.Brush("TextMuted");
+    private string _healthSummaryTone = "TextMuted";
 
     public MainViewModel(
         ReceiverController receiverController,
@@ -240,6 +242,7 @@ public sealed partial class MainViewModel : ObservableObject
         SelectSoundModeCommand = new AsyncRelayCommand(SelectSoundModeAsync, CanControlReceiver);
         SetEcoModeCommand = new AsyncRelayCommand(SetEcoModeAsync, CanControlReceiver);
         SetSleepTimerCommand = new AsyncRelayCommand(SetSleepTimerAsync, CanControlReceiver);
+        ThemeManager.ThemeChanged += (_, _) => OnPropertyChanged(nameof(ThemeSummaryText)); // "Follow Windows" can change it
 
         // Stations & Streams
         PlayCustomStreamCommand = new AsyncRelayCommand(_ => PlayCustomStreamAsync(), CanControlReceiver);
@@ -487,10 +490,18 @@ public sealed partial class MainViewModel : ObservableObject
         private set => SetProperty(ref _connectionBadgeText, value);
     }
 
-    public Brush ConnectionBadgeBrush
+    public Brush ConnectionBadgeBrush => ThemeResources.Brush(_connectionBadgeTone);
+
+    private string ConnectionBadgeTone
     {
-        get => _connectionBadgeBrush;
-        private set => SetProperty(ref _connectionBadgeBrush, value);
+        set
+        {
+            if (_connectionBadgeTone != value)
+            {
+                _connectionBadgeTone = value;
+                OnPropertyChanged(nameof(ConnectionBadgeBrush));
+            }
+        }
     }
 
     public string StatusMessage
@@ -1031,10 +1042,18 @@ public sealed partial class MainViewModel : ObservableObject
         private set => SetProperty(ref _healthSummaryText, value);
     }
 
-    public Brush HealthSummaryBrush
+    public Brush HealthSummaryBrush => ThemeResources.Brush(_healthSummaryTone);
+
+    private string HealthSummaryTone
     {
-        get => _healthSummaryBrush;
-        private set => SetProperty(ref _healthSummaryBrush, value);
+        set
+        {
+            if (_healthSummaryTone != value)
+            {
+                _healthSummaryTone = value;
+                OnPropertyChanged(nameof(HealthSummaryBrush));
+            }
+        }
     }
 
     public void BeginVolumeDrag()
@@ -1232,7 +1251,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             var isAwake = snapshot.Status is { IsPoweredOn: true, IsMainZoneOn: true };
             ConnectionBadgeText = isAwake ? "ONLINE" : "STANDBY";
-            ConnectionBadgeBrush = isAwake ? OnlineBrush : StandbyBrush;
+            ConnectionBadgeTone = isAwake ? OnlineTone : StandbyTone;
             StatusMessage = snapshot.Status is not null
                 ? $"{(isAwake ? InputSourceDisplay : "Standby")} • {DenonVolumeMath.FormatDecibels(LiveVolume)} ({LiveVolume})"
                 : "Receiver connected.";
@@ -1240,7 +1259,7 @@ public sealed partial class MainViewModel : ObservableObject
         else
         {
             ConnectionBadgeText = "OFFLINE";
-            ConnectionBadgeBrush = OfflineBrush;
+            ConnectionBadgeTone = OfflineTone;
         }
 
         LastUpdatedText = snapshot.LastSuccessfulRefresh.HasValue
@@ -1269,6 +1288,8 @@ public sealed partial class MainViewModel : ObservableObject
         SettingsDisplayVolumeInDb = settings.Ui.DisplayVolumeInDb;
         SettingsLaunchAtWindowsStartup = settings.Ui.LaunchAtWindowsStartup || _startupService.IsEnabled();
         DisplayVolumeInDb = settings.Ui.DisplayVolumeInDb;
+        MarkActiveTheme(settings.Ui.Theme);
+        MarkActiveSkin(settings.Ui.Skin);
 
         SettingsTelemetryEnabled = settings.Telemetry.Enabled;
         SettingsTelemetryRetentionDays = settings.Telemetry.RetentionDays.ToString();
@@ -1827,6 +1848,8 @@ public sealed partial class MainViewModel : ObservableObject
                 ShowNotifications = SettingsShowNotifications,
                 DisplayVolumeInDb = SettingsDisplayVolumeInDb,
                 LaunchAtWindowsStartup = SettingsLaunchAtWindowsStartup,
+                Theme = settings.Ui.Theme, // set live from Appearance, not by Save
+                Skin = settings.Ui.Skin,
             };
             settings.Media = new MediaRelaySettings
             {
@@ -2002,7 +2025,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         IsRunningHealthCheck = true;
         HealthSummaryText = "Running 5-point receiver health check...";
-        HealthSummaryBrush = ThemeResources.Brush("AccentCyanBright");
+        HealthSummaryTone = "AccentCyanBright";
 
         var settings = _settingsStore.Current.Receiver;
         var netCheck = DiagnosticChecks[0];
@@ -2183,17 +2206,17 @@ public sealed partial class MainViewModel : ObservableObject
             if (fails == 0 && warns == 0)
             {
                 HealthSummaryText = "All systems healthy! Your Denon receiver and radio streams are ready.";
-                HealthSummaryBrush = OnlineBrush;
+                HealthSummaryTone = OnlineTone;
             }
             else if (fails == 0)
             {
                 HealthSummaryText = $"Connected with {warns} item(s) to check — see tips below or click 'Fix Silent Audio'.";
-                HealthSummaryBrush = StandbyBrush;
+                HealthSummaryTone = StandbyTone;
             }
             else
             {
                 HealthSummaryText = $"Found {fails} connection/stream issue(s) — follow the plain-English fixes below.";
-                HealthSummaryBrush = OfflineBrush;
+                HealthSummaryTone = OfflineTone;
             }
 
             _logStore.Info($"Health check completed ({5 - fails - warns} OK, {warns} warnings, {fails} issues).");

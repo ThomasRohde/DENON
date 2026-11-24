@@ -30,12 +30,13 @@ public sealed class VuDial : FrameworkElement
     private const double MaxDesignWidth = 760;
     private const double PivotY = 238;
 
-    private static readonly FontFamily ScaleFont = ThemeResources.Font("DisplayFont");
-    private static readonly FontFamily ReadoutFont = ThemeResources.Font("MonoFont");
-    private static readonly Typeface ScaleTypeface = new(ScaleFont, FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
-    private static readonly Typeface LightTypeface = new(ScaleFont, FontStyles.Normal, FontWeights.Light, FontStretches.Normal);
-    private static readonly Typeface LegendTypeface = new(ScaleFont, FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
-    private static readonly Typeface ReadoutTypeface = new(ReadoutFont, FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
+    // Skin fonts, read at each draw: a skin switch redraws the dials (Restyle).
+    private static FontFamily ScaleFont => ThemeResources.Font("DisplayFont");
+    private static FontFamily ReadoutFont => ThemeResources.Font("MonoFont");
+    private static Typeface ScaleTypeface => new(ScaleFont, FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
+    private static Typeface LightTypeface => new(ScaleFont, FontStyles.Normal, FontWeights.Light, FontStretches.Normal);
+    private static Typeface LegendTypeface => new(ScaleFont, FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
+    private static Typeface ReadoutTypeface => new(ReadoutFont, FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
 
     private static Color Red => P.RedZone;
     private static Color RedInk => P.RedZoneInk;
@@ -225,6 +226,9 @@ public sealed class VuDial : FrameworkElement
 
         return (s, Math.Min(designW, MaxDesignWidth));
     }
+
+    /// <summary>Redraws every layer with the current skin's fonts and meter materials.</summary>
+    public void Restyle() => RebuildStatic();
 
     // ---------------------------------------------------------------- static layers
 

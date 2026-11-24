@@ -395,7 +395,7 @@ public sealed class HueDashboardViewModel : HueObservableObject
     private bool _isPaired;
     private bool _isPairing;
     private string _connectionBadgeText = "NOT CONNECTED";
-    private Brush _connectionBadgeBrush = HostTheme.Brush("AccentAmber");
+    private string _connectionBadgeTone = "AccentAmber"; // a token: a theme switch rebuilds the brush
     private string _statusMessage = "Discover your Philips Hue Bridge on LAN, enter its IP, or try Demo Mode.";
     private string _pairingHintText = string.Empty;
     private bool _isBusy;
@@ -617,10 +617,18 @@ public sealed class HueDashboardViewModel : HueObservableObject
         private set => SetProperty(ref _connectionBadgeText, value);
     }
 
-    public Brush ConnectionBadgeBrush
+    public Brush ConnectionBadgeBrush => HostTheme.Brush(_connectionBadgeTone);
+
+    private string ConnectionBadgeTone
     {
-        get => _connectionBadgeBrush;
-        private set => SetProperty(ref _connectionBadgeBrush, value);
+        set
+        {
+            if (_connectionBadgeTone != value)
+            {
+                _connectionBadgeTone = value;
+                RaisePropertyChanged(nameof(ConnectionBadgeBrush));
+            }
+        }
     }
 
     public string StatusMessage
@@ -1478,17 +1486,17 @@ public sealed class HueDashboardViewModel : HueObservableObject
         if (IsDemoMode)
         {
             ConnectionBadgeText = "DEMO SIMULATOR";
-            ConnectionBadgeBrush = HostTheme.Brush("AccentCyanBright");
+            ConnectionBadgeTone = "AccentCyanBright";
         }
         else if (IsPaired)
         {
             ConnectionBadgeText = $"CONNECTED • {BridgeIpInput}";
-            ConnectionBadgeBrush = HostTheme.Brush("AccentEmerald");
+            ConnectionBadgeTone = "AccentEmerald";
         }
         else
         {
             ConnectionBadgeText = "SETUP REQUIRED";
-            ConnectionBadgeBrush = HostTheme.Brush("AccentAmber");
+            ConnectionBadgeTone = "AccentAmber";
         }
     }
 

@@ -1,41 +1,92 @@
 <!-- Settings page: hardware, behavior, relay, lip-sync calibration and shortcuts. -->
 <UserControl x:Class="Denon.App.Desktop.Views.SettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:skin="clr-namespace:Denon.App.Desktop.Infrastructure.Theming"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:controls="clr-namespace:Denon.App.Desktop.Controls">
+             xmlns:controls="clr-namespace:Denon.App.Desktop.Controls"
+             xmlns:infra="clr-namespace:Denon.App.Desktop.Infrastructure">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="1.05*" />
-            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="{skin:Size 16}" />
             <ColumnDefinition Width="0.95*" />
         </Grid.ColumnDefinitions>
 
         <!-- Left: Hardware & Auto-Discovery -->
-        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,0">
+        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="{skin:Space 0,0,4,0}">
             <StackPanel>
-                <Border Style="{StaticResource SurfaceCard}" Margin="0,0,0,18">
+                <!-- Appearance: the theme and the skin apply live and are saved at once (docs/theming.md) -->
+                <Border Style="{StaticResource SurfaceCard}" Margin="{skin:Space 0,0,0,18}">
                     <StackPanel>
-                        <DockPanel Margin="0,0,0,10">
+                        <TextBlock Text="APPEARANCE" Style="{StaticResource SectionLabelStyle}" Margin="{skin:Space 0,0,0,10}" />
+                        <ItemsControl ItemsSource="{Binding ThemeOptions}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Content="{Binding Label}"
+                                            ToolTip="{Binding Hint}"
+                                            Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
+                                            Command="{Binding DataContext.SetThemeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{Binding ThemeSummaryText}"
+                                   FontSize="{DynamicResource FontSize05}"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   Margin="{skin:Space 0,8,0,0}" />
+                        <TextBlock Text="SKIN" Style="{StaticResource SectionLabelStyle}" Margin="{skin:Space 0,14,0,10}" />
+                        <ItemsControl ItemsSource="{Binding SkinOptions}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Content="{Binding Label}"
+                                            ToolTip="{Binding Hint}"
+                                            Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
+                                            Command="{Binding DataContext.SetSkinCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="Type, spacing, corners and meters. Works with every theme."
+                                   FontSize="{DynamicResource FontSize05}"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="{skin:Space 0,8,0,0}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource SurfaceCard}" Margin="{skin:Space 0,0,0,18}">
+                    <StackPanel>
+                        <DockPanel Margin="{skin:Space 0,0,0,10}">
                             <TextBlock Text="NETWORK AUTO-DISCOVERY" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
                             <Button Content="Scan LAN"
                                     HorizontalAlignment="Right"
                                     Command="{Binding ScanNetworkCommand}"
                                     Style="{StaticResource PrimaryButton}"
-                                    Padding="12,6" />
+                                    Padding="{skin:Space 12,6}" />
                         </DockPanel>
-                        <TextBlock Text="{Binding DiscoveryStatusText}" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding DiscoveryStatusText}" FontSize="{DynamicResource FontSize06}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" />
 
-                        <ItemsControl ItemsSource="{Binding DiscoveredReceivers}" Margin="0,10,0,0">
+                        <ItemsControl ItemsSource="{Binding DiscoveredReceivers}" Margin="{skin:Space 0,10,0,0}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Button Command="{Binding DataContext.UseDiscoveredReceiverCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                             CommandParameter="{Binding}"
                                             Style="{StaticResource HardwareChipButton}"
                                             HorizontalContentAlignment="Left"
-                                            Margin="0,0,0,6">
+                                            Margin="{skin:Space 0,0,0,6}">
                                         <StackPanel>
-                                            <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrush}" />
-                                            <TextBlock FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextSecondaryBrush}">
+                                            <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="{DynamicResource AccentCyanBrush}" />
+                                            <TextBlock FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextSecondaryBrush}">
                                                 <Run Text="{Binding Model, Mode=OneWay}" />
                                                 <Run Text=" • " />
                                                 <Run Text="{Binding IpAddress, Mode=OneWay}" />
@@ -52,90 +103,90 @@
 
                 <Border Style="{StaticResource SurfaceCard}">
                     <StackPanel>
-                        <TextBlock Text="RECEIVER CONNECTION PROFILE" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,14" />
+                        <TextBlock Text="RECEIVER CONNECTION PROFILE" Style="{StaticResource SectionLabelStyle}" Margin="{skin:Space 0,0,0,14}" />
 
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="2*" />
-                                <ColumnDefinition Width="10" />
+                                <ColumnDefinition Width="{skin:Size 10}" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0">
-                                <TextBlock Text="Receiver IP / Host (leave blank to auto-detect)" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
-                                <TextBox Text="{Binding SettingsHost, UpdateSourceTrigger=PropertyChanged}" Tag="Auto-detect via LAN SSDP scan..." Margin="0,0,0,12" />
+                                <TextBlock Text="Receiver IP / Host (leave blank to auto-detect)" FontSize="{DynamicResource FontSize06}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="{skin:Space 0,0,0,5}" />
+                                <TextBox Text="{Binding SettingsHost, UpdateSourceTrigger=PropertyChanged}" Tag="Auto-detect via LAN SSDP scan..." Margin="{skin:Space 0,0,0,12}" />
                             </StackPanel>
                             <StackPanel Grid.Column="2">
-                                <TextBlock Text="HEOS Port" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
-                                <TextBox Text="{Binding SettingsPort, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+                                <TextBlock Text="HEOS Port" FontSize="{DynamicResource FontSize06}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="{skin:Space 0,0,0,5}" />
+                                <TextBox Text="{Binding SettingsPort, UpdateSourceTrigger=PropertyChanged}" Margin="{skin:Space 0,0,0,12}" />
                             </StackPanel>
                         </Grid>
 
-                        <TextBlock Text="HEOS Player Name (leave blank to auto-detect model)" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
-                        <TextBox Text="{Binding SettingsPlayerName, UpdateSourceTrigger=PropertyChanged}" Tag="Auto-detect receiver model name..." Margin="0,0,0,12" />
+                        <TextBlock Text="HEOS Player Name (leave blank to auto-detect model)" FontSize="{DynamicResource FontSize06}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="{skin:Space 0,0,0,5}" />
+                        <TextBox Text="{Binding SettingsPlayerName, UpdateSourceTrigger=PropertyChanged}" Tag="Auto-detect receiver model name..." Margin="{skin:Space 0,0,0,12}" />
 
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="10" />
+                                <ColumnDefinition Width="{skin:Size 10}" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0">
-                                <TextBlock Text="Poll Interval (sec)" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
-                                <TextBox Text="{Binding SettingsPollIntervalSeconds, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+                                <TextBlock Text="Poll Interval (sec)" FontSize="{DynamicResource FontSize06}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="{skin:Space 0,0,0,5}" />
+                                <TextBox Text="{Binding SettingsPollIntervalSeconds, UpdateSourceTrigger=PropertyChanged}" Margin="{skin:Space 0,0,0,12}" />
                             </StackPanel>
                             <StackPanel Grid.Column="2">
-                                <TextBlock Text="Safety Low Volume (0-98)" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
-                                <TextBox Text="{Binding SettingsLowVolume, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+                                <TextBlock Text="Safety Low Volume (0-98)" FontSize="{DynamicResource FontSize06}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="{skin:Space 0,0,0,5}" />
+                                <TextBox Text="{Binding SettingsLowVolume, UpdateSourceTrigger=PropertyChanged}" Margin="{skin:Space 0,0,0,12}" />
                             </StackPanel>
                         </Grid>
 
-                        <TextBlock Text="Quick Volume Presets (comma-separated, 0-98)" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
-                        <TextBox Text="{Binding SettingsVolumePresetsText, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,18" />
+                        <TextBlock Text="Quick Volume Presets (comma-separated, 0-98)" FontSize="{DynamicResource FontSize06}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="{skin:Space 0,0,0,5}" />
+                        <TextBox Text="{Binding SettingsVolumePresetsText, UpdateSourceTrigger=PropertyChanged}" Margin="{skin:Space 0,0,0,18}" />
 
                         <WrapPanel>
-                            <Button Content="Save &amp; Sync" Command="{Binding SaveSettingsCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,8,8" />
-                            <Button Content="Export JSON" Command="{Binding ExportSettingsCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,8,8" />
-                            <Button Content="Import JSON" Command="{Binding ImportSettingsCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,8,8" />
-                            <Button Content="Data Folder" Command="{Binding OpenDataFolderCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,8,8" />
-                            <Button Content="Factory Reset" Command="{Binding ResetDefaultsCommand}" Style="{StaticResource DangerButton}" Margin="0,0,0,8" />
+                            <Button Content="Save &amp; Sync" Command="{Binding SaveSettingsCommand}" Style="{StaticResource PrimaryButton}" Margin="{skin:Space 0,0,8,8}" />
+                            <Button Content="Export JSON" Command="{Binding ExportSettingsCommand}" Style="{StaticResource SecondaryButton}" Margin="{skin:Space 0,0,8,8}" />
+                            <Button Content="Import JSON" Command="{Binding ImportSettingsCommand}" Style="{StaticResource SecondaryButton}" Margin="{skin:Space 0,0,8,8}" />
+                            <Button Content="Data Folder" Command="{Binding OpenDataFolderCommand}" Style="{StaticResource SecondaryButton}" Margin="{skin:Space 0,0,8,8}" />
+                            <Button Content="Factory Reset" Command="{Binding ResetDefaultsCommand}" Style="{StaticResource DangerButton}" Margin="{skin:Space 0,0,0,8}" />
                         </WrapPanel>
                     </StackPanel>
                 </Border>
 
-                <Border Style="{StaticResource SurfaceCard}" Margin="0,12,0,0">
+                <Border Style="{StaticResource SurfaceCard}" Margin="{skin:Space 0,12,0,0}">
                     <StackPanel>
-                        <TextBlock Text="SMART EVENT &amp; HABIT LOGGING" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,10" />
+                        <TextBlock Text="SMART EVENT &amp; HABIT LOGGING" Style="{StaticResource SectionLabelStyle}" Margin="{skin:Space 0,0,0,10}" />
                         <CheckBox Content="Record smart device, media &amp; external remote events locally"
                                   IsChecked="{Binding SettingsTelemetryEnabled}"
                                   Style="{StaticResource ToggleSwitchStyle}"
-                                  FontSize="{StaticResource FontSize06}"
-                                  Margin="0,0,0,10" />
+                                  FontSize="{DynamicResource FontSize06}"
+                                  Margin="{skin:Space 0,0,0,10}" />
 
-                        <Grid Margin="0,0,0,10">
+                        <Grid Margin="{skin:Space 0,0,0,10}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="10" />
+                                <ColumnDefinition Width="{skin:Size 10}" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0">
-                                <TextBlock Text="Retention (days)" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                <TextBlock Text="Retention (days)" FontSize="{DynamicResource FontSize06}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="{skin:Space 0,0,0,5}" />
                                 <TextBox Text="{Binding SettingsTelemetryRetentionDays, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                             <StackPanel Grid.Column="2">
-                                <TextBlock Text="Media dwell filter (sec)" FontSize="{StaticResource FontSize06}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5" />
+                                <TextBlock Text="Media dwell filter (sec)" FontSize="{DynamicResource FontSize06}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="{skin:Space 0,0,0,5}" />
                                 <TextBox Text="{Binding SettingsTelemetryMediaDwellSeconds, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                         </Grid>
 
                         <TextBlock Text="{Binding TelemetryStatsSummaryText}"
-                                   FontSize="{StaticResource FontSize05}"
-                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   FontSize="{DynamicResource FontSize05}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
                                    TextWrapping="Wrap"
-                                   Margin="0,0,0,12" />
+                                   Margin="{skin:Space 0,0,0,12}" />
 
                         <WrapPanel>
-                            <Button Content="Open Events Folder" Command="{Binding OpenEventsFolderCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,8,4" />
-                            <Button Content="Clear Event History" Command="{Binding ClearTelemetryHistoryCommand}" Style="{StaticResource DangerButton}" Margin="0,0,0,4" />
+                            <Button Content="Open Events Folder" Command="{Binding OpenEventsFolderCommand}" Style="{StaticResource SecondaryButton}" Margin="{skin:Space 0,0,8,4}" />
+                            <Button Content="Clear Event History" Command="{Binding ClearTelemetryHistoryCommand}" Style="{StaticResource DangerButton}" Margin="{skin:Space 0,0,0,4}" />
                         </WrapPanel>
                     </StackPanel>
                 </Border>
@@ -150,87 +201,87 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Style="{StaticResource SurfaceCard}" Padding="14,12" Margin="0,0,0,12">
+            <Border Grid.Row="0" Style="{StaticResource SurfaceCard}" Padding="{skin:Space 14,12}" Margin="{skin:Space 0,0,0,12}">
                 <StackPanel>
-                    <TextBlock Text="DESKTOP &amp; TRAY BEHAVIOR" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,8" />
+                    <TextBlock Text="DESKTOP &amp; TRAY BEHAVIOR" Style="{StaticResource SectionLabelStyle}" Margin="{skin:Space 0,0,0,8}" />
 
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="{skin:Size 12}" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <CheckBox Content="Start minimized in tray" IsChecked="{Binding SettingsStartMinimizedToTray}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="{StaticResource FontSize06}" />
-                            <CheckBox Content="Minimize window to tray" IsChecked="{Binding SettingsMinimizeToTray}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="{StaticResource FontSize06}" />
-                            <CheckBox Content="Close hides to tray" IsChecked="{Binding SettingsCloseToTray}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="{StaticResource FontSize06}" />
+                            <CheckBox Content="Start minimized in tray" IsChecked="{Binding SettingsStartMinimizedToTray}" Style="{StaticResource ToggleSwitchStyle}" Margin="{skin:Space 0,4}" FontSize="{DynamicResource FontSize06}" />
+                            <CheckBox Content="Minimize window to tray" IsChecked="{Binding SettingsMinimizeToTray}" Style="{StaticResource ToggleSwitchStyle}" Margin="{skin:Space 0,4}" FontSize="{DynamicResource FontSize06}" />
+                            <CheckBox Content="Close hides to tray" IsChecked="{Binding SettingsCloseToTray}" Style="{StaticResource ToggleSwitchStyle}" Margin="{skin:Space 0,4}" FontSize="{DynamicResource FontSize06}" />
                         </StackPanel>
                         <StackPanel Grid.Column="2">
-                            <CheckBox Content="Tray notifications" IsChecked="{Binding SettingsShowNotifications}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="{StaticResource FontSize06}" />
-                            <CheckBox Content="Primary dB readout" IsChecked="{Binding SettingsDisplayVolumeInDb}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="{StaticResource FontSize06}" />
-                            <CheckBox Content="Launch at startup" IsChecked="{Binding SettingsLaunchAtWindowsStartup}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4" FontSize="{StaticResource FontSize06}" />
+                            <CheckBox Content="Tray notifications" IsChecked="{Binding SettingsShowNotifications}" Style="{StaticResource ToggleSwitchStyle}" Margin="{skin:Space 0,4}" FontSize="{DynamicResource FontSize06}" />
+                            <CheckBox Content="Primary dB readout" IsChecked="{Binding SettingsDisplayVolumeInDb}" Style="{StaticResource ToggleSwitchStyle}" Margin="{skin:Space 0,4}" FontSize="{DynamicResource FontSize06}" />
+                            <CheckBox Content="Launch at startup" IsChecked="{Binding SettingsLaunchAtWindowsStartup}" Style="{StaticResource ToggleSwitchStyle}" Margin="{skin:Space 0,4}" FontSize="{DynamicResource FontSize06}" />
                         </StackPanel>
                     </Grid>
                 </StackPanel>
             </Border>
 
-            <Border Grid.Row="1" Style="{StaticResource SurfaceCard}" Padding="14,12" Margin="0,0,0,12">
+            <Border Grid.Row="1" Style="{StaticResource SurfaceCard}" Padding="{skin:Space 14,12}" Margin="{skin:Space 0,0,0,12}">
                 <StackPanel>
-                    <TextBlock Text="YOUTUBE &amp; LOCAL AUDIO RELAY" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,8" />
+                    <TextBlock Text="YOUTUBE &amp; LOCAL AUDIO RELAY" Style="{StaticResource SectionLabelStyle}" Margin="{skin:Space 0,0,0,8}" />
 
-                    <Grid Margin="0,0,0,8">
+                    <Grid Margin="{skin:Space 0,0,0,8}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="0.75*" />
-                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="{skin:Size 8}" />
                             <ColumnDefinition Width="0.85*" />
-                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="{skin:Size 8}" />
                             <ColumnDefinition Width="1.4*" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="Relay Port" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                            <TextBox Text="{Binding SettingsRelayPort, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="{StaticResource FontSize06}" />
+                            <TextBlock Text="Relay Port" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="{skin:Space 0,0,0,4}" />
+                            <TextBox Text="{Binding SettingsRelayPort, UpdateSourceTrigger=PropertyChanged}" Padding="{skin:Space 8,6}" FontSize="{DynamicResource FontSize06}" />
                         </StackPanel>
                         <StackPanel Grid.Column="2">
-                            <TextBlock Text="Cinema Offset (ms)" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                            <TextBox Text="{Binding SettingsCinemaSyncOffsetMs, UpdateSourceTrigger=PropertyChanged}" Padding="8,6" FontSize="{StaticResource FontSize06}" />
+                            <TextBlock Text="Cinema Offset (ms)" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="{skin:Space 0,0,0,4}" />
+                            <TextBox Text="{Binding SettingsCinemaSyncOffsetMs, UpdateSourceTrigger=PropertyChanged}" Padding="{skin:Space 8,6}" FontSize="{DynamicResource FontSize06}" />
                         </StackPanel>
                         <StackPanel Grid.Column="4">
-                            <TextBlock Text="FFmpeg Path (optional)" FontSize="{StaticResource FontSize04}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                            <TextBox Text="{Binding SettingsFfmpegPath, UpdateSourceTrigger=PropertyChanged}" Tag="Auto-detect..." Padding="8,6" FontSize="{StaticResource FontSize06}" />
+                            <TextBlock Text="FFmpeg Path (optional)" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="{skin:Space 0,0,0,4}" />
+                            <TextBox Text="{Binding SettingsFfmpegPath, UpdateSourceTrigger=PropertyChanged}" Tag="Auto-detect..." Padding="{skin:Space 8,6}" FontSize="{DynamicResource FontSize06}" />
                         </StackPanel>
                     </Grid>
 
                     <CheckBox Content="Transcode YouTube audio to 320 kbps MP3 via FFmpeg"
                               IsChecked="{Binding SettingsPreferFfmpegMp3}"
                               Style="{StaticResource ToggleSwitchStyle}"
-                              Margin="0,2,0,8"
-                              FontSize="{StaticResource FontSize06}" />
+                              Margin="{skin:Space 0,2,0,8}"
+                              FontSize="{DynamicResource FontSize06}" />
 
                     <!-- 1-Click Acoustic Lip-Sync Auto-Calibration (PC Mic Chirp) -->
-                    <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius04}" Padding="10,8">
+                    <Border Background="{DynamicResource Ink03Brush}" BorderBrush="{DynamicResource Ink11Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius04}" Padding="{skin:Space 10,8}">
                         <DockPanel>
                             <Button DockPanel.Dock="Right"
                                     Content="{Binding CalibrateSyncButtonLabel}"
                                     Command="{Binding RunAcousticCalibrationCommand}"
                                     Style="{StaticResource PrimaryButton}"
-                                    Padding="11,5"
-                                    FontSize="{StaticResource FontSize04}"
+                                    Padding="{skin:Space 11,5}"
+                                    FontSize="{DynamicResource FontSize04}"
                                     VerticalAlignment="Center"
-                                    Margin="10,0,0,0" />
+                                    Margin="{skin:Space 10,0,0,0}" />
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="ACOUSTIC LIP-SYNC AUTO-CALIBRATION" Style="{StaticResource SectionLabelStyle}" />
                                 <TextBlock Text="{Binding AcousticCalibrationStatus}"
-                                           FontSize="{StaticResource FontSize04}"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           FontSize="{DynamicResource FontSize04}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            TextWrapping="Wrap"
-                                           Margin="0,2,0,0" />
+                                           Margin="{skin:Space 0,2,0,0}" />
                             </StackPanel>
                         </DockPanel>
                     </Border>
                 </StackPanel>
             </Border>
 
-            <Border Grid.Row="2" Style="{StaticResource SurfaceCard}" Padding="14,12">
+            <Border Grid.Row="2" Style="{StaticResource SurfaceCard}" Padding="{skin:Space 14,12}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -239,41 +290,41 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                    <DockPanel Grid.Row="0" Margin="{skin:Space 0,0,0,8}">
                         <TextBlock Text="SHORTCUT EDITOR &amp; COLLISION CHECKER" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <Button Content="Check Collisions"
                                     Command="{Binding CheckShortcutCollisionsCommand}"
                                     Style="{StaticResource SecondaryButton}"
-                                    Padding="8,4"
-                                    FontSize="{StaticResource FontSize03}"
-                                    Margin="0,0,5,0"
+                                    Padding="{skin:Space 8,4}"
+                                    FontSize="{DynamicResource FontSize03}"
+                                    Margin="{skin:Space 0,0,5,0}"
                                     ToolTip="Re-check internal duplicates, reserved Windows combos, and live Win32 global hotkey availability" />
                             <Button Content="Reset"
                                     Command="{Binding ResetShortcutsToDefaultCommand}"
                                     Style="{StaticResource SecondaryButton}"
-                                    Padding="8,4"
-                                    FontSize="{StaticResource FontSize03}"
-                                    Margin="0,0,5,0" />
+                                    Padding="{skin:Space 8,4}"
+                                    FontSize="{DynamicResource FontSize03}"
+                                    Margin="{skin:Space 0,0,5,0}" />
                             <Button Content="Save"
                                     Command="{Binding SaveSettingsCommand}"
                                     Style="{StaticResource PrimaryButton}"
-                                    Padding="10,4"
-                                    FontSize="{StaticResource FontSize03}" />
+                                    Padding="{skin:Space 10,4}"
+                                    FontSize="{DynamicResource FontSize03}" />
                         </StackPanel>
                     </DockPanel>
 
                     <TextBlock Grid.Row="1"
                                Text="{Binding ShortcutSummaryText}"
-                               FontSize="{StaticResource FontSize05}"
+                               FontSize="{DynamicResource FontSize05}"
                                TextWrapping="Wrap"
-                               Margin="0,0,0,8">
+                               Margin="{skin:Space 0,0,0,8}">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="{StaticResource AccentCyanBrightBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AccentCyanBrightBrush}" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding HasShortcutCollisions}" Value="True">
-                                        <Setter Property="Foreground" Value="{StaticResource AccentCrimsonBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentCrimsonBrush}" />
                                         <Setter Property="FontWeight" Value="SemiBold" />
                                     </DataTrigger>
                                 </Style.Triggers>
@@ -285,27 +336,27 @@
                     <ScrollViewer Grid.Row="2"
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled"
-                                  Padding="0,0,6,0">
+                                  Padding="{skin:Space 0,0,6,0}">
                         <ItemsControl ItemsSource="{Binding ShortcutEditors}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border CornerRadius="{StaticResource Radius03}" Padding="9,7" Margin="0,0,0,6" BorderThickness="1">
+                                    <Border CornerRadius="{DynamicResource Radius03}" Padding="{skin:Space 9,7}" Margin="{skin:Space 0,0,0,6}" BorderThickness="1">
                                         <Border.Style>
                                             <Style TargetType="Border">
-                                                <Setter Property="Background" Value="{StaticResource CardBgBrush}" />
-                                                <Setter Property="BorderBrush" Value="{StaticResource ControlHoverBrush}" />
+                                                <Setter Property="Background" Value="{DynamicResource CardBgBrush}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource ControlHoverBrush}" />
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsRecording}" Value="True">
-                                                        <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgDeepBrush}" />
-                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentCyanBrush}" />
+                                                        <Setter Property="Background" Value="{DynamicResource AccentCyanSubtleBgDeepBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentCyanBrush}" />
                                                     </DataTrigger>
                                                     <DataTrigger Binding="{Binding HasCollision}" Value="True">
-                                                        <Setter Property="Background" Value="{StaticResource AccentCrimsonBgDeepBrush}" />
-                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentCrimsonBrush}" />
+                                                        <Setter Property="Background" Value="{DynamicResource AccentCrimsonBgDeepBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentCrimsonBrush}" />
                                                     </DataTrigger>
                                                     <DataTrigger Binding="{Binding IsWarningOnly}" Value="True">
-                                                        <Setter Property="Background" Value="{StaticResource AccentAmberSubtleBgBrush}" />
-                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentAmberBrush}" />
+                                                        <Setter Property="Background" Value="{DynamicResource AccentAmberSubtleBgBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentAmberBrush}" />
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -320,24 +371,24 @@
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
 
-                                                <Border Grid.Column="0" CornerRadius="{StaticResource Radius01}" Padding="5,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                <Border Grid.Column="0" CornerRadius="{DynamicResource Radius01}" Padding="{skin:Space 5,2}" Margin="{skin:Space 0,0,8,0}" VerticalAlignment="Center">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
-                                                            <Setter Property="Background" Value="{StaticResource Ink08Brush}" />
+                                                            <Setter Property="Background" Value="{DynamicResource Ink08Brush}" />
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding IsGlobal}" Value="True">
-                                                                    <Setter Property="Background" Value="{StaticResource AccentCyanSubtleBgBrush}" />
+                                                                    <Setter Property="Background" Value="{DynamicResource AccentCyanSubtleBgBrush}" />
                                                                 </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
                                                     </Border.Style>
-                                                    <TextBlock Text="{Binding ScopeBadge}" FontSize="{StaticResource FontSize00}" FontWeight="Bold" FontFamily="{StaticResource MonoFont}">
+                                                    <TextBlock Text="{Binding ScopeBadge}" FontSize="{DynamicResource FontSize00}" FontWeight="Bold" FontFamily="{DynamicResource MonoFont}">
                                                         <TextBlock.Style>
                                                             <Style TargetType="TextBlock">
-                                                                <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+                                                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding IsGlobal}" Value="True">
-                                                                        <Setter Property="Foreground" Value="{StaticResource AccentCyanBrush}" />
+                                                                        <Setter Property="Foreground" Value="{DynamicResource AccentCyanBrush}" />
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
@@ -347,31 +398,31 @@
 
                                                 <TextBlock Grid.Column="1"
                                                            Text="{Binding Label}"
-                                                           FontSize="{StaticResource FontSize06}"
+                                                           FontSize="{DynamicResource FontSize06}"
                                                            FontWeight="SemiBold"
                                                            VerticalAlignment="Center"
                                                            TextTrimming="CharacterEllipsis"
-                                                           Margin="0,0,8,0" />
+                                                           Margin="{skin:Space 0,0,8,0}" />
 
                                                 <Border Grid.Column="2"
-                                                        Background="{StaticResource SidebarBgBrush}"
-                                                        BorderBrush="{StaticResource Ink12Brush}"
+                                                        Background="{DynamicResource SidebarBgBrush}"
+                                                        BorderBrush="{DynamicResource Ink12Brush}"
                                                         BorderThickness="1"
-                                                        CornerRadius="{StaticResource Radius02}"
-                                                        Padding="8,4"
-                                                        Margin="0,0,6,0"
+                                                        CornerRadius="{DynamicResource Radius02}"
+                                                        Padding="{skin:Space 8,4}"
+                                                        Margin="{skin:Space 0,0,6,0}"
                                                         VerticalAlignment="Center">
                                                     <StackPanel Orientation="Horizontal">
                                                         <TextBlock Text="{Binding GestureDisplay}"
-                                                                   FontSize="{StaticResource FontSize04}"
+                                                                   FontSize="{DynamicResource FontSize04}"
                                                                    FontWeight="Bold"
-                                                                   FontFamily="{StaticResource MonoFont}"
-                                                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                                                   FontFamily="{DynamicResource MonoFont}"
+                                                                   Foreground="{DynamicResource TextPrimaryBrush}"
                                                                    VerticalAlignment="Center" />
                                                         <TextBlock Text="{Binding StatusLabel, StringFormat='  [{0}]'}"
-                                                                   FontSize="{StaticResource FontSize01}"
+                                                                   FontSize="{DynamicResource FontSize01}"
                                                                    FontWeight="Bold"
-                                                                   FontFamily="{StaticResource MonoFont}"
+                                                                   FontFamily="{DynamicResource MonoFont}"
                                                                    Foreground="{Binding StatusBrush}"
                                                                    VerticalAlignment="Center" />
                                                     </StackPanel>
@@ -382,24 +433,24 @@
                                                             Command="{Binding DataContext.ToggleRecordShortcutCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource SecondaryButton}"
-                                                            Padding="8,4"
-                                                            FontSize="{StaticResource FontSize03}"
-                                                            Margin="0,0,4,0" />
+                                                            Padding="{skin:Space 8,4}"
+                                                            FontSize="{DynamicResource FontSize03}"
+                                                            Margin="{skin:Space 0,0,4,0}" />
                                                     <Button Content="✕"
                                                             Command="{Binding DataContext.ClearShortcutCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource DangerButton}"
-                                                            Padding="6,4"
-                                                            FontSize="{StaticResource FontSize03}"
+                                                            Padding="{skin:Space 6,4}"
+                                                            FontSize="{DynamicResource FontSize03}"
                                                             ToolTip="Clear shortcut" />
                                                 </StackPanel>
                                             </Grid>
 
                                             <TextBlock Text="{Binding CollisionMessage}"
-                                                       FontSize="{StaticResource FontSize03}"
+                                                       FontSize="{DynamicResource FontSize03}"
                                                        Foreground="{Binding StatusBrush}"
                                                        TextWrapping="Wrap"
-                                                       Margin="0,5,0,0"
+                                                       Margin="{skin:Space 0,5,0,0}"
                                                        Visibility="{Binding CollisionMessage, Converter={StaticResource StringToVis}}" />
                                         </StackPanel>
                                     </Border>
@@ -408,46 +459,46 @@
                         </ItemsControl>
                     </ScrollViewer>
 
-                    <StackPanel Grid.Row="3" Margin="0,8,0,0">
+                    <StackPanel Grid.Row="3" Margin="{skin:Space 0,8,0,0}">
                         <!-- Quick-Add Global Hotkey for any Smart Scene or Plugin Action -->
-                        <Border Background="{StaticResource Ink03Brush}" BorderBrush="{StaticResource Ink11Brush}" BorderThickness="1" CornerRadius="{StaticResource Radius03}" Padding="9,7" Margin="0,0,0,6">
+                        <Border Background="{DynamicResource Ink03Brush}" BorderBrush="{DynamicResource Ink11Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius03}" Padding="{skin:Space 9,7}" Margin="{skin:Space 0,0,0,6}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="6" />
+                                    <ColumnDefinition Width="{skin:Size 6}" />
                                     <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="{skin:Size 10}" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="6" />
+                                    <ColumnDefinition Width="{skin:Size 6}" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <ComboBox Grid.Column="0"
                                           ItemsSource="{Binding ScenePresets}"
                                           SelectedItem="{Binding ShortcutSceneToAdd}"
                                           DisplayMemberPath="Name"
-                                          FontSize="{StaticResource FontSize04}" />
+                                          FontSize="{DynamicResource FontSize04}" />
                                 <Button Grid.Column="2"
                                         Content="+ Scene Key"
                                         Command="{Binding AddSceneShortcutCommand}"
                                         Style="{StaticResource SecondaryButton}"
-                                        Padding="8,4"
-                                        FontSize="{StaticResource FontSize03}" />
+                                        Padding="{skin:Space 8,4}"
+                                        FontSize="{DynamicResource FontSize03}" />
                                 <ComboBox Grid.Column="4"
                                           ItemsSource="{Binding AvailablePluginActions}"
                                           SelectedItem="{Binding ShortcutPluginActionToAdd}"
                                           DisplayMemberPath="FullLabel"
-                                          FontSize="{StaticResource FontSize04}" />
+                                          FontSize="{DynamicResource FontSize04}" />
                                 <Button Grid.Column="6"
                                         Content="+ Plugin Key"
                                         Command="{Binding AddPluginActionShortcutCommand}"
                                         Style="{StaticResource SecondaryButton}"
-                                        Padding="8,4"
-                                        FontSize="{StaticResource FontSize03}" />
+                                        Padding="{skin:Space 8,4}"
+                                        FontSize="{DynamicResource FontSize03}" />
                             </Grid>
                         </Border>
                         <TextBlock Text="Built-in: Ctrl+1..7 switches views • Ctrl+R refreshes • Mouse wheel over Volume adjusts ±2 steps"
-                                   FontSize="{StaticResource FontSize03}"
-                                   Foreground="{StaticResource TextMutedBrush}" />
+                                   FontSize="{DynamicResource FontSize03}"
+                                   Foreground="{DynamicResource TextMutedBrush}" />
                     </StackPanel>
                 </Grid>
             </Border>

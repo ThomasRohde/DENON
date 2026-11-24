@@ -24,6 +24,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Resource Include="Themes\Fonts\ShareTechMono-Regular.ttf" />
     <Resource Include="denon_icon.ico" />
     <Resource Include="denon_icon.png" />
     <Resource Include="Assets\Icons\denon_tray.ico" />

@@ -1,5 +1,6 @@
 <Window x:Class="Denon.App.Desktop.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:skin="clr-namespace:Denon.App.Desktop.Infrastructure.Theming"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -11,7 +12,7 @@
         Height="920"
         MinWidth="960"
         MinHeight="580"
-        Background="{StaticResource ChassisBgBrush}"
+        Background="{DynamicResource ChassisBgBrush}"
         Icon="denon_icon.ico"
         WindowStartupLocation="CenterScreen"
         WindowStyle="SingleBorderWindow"
@@ -19,7 +20,7 @@
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="46"
-                      CornerRadius="{StaticResource Radius05}"
+                      CornerRadius="{DynamicResource Radius05}"
                       GlassFrameThickness="0"
                       ResizeBorderThickness="6"
                       UseAeroCaptionButtons="False" />
@@ -28,21 +29,21 @@
 
     <!-- Root Border handles maximized margin compensation cleanly -->
     <Border x:Name="WindowRootBorder"
-            Background="{StaticResource ChassisBgBrush}"
-            BorderBrush="{StaticResource Ink08Brush}"
+            Background="{DynamicResource ChassisBgBrush}"
+            BorderBrush="{DynamicResource Ink08Brush}"
             BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="48" />
+                <RowDefinition Height="{skin:Size 48}" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
             <!-- ======================== CUSTOM INTEGRATED TITLE BAR ======================== -->
             <Border Grid.Row="0"
-                    Background="{StaticResource SidebarBgBrush}"
-                    BorderBrush="{StaticResource BorderHairlineBrush}"
+                    Background="{DynamicResource SidebarBgBrush}"
+                    BorderBrush="{DynamicResource BorderHairlineBrush}"
                     BorderThickness="0,0,0,1"
-                    Padding="14,0,8,0">
+                    Padding="{skin:Space 14,0,8,0}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -53,28 +54,28 @@
                     <!-- Brand Emblem -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <Image Source="pack://application:,,,/denon_icon.png"
-                               Width="28"
-                               Height="28"
+                               Width="{skin:Size 28}"
+                               Height="{skin:Size 28}"
                                RenderOptions.BitmapScalingMode="HighQuality"
-                               Margin="0,0,10,0"
+                               Margin="{skin:Space 0,0,10,0}"
                                VerticalAlignment="Center" />
                         <TextBlock Text="{Binding BrandName}"
-                                   FontSize="{StaticResource FontSize09}"
+                                   FontSize="{DynamicResource FontSize09}"
                                    FontWeight="Bold"
-                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
                                    VerticalAlignment="Center" />
-                        <Border Background="{StaticResource Ink08Brush}"
-                                BorderBrush="{StaticResource Ink12Brush}"
+                        <Border Background="{DynamicResource Ink08Brush}"
+                                BorderBrush="{DynamicResource Ink12Brush}"
                                 BorderThickness="1"
-                                CornerRadius="{StaticResource Radius02}"
-                                Padding="6,2"
-                                Margin="8,0,0,0"
+                                CornerRadius="{DynamicResource Radius02}"
+                                Padding="{skin:Space 6,2}"
+                                Margin="{skin:Space 8,0,0,0}"
                                 VerticalAlignment="Center"
                                 ToolTip="Auto-detected Denon / Marantz receiver model">
                             <TextBlock Text="{Binding DetectedModelBadge}"
-                                       FontSize="{StaticResource FontSize01}"
+                                       FontSize="{DynamicResource FontSize01}"
                                        FontWeight="Bold"
-                                       Foreground="{StaticResource AccentCyanBrightBrush}" />
+                                       Foreground="{DynamicResource AccentCyanBrightBrush}" />
                         </Border>
                     </StackPanel>
 
@@ -83,45 +84,45 @@
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center">
-                        <Border Background="{StaticResource CardBgBrush}"
-                                BorderBrush="{StaticResource ControlHoverBrush}"
+                        <Border Background="{DynamicResource CardBgBrush}"
+                                BorderBrush="{DynamicResource ControlHoverBrush}"
                                 BorderThickness="1"
-                                CornerRadius="{StaticResource Radius06}"
-                                Padding="12,5">
+                                CornerRadius="{DynamicResource Radius06}"
+                                Padding="{skin:Space 12,5}">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Ellipse Width="8"
-                                         Height="8"
+                                <Ellipse Width="{skin:Size 8}"
+                                         Height="{skin:Size 8}"
                                          Fill="{Binding ConnectionBadgeBrush}"
-                                         Margin="0,0,8,0"
+                                         Margin="{skin:Space 0,0,8,0}"
                                          VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding ReceiverTitle}"
-                                           FontSize="{StaticResource FontSize06}"
+                                           FontSize="{DynamicResource FontSize06}"
                                            FontWeight="SemiBold"
-                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
                                            VerticalAlignment="Center" />
                                 <TextBlock Text="  •  "
-                                           FontSize="{StaticResource FontSize04}"
-                                           Foreground="{StaticResource TextMutedBrush}"
+                                           FontSize="{DynamicResource FontSize04}"
+                                           Foreground="{DynamicResource TextMutedBrush}"
                                            VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding ConnectionBadgeText}"
-                                           FontSize="{StaticResource FontSize04}"
+                                           FontSize="{DynamicResource FontSize04}"
                                            FontWeight="Bold"
                                            Foreground="{Binding ConnectionBadgeBrush}"
                                            VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding FirmwareVersion, StringFormat='  •  {0}'}"
-                                           FontSize="{StaticResource FontSize04}"
-                                           Foreground="{StaticResource TextMutedBrush}"
+                                           FontSize="{DynamicResource FontSize04}"
+                                           Foreground="{DynamicResource TextMutedBrush}"
                                            Visibility="{Binding FirmwareVersion, Converter={StaticResource StringToVis}}"
                                            VerticalAlignment="Center" />
-                                <Border Background="{StaticResource AccentEmeraldSubtleBgBrush}"
-                                        BorderBrush="{StaticResource AccentEmeraldBrush}"
+                                <Border Background="{DynamicResource AccentEmeraldSubtleBgBrush}"
+                                        BorderBrush="{DynamicResource AccentEmeraldBrush}"
                                         BorderThickness="1"
-                                        CornerRadius="{StaticResource Radius02}"
-                                        Padding="6,1.5"
-                                        Margin="9,0,0,0"
+                                        CornerRadius="{DynamicResource Radius02}"
+                                        Padding="{skin:Space 6,1.5}"
+                                        Margin="{skin:Space 9,0,0,0}"
                                         ToolTip="Subscribed to real-time HEOS change events (&lt;50ms zero-lag volume &amp; play state sync)"
                                         Visibility="{Binding IsLivePushConnected, Converter={StaticResource BoolToVis}}">
-                                    <TextBlock Text="LIVE PUSH" FontSize="{StaticResource FontSize00}" FontWeight="Bold" Foreground="{StaticResource AccentEmeraldBrush}" />
+                                    <TextBlock Text="LIVE PUSH" FontSize="{DynamicResource FontSize00}" FontWeight="Bold" Foreground="{DynamicResource AccentEmeraldBrush}" />
                                 </Border>
                             </StackPanel>
                         </Border>
@@ -133,44 +134,44 @@
                                 CommandParameter="Mcp"
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 Style="{StaticResource SecondaryButton}"
-                                Padding="9,4"
-                                FontSize="{StaticResource FontSize04}"
-                                Margin="0,0,6,0"
+                                Padding="{skin:Space 9,4}"
+                                FontSize="{DynamicResource FontSize04}"
+                                Margin="{skin:Space 0,0,6,0}"
                                 ToolTip="Open Streamable HTTP MCP Server, Room Doctor &amp; Habits Memory">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Ellipse Width="6.5" Height="6.5" Margin="0,0,6,0" VerticalAlignment="Center">
+                                <Ellipse Width="{skin:Size 6.5}" Height="{skin:Size 6.5}" Margin="{skin:Space 0,0,6,0}" VerticalAlignment="Center">
                                     <Ellipse.Style>
                                         <Style TargetType="Ellipse">
-                                            <Setter Property="Fill" Value="{StaticResource TextFaintBrush}" />
+                                            <Setter Property="Fill" Value="{DynamicResource TextFaintBrush}" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsMcpRunning}" Value="True">
-                                                    <Setter Property="Fill" Value="{StaticResource AccentEmeraldBrush}" />
+                                                    <Setter Property="Fill" Value="{DynamicResource AccentEmeraldBrush}" />
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </Ellipse.Style>
                                 </Ellipse>
-                                <TextBlock Text="{Binding McpTitleBarBadge}" Foreground="{StaticResource AccentEmeraldBrush}" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding McpTitleBarBadge}" Foreground="{DynamicResource AccentEmeraldBrush}" FontWeight="SemiBold" />
                             </StackPanel>
                         </Button>
                         <Button Command="{Binding NavigateCommand}"
                                 CommandParameter="CastRemote"
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 Style="{StaticResource SecondaryButton}"
-                                Padding="9,4"
-                                FontSize="{StaticResource FontSize04}"
-                                Margin="0,0,6,0"
+                                Padding="{skin:Space 9,4}"
+                                FontSize="{DynamicResource FontSize04}"
+                                Margin="{skin:Space 0,0,6,0}"
                                 ToolTip="Open Couch Phone Remote QR Code, PC Audio Cast &amp; Local FLAC Jukebox">
-                            <TextBlock Text="Phone QR" Foreground="{StaticResource AccentCyanBrightBrush}" FontWeight="SemiBold" />
+                            <TextBlock Text="Phone QR" Foreground="{DynamicResource AccentCyanBrightBrush}" FontWeight="SemiBold" />
                         </Button>
                         <Button Command="{Binding RefreshCommand}"
                                 Style="{StaticResource TitleBarButton}"
                                 ToolTip="Refresh Receiver (F5)"
-                                Margin="0,0,4,0">
-                            <Path Data="{StaticResource IconRefresh}"
+                                Margin="{skin:Space 0,0,4,0}">
+                            <Path Data="{DynamicResource IconRefresh}"
                                   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                  Width="13"
-                                  Height="13"
+                                  Width="{skin:Size 13}"
+                                  Height="{skin:Size 13}"
                                   Stretch="Uniform" />
                         </Button>
 
@@ -178,14 +179,14 @@
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 ToolTip="Toggle Receiver Power / Standby"
                                 Cursor="Hand"
-                                Margin="0,0,10,0">
+                                Margin="{skin:Space 0,0,10,0}">
                             <Button.Style>
                                 <Style TargetType="Button">
-                                    <Setter Property="Height" Value="30" />
-                                    <Setter Property="Padding" Value="11,0" />
-                                    <Setter Property="Background" Value="{StaticResource ControlBgBrush}" />
-                                    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
-                                    <Setter Property="BorderBrush" Value="{StaticResource BorderSpecBrush}" />
+                                    <Setter Property="Height" Value="{skin:Size 30}" />
+                                    <Setter Property="Padding" Value="{skin:Space 11,0}" />
+                                    <Setter Property="Background" Value="{DynamicResource ControlBgBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource BorderSpecBrush}" />
                                     <Setter Property="BorderThickness" Value="1" />
                                     <Setter Property="Template">
                                         <Setter.Value>
@@ -194,17 +195,17 @@
                                                         Background="{TemplateBinding Background}"
                                                         BorderBrush="{TemplateBinding BorderBrush}"
                                                         BorderThickness="{TemplateBinding BorderThickness}"
-                                                        CornerRadius="{StaticResource Radius06}"
+                                                        CornerRadius="{DynamicResource Radius06}"
                                                         Padding="{TemplateBinding Padding}">
                                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                        <Path Data="{StaticResource IconPower}"
+                                                        <Path Data="{DynamicResource IconPower}"
                                                               Fill="{TemplateBinding Foreground}"
-                                                              Width="12"
-                                                              Height="12"
+                                                              Width="{skin:Size 12}"
+                                                              Height="{skin:Size 12}"
                                                               Stretch="Uniform"
-                                                              Margin="0,0,6,0" />
+                                                              Margin="{skin:Space 0,0,6,0}" />
                                                         <TextBlock Text="{Binding PowerStateLabel}"
-                                                                   FontSize="{StaticResource FontSize03}"
+                                                                   FontSize="{DynamicResource FontSize03}"
                                                                    FontWeight="Bold"
                                                                    Foreground="{TemplateBinding Foreground}"
                                                                    VerticalAlignment="Center" />
@@ -220,29 +221,29 @@
                                     </Setter>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding PowerStateLabel}" Value="ACTIVE">
-                                            <Setter Property="Background" Value="{StaticResource AccentEmeraldSubtleBgBrush}" />
-                                            <Setter Property="BorderBrush" Value="{StaticResource AccentEmeraldBrush}" />
-                                            <Setter Property="Foreground" Value="{StaticResource AccentEmeraldBrush}" />
+                                            <Setter Property="Background" Value="{DynamicResource AccentEmeraldSubtleBgBrush}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource AccentEmeraldBrush}" />
+                                            <Setter Property="Foreground" Value="{DynamicResource AccentEmeraldBrush}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </Button.Style>
                         </Button>
 
-                        <Border Width="1" Height="18" Background="{StaticResource BorderHairlineBrush}" Margin="0,0,6,0" />
+                        <Border Width="1" Height="{skin:Size 18}" Background="{DynamicResource BorderHairlineBrush}" Margin="{skin:Space 0,0,6,0}" />
 
                         <Button Click="MinimizeButton_Click" Style="{StaticResource TitleBarButton}" ToolTip="Minimize">
-                            <Rectangle Width="10" Height="1.5" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                            <Rectangle Width="{skin:Size 10}" Height="1.5" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                         </Button>
                         <Button Click="MaximizeRestoreButton_Click" Style="{StaticResource TitleBarButton}" ToolTip="Maximize / Restore">
-                            <Border Width="10" Height="10" BorderThickness="1.3" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" CornerRadius="{StaticResource Radius00}" />
+                            <Border Width="{skin:Size 10}" Height="{skin:Size 10}" BorderThickness="1.3" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" CornerRadius="{DynamicResource Radius00}" />
                         </Button>
                         <Button Click="CloseButton_Click" Style="{StaticResource TitleBarCloseButton}" ToolTip="Close">
-                            <Path Data="{StaticResource IconClose}"
+                            <Path Data="{DynamicResource IconClose}"
                                   Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                   StrokeThickness="1.5"
-                                  Width="10"
-                                  Height="10" />
+                                  Width="{skin:Size 10}"
+                                  Height="{skin:Size 10}" />
                         </Button>
                     </StackPanel>
                 </Grid>
@@ -255,17 +256,17 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="84" />
+                    <ColumnDefinition Width="{skin:Size 84}" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
                 <!-- ICON RAIL: listen, room and system groups; connected devices at the bottom -->
                 <Border Grid.Column="0"
-                        Background="{StaticResource SidebarBgBrush}"
-                        BorderBrush="{StaticResource BorderHairlineBrush}"
+                        Background="{DynamicResource SidebarBgBrush}"
+                        BorderBrush="{DynamicResource BorderHairlineBrush}"
                         BorderThickness="0,0,1,0">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel HorizontalAlignment="Center" Margin="0,12">
+                    <StackPanel HorizontalAlignment="Center" Margin="{skin:Space 0,12}">
                         <RadioButton GroupName="NavRail"
                                      Style="{StaticResource NavRailIconItem}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Control}"
@@ -273,14 +274,14 @@
                                      CommandParameter="Control"
                                      ToolTip="Control Deck">
                             <StackPanel HorizontalAlignment="Center">
-                                <Path Data="{StaticResource IconNavControlDeck}"
+                                <Path Data="{DynamicResource IconNavControlDeck}"
                                       Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                      Width="18"
-                                      Height="18"
+                                      Width="{skin:Size 18}"
+                                      Height="{skin:Size 18}"
                                       Stretch="Uniform"
                                       HorizontalAlignment="Center" />
                                 <TextBlock Text="Deck"
-                                           Margin="0,5,0,0"
+                                           Margin="{skin:Space 0,5,0,0}"
                                            HorizontalAlignment="Center"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                             </StackPanel>
@@ -292,14 +293,14 @@
                                      CommandParameter="YouTube"
                                      ToolTip="YouTube &amp; Music">
                             <StackPanel HorizontalAlignment="Center">
-                                <Path Data="{StaticResource IconNavYouTube}"
+                                <Path Data="{DynamicResource IconNavYouTube}"
                                       Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                      Width="18"
-                                      Height="18"
+                                      Width="{skin:Size 18}"
+                                      Height="{skin:Size 18}"
                                       Stretch="Uniform"
                                       HorizontalAlignment="Center" />
                                 <TextBlock Text="Music"
-                                           Margin="0,5,0,0"
+                                           Margin="{skin:Space 0,5,0,0}"
                                            HorizontalAlignment="Center"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                             </StackPanel>
@@ -311,14 +312,14 @@
                                      CommandParameter="Stations"
                                      ToolTip="Stations &amp; Streams">
                             <StackPanel HorizontalAlignment="Center">
-                                <Path Data="{StaticResource IconRadio}"
+                                <Path Data="{DynamicResource IconRadio}"
                                       Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                      Width="18"
-                                      Height="18"
+                                      Width="{skin:Size 18}"
+                                      Height="{skin:Size 18}"
                                       Stretch="Uniform"
                                       HorizontalAlignment="Center" />
                                 <TextBlock Text="Stations"
-                                           Margin="0,5,0,0"
+                                           Margin="{skin:Space 0,5,0,0}"
                                            HorizontalAlignment="Center"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                             </StackPanel>
@@ -330,19 +331,19 @@
                                      CommandParameter="CastRemote"
                                      ToolTip="Cast &amp; Remote">
                             <StackPanel HorizontalAlignment="Center">
-                                <Path Data="{StaticResource IconNavCast}"
+                                <Path Data="{DynamicResource IconNavCast}"
                                       Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                      Width="18"
-                                      Height="18"
+                                      Width="{skin:Size 18}"
+                                      Height="{skin:Size 18}"
                                       Stretch="Uniform"
                                       HorizontalAlignment="Center" />
                                 <TextBlock Text="Cast"
-                                           Margin="0,5,0,0"
+                                           Margin="{skin:Space 0,5,0,0}"
                                            HorizontalAlignment="Center"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                             </StackPanel>
                         </RadioButton>
-                        <Border Width="40" Height="1" Background="{StaticResource BorderHairlineBrush}" Margin="0,8" HorizontalAlignment="Center" />
+                        <Border Width="{skin:Size 40}" Height="1" Background="{DynamicResource BorderHairlineBrush}" Margin="{skin:Space 0,8}" HorizontalAlignment="Center" />
                         <RadioButton GroupName="NavRail"
                                      Style="{StaticResource NavRailIconItem}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Acoustics}"
@@ -350,14 +351,14 @@
                                      CommandParameter="Acoustics"
                                      ToolTip="Scenes &amp; Acoustics">
                             <StackPanel HorizontalAlignment="Center">
-                                <Path Data="{StaticResource IconNavScenes}"
+                                <Path Data="{DynamicResource IconNavScenes}"
                                       Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                      Width="18"
-                                      Height="18"
+                                      Width="{skin:Size 18}"
+                                      Height="{skin:Size 18}"
                                       Stretch="Uniform"
                                       HorizontalAlignment="Center" />
                                 <TextBlock Text="Scenes"
-                                           Margin="0,5,0,0"
+                                           Margin="{skin:Space 0,5,0,0}"
                                            HorizontalAlignment="Center"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                             </StackPanel>
@@ -370,33 +371,33 @@
                                      ToolTip="Plugins">
                             <Grid>
                                 <StackPanel HorizontalAlignment="Center">
-                                    <Path Data="{StaticResource IconNavPlugins}"
+                                    <Path Data="{DynamicResource IconNavPlugins}"
                                           Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                          Width="18"
-                                          Height="18"
+                                          Width="{skin:Size 18}"
+                                          Height="{skin:Size 18}"
                                           Stretch="Uniform"
                                           HorizontalAlignment="Center" />
                                     <TextBlock Text="Plugins"
-                                               Margin="0,5,0,0"
+                                               Margin="{skin:Space 0,5,0,0}"
                                                HorizontalAlignment="Center"
                                                Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                                 </StackPanel>
-                                <Border Background="{StaticResource Ink08Brush}"
-                                        BorderBrush="{StaticResource Ink12Brush}"
+                                <Border Background="{DynamicResource Ink08Brush}"
+                                        BorderBrush="{DynamicResource Ink12Brush}"
                                         BorderThickness="1"
-                                        CornerRadius="{StaticResource Radius03}"
-                                        Padding="4,0"
+                                        CornerRadius="{DynamicResource Radius03}"
+                                        Padding="{skin:Space 4,0}"
                                         HorizontalAlignment="Right"
                                         VerticalAlignment="Top"
-                                        Margin="0,-6,-14,0">
+                                        Margin="{skin:Space 0,-6,-14,0}">
                                     <TextBlock Text="{Binding ActivePluginsBadgeText}"
-                                               FontSize="{StaticResource FontSize00}"
+                                               FontSize="{DynamicResource FontSize00}"
                                                FontWeight="Bold"
-                                               Foreground="{StaticResource AccentAmberBrush}" />
+                                               Foreground="{DynamicResource AccentAmberBrush}" />
                                 </Border>
                             </Grid>
                         </RadioButton>
-                        <Border Width="40" Height="1" Background="{StaticResource BorderHairlineBrush}" Margin="0,8" HorizontalAlignment="Center" />
+                        <Border Width="{skin:Size 40}" Height="1" Background="{DynamicResource BorderHairlineBrush}" Margin="{skin:Space 0,8}" HorizontalAlignment="Center" />
                         <RadioButton GroupName="NavRail"
                                      Style="{StaticResource NavRailIconItem}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Mcp}"
@@ -404,14 +405,14 @@
                                      CommandParameter="Mcp"
                                      ToolTip="MCP Server &amp; Room Brain">
                             <StackPanel HorizontalAlignment="Center">
-                                <Path Data="{StaticResource IconNavMcp}"
+                                <Path Data="{DynamicResource IconNavMcp}"
                                       Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                      Width="18"
-                                      Height="18"
+                                      Width="{skin:Size 18}"
+                                      Height="{skin:Size 18}"
                                       Stretch="Uniform"
                                       HorizontalAlignment="Center" />
                                 <TextBlock Text="Brain"
-                                           Margin="0,5,0,0"
+                                           Margin="{skin:Space 0,5,0,0}"
                                            HorizontalAlignment="Center"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                             </StackPanel>
@@ -423,14 +424,14 @@
                                      CommandParameter="Settings"
                                      ToolTip="Settings">
                             <StackPanel HorizontalAlignment="Center">
-                                <Path Data="{StaticResource IconNavSettings}"
+                                <Path Data="{DynamicResource IconNavSettings}"
                                       Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                      Width="18"
-                                      Height="18"
+                                      Width="{skin:Size 18}"
+                                      Height="{skin:Size 18}"
                                       Stretch="Uniform"
                                       HorizontalAlignment="Center" />
                                 <TextBlock Text="Settings"
-                                           Margin="0,5,0,0"
+                                           Margin="{skin:Space 0,5,0,0}"
                                            HorizontalAlignment="Center"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                             </StackPanel>
@@ -442,14 +443,14 @@
                                      CommandParameter="Diagnostics"
                                      ToolTip="Health &amp; Support">
                             <StackPanel HorizontalAlignment="Center">
-                                <Path Data="{StaticResource IconNavHealth}"
+                                <Path Data="{DynamicResource IconNavHealth}"
                                       Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                      Width="18"
-                                      Height="18"
+                                      Width="{skin:Size 18}"
+                                      Height="{skin:Size 18}"
                                       Stretch="Uniform"
                                       HorizontalAlignment="Center" />
                                 <TextBlock Text="Health"
-                                           Margin="0,5,0,0"
+                                           Margin="{skin:Space 0,5,0,0}"
                                            HorizontalAlignment="Center"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                             </StackPanel>
@@ -460,61 +461,61 @@
                                      Command="{Binding OpenContextHelpCommand}"
                                      ToolTip="Help &amp; Guide (F1)">
                             <StackPanel HorizontalAlignment="Center">
-                                <Path Data="{StaticResource IconNavHelp}"
+                                <Path Data="{DynamicResource IconNavHelp}"
                                       Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                      Width="18"
-                                      Height="18"
+                                      Width="{skin:Size 18}"
+                                      Height="{skin:Size 18}"
                                       Stretch="Uniform"
                                       HorizontalAlignment="Center" />
                                 <TextBlock Text="Help"
-                                           Margin="0,5,0,0"
+                                           Margin="{skin:Space 0,5,0,0}"
                                            HorizontalAlignment="Center"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                             </StackPanel>
                         </RadioButton>
-                        <Border Width="40" Height="1" Background="{StaticResource BorderHairlineBrush}" Margin="0,8" HorizontalAlignment="Center" />
+                        <Border Width="{skin:Size 40}" Height="1" Background="{DynamicResource BorderHairlineBrush}" Margin="{skin:Space 0,8}" HorizontalAlignment="Center" />
                         <!-- Connected devices: one badge per plugin; click opens it -->
-                        <ItemsControl ItemsSource="{Binding InstalledPlugins}" Margin="0,6,0,0" HorizontalAlignment="Center">
+                        <ItemsControl ItemsSource="{Binding InstalledPlugins}" Margin="{skin:Space 0,6,0,0}" HorizontalAlignment="Center">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Button Command="{Binding DataContext.OpenPluginCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                             CommandParameter="{Binding}"
-                                            Margin="0,4"
+                                            Margin="{skin:Space 0,4}"
                                             Cursor="Hand">
                                         <Button.ToolTip>
                                             <StackPanel>
                                                 <TextBlock Text="{Binding ShortName}" FontWeight="SemiBold" />
-                                                <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource TextMutedBrush}" />
+                                                <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource TextMutedBrush}" />
                                             </StackPanel>
                                         </Button.ToolTip>
                                         <Button.Template>
                                             <ControlTemplate TargetType="Button">
-                                                <Grid Width="48" Height="30">
+                                                <Grid Width="{skin:Size 48}" Height="{skin:Size 30}">
                                                     <Border x:Name="Badge"
                                                             Background="Transparent"
-                                                            BorderBrush="{StaticResource BorderSpecBrush}"
+                                                            BorderBrush="{DynamicResource BorderSpecBrush}"
                                                             BorderThickness="1"
-                                                            CornerRadius="{StaticResource Radius02}"
-                                                            Margin="2,4,4,0">
+                                                            CornerRadius="{DynamicResource Radius02}"
+                                                            Margin="{skin:Space 2,4,4,0}">
                                                         <TextBlock Text="{Binding IconGlyph}"
-                                                                   FontSize="{StaticResource FontSize00}"
+                                                                   FontSize="{DynamicResource FontSize00}"
                                                                    FontWeight="Bold"
                                                                    Foreground="{Binding AccentBrush}"
                                                                    HorizontalAlignment="Center"
                                                                    VerticalAlignment="Center" />
                                                     </Border>
-                                                    <Ellipse Width="9"
-                                                             Height="9"
+                                                    <Ellipse Width="{skin:Size 9}"
+                                                             Height="{skin:Size 9}"
                                                              Fill="{Binding HealthBadgeBrush}"
-                                                             Stroke="{StaticResource SidebarBgBrush}"
+                                                             Stroke="{DynamicResource SidebarBgBrush}"
                                                              StrokeThickness="2"
                                                              HorizontalAlignment="Right"
                                                              VerticalAlignment="Top" />
                                                 </Grid>
                                                 <ControlTemplate.Triggers>
                                                     <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="Badge" Property="Background" Value="{StaticResource CardElevatedBrush}" />
-                                                        <Setter TargetName="Badge" Property="BorderBrush" Value="{StaticResource Ink15Brush}" />
+                                                        <Setter TargetName="Badge" Property="Background" Value="{DynamicResource CardElevatedBrush}" />
+                                                        <Setter TargetName="Badge" Property="BorderBrush" Value="{DynamicResource Ink15Brush}" />
                                                     </Trigger>
                                                 </ControlTemplate.Triggers>
                                             </ControlTemplate>
@@ -528,82 +529,82 @@
                 </Border>
 
                 <!-- ======================== CONTENT STAGE ======================== -->
-                <Grid Grid.Column="1" Background="{StaticResource ChassisBgBrush}">
+                <Grid Grid.Column="1" Background="{DynamicResource ChassisBgBrush}">
 
                     <!-- ==================== VIEW 1: CONTROL DECK ==================== -->
-                    <Grid Margin="20,16" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Control}">
+                    <Grid Margin="{skin:Space 20,16}" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Control}">
                         <views:ControlDeckView x:Name="ControlDeckPage" />
                     </Grid>
 
                     <!-- ==================== VIEW 1B: YOUTUBE & MUSIC ==================== -->
-                    <Grid Margin="20,16" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=YouTube}">
+                    <Grid Margin="{skin:Space 20,16}" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=YouTube}">
                         <views:YouTubeMusicView />
                     </Grid>
 
                     <!-- ==================== VIEW 1C: SCENES & ACOUSTICS ==================== -->
-                    <Grid Margin="20,16" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Acoustics}">
+                    <Grid Margin="{skin:Space 20,16}" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Acoustics}">
                         <views:ScenesAcousticsView />
                     </Grid>
 
                     <!-- ==================== VIEW 1D: CAST & REMOTE ==================== -->
-                    <Grid Margin="20,16" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=CastRemote}">
+                    <Grid Margin="{skin:Space 20,16}" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=CastRemote}">
                         <views:CastRemoteView />
                     </Grid>
 
                     <!-- ==================== VIEW 2: STATIONS & STREAMS ==================== -->
-                    <Grid Margin="20,16" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Stations}">
+                    <Grid Margin="{skin:Space 20,16}" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Stations}">
                         <views:StationsStreamsView />
                     </Grid>
 
                     <!-- ==================== VIEW 3: SETTINGS ==================== -->
-                    <Grid Margin="20,16" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Settings}">
+                    <Grid Margin="{skin:Space 20,16}" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Settings}">
                         <views:SettingsView />
                     </Grid>
 
                     <!-- ==================== VIEW 4: HEALTH & SUPPORT ==================== -->
-                    <Grid Margin="20,16" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Diagnostics}">
+                    <Grid Margin="{skin:Space 20,16}" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Diagnostics}">
                         <views:HealthSupportView />
                     </Grid>
 
                     <!-- ==================== VIEW 8: PLUGINS & EXTENSIONS ==================== -->
-                    <Grid Margin="20,14" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Plugins}">
+                    <Grid Margin="{skin:Space 20,14}" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Plugins}">
                         <views:PluginsView />
                     </Grid>
 
                     <!-- ==================== VIEW 9: HELP & INTERACTIVE GUIDE ==================== -->
-                    <Grid Margin="20,14" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Help}">
+                    <Grid Margin="{skin:Space 20,14}" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Help}">
                         <views:HelpGuideView />
                     </Grid>
 
                     <!-- ==================== VIEW 10: STREAMABLE HTTP MCP SERVER & ROOM BRAIN ==================== -->
-                    <Grid Margin="20,14" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Mcp}">
+                    <Grid Margin="{skin:Space 20,14}" Visibility="{Binding ActiveSection, Converter={StaticResource EqualityToVis}, ConverterParameter=Mcp}">
                         <views:McpIntelligenceView />
                     </Grid>
                 </Grid>
                 <!-- STATUS LINE: receiver, last action, last sync (was the sidebar telemetry card) -->
                 <Border Grid.Row="1"
                         Grid.ColumnSpan="2"
-                        Background="{StaticResource SidebarBgBrush}"
-                        BorderBrush="{StaticResource BorderHairlineBrush}"
+                        Background="{DynamicResource SidebarBgBrush}"
+                        BorderBrush="{DynamicResource BorderHairlineBrush}"
                         BorderThickness="0,1,0,0"
-                        Padding="16,6">
+                        Padding="{skin:Space 16,6}">
                     <DockPanel LastChildFill="True">
                         <TextBlock DockPanel.Dock="Right"
                                    Text="{Binding LastUpdatedText}"
-                                   FontSize="{StaticResource FontSize03}"
-                                   Foreground="{StaticResource TextMutedBrush}"
-                                   Margin="16,0,0,0" />
+                                   FontSize="{DynamicResource FontSize03}"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   Margin="{skin:Space 16,0,0,0}" />
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="{Binding ReceiverDetails}"
-                                       FontSize="{StaticResource FontSize03}"
-                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                                       FontSize="{DynamicResource FontSize03}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
                             <TextBlock Text="{Binding StatusMessage, StringFormat='   ·   {0}'}"
-                                       FontSize="{StaticResource FontSize03}"
-                                       Foreground="{StaticResource AccentCyanBrightBrush}"
+                                       FontSize="{DynamicResource FontSize03}"
+                                       Foreground="{DynamicResource AccentCyanBrightBrush}"
                                        TextTrimming="CharacterEllipsis" />
                             <TextBlock Text="{Binding LastError, StringFormat='   ·   {0}'}"
-                                       FontSize="{StaticResource FontSize03}"
-                                       Foreground="{StaticResource AccentCrimsonBrush}"
+                                       FontSize="{DynamicResource FontSize03}"
+                                       Foreground="{DynamicResource AccentCrimsonBrush}"
                                        TextTrimming="CharacterEllipsis"
                                        Visibility="{Binding LastError, Converter={StaticResource StringToVis}}" />
                         </StackPanel>

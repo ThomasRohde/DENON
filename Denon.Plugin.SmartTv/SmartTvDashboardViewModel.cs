@@ -11,10 +11,11 @@ namespace Denon.Plugin.SmartTv;
 
 public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 {
-    private static Brush LiveBrush => HostTheme.Brush("AccentEmerald");
-    private static Brush DemoBrush => HostTheme.Brush("AccentCyanBright");
-    private static Brush WarnBrush => HostTheme.Brush("AccentAmber");
-    private static Brush MutedBrush => HostTheme.Brush("TextFaint");
+    // Tokens, not brushes: a theme switch rebuilds the brush from the token.
+    private const string LiveTone = "AccentEmerald";
+    private const string DemoTone = "AccentCyanBright";
+    private const string WarnTone = "AccentAmber";
+    private const string MutedTone = "TextFaint";
 
     private static readonly IReadOnlyList<LgTvInputInfo> DefaultOfflineInputs =
     [
@@ -62,7 +63,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 
     private bool _isLiveConnected;
     private string _connectionBadgeText = "STANDBY / OFFLINE";
-    private Brush _connectionBadgeBrush = MutedBrush;
+    private string _connectionBadgeTone = MutedTone;
     private string _modelSummary = "Not paired yet";
     private string _nowShowingText = "TV Standby / Offline";
     private string _soundOutputText = "—";
@@ -221,7 +222,19 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 
     public bool IsLiveConnected { get => _isLiveConnected; private set => Set(ref _isLiveConnected, value); }
     public string ConnectionBadgeText { get => _connectionBadgeText; private set => Set(ref _connectionBadgeText, value); }
-    public Brush ConnectionBadgeBrush { get => _connectionBadgeBrush; private set => Set(ref _connectionBadgeBrush, value); }
+    public Brush ConnectionBadgeBrush => HostTheme.Brush(_connectionBadgeTone);
+
+    private string ConnectionBadgeTone
+    {
+        set
+        {
+            if (_connectionBadgeTone != value)
+            {
+                _connectionBadgeTone = value;
+                Raise(nameof(ConnectionBadgeBrush));
+            }
+        }
+    }
     public string ModelSummary { get => _modelSummary; private set => Set(ref _modelSummary, value); }
     public string NowShowingText { get => _nowShowingText; private set => Set(ref _nowShowingText, value); }
     public string SoundOutputText { get => _soundOutputText; private set => Set(ref _soundOutputText, value); }
@@ -389,27 +402,27 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
             if (state.IsDemo)
             {
                 ConnectionBadgeText = "DEMO SIMULATOR";
-                ConnectionBadgeBrush = DemoBrush;
+                ConnectionBadgeTone = DemoTone;
             }
             else if (state.IsConnected)
             {
                 ConnectionBadgeText = $"LIVE • {state.TransportLabel}";
-                ConnectionBadgeBrush = LiveBrush;
+                ConnectionBadgeTone = LiveTone;
             }
             else if (!string.IsNullOrWhiteSpace(_plugin.Config.ClientKey))
             {
                 ConnectionBadgeText = "PAIRED • STANDBY";
-                ConnectionBadgeBrush = MutedBrush;
+                ConnectionBadgeTone = MutedTone;
             }
             else if (!string.IsNullOrWhiteSpace(_plugin.Config.TvIp))
             {
                 ConnectionBadgeText = "NEEDS PAIRING";
-                ConnectionBadgeBrush = WarnBrush;
+                ConnectionBadgeTone = WarnTone;
             }
             else
             {
                 ConnectionBadgeText = "NOT CONFIGURED";
-                ConnectionBadgeBrush = MutedBrush;
+                ConnectionBadgeTone = MutedTone;
             }
 
             if (!string.IsNullOrWhiteSpace(state.ModelName) || !string.IsNullOrWhiteSpace(state.WebOsVersion))

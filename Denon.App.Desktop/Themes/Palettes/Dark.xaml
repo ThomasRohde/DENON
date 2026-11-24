@@ -1,7 +1,7 @@
 <!--
-    Color tokens of the dark theme (the default look). Every color the app draws comes from here.
-    Views use the brushes in Brushes.xaml, or these colors where a property takes a Color.
-    A future theme is another file with the same keys. Keep the keys stable: plugins use them too.
+    Dark palette (the default theme). Every color the app draws comes from a palette; see docs/theming.md.
+    Views use the brushes in Themes/Brushes.xaml with {DynamicResource}, so a theme switch reaches them live.
+    Every palette defines exactly these keys (ThemePaletteTests). Keep the keys stable: plugins use them too.
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
@@ -104,9 +104,9 @@
     <Color x:Key="AccentTealColor">#22D3EE</Color>
 
     <!-- Overlays with alpha (glass highlights, scrims, glows). -->
-    <Color x:Key="OverlayWhiteClearColor">#00FFFFFF</Color>
-    <Color x:Key="OverlayWhiteFaintColor">#10FFFFFF</Color>
-    <Color x:Key="OverlayWhiteSoftColor">#1FFFFFFF</Color>
+    <Color x:Key="OverlayHighlightClearColor">#00FFFFFF</Color>
+    <Color x:Key="OverlayHighlightFaintColor">#10FFFFFF</Color>
+    <Color x:Key="OverlayHighlightSoftColor">#1FFFFFFF</Color>
     <Color x:Key="OverlayScrimColor">#CC07090D</Color>
 
 </ResourceDictionary>

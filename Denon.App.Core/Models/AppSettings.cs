@@ -129,6 +129,12 @@ public sealed class UiSettings
 
     public bool LaunchAtWindowsStartup { get; set; } = false;
 
+    /// <summary>Theme: <c>system</c> (follow the Windows app mode), <c>dark</c> or <c>light</c> (docs/theming.md).</summary>
+    public string Theme { get; set; } = "system";
+
+    /// <summary>Skin: <c>default</c> is the only one so far; applied at start.</summary>
+    public string Skin { get; set; } = "default";
+
     public UiSettings Clone() =>
         new()
         {
@@ -138,6 +144,8 @@ public sealed class UiSettings
             ShowNotifications = ShowNotifications,
             DisplayVolumeInDb = DisplayVolumeInDb,
             LaunchAtWindowsStartup = LaunchAtWindowsStartup,
+            Theme = Theme,
+            Skin = Skin,
         };
 }
 
