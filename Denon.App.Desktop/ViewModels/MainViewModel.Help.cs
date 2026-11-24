@@ -393,7 +393,8 @@ public sealed partial class MainViewModel
         HelpPortsReference.Add(new("UDP 9 and 7", "Wake-on-LAN", "Broadcast wake packet that turns an LG webOS TV on from standby"));
         HelpPortsReference.Add(new("HTTP / HTTPS 8123", "Home Assistant REST and webhooks", "Entity sync, scene / script / switch triggers and the sensor.denon_desktop_receiver state"));
         HelpPortsReference.Add(new("TCP 8009 (TLS)", "Chromecast plugin: Cast v2", "Status and control of Chromecast and Google Cast devices"));
-        HelpPortsReference.Add(new("UDP 5353", "mDNS / DNS-SD", "The Chromecast and Apple TV plugins find devices. Windows Firewall must let the answers in."));
+        HelpPortsReference.Add(new("UDP 5353", "mDNS / DNS-SD", "The Chromecast, Apple TV and HomePod plugins find devices. Windows Firewall must let the answers in."));
+        HelpPortsReference.Add(new("TCP 7000 (AirPlay)", "HomePod plugin: AirPlay remote control", "Now playing and play/pause/next on each HomePod. Transient pairing on each connection: no PIN, nothing stored."));
         HelpPortsReference.Add(new("TCP (port from DNS-SD)", "Apple TV plugin: Companion and AirPlay", "Pairing, power, keys, apps and now playing. The Apple TV announces the ports (for example Companion 49153, AirPlay 7000)."));
         HelpPortsReference.Add(new("HTTPS 443 (internet)", "Online services", "YouTube, the Radio Browser directory, LRCLIB lyrics, Hue cloud discovery, the daily update check and the TV channel logos (GitHub). Device control does not need the internet."));
     }
@@ -409,7 +410,7 @@ public sealed partial class MainViewModel
             category: "Getting Started",
             title: "Quick Start & First-Time Setup",
             subtitle: "Connect your Denon or Marantz receiver, allow the firewall rule, and add the devices you use.",
-            overview: "Denon Desktop controls your Denon or Marantz AV receiver over your local network. It needs no cloud account. It uses the AVR control port (TCP 23) for power, volume, inputs and sound modes, and the HEOS port (TCP 1255) for playback and live push events. A built-in audio relay (TCP 18925) streams YouTube, PC audio and local files to the receiver and serves the Phone Remote. Plugins add Philips Hue, LG webOS TV, Home Assistant and, as separate downloads, Chromecast and Apple TV.",
+            overview: "Denon Desktop controls your Denon or Marantz AV receiver over your local network. It needs no cloud account. It uses the AVR control port (TCP 23) for power, volume, inputs and sound modes, and the HEOS port (TCP 1255) for playback and live push events. A built-in audio relay (TCP 18925) streams YouTube, PC audio and local files to the receiver and serves the Phone Remote. Plugins add Philips Hue, LG webOS TV, Home Assistant and, as separate downloads, Chromecast, Apple TV and HomePod.",
             steps:
             [
                 new("01", "Let the app find your receiver", "Start Denon Desktop. On the first start it scans the LAN and connects when it finds one receiver."),
@@ -880,6 +881,43 @@ public sealed partial class MainViewModel
             ],
             contextSection: "Plugins",
             contextPluginId: "apple-tv"));
+
+        _allHelpTopics.Add(new HelpGuideTopic(
+            id: "plugin-homepod",
+            badge: "POD",
+            accentHex: "#9CA3AF",
+            category: "Plugins",
+            title: "HomePod Plugin",
+            subtitle: "Separate download. See what each HomePod plays, play, pause and skip, and count listening time in Insights.",
+            overview: "The HomePod plugin is not part of the app. You install it separately. It finds the HomePods on the LAN and treats a stereo pair as one speaker. It shows what each speaker plays: the app (Apple Music, Podcasts, or the app that sends AirPlay), the title, the artist and the play state. It can play, pause and skip tracks, and it logs listening time, which Insights shows next to your TV time. There is no PIN: HomePods accept a short-lived pairing on each connection, and the plugin stores no keys. HomePods are not connected to the receiver, so the Control Deck now-playing card does not show them.",
+            steps:
+            [
+                new("01", "Download the plugin", "Download Denon.Plugin.HomePod-<version>.zip from the homepod-v* release that matches your Denon Desktop release."),
+                new("02", "Install it", "Close Denon Desktop. Unzip the file to %LocalAppData%\\DenonDesktop\\plugins\\external\\HomePod\\. Start Denon Desktop."),
+                new("03", "Find the HomePods", "Open Plugins → HomePod. The plugin looks for HomePods at the start; click Discover now to look again."),
+                new("04", "See what plays", "Each speaker card shows the app, the title, the artist and the play state, live."),
+                new("05", "Control a speaker", "On the card, click Previous, Play / Pause or Next."),
+                new("06", "Pause for movie night", "Tick 'Pause the HomePods when the Denon turns on' at the top. HomePods that play then pause when the receiver turns on."),
+            ],
+            proTips:
+            [
+                "A stereo pair shows as one speaker, for example 'HomePod Left + Right'. The plugin talks to the pair's leader, which reports what plays on both.",
+                "Insights counts HomePod time in full, next to the TV: it is listening in its own room. LISTENING in the summary includes it.",
+                "Untick 'Linked by Denon Desktop' on a card to leave that speaker alone: no link and no listening log.",
+                "The actions (list-devices, now-playing, play, pause, play-pause, next, previous, discover) also work in Smart Scenes, hotkeys and MCP.",
+            ],
+            troubleshooting:
+            [
+                new("No HomePod shows?", "Put the PC and the HomePods on the same network and click Discover now. A firewall that drops multicast answers can hide them."),
+                new("A card says Not reachable?", "The plugin tries again by itself, first after 5 seconds, then up to every minute. Check that the HomePod is on and on the same network."),
+                new("The app shows as 'AirPlay'?", "The phone or app that sends the stream did not give its name. Music from the HomePod itself shows as Apple Music or Podcasts."),
+            ],
+            quickJumps:
+            [
+                new("Open HomePod Plugin →", "Plugins", "homepod"),
+            ],
+            contextSection: "Plugins",
+            contextPluginId: "homepod"));
 
         _allHelpTopics.Add(new HelpGuideTopic(
             id: "mcp-room-brain",

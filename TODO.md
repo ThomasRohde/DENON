@@ -68,6 +68,21 @@ The bridge returns JSON + images and uses declared parameters/hints since app 1.
       NRK TV/Radio, Yle Areena, Twitch, Plex, Jellyfin, BBC iPlayer/Sounds, SoundCloud, etc.) plus display-name cleanup
       for dynamic-ID services (TV 2 Play, Max, SkyShowtime, Apple TV+).
 
+## HomePod plugin
+
+- [x] Go/no-go (2026-11-24): transient pairing and MRP on HomePod mini, HomePod software 27.2.1; read "DR P4 København"
+      live from the stereo pair. Plugin 0.1.0 built: discovery, stereo pair as one speaker, now playing, commands,
+      listening sessions, pause on receiver on. Verified live in the app: both speakers linked, the dashboard shows
+      what plays.
+- [ ] Verify live: a full listening session in Insights (play something for longer than 15 s), Apple Music started on
+      the HomePod itself (no AirPlay client message), and that Play/Pause/Next work (ask first: it plays audio).
+- [ ] The pair's leader moves (Left, then Right). The plugin follows it at the next discovery (10 min); a faster
+      switch could follow the HomePod's `igl` TXT change. Check that a leader change keeps the listening session.
+- [ ] "Interrupted" (MRP state 3) shows as paused in the status line; check what the HomePod reports after Siri, a
+      timer or an AirPlay sender that disconnects, and whether it should end the session sooner.
+- [ ] Next: volume (MRP volume for the output device), artwork for the dashboard and Insights, and the HomePod in
+      Insights' RIGHT NOW.
+
 ## Apple TV plugin
 
 Native .NET (no Python), protocol logic ported from pyatv (MIT). See `external-plugins/Denon.Plugin.AppleTv/README.md`.

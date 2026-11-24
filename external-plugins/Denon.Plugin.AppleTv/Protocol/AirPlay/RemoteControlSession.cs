@@ -18,7 +18,7 @@ internal sealed class RemoteControlSession : IAsyncDisposable
     public const string DataStreamInputInfo = "DataStream-Input-Encryption-Key";
 
     private readonly AirPlayConnection _control;
-    private readonly HapPairVerify _verifier;
+    private readonly IHapSessionKeys _verifier;
     private readonly CompanionIdentity _identity;
     private readonly uint _sessionId = (uint)Random.Shared.NextInt64(0, uint.MaxValue);
     private readonly string _dacpId = Convert.ToHexString(BitConverter.GetBytes(Random.Shared.NextInt64())).TrimStart('0');
@@ -28,7 +28,7 @@ internal sealed class RemoteControlSession : IAsyncDisposable
     private EventChannel? _events;
     private Task? _feedbackLoop;
 
-    private RemoteControlSession(AirPlayConnection control, HapPairVerify verifier, CompanionIdentity identity)
+    private RemoteControlSession(AirPlayConnection control, IHapSessionKeys verifier, CompanionIdentity identity)
     {
         _control = control;
         _verifier = verifier;
@@ -48,6 +48,25 @@ internal sealed class RemoteControlSession : IAsyncDisposable
         {
             var verifier = await AirPlayAuth.VerifyAsync(control, credentials, cancellationToken);
             var session = new RemoteControlSession(control, verifier, identity);
+            await session.SetupAsync(host, cancellationToken);
+            return session;
+        }
+        catch
+        {
+            await control.DisposeAsync();
+            throw;
+        }
+    }
+
+    /// <summary>The same session with a transient pairing (HomePod): no stored credentials.</summary>
+    public static async Task<RemoteControlSession> ConnectTransientAsync(
+        string host, int port, CompanionIdentity identity, CancellationToken cancellationToken)
+    {
+        var control = await AirPlayConnection.ConnectAsync(host, port, cancellationToken);
+        try
+        {
+            var keys = await AirPlayAuth.TransientVerifyAsync(control, cancellationToken);
+            var session = new RemoteControlSession(control, keys, identity);
             await session.SetupAsync(host, cancellationToken);
             return session;
         }

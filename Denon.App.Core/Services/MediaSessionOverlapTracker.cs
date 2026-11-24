@@ -42,7 +42,8 @@ public sealed class MediaSessionOverlapTracker
             return data;
         }
 
-        var key = $"{device}|{GetString(data, "castDevice")}{GetString(data, "appleTvDevice")}";
+        // One open session per physical device: several Chromecasts, Apple TVs or HomePods can play at once.
+        var key = $"{device}|{GetString(data, "castDevice")}{GetString(data, "appleTvDevice")}{GetString(data, "homepodDevice")}";
         lock (_sync)
         {
             if (eventName == "session.started")

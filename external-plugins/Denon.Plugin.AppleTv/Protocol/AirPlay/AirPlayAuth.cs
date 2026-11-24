@@ -41,6 +41,31 @@ internal static class AirPlayAuth
         return setup.ReadM6(m6.Body);
     }
 
+    /// <summary>
+    /// Transient pairing (HomePod: no screen, no PIN to show): pair-setup M1–M4 with the fixed PIN and the transient
+    /// flag (HKP 4), then the control connection is encrypted as after pair-verify. Nothing is stored.
+    /// </summary>
+    public static async Task<IHapSessionKeys> TransientVerifyAsync(AirPlayConnection connection, CancellationToken cancellationToken)
+    {
+        IEnumerable<KeyValuePair<string, string>> headers =
+        [
+            new("User-Agent", "AirPlay/320.20"),
+            new("Connection", "keep-alive"),
+            new("X-Apple-HKP", "4"),
+            new("Content-Type", "application/octet-stream"),
+        ];
+
+        var setup = new HapTransientPairSetup();
+        var m2 = await connection.SendAsync("POST", "/pair-setup", headers, HapTransientPairSetup.BuildM1(), cancellationToken);
+        setup.ReadM2(m2.Body);
+        var m4 = await connection.SendAsync("POST", "/pair-setup", headers, setup.BuildM3(), cancellationToken);
+        setup.ReadM4(m4.Body);
+
+        var (output, input) = setup.DeriveKeys(ControlSalt, ControlOutputInfo, ControlInputInfo);
+        connection.EnableEncryption(output, input);
+        return setup;
+    }
+
     /// <summary>Pair-verify and encrypt the control connection. Returns the verifier for channel keys.</summary>
     public static async Task<HapPairVerify> VerifyAsync(AirPlayConnection connection, HapCredentials credentials, CancellationToken cancellationToken)
     {

@@ -200,6 +200,18 @@ public static class ActivityFeed
                 quiet = true;
                 break;
 
+            case "homepod.connected":
+            case "homepod.disconnected":
+                text = $"{Get("homepodDevice") ?? "HomePod"} {(name == "homepod.connected" ? "linked" : "not linked")}";
+                icon = "link";
+                quiet = true;
+                break;
+
+            case "homepod.paused_by_automation":
+                text = $"{Get("homepodDevice") ?? "HomePod"} paused: the receiver turned on";
+                icon = "pause";
+                break;
+
             case "appletv.slept":
                 text = $"{Get("appleTvDevice") ?? "Apple TV"} went to sleep";
                 icon = "moon";
@@ -260,6 +272,7 @@ public static class ActivityFeed
         "avr" => "Receiver",
         "smart-tv" or "lg-tv" => "TV",
         "apple-tv" => "Apple TV",
+        "homepod" => "HomePod",
         "chromecast" => "Chromecast",
         "philips-hue" => "Hue",
         "home-assistant" => "Home Assistant",

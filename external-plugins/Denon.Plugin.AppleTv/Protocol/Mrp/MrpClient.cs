@@ -75,6 +75,30 @@ internal sealed class MrpClient : IAsyncDisposable
         }
     }
 
+    /// <summary>MRP over a transiently paired AirPlay session (HomePod).</summary>
+    public static async Task<MrpClient> ConnectTransientAsync(
+        string host, int airPlayPort, CompanionIdentity identity, CancellationToken cancellationToken,
+        Action<ProtoReader>? onRawMessage = null)
+    {
+        var session = await RemoteControlSession.ConnectTransientAsync(host, airPlayPort, identity, cancellationToken);
+        var client = new MrpClient(session);
+        if (onRawMessage is not null)
+        {
+            client.RawMessageReceived += onRawMessage;
+        }
+
+        try
+        {
+            await client.StartAsync(identity, cancellationToken);
+            return client;
+        }
+        catch
+        {
+            await client.DisposeAsync();
+            throw;
+        }
+    }
+
     private async Task StartAsync(CompanionIdentity identity, CancellationToken cancellationToken)
     {
         var deviceInfo = await SendAndReceiveAsync(

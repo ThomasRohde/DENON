@@ -165,7 +165,7 @@ public sealed partial class UpdateService : IDisposable
     }
 
     /// <summary>
-    /// Checks GitHub for both a newer app release and newer external plugin releases (chromecast-v*, appletv-v*)
+    /// Checks GitHub for both a newer app release and newer external plugin releases (chromecast-v*, appletv-v*, homepod-v*)
     /// matching <paramref name="installedPlugins"/>, reusing a single releases request when external plugins are installed.
     /// </summary>
     public async Task<UpdateCheckResult> CheckForUpdatesAsync(
@@ -191,7 +191,7 @@ public sealed partial class UpdateService : IDisposable
     }
 
     /// <summary>
-    /// Checks GitHub for newer releases of any installed external plugins (chromecast-v*, appletv-v*).
+    /// Checks GitHub for newer releases of any installed external plugins (chromecast-v*, appletv-v*, homepod-v*).
     /// Makes no network request when no trackable external plugin is installed.
     /// </summary>
     public async Task<IReadOnlyList<PluginUpdateInfo>> FindPluginUpdatesAsync(
@@ -249,7 +249,8 @@ public sealed partial class UpdateService : IDisposable
     /// <summary>True when <paramref name="pluginId"/> corresponds to an external plugin published in this repository's GitHub releases.</summary>
     public static bool IsTrackablePlugin(string? pluginId) =>
         string.Equals(pluginId, NowPlayingResolver.ChromecastPluginId, StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(pluginId, NowPlayingResolver.AppleTvPluginId, StringComparison.OrdinalIgnoreCase);
+        string.Equals(pluginId, NowPlayingResolver.AppleTvPluginId, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(pluginId, NowPlayingResolver.HomePodPluginId, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// The newest published app release in a GitHub releases list: tags vX.Y.Z only (the plugins have their own
@@ -287,7 +288,7 @@ public sealed partial class UpdateService : IDisposable
 
     /// <summary>
     /// The newest published release per external plugin in a GitHub releases list: tags <c>chromecast-vX.Y.Z</c>
-    /// and <c>appletv-vX.Y.Z</c>, skipping drafts and pre-releases.
+    /// <c>appletv-vX.Y.Z</c> and <c>homepod-vX.Y.Z</c>, skipping drafts and pre-releases.
     /// </summary>
     public static IReadOnlyDictionary<string, PluginRelease> PickLatestPlugins(string releasesJson)
     {
@@ -549,6 +550,7 @@ public sealed partial class UpdateService : IDisposable
             {
                 "chromecast" => NowPlayingResolver.ChromecastPluginId,
                 "appletv" => NowPlayingResolver.AppleTvPluginId,
+                "homepod" => NowPlayingResolver.HomePodPluginId,
                 _ => string.Empty,
             };
             if (pluginId.Length > 0)
@@ -571,7 +573,7 @@ public sealed partial class UpdateService : IDisposable
     [GeneratedRegex(@"^v(\d+)\.(\d+)\.(\d+)$")]
     private static partial Regex AppTag();
 
-    [GeneratedRegex(@"^(chromecast|appletv)-v(\d+)\.(\d+)\.(\d+)$")]
+    [GeneratedRegex(@"^(chromecast|appletv|homepod)-v(\d+)\.(\d+)\.(\d+)$")]
     private static partial Regex PluginTag();
 
     [GeneratedRegex(@"^([0-9a-fA-F]{64})\s+\*?(.+)$")]

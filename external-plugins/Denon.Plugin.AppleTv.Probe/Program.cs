@@ -14,6 +14,8 @@ using Denon.Plugin.AppleTv.Protocol.Hap;
 //   atvprobe watch    --host IP [--seconds N]   print events
 //   atvprobe nowplaying --host IP [--seconds N] now playing over the AirPlay MRP tunnel
 //   atvprobe airplay-pair --host IP [--pin-file PATH]   separate AirPlay pairing (shows a PIN)
+//   atvprobe homepod --host IP [--seconds N] [--dump]   HomePod: transient pairing (no PIN, nothing stored),
+//                                                       then now playing over the AirPlay MRP tunnel
 // Pairing (the Apple TV shows a PIN):
 //   atvprobe pair     --host IP [--name NAME] [--pin-file PATH]
 // Changes the Apple TV (ask the owner first):
@@ -65,6 +67,8 @@ try
             });
         case "nowplaying":
             return await NowPlayingAsync(RequireHost(host), seconds);
+        case "homepod":
+            return await NowPlayingAsync(RequireHost(host), seconds, transient: true);
         case "airplay-pair":
             return await AirPlayPairAsync(RequireHost(host), Option("--name") ?? "Denon Desktop", Option("--pin-file"));
         case "key":
@@ -218,26 +222,38 @@ static async Task<int> PairAsync(string host, string name, string? pinFile)
     return 0;
 }
 
-static async Task<int> NowPlayingAsync(string host, double seconds)
+static async Task<int> NowPlayingAsync(string host, double seconds, bool transient = false)
 {
-    var entry = ProbeStore.Load(host) ?? throw new HapPairingException($"No pairing for {host}. Run: atvprobe pair --host {host}");
     var port = await ServicePortAsync(host, AppleServiceTypes.AirPlay, 7000);
-    var useAirPlayCredentials = entry.AirPlayCredentials is not null;
-    var credentials = HapCredentials.Parse(entry.AirPlayCredentials ?? entry.Credentials);
-    Console.WriteLine($"Opening the AirPlay remote-control tunnel to {host}:{port} with the {(useAirPlayCredentials ? "AirPlay" : "Companion")} pairing ...");
-
     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(seconds + 30));
+    Action<Denon.Plugin.AppleTv.Protocol.ProtoReader>? dump = Environment.GetCommandLineArgs().Contains("--dump")
+        ? m => Console.WriteLine($"    {DateTime.Now:HH:mm:ss.f} raw {Dump(m)}")
+        : null;
     Denon.Plugin.AppleTv.Protocol.Mrp.MrpClient client;
-    try
+
+    if (transient)
     {
-        client = await Denon.Plugin.AppleTv.Protocol.Mrp.MrpClient.ConnectAsync(host, port, credentials, entry.Identity, cts.Token,
-            Environment.GetCommandLineArgs().Contains("--dump") ? m => Console.WriteLine($"    {DateTime.Now:HH:mm:ss.f} raw {Dump(m)}") : null);
+        // HomePod: no screen, so no PIN and no stored pairing. Each connection pairs transiently.
+        Console.WriteLine($"Opening the AirPlay remote-control tunnel to {host}:{port} with a transient pairing (no PIN, nothing stored) ...");
+        client = await Denon.Plugin.AppleTv.Protocol.Mrp.MrpClient.ConnectTransientAsync(
+            host, port, CompanionIdentity.Create("Denon Desktop"), cts.Token, dump);
     }
-    catch (Exception ex) when (!useAirPlayCredentials && ex is HapPairingException or Denon.Plugin.AppleTv.Protocol.AirPlay.AirPlayHttpException)
+    else
     {
-        Console.Error.WriteLine($"The Apple TV did not accept the Companion pairing on AirPlay: {ex.Message}");
-        Console.Error.WriteLine($"AirPlay needs its own pairing: atvprobe airplay-pair --host {host}");
-        return 6;
+        var entry = ProbeStore.Load(host) ?? throw new HapPairingException($"No pairing for {host}. Run: atvprobe pair --host {host}");
+        var useAirPlayCredentials = entry.AirPlayCredentials is not null;
+        var credentials = HapCredentials.Parse(entry.AirPlayCredentials ?? entry.Credentials);
+        Console.WriteLine($"Opening the AirPlay remote-control tunnel to {host}:{port} with the {(useAirPlayCredentials ? "AirPlay" : "Companion")} pairing ...");
+        try
+        {
+            client = await Denon.Plugin.AppleTv.Protocol.Mrp.MrpClient.ConnectAsync(host, port, credentials, entry.Identity, cts.Token, dump);
+        }
+        catch (Exception ex) when (!useAirPlayCredentials && ex is HapPairingException or Denon.Plugin.AppleTv.Protocol.AirPlay.AirPlayHttpException)
+        {
+            Console.Error.WriteLine($"The Apple TV did not accept the Companion pairing on AirPlay: {ex.Message}");
+            Console.Error.WriteLine($"AirPlay needs its own pairing: atvprobe airplay-pair --host {host}");
+            return 6;
+        }
     }
 
     await using (client)

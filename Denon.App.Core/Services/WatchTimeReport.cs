@@ -105,6 +105,7 @@ public static class WatchTimeReport
     {
         "cast" => GetString(data, "app") ?? GetString(data, "source") ?? "Cast",
         "appletv" => GetString(data, "app") ?? GetString(data, "source") ?? "Apple TV",
+        "homepod" => GetString(data, "app") ?? "HomePod",
         "tv_channel" => GetString(data, "channelName") ?? ChannelFromShowing(title) ?? "Live TV",
         "tv_app" => title.Length > 0 ? title : "TV app",
         "avr_input" => title.Length > 0 ? title : GetString(data, "input") ?? "Receiver input",

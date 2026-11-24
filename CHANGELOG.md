@@ -4,6 +4,24 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **HomePod plugin (separate download, `homepod-v*` releases)** in `external-plugins/Denon.Plugin.HomePod`: finds the
+  HomePods on the LAN (a stereo pair is one speaker), shows what each plays (app, title, artist, play state) over the
+  AirPlay 2 remote-control channel, sends play/pause/next/previous, logs listening sessions (`kind: "homepod"`) and can
+  pause the HomePods when the Denon turns on. No PIN and no stored pairing: HomePods accept a transient pairing on each
+  connection. It compiles in the Apple TV plugin's protocol code, so that code exists once.
+- **The app knows HomePod sessions:** Insights counts them as listening time ("HomePod" source, the app as AirPlay
+  sender, Apple Music or Podcasts), in full next to the TV; the activity feed says "Køkken linked" and "… paused: the
+  receiver turned on"; the update check finds `homepod-v*` releases; Help has a HomePod topic.
+
+### Changed
+- The watch-time overlap tracker keeps one open session per HomePod too (`homepodDevice`), so two HomePods that play
+  at once both count.
+- Shared Apple protocol code: transient HAP pair-setup (fixed PIN 3939, transient flag, `X-Apple-HKP: 4`) next to the
+  stored pairing, and `atvprobe homepod --host <ip>` to read what a HomePod plays. No change for the Apple TV.
+
 ## [2.6.2] - 2026-11-24
 
 Fixes from the first computer-use test run (`docs/testing/computer-use-test-script.md`).

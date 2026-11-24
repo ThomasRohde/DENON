@@ -125,7 +125,7 @@ internal sealed class HapPairSetup
 /// HAP pair-verify (M1–M4) with stored credentials; yields the shared secret for session keys
 /// (pyatv: hap_srp.SRPAuthHandler.verify1/verify2 and companion/auth.CompanionPairVerifyProcedure).
 /// </summary>
-internal sealed class HapPairVerify(HapCredentials credentials)
+internal sealed class HapPairVerify(HapCredentials credentials) : IHapSessionKeys
 {
     private readonly HapCrypto.X25519KeyPair _ephemeral = new();
     private byte[]? _shared;

@@ -70,6 +70,9 @@ public sealed record CastNowPlaying(
 public static class NowPlayingResolver
 {
     public const string ChromecastPluginId = "chromecast";
+
+    /// <summary>The HomePod plugin (separate download). HomePods are not on the receiver: the hero never shows them.</summary>
+    public const string HomePodPluginId = "homepod";
     public const string AppleTvPluginId = "apple-tv";
 
     public static ResolvedNowPlaying Resolve(

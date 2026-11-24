@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Standalone external plugin for Apple HomePods. Released separately with homepod-vX.Y.Z tags
+    (release-homepod-plugin.yml). It is NOT part of DenonDesktop.slnx and is NOT shipped with the app.
+    Build with Denon.Plugin.HomePod.slnx.
+
+    The Apple protocol code (HAP crypto, AirPlay 2 remote-control session, MRP now playing, DNS-SD discovery) is
+    compiled in from the Apple TV plugin's sources, so it exists once in the repository. Protocol logic is ported
+    from pyatv (MIT, https://github.com/postlund/pyatv); see THIRD-PARTY-NOTICES.md.
+    The SDK reference is compile-only: the host shares its own Denon.App.PluginSdk.dll at run time.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Version>0.1.0</Version>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <RootNamespace>Denon.Plugin.HomePod</RootNamespace>
+    <Description>HomePod plugin for Denon Desktop: discovery, now playing, play/pause/next and listening sessions (native .NET, no Python, no pairing PIN).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Denon.App.PluginSdk\Denon.App.PluginSdk.csproj">
+      <Private>false</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Ed25519, X25519 and the RFC 5054 SRP groups (MIT). ChaCha20-Poly1305 and HKDF come from .NET itself. -->
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.5.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Shared with the Apple TV plugin: one copy of the protocol code in the repository. -->
+    <Compile Include="..\Denon.Plugin.AppleTv\Protocol\**\*.cs" Link="Shared\Protocol\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Denon.Plugin.AppleTv\Discovery\**\*.cs" Link="Shared\Discovery\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Denon.Plugin.AppleTv\HostTheme.cs" Link="Shared\HostTheme.cs" />
+    <Compile Include="..\Denon.Plugin.AppleTv\HostSkin.cs" Link="Shared\HostSkin.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- WPF projects leave System.IO out of the implicit usings. -->
+    <Using Include="System.IO" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Denon.Plugin.HomePod.Tests" />
+  </ItemGroup>
+
+</Project>

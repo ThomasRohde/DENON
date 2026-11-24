@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="../Denon.App.PluginSdk/Denon.App.PluginSdk.csproj" />
+  <Project Path="Denon.Plugin.HomePod/Denon.Plugin.HomePod.csproj" />
+  <Project Path="Denon.Plugin.HomePod.Tests/Denon.Plugin.HomePod.Tests.csproj" />
+</Solution>

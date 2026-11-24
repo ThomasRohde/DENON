@@ -121,6 +121,7 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const KIND_VAR = {
   cast: "--accent-cyan",
   appletv: "--accent-violet",
+  homepod: "--accent-rose-text",
   tv_app: "--accent-amber",
   tv_channel: "--accent-amber-bright",
   youtube: "--accent-crimson",

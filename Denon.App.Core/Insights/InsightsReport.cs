@@ -182,6 +182,7 @@ public static class InsightsReport
     {
         "cast" => "Chromecast",
         "appletv" => "Apple TV",
+        "homepod" => "HomePod",
         "tv_app" => "TV apps & HDMI",
         "tv_channel" => "Live TV",
         "youtube" => "YouTube",
