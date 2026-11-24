@@ -4,7 +4,7 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.6.0] - 2026-11-24
 
 ### Added
 - **Live TV shows the program and the channel logo.** On Live TV the now-playing hero shows the program from the LG TV's guide as the title, "DR1 • Ch 1 • 16:25–17:15" below it, and the channel's logo. The LG webOS TV plugin (2.3.0) reads the channel's TV and DVB IDs, asks the TV for its guide on a channel change and when a program ends, and corrects a guide that the TV dates a day wrong (seen live: one day ahead).
