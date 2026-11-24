@@ -101,7 +101,6 @@ Design and decisions: `docs/theming.md` (branch `theming-2.0`).
 - [x] Released Chromecast plugin 0.5.0 and Apple TV plugin 0.4.0 (theme brushes read at each use, `HostSkin`).
 - [ ] Check live in the installed app: tray flyout, YouTube cinema window, Chromecast and Apple TV pages in Light and
       in each skin (screenshot mode does not show them).
-- [ ] Refresh README screenshot 06 (Settings now has the Appearance card).
 - [ ] Help topic badges and scene colors are content colors (not themed): check that they read on Light.
 - [ ] Decide user theme files (JSON tokens, validated on import; no loose XAML).
 - [ ] Semantic aliases (Success/Warning/Danger/Info/Accent) over the hue families, so a theme can recolor states.

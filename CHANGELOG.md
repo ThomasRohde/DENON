@@ -6,11 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-24
+
+Themes and skins. The Chromecast (0.5.0 or later) and Apple TV (0.4.0 or later) plugin pages follow both live;
+older plugin versions keep the Dark colors and the Default sizes.
+
 ### Added
 - **Themes**: Settings → Appearance has *Follow Windows* (the default: light or dark as Windows apps are set), *Dark* and *Light*. The theme switches live, with no restart, and is saved at once. The VU dials and the LED spectrum screen stay dark in every theme, like the display of a real receiver.
 - **Skins**: Settings → Appearance → Skin has *Default*, *Hi-Fi* (rack-receiver look: nearly square corners, Bahnschrift headings, Share Tech Mono numbers, amber-backlit VU dials and a teal fluorescent-display spectrum), *Compact* (smaller type and tighter spacing) and *Large* (larger type, controls and spacing, for the sofa or a touch screen). A skin switches live, works with every theme, and also reaches the plugin pages.
 - **Screenshot mode options** for theme and skin work: `--theme <id>`, `--skin <id>`, `--switch-theme <id>` and `--switch-skin <id>` (switch live with the window open, to test the live path) and `--all-pages` (also Brain, Health, Help, Plugins and each plugin page).
 - **Third-party notices** (`THIRD-PARTY-NOTICES.md`, installed next to the app) for the bundled Share Tech Mono font (SIL Open Font License).
+- **README screenshots** show the Appearance card in Settings.
 
 ### Changed
 - **Theme files** are in layers (see `docs/theming.md`): palettes in `Themes/Palettes/` (Dark, Light), brushes built from them in `Themes/Brushes.xaml`, skin tokens in `Themes/Skins/` (one file per skin), and the shared `Themes/Icons.xaml` and `Themes/Styles.xaml`. Views refer to theme brushes and skin tokens with `DynamicResource`; tests block `StaticResource` for them.
