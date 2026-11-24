@@ -33,6 +33,17 @@ public partial class MainWindow : Window
         DataContext = viewModel;
 
         StateChanged += OnWindowStateChanged;
+
+        // When the update panel opens, focus moves into it (the content behind it is disabled).
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(MainViewModel.IsUpdatePanelOpen) && viewModel.IsUpdatePanelOpen)
+            {
+                Dispatcher.BeginInvoke(
+                    () => UpdatePanel.MoveFocus(new TraversalRequest(FocusNavigationDirection.First)),
+                    System.Windows.Threading.DispatcherPriority.Input);
+            }
+        };
         Loaded += (_, _) => CompositionTarget.Rendering += OnCompositionRendering;
         Unloaded += (_, _) => CompositionTarget.Rendering -= OnCompositionRendering;
         ApplyDwmStyling();
@@ -108,6 +119,18 @@ public partial class MainWindow : Window
         {
             if (_viewModel.TryCaptureRecordedShortcut(actualKey, modifiers))
             {
+                e.Handled = true;
+            }
+
+            return;
+        }
+
+        // The update panel is modal: Escape closes it, Tab stays inside it, and the page shortcuts wait.
+        if (_viewModel.IsUpdatePanelOpen)
+        {
+            if (actualKey == Key.Escape)
+            {
+                _viewModel.CloseUpdatePanelCommand.Execute(null);
                 e.Handled = true;
             }
 

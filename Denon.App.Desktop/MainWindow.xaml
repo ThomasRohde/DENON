@@ -42,6 +42,7 @@
 
             <!-- ======================== CUSTOM INTEGRATED TITLE BAR ======================== -->
             <Border Grid.Row="0"
+                    IsEnabled="{Binding IsUpdatePanelClosed}"
                     Background="{DynamicResource SidebarBgBrush}"
                     BorderBrush="{DynamicResource BorderHairlineBrush}"
                     BorderThickness="0,0,0,1"
@@ -252,7 +253,7 @@
             </Border>
 
             <!-- ======================== MAIN APP SHELL ======================== -->
-            <Grid Grid.Row="1">
+            <Grid Grid.Row="1" IsEnabled="{Binding IsUpdatePanelClosed}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
@@ -591,6 +592,17 @@
                         BorderThickness="0,1,0,0"
                         Padding="{skin:Space 16,6}">
                     <DockPanel LastChildFill="True">
+                        <!-- A newer version is out (MainViewModel.Updates): opens the update panel. -->
+                        <Button DockPanel.Dock="Right"
+                                Content="{Binding UpdateButtonText}"
+                                Style="{StaticResource ChipButton}"
+                                infra:Chip.IsActive="True"
+                                Padding="{skin:Space 8,1}"
+                                FontSize="{DynamicResource FontSize03}"
+                                Margin="{skin:Space 16,0,0,0}"
+                                ToolTip="See what changed and install the update"
+                                Command="{Binding OpenUpdatePanelCommand}"
+                                Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolToVis}}" />
                         <!-- The app version, at the far right: what support asks first. -->
                         <TextBlock DockPanel.Dock="Right"
                                    Text="{x:Static infra:AppInfo.VersionLabel}"
@@ -618,6 +630,78 @@
                                        Visibility="{Binding LastError, Converter={StaticResource StringToVis}}" />
                         </StackPanel>
                     </DockPanel>
+                </Border>
+            </Grid>
+
+            <!-- Update panel: what changed in the new version, and Download and install (MainViewModel.Updates). -->
+            <Grid Grid.RowSpan="2"
+                  Background="{DynamicResource OverlayScrimBrush}"
+                  Visibility="{Binding IsUpdatePanelOpen, Converter={StaticResource BoolToVis}}">
+                <Border x:Name="UpdatePanel"
+                        KeyboardNavigation.TabNavigation="Cycle"
+                        Style="{StaticResource SurfaceCard}"
+                        Background="{DynamicResource CardElevatedBrush}"
+                        MaxWidth="{skin:Size 560}"
+                        Margin="{skin:Space 24}"
+                        Padding="{skin:Space 22,20}"
+                        VerticalAlignment="Center">
+                    <StackPanel>
+                        <TextBlock Text="{Binding UpdatePanelTitle}"
+                                   FontFamily="{DynamicResource DisplayFont}"
+                                   FontSize="{DynamicResource FontSize12}"
+                                   FontWeight="SemiBold"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding UpdateCurrentText}"
+                                   FontSize="{DynamicResource FontSize06}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="{skin:Space 0,6,0,14}" />
+                        <TextBlock Text="WHAT CHANGED" Style="{StaticResource SectionLabelStyle}" Margin="{skin:Space 0,0,0,6}" />
+                        <Border Background="{DynamicResource CardBgBrush}"
+                                BorderBrush="{DynamicResource BorderHairlineBrush}"
+                                BorderThickness="1"
+                                CornerRadius="{DynamicResource Radius03}"
+                                Padding="{skin:Space 12,10}"
+                                MaxHeight="{skin:Size 280}">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <TextBlock Text="{Binding UpdateNotesText}"
+                                           FontSize="{DynamicResource FontSize05}"
+                                           Foreground="{DynamicResource TextSoftBrush}"
+                                           TextWrapping="Wrap" />
+                            </ScrollViewer>
+                        </Border>
+                        <TextBlock Text="{Binding UpdateProgressText}"
+                                   FontSize="{DynamicResource FontSize05}"
+                                   Foreground="{DynamicResource AccentCyanTextBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="{skin:Space 0,12,0,0}"
+                                   Visibility="{Binding UpdateProgressText, Converter={StaticResource StringToVis}}" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="{skin:Space 0,18,0,0}">
+                            <Button Content="Cancel"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Padding="{skin:Space 14,6}"
+                                    Margin="{skin:Space 0,0,8,0}"
+                                    Visibility="{Binding IsUpdateBusy, Converter={StaticResource BoolToVis}}"
+                                    Command="{Binding CancelUpdateCommand}" />
+                            <Button Content="Later"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Padding="{skin:Space 14,6}"
+                                    Margin="{skin:Space 0,0,8,0}"
+                                    IsEnabled="{Binding IsUpdateIdle}"
+                                    Command="{Binding CloseUpdatePanelCommand}" />
+                            <Button Content="Open release page"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Padding="{skin:Space 14,6}"
+                                    Margin="{skin:Space 0,0,8,0}"
+                                    Command="{Binding OpenUpdatePageCommand}" />
+                            <Button Content="Download and install"
+                                    Style="{StaticResource PrimaryButton}"
+                                    Padding="{skin:Space 14,6}"
+                                    IsEnabled="{Binding IsUpdateIdle}"
+                                    Visibility="{Binding IsInstalledCopy, Converter={StaticResource BoolToVis}}"
+                                    Command="{Binding InstallUpdateCommand}" />
+                        </StackPanel>
+                    </StackPanel>
                 </Border>
             </Grid>
         </Grid>

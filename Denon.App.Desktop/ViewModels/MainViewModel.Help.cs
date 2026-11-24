@@ -394,7 +394,7 @@ public sealed partial class MainViewModel
         HelpPortsReference.Add(new("TCP 8009 (TLS)", "Chromecast plugin: Cast v2", "Status and control of Chromecast and Google Cast devices"));
         HelpPortsReference.Add(new("UDP 5353", "mDNS / DNS-SD", "The Chromecast and Apple TV plugins find devices. Windows Firewall must let the answers in."));
         HelpPortsReference.Add(new("TCP (port from DNS-SD)", "Apple TV plugin: Companion and AirPlay", "Pairing, power, keys, apps and now playing. The Apple TV announces the ports (for example Companion 49153, AirPlay 7000)."));
-        HelpPortsReference.Add(new("HTTPS 443 (internet)", "Online services", "YouTube, the Radio Browser directory, LRCLIB lyrics and Hue cloud discovery. Device control does not need the internet."));
+        HelpPortsReference.Add(new("HTTPS 443 (internet)", "Online services", "YouTube, the Radio Browser directory, LRCLIB lyrics, Hue cloud discovery and the daily update check (GitHub). Device control does not need the internet."));
     }
 
     private void SeedHelpTopics()
@@ -489,6 +489,7 @@ public sealed partial class MainViewModel
                 new("06", "Open a device", "Click a device badge at the bottom of the rail. There is one badge for each plugin. The dot on the badge shows its health."),
                 new("07", "Use the title bar", "The title bar shows the receiver model, its name, ONLINE / STANDBY / OFFLINE and LIVE PUSH. At the right are the MCP badge (opens Brain), Phone QR (opens Cast), Refresh and the power button."),
                 new("08", "Read the status line", "The status line at the bottom shows the receiver, the last action and the last error. At the right it shows the time of the last update and the app version."),
+                new("09", "Update the app", "When a newer version is out, an Update button shows next to the version. Click it to see what changed, then click Download and install. The app checks the download, closes, updates and starts again, and keeps your settings. The portable app opens the release page instead. The app checks GitHub once a day; turn this off, or check now, in Settings → DESKTOP & TRAY BEHAVIOR."),
             ],
             proTips:
             [
@@ -950,7 +951,7 @@ public sealed partial class MainViewModel
             category: "Troubleshooting",
             title: "Network Ports, Firewall & Troubleshooting",
             subtitle: "The ports that Denon Desktop uses, the Health Check, the AVR / HEOS console and common fixes.",
-            overview: "Device control runs on your local network. Some features use the internet: YouTube, the Radio Browser directory, LRCLIB lyrics and Hue cloud discovery. The table below lists the ports. The Health page tests the receiver and has tools for common problems.",
+            overview: "Device control runs on your local network. Some features use the internet: YouTube, the Radio Browser directory, LRCLIB lyrics, Hue cloud discovery and the daily update check on GitHub (you can turn it off in Settings). The table below lists the ports. The Health page tests the receiver and has tools for common problems.",
             steps:
             [
                 new("01", "Run the Health Check", "In Health, click Run Health Check. It tests the network connection, the AVR control port (23), the HEOS engine (1255), the audio output and the radio stream."),

@@ -129,6 +129,12 @@ public sealed class UiSettings
 
     public bool LaunchAtWindowsStartup { get; set; } = false;
 
+    /// <summary>Check GitHub once a day for a newer Denon Desktop (Settings → Desktop &amp; Tray Behavior).</summary>
+    public bool CheckForUpdates { get; set; } = true;
+
+    /// <summary>When the last update check succeeded; the next automatic check is a day later, across restarts.</summary>
+    public DateTimeOffset? LastUpdateCheck { get; set; }
+
     /// <summary>Theme: <c>system</c> (follow the Windows app mode), <c>dark</c> or <c>light</c> (docs/theming.md).</summary>
     public string Theme { get; set; } = "system";
 
@@ -157,6 +163,7 @@ public sealed class UiSettings
         ShowNotifications = editor.ShowNotifications;
         DisplayVolumeInDb = editor.DisplayVolumeInDb;
         LaunchAtWindowsStartup = editor.LaunchAtWindowsStartup;
+        CheckForUpdates = editor.CheckForUpdates;
     }
 
     public UiSettings Clone() =>
@@ -168,6 +175,8 @@ public sealed class UiSettings
             ShowNotifications = ShowNotifications,
             DisplayVolumeInDb = DisplayVolumeInDb,
             LaunchAtWindowsStartup = LaunchAtWindowsStartup,
+            CheckForUpdates = CheckForUpdates,
+            LastUpdateCheck = LastUpdateCheck,
             Theme = Theme,
             Skin = Skin,
             Window = Window?.Clone(),

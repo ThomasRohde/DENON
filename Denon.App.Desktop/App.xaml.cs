@@ -140,6 +140,7 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<RoomIntelligenceService>();
             builder.Services.AddSingleton<DenonMcpHttpServer>();
             builder.Services.AddSingleton<LyricsService>();
+            builder.Services.AddSingleton<UpdateService>();
             builder.Services.AddSingleton<AcousticSyncCalibrationService>();
             builder.Services.AddSingleton<LiveAudioAnalyzerService>();
             builder.Services.AddHostedService(sp => sp.GetRequiredService<LiveAudioAnalyzerService>());
@@ -255,6 +256,26 @@ public partial class App : System.Windows.Application
                     ThemeManager.ApplySkin(switchSkin);
                 }
 
+                // --update-check-as <version>: the real update check as if the app were that version, with the update
+                // panel open in the captures; --update-download also downloads and verifies the installer (no install).
+                if (ArgValue(e.Args, "--update-check-as") is { } asVersion)
+                {
+                    System.IO.Directory.CreateDirectory(captureDir!);
+                    string report;
+                    try
+                    {
+                        report = await vm.CheckUpdateForScreenshotAsync(
+                            _host.Services.GetRequiredService<UpdateService>(), asVersion,
+                            e.Args.Contains("--update-download", StringComparer.OrdinalIgnoreCase));
+                    }
+                    catch (Exception exception)
+                    {
+                        report = $"failed: {exception.Message}";
+                    }
+
+                    await System.IO.File.WriteAllTextAsync(System.IO.Path.Combine(captureDir!, "update.txt"), report);
+                }
+
                 // --all-pages: also the pages the README does not show (checks a theme on every page).
                 var allPages = e.Args.Any(a => string.Equals(a, "--all-pages", StringComparison.OrdinalIgnoreCase));
                 await CaptureScreenshotsAsync(window, vm, captureDir!, allPages);
@@ -328,6 +349,11 @@ public partial class App : System.Windows.Application
                 await splash.FadeOutAndCloseAsync();
                 window.Activate();
             }
+
+            // In-app updates: a daily check of GitHub; after "Download and install" starts the installer, the app exits
+            // so the installer can replace it (it starts the new version by itself).
+            mainVm.ExitForUpdateRequested += () => _ = Dispatcher.InvokeAsync(ExitApplicationAsync);
+            mainVm.StartUpdateChecks(_host.Services.GetRequiredService<UpdateService>(), allowInstall: requestedDataRoot is null);
         }
         catch (Exception exception)
         {

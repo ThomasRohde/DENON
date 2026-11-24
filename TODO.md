@@ -131,6 +131,13 @@ Design and decisions: `docs/theming.md` (branch `theming-2.0`).
       still reload the settings editor and drop unsaved edits, and each save reconnects HEOS events. Move them to
       targeted saves like `SaveUiStateAsync` (the theme and skin chips were fixed this way after the Codex review).
 
+## In-app updates
+
+- [ ] Verify live: the first real update (the installed app on the previous version, Update → Download and install): the
+      installer closes the app, installs, and `/LAUNCHAFTER=1` starts the new version.
+- [ ] Plugin updates (Chromecast `chromecast-v*`, Apple TV `appletv-v*`) through the same check.
+- [ ] Code signing would let the update check who made the installer, not only that it arrived intact.
+
 ## Release / build
 
 - [ ] The installer and exe are unsigned (SmartScreen warning). Consider code signing.

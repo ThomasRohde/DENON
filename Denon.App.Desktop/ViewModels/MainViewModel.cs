@@ -1287,6 +1287,7 @@ public sealed partial class MainViewModel : ObservableObject
         SettingsShowNotifications = settings.Ui.ShowNotifications;
         SettingsDisplayVolumeInDb = settings.Ui.DisplayVolumeInDb;
         SettingsLaunchAtWindowsStartup = settings.Ui.LaunchAtWindowsStartup || _startupService.IsEnabled();
+        SettingsCheckForUpdates = settings.Ui.CheckForUpdates;
         DisplayVolumeInDb = settings.Ui.DisplayVolumeInDb;
         MarkActiveTheme(settings.Ui.Theme);
         MarkActiveSkin(settings.Ui.Skin);
@@ -1848,6 +1849,7 @@ public sealed partial class MainViewModel : ObservableObject
                 ShowNotifications = SettingsShowNotifications,
                 DisplayVolumeInDb = SettingsDisplayVolumeInDb,
                 LaunchAtWindowsStartup = SettingsLaunchAtWindowsStartup,
+                CheckForUpdates = SettingsCheckForUpdates,
             };
             settings.Media = new MediaRelaySettings
             {

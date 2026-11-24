@@ -81,12 +81,22 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFile
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Registry]
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "DenonDesktop"; ValueData: """{app}\{#MyAppExeName}"" --minimized"; Flags: uninsdeletevalue; Tasks: autostart
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "DenonDesktop"; ValueData: """{app}\{#MyAppExeName}"" --minimized"; Flags: uninsdeletevalue; Tasks: autostart; Check: not IsInAppUpdate
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--show"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+; In-app update (Denon Desktop runs the installer with /SILENT /LAUNCHAFTER=1): start the new version when done, as the
+; user who started the update (not with Setup's rights, which can be elevated for an all-users install).
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--show"; Flags: nowait runasoriginaluser; Check: IsInAppUpdate
 
 [Code]
+// An update started from the app (/LAUNCHAFTER=1): relaunch the app when done, and leave the Windows startup entry
+// alone (the app's own Settings own it; a silent upgrade would otherwise re-apply the first install's choice).
+function IsInAppUpdate(): Boolean;
+begin
+  Result := ExpandConstant('{param:LAUNCHAFTER|0}') = '1';
+end;
+
 const
   // Denon Desktop Cyan Accent (Inno Setup uses $BBGGRR color order)
   DenonCyan = $FFD400; // #00D4FF
