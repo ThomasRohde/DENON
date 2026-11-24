@@ -94,8 +94,8 @@ Native .NET (no Python), protocol logic ported from pyatv (MIT). See `external-p
       from `SET_STATE`, exposes `canPause` / `"APPLE TV LIVE • …"`, disables Pause with tooltip on the Apple TV
       dashboard, and gates the hero & tray flyout `PlayPauseCommand` via `CanPauseTransport`. Only an explicit
       `Pause` command counts (the app sends Pause, not TogglePlayPause).
-- [ ] Release order: the next Apple TV plugin writes `APPLE TV LIVE • …`, which only an app newer than 2.4.1 reads.
-      An older app drops a live program from the hero. Release the app first, or both together.
+- [ ] Release order: the next Apple TV plugin writes `APPLE TV LIVE • …`, which only app 2.5.0 or newer reads.
+      An older app drops a live program from the hero; app 2.5.0 is out, so the plugin can follow.
 - [ ] Verify live: the 35 s standby grace (power button → `standby`), and that Pause is greyed out on DRTV live and
       enabled on DRTV on-demand.
 - [ ] Verify live with the user's OK: Denon automations on wake/sleep, `key`, `launch-app`, `power-on/off`.

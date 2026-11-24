@@ -4,7 +4,7 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.5.0] - 2026-11-24
 
 ### Added
 - **ROOM mode (opt-in, off by default).** Settings → YouTube & Local Audio Relay can drive the VU and RTA meters (and Hue Music Sync) from a PC microphone or line-in for TV/ARC, HDMI and Cast audio the app cannot tap. The mic opens only on such a source with the receiver on and unmuted, while the meters are visible or Hue Music Sync is on, and closes at once otherwise. A selected device is never swapped for another microphone. The meters show **ROOM**.
