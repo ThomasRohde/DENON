@@ -88,6 +88,12 @@ public static class NowPlayingResolver
 
         if (!status.IsPoweredOn || !status.IsMainZoneOn)
         {
+            // The receiver sleeps: a HomePod that plays (or is paused) is what plays in the house, so show it.
+            if (TryResolveHomePod(plugins) is { } homePod)
+            {
+                return homePod;
+            }
+
             return new ResolvedNowPlaying(
                 Title: "Receiver in Standby",
                 Detail: "Press Power or select any station to wake the receiver.",
@@ -368,6 +374,51 @@ public static class NowPlayingResolver
         }
 
         return new SmartTvNowShowing(model, showing, isScreenOff, TryReadLiveTv(tv.StatusDetails));
+    }
+
+    /// <summary>
+    /// What a HomePod plays, from the HomePod plugin's status details (kind "homepod"), as a hero entry: the title,
+    /// "artist • app • speaker", its artwork (a file in the plugin data folder) and a <see cref="CastNowPlaying"/>
+    /// so play/pause goes to the HomePod. Null when the plugin is missing, stopped or nothing plays.
+    /// </summary>
+    public static ResolvedNowPlaying? TryResolveHomePod(IReadOnlyList<PluginRecordSnapshot>? plugins, string? homePodDataDirectory = null)
+    {
+        var plugin = plugins?.FirstOrDefault(p =>
+            p.Id.Equals(HomePodPluginId, StringComparison.OrdinalIgnoreCase) && p.IsEnabled && p.IsStarted);
+        var details = plugin?.StatusDetails;
+        if (details is null || !details.TryGetValue("kind", out var kind) || kind != "homepod" ||
+            Get("speaker") is not { } speaker || Get("app") is not { } app)
+        {
+            return null;
+        }
+
+        var playing = Get("playbackState") == "Playing";
+        var title = Get("title");
+        var parts = new List<string>();
+        if (Get("artist") is { } artist)
+        {
+            parts.Add(artist);
+        }
+
+        parts.Add(app);
+        parts.Add(speaker);
+
+        var image = Get("artworkPath") is { } path &&
+                    Uri.TryCreate(path, UriKind.Absolute, out var uri) &&
+                    IsFileInside(uri, homePodDataDirectory ?? AppDataPaths.GetPluginDataDirectory(HomePodPluginId)) &&
+                    File.Exists(uri.LocalPath)
+            ? uri.AbsoluteUri
+            : string.Empty;
+
+        return new ResolvedNowPlaying(
+            Title: title ?? app,
+            Detail: string.Join(" • ", parts),
+            ImageUrl: image,
+            PlayStateLabel: playing ? "Playing" : "Paused",
+            IsExternalLiveInput: true,
+            Cast: new CastNowPlaying(speaker, app, title, playing, HomePodPluginId, CanPause: true));
+
+        string? Get(string key) => details.TryGetValue(key, out var v) && !string.IsNullOrWhiteSpace(v) ? v.Trim() : null;
     }
 
     /// <summary>

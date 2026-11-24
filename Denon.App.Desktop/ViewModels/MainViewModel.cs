@@ -1429,6 +1429,12 @@ public sealed partial class MainViewModel : ObservableObject
 
     private async Task NextTrackAsync()
     {
+        if (_heroCast is { PluginId: NowPlayingResolver.HomePodPluginId } homePod)
+        {
+            await SkipCastAsync(homePod, "next");
+            return;
+        }
+
         if (_youtubeQueueService.IsYouTubePlaybackActive)
         {
             try
@@ -1466,6 +1472,12 @@ public sealed partial class MainViewModel : ObservableObject
 
     private async Task PreviousTrackAsync()
     {
+        if (_heroCast is { PluginId: NowPlayingResolver.HomePodPluginId } homePod)
+        {
+            await SkipCastAsync(homePod, "previous");
+            return;
+        }
+
         if (_youtubeQueueService.IsYouTubePlaybackActive)
         {
             try

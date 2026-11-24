@@ -121,7 +121,21 @@ public sealed partial class MainViewModel
         }
     }
 
-    /// <summary>Play/pause for the Chromecast or Apple TV the hero shows (explicit play or pause, from the known state).</summary>
+    /// <summary>Next or previous track on the HomePod the hero shows (while the receiver sleeps).</summary>
+    private async Task SkipCastAsync(CastNowPlaying cast, string action)
+    {
+        try
+        {
+            var result = await _pluginHost.ExecuteActionAsync(cast.PluginId, action, new Dictionary<string, string> { ["device"] = cast.DeviceName });
+            StatusMessage = result.Success ? $"{cast.DeviceName}: {action} track." : $"Could not skip on {cast.DeviceName}: {result.Message}";
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            StatusMessage = $"Could not skip on {cast.DeviceName}: {ex.Message}";
+        }
+    }
+
+    /// <summary>Play/pause for the Chromecast, Apple TV or HomePod the hero shows (explicit play or pause, from the known state).</summary>
     private async Task PlayPauseCastAsync(CastNowPlaying cast)
     {
         if (cast.IsPlaying && !cast.CanPause)

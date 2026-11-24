@@ -1,7 +1,10 @@
 using System.Globalization;
 using System.Text.Json;
 using Denon.App.Core.Insights;
+using Denon.App.Core.Models;
+using Denon.App.Core.Plugins;
 using Denon.App.Core.Services;
+using Denon.App.PluginSdk;
 using Denon.App.Desktop.Services;
 using Xunit;
 
@@ -88,6 +91,60 @@ public sealed class HomePodHostTests
 
         var started = ActivityFeed.Describe(Ev("session.started", Now, new { kind = "homepod", title = "Song A", app = "Apple Music" }));
         Assert.Equal("Started Song A · Apple Music", started?.Text);
+    }
+
+    private static PluginRecordSnapshot HomePodPlugin(IReadOnlyDictionary<string, string> details) => new()
+    {
+        Id = "homepod",
+        Name = "HomePod",
+        Version = "0.2.0",
+        Author = "test",
+        Description = "",
+        Category = "",
+        AccentHex = "#000000",
+        IconGlyph = "POD",
+        Capabilities = PluginCapabilities.Actions,
+        Origin = PluginOrigin.ExternalDll,
+        IsEnabled = true,
+        IsStarted = true,
+        Health = PluginHealthState.Connected,
+        StatusText = "HOMEPOD • HomePod Left + Right • Apple Music • DR P4 København",
+        StatusDetails = details,
+    };
+
+    private static readonly ReceiverPlayerInfo Player = new("Denon AVR-X2400H", 101, "Denon AVR-X2400H", "3.1", "192.168.1.3", "wired", 1, "SER");
+
+    private static ReceiverStatus Receiver(bool on) => new(
+        Player, "stop", 32, false, new NowPlayingMedia("song", "", "", "", "", "", "", null, null), DateTimeOffset.Now,
+        IsPoweredOn: on, IsMainZoneOn: on, InputSource: "TV", SoundMode: "MCH STEREO");
+
+    private static readonly Dictionary<string, string> PlayingRadio = new()
+    {
+        ["kind"] = "homepod",
+        ["speaker"] = "HomePod Left + Right",
+        ["app"] = "Apple Music",
+        ["playbackState"] = "Playing",
+        ["title"] = "DR P4 København",
+    };
+
+    [Fact]
+    public void While_the_receiver_sleeps_the_hero_shows_the_homepod_that_plays()
+    {
+        var resolved = NowPlayingResolver.Resolve(Receiver(on: false), null, [HomePodPlugin(PlayingRadio)]);
+
+        Assert.Equal("DR P4 København", resolved.Title);
+        Assert.Equal("Apple Music • HomePod Left + Right", resolved.Detail);
+        Assert.Equal("Playing", resolved.PlayStateLabel);
+        Assert.Equal("homepod", resolved.Cast?.PluginId);
+        Assert.Equal("HomePod Left + Right", resolved.Cast?.DeviceName); // play/pause and artwork go to this speaker
+        Assert.True(resolved.Cast?.IsPlaying);
+    }
+
+    [Fact]
+    public void An_awake_receiver_or_a_silent_homepod_keeps_the_receiver_hero()
+    {
+        Assert.NotEqual("DR P4 København", NowPlayingResolver.Resolve(Receiver(on: true), null, [HomePodPlugin(PlayingRadio)]).Title);
+        Assert.Equal("Receiver in Standby", NowPlayingResolver.Resolve(Receiver(on: false), null, [HomePodPlugin(new Dictionary<string, string>())]).Title);
     }
 
     [Fact]

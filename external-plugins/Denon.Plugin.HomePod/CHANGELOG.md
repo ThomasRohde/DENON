@@ -2,6 +2,17 @@
 
 Released separately from Denon Desktop with tags `homepod-vX.Y.Z`.
 
+## [0.2.0] - 2026-11-24
+
+Needs Denon Desktop **2.8.0** or later for the now-playing hero (older versions ignore it).
+
+### Added
+- **The now-playing hero shows the HomePod while the receiver sleeps:** the title, "artist • app • speaker", the
+  artwork, and Play / Pause, Previous and Next that control the HomePod.
+- **Artwork:** the plugin asks the HomePod for the artwork of what plays (as the Apple TV plugin does) and keeps the
+  newest 40 images in its data folder. `now-playing` returns it as `imageUrl`.
+- Structured status details (Plugin SDK 2.1) for the speaker the status line names.
+
 ## [0.1.0] - 2026-11-24
 
 First release. Needs Denon Desktop **2.7.0** or later (Insights and the activity feed know HomePod sessions; the

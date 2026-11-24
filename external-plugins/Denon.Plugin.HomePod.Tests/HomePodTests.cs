@@ -90,6 +90,23 @@ public sealed class HomePodStateTests
     }
 
     [Fact]
+    public void Hero_details_name_the_speaker_app_title_and_only_matching_artwork()
+    {
+        var speaker = new HomePodSpeakerConfig { Id = "L", Name = "HomePod Left + Right", Members = ["HomePod Left", "HomePod Right"] };
+        var state = Playing("com.apple.Music", "Music", "DR P4 København") with { ArtworkKey = "old|key", ArtworkPath = @"C:\art\old.jpg" };
+
+        var details = HomePodPlugin.HeroDetails((speaker, state));
+        Assert.Equal("homepod", details["kind"]);
+        Assert.Equal("HomePod Left + Right", details["speaker"]);
+        Assert.Equal("Apple Music", details["app"]);
+        Assert.Equal("Playing", details["playbackState"]);
+        Assert.Equal("DR P4 København", details["title"]);
+        Assert.False(details.ContainsKey("artworkPath")); // The artwork belongs to an older item.
+
+        Assert.Empty(HomePodPlugin.HeroDetails((speaker, new HomePodState("L"))));
+    }
+
+    [Fact]
     public void System_sounds_and_a_lost_link_are_not_media()
     {
         Assert.False(Playing("com.apple.SoundBoard").HasMedia);

@@ -38,6 +38,7 @@ public sealed class HomePodPlugin : IDenonPlugin, IPluginViewProvider
     private Task? _discoveryLoop;
     private Task? _tickLoop;
     private string? _lastStatus;
+    private string? _lastDetailsKey;
 
     public PluginManifest Manifest { get; } = new(
         Id: "homepod",
@@ -425,7 +426,8 @@ public sealed class HomePodPlugin : IDenonPlugin, IPluginViewProvider
                 return;
             }
 
-            client = new HomePodClient(speaker.Id, speaker.Host, speaker.AirPlayPort, _identity);
+            var artwork = Path.Combine(_context?.Storage.PluginDataDirectory ?? Path.GetTempPath(), "artwork");
+            client = new HomePodClient(speaker.Id, speaker.Host, speaker.AirPlayPort, _identity, artwork);
             _clients[speaker.Id] = client;
         }
 
@@ -506,13 +508,52 @@ public sealed class HomePodPlugin : IDenonPlugin, IPluginViewProvider
             health = linked > 0 ? PluginHealthState.Connected : enabled > 0 ? PluginHealthState.Warning : PluginHealthState.Idle;
         }
 
-        if (!force && text == _lastStatus)
+        var details = HeroDetails(withMedia.FirstOrDefault());
+        var detailsKey = string.Join("|", details.OrderBy(d => d.Key, StringComparer.Ordinal).Select(d => $"{d.Key}={d.Value}"));
+        if (!force && text == _lastStatus && detailsKey == _lastDetailsKey)
         {
             return;
         }
 
         _lastStatus = text;
-        _context?.ReportStatus(text, health);
+        _lastDetailsKey = detailsKey;
+        _context?.ReportStatus(text, health, details);
+    }
+
+    /// <summary>
+    /// Structured details of the speaker the status line names (kind "homepod"): Denon Desktop shows it in the
+    /// now-playing hero while the receiver sleeps, with its artwork and play/pause.
+    /// </summary>
+    internal static Dictionary<string, string> HeroDetails((HomePodSpeakerConfig Config, HomePodState State) view)
+    {
+        var details = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (view.Config is null || !view.State.HasMedia)
+        {
+            return details;
+        }
+
+        var (config, state) = view;
+        details["kind"] = "homepod";
+        details["speaker"] = config.Name;
+        details["app"] = state.AppName ?? "HomePod";
+        details["playbackState"] = state.IsPlaying ? "Playing" : "Paused";
+        Add("title", state.NowPlaying.Title);
+        Add("artist", state.NowPlaying.Artist);
+        Add("album", state.NowPlaying.Album);
+        if (state.ArtworkPath is { } art && state.ArtworkKey == state.NowPlaying.ArtworkKey)
+        {
+            details["artworkPath"] = art;
+        }
+
+        return details;
+
+        void Add(string key, string? value)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                details[key] = value.Trim();
+            }
+        }
     }
 
     private static string Describe(HomePodSpeakerConfig speaker, HomePodState state) =>
@@ -540,6 +581,10 @@ public sealed class HomePodPlugin : IDenonPlugin, IPluginViewProvider
         album = state.HasMedia ? state.NowPlaying.Album : null,
         durationSec = state.HasMedia ? state.NowPlaying.DurationSeconds : null,
         elapsedSec = state.HasMedia ? state.NowPlaying.ElapsedSeconds : null,
+        // The now-playing hero reads the artwork from here (a file in the plugin data folder), as for the Apple TV.
+        imageUrl = state.HasMedia && state.ArtworkPath is { } art && state.ArtworkKey == state.NowPlaying.ArtworkKey
+            ? new Uri(art).AbsoluteUri
+            : null,
     };
 
     private List<HomePodSpeakerConfig> SnapshotSpeakers()
