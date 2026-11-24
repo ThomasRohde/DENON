@@ -1,0 +1,265 @@
+/*
+  The site uses the app's design system: the palettes, type and radius scales and meter materials come from
+  src/generated/tokens.css (written from the app's XAML by scripts/sync-from-app.mjs). This file maps them to the
+  app's surface roles (Themes/Brushes.xaml) and sets the web layout.
+*/
+@import "../generated/tokens.css";
+
+@font-face {
+  font-family: "Share Tech Mono";
+  src: url("/DENON/generated/ShareTechMono-Regular.ttf") format("truetype");
+  font-display: swap;
+}
+
+:root {
+  /* Surface roles, as the app's brushes name them. */
+  --chassis: var(--ink-01);
+  --sidebar: var(--ink-02);
+  --card: var(--ink-04);
+  --card-raised: var(--ink-06);
+  --hairline: var(--ink-09);
+  --control: var(--ink-08);
+  --control-border: var(--ink-12);
+
+  /* Web type scale: the app's ratios, sized for reading. */
+  --step--1: 0.875rem;
+  --step-0: 1.0625rem;
+  --step-1: 1.25rem;
+  --step-2: 1.625rem;
+  --step-3: 2.25rem;
+  --step-4: clamp(2.4rem, 4.6vw, 3.75rem);
+
+  --gutter: clamp(1rem, 4vw, 2.5rem);
+  --measure: 68ch;
+  --wide: 76rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--chassis);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  background: var(--chassis);
+  font-size: var(--step-0);
+  line-height: 1.6;
+}
+
+img,
+svg,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: var(--accent-cyan-text);
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+}
+
+a:hover {
+  color: var(--accent-cyan-bright);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 3px;
+  border-radius: var(--app-radius-01);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  margin: 0 0 0.5em;
+  color: var(--text-strong);
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: var(--step-4);
+  font-weight: 650;
+}
+
+h2 {
+  font-size: var(--step-3);
+  font-weight: 600;
+}
+
+h3 {
+  font-size: var(--step-1);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+p {
+  margin: 0 0 1em;
+  max-width: var(--measure);
+  text-wrap: pretty;
+}
+
+code,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+kbd {
+  display: inline-block;
+  padding: 0.05em 0.45em;
+  border: 1px solid var(--control-border);
+  border-bottom-width: 2px;
+  border-radius: var(--app-radius-01);
+  background: var(--control);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.wrap {
+  width: min(100% - 2 * var(--gutter), var(--wide));
+  margin-inline: auto;
+}
+
+.muted {
+  color: var(--text-secondary);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Buttons and chips, as the app draws them. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.75em 1.25em;
+  border-radius: var(--app-radius-04);
+  border: 1px solid transparent;
+  font: 600 var(--step-0) / 1.2 var(--font-ui);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button-primary {
+  background: var(--accent-cyan);
+  color: var(--accent-cyan-ink);
+  box-shadow: 0 0 0 1px var(--accent-cyan-border-strong), 0 8px 28px -12px var(--accent-cyan-glow);
+}
+
+.button-primary:hover {
+  background: var(--accent-cyan-bright);
+  color: var(--accent-cyan-ink);
+}
+
+.button-quiet {
+  background: var(--control);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+.button-quiet:hover {
+  background: var(--card-raised);
+  color: var(--text-strong);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.3em 0.75em;
+  border-radius: var(--app-radius-03);
+  border: 1px solid var(--control-border);
+  background: var(--control);
+  color: var(--text-secondary);
+  font: 600 var(--step--1) / 1.3 var(--font-ui);
+  cursor: pointer;
+}
+
+.chip[aria-pressed="true"],
+.chip[aria-current="page"] {
+  background: var(--accent-cyan-subtle-bg);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan-text);
+}
+
+.chip:hover {
+  color: var(--text-strong);
+}
+
+/* A section of the page. */
+.section {
+  padding-block: clamp(3.5rem, 8vw, 6.5rem);
+  border-top: 1px solid var(--hairline);
+}
+
+.section-intro {
+  max-width: 44rem;
+  margin-bottom: 2.5rem;
+}
+
+.section-intro p {
+  color: var(--text-secondary);
+  font-size: var(--step-1);
+  line-height: 1.5;
+}
+
+/* Screenshots: the dark or light capture follows the theme. */
+.shot {
+  border-radius: var(--app-radius-05);
+  border: 1px solid var(--hairline);
+  box-shadow: 0 30px 80px -40px rgb(0 0 0 / 0.65);
+  background: var(--sidebar);
+  width: 100%;
+  height: auto;
+}
+
+.shot-light {
+  display: none;
+}
+
+:root[data-theme="light"] .shot-light {
+  display: block;
+}
+
+:root[data-theme="light"] .shot-dark {
+  display: none;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .shot-light {
+    display: block;
+  }
+
+  :root:not([data-theme="dark"]) .shot-dark {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

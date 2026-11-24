@@ -1,0 +1,384 @@
+---
+// The app's meters, for the web: a pair of VU dials drawn like Controls/VuDial.cs (500 x 132 design space, pivot
+// below the window, true VU scale) and the 31-band LED spectrum (Controls/SpectrumLedView.cs). Colours are the
+// meter materials from MeterPalette (generated tokens), so they follow the theme like the app. A synthetic program
+// signal moves them; with reduced motion they hold one frame.
+
+const W = 500;
+const H = 132;
+const PIVOT = { x: 250, y: 238 };
+const R = 196;
+const MIN = -50;
+const MAX = 50;
+const deflect = (vu: number) => Math.pow(10, vu / 20) / Math.pow(10, 3 / 20);
+const angleFor = (d: number) => MIN + d * (MAX - MIN);
+const at = (deg: number, r: number) => {
+  const a = (deg * Math.PI) / 180;
+  return { x: PIVOT.x + r * Math.sin(a), y: PIVOT.y - r * Math.cos(a) };
+};
+const arc = (from: number, to: number, r: number) => {
+  const a = at(from, r);
+  const b = at(to, r);
+  return `M${a.x.toFixed(2)},${a.y.toFixed(2)} A${r},${r} 0 0 1 ${b.x.toFixed(2)},${b.y.toFixed(2)}`;
+};
+
+const zero = angleFor(deflect(0));
+const marks = [
+  { vu: -20, label: "20" }, { vu: -10, label: "10" }, { vu: -7, label: "7" }, { vu: -6 }, { vu: -5, label: "5" },
+  { vu: -4 }, { vu: -3, label: "3" }, { vu: -2, label: "2" }, { vu: -1, label: "1" }, { vu: 0, label: "0" },
+  { vu: 0.5 }, { vu: 1, label: "1" }, { vu: 1.5 }, { vu: 2, label: "2" }, { vu: 2.5 }, { vu: 3, label: "3" },
+].map((m) => {
+  const a = angleFor(deflect(m.vu));
+  const major = "label" in m;
+  return {
+    ...m,
+    red: m.vu >= 0,
+    major,
+    tick: [at(a, R - 1.5), at(a, R + (major ? 10 : 5.5))],
+    text: at(a, R + 20.5),
+  };
+});
+const inner = [20, 40, 60, 80, 100].map((p) => ({ p, at: at(angleFor(deflect(0) * p / 100), R - 25) }));
+const band = (() => {
+  const a = at(zero, R);
+  const b = at(MAX, R);
+  const c = at(MAX, R + 7.5);
+  const d = at(zero, R + 4);
+  return `M${a.x},${a.y} A${R},${R} 0 0 1 ${b.x},${b.y} L${c.x},${c.y} A${R + 6},${R + 6} 0 0 0 ${d.x},${d.y} Z`;
+})();
+
+const dials = [
+  { channel: "L", name: "LEFT CHANNEL", side: "left", accent: "var(--meter-left-accent)" },
+  { channel: "R", name: "RIGHT CHANNEL", side: "right", accent: "var(--meter-right-accent)" },
+] as const;
+---
+
+<figure class="panel" aria-label="The Denon Desktop meters: a pair of VU dials and a 31-band spectrum, moving with music">
+  <div class="dials">
+    {dials.map((d) => (
+      <svg class="dial" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${d.name.toLowerCase()} VU meter`} data-dial={d.side} style={`--accent:${d.accent}`}>
+        <defs>
+          <linearGradient id={`face-${d.side}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="var(--meter-face-top)" />
+            <stop offset="0.55" stop-color="var(--meter-face-middle)" />
+            <stop offset="1" stop-color="var(--meter-face-bottom)" />
+          </linearGradient>
+          <radialGradient id={`lamp-${d.side}`} cx="0.5" cy="1.05" r="0.75">
+            <stop offset="0" stop-color={d.accent} stop-opacity="0.42" />
+            <stop offset="0.45" stop-color={d.accent} stop-opacity="0.16" />
+            <stop offset="1" stop-color={d.accent} stop-opacity="0" />
+          </radialGradient>
+          <radialGradient id={`hood-${d.side}`} cx={PIVOT.x} cy={PIVOT.y} r="116" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="var(--meter-hood-center)" />
+            <stop offset="0.93" stop-color="var(--meter-hood-center)" />
+            <stop offset="1" stop-color="var(--meter-hood-edge)" />
+          </radialGradient>
+          <linearGradient id={`sheen-${d.side}`} x1="0" y1="0" x2="0.15" y2="1">
+            <stop offset="0" stop-color="#fff" stop-opacity="0.09" />
+            <stop offset="1" stop-color="#fff" stop-opacity="0.01" />
+          </linearGradient>
+          <clipPath id={`clip-${d.side}`}><rect width={W} height={H} rx="11" /></clipPath>
+        </defs>
+        <g clip-path={`url(#clip-${d.side})`}>
+          <rect width={W} height={H} fill={`url(#face-${d.side})`} />
+          <rect class="lamp" width={W} height={H} fill={`url(#lamp-${d.side})`} />
+          <path d={band} fill="var(--meter-red-zone)" opacity="0.9" />
+          <path d={arc(MIN + (angleFor(deflect(-20)) - MIN), zero, R)} class="ink" fill="none" stroke-width="1.3" />
+          <path d={arc(zero, MAX, R)} fill="none" stroke="var(--meter-red-zone-ink)" stroke-width="1" />
+          {marks.map((m) => (
+            <line x1={m.tick[0].x} y1={m.tick[0].y} x2={m.tick[1].x} y2={m.tick[1].y}
+              stroke={m.red ? "var(--meter-red-zone-ink)" : "var(--meter-paper-ink)"} stroke-width={m.major ? 1.6 : 1} stroke-linecap="round" />
+          ))}
+          {marks.filter((m) => m.label).map((m) => (
+            <text x={m.text.x} y={m.text.y} class="scale" fill={m.red ? "var(--meter-red-zone-ink)" : "var(--meter-paper-ink)"}
+              font-size={m.vu === 0 ? 12.5 : 11} text-anchor="middle" dominant-baseline="central">{m.label}</text>
+          ))}
+          <path d={arc(MIN, zero, R - 15)} class="ink dim" fill="none" stroke-width="0.8" />
+          {inner.map((i) => (
+            <text x={i.at.x} y={i.at.y} class="scale dim-text" font-size="7.5" text-anchor="middle" dominant-baseline="central">{i.p}</text>
+          ))}
+          <text x={d.side === "left" ? 18 : W - 18} y="34" class="letter" text-anchor={d.side === "left" ? "start" : "end"}>{d.channel}</text>
+          <text x={d.side === "left" ? 19 : W - 18} y="49" class="caption" text-anchor={d.side === "left" ? "start" : "end"}>{d.name}</text>
+          <circle class="peak" cx={d.side === "left" ? W - 30 : 30} cy="22" r="4.8" />
+          <text x={d.side === "left" ? W - 39 : 39} y="22" class="caption" text-anchor={d.side === "left" ? "end" : "start"} dominant-baseline="central">PEAK</text>
+          <text x={W / 2} y="96" class="legend" text-anchor="middle">VU</text>
+          <g class="tag">
+            <rect x={W / 2 - 22} y="106" width="44" height="13" rx="4" />
+            <text x={W / 2} y="113" text-anchor="middle" dominant-baseline="central">DENON</text>
+          </g>
+          <text x={d.side === "left" ? 18 : W - 18} y="104" class="readout" data-readout text-anchor={d.side === "left" ? "start" : "end"}>-12.0</text>
+          <text x={d.side === "left" ? 18.5 : W - 18} y="118" class="readout-sub" data-peak text-anchor={d.side === "left" ? "start" : "end"}>dBFS · PK -9.0</text>
+          <g class="needle" data-needle style={`transform-origin:${PIVOT.x}px ${PIVOT.y}px; transform: rotate(${MIN + 18}deg)`}>
+            <path d={`M${PIVOT.x - 1.7},${PIVOT.y - 96} L${PIVOT.x - 0.45},${PIVOT.y - R - 9} L${PIVOT.x + 0.45},${PIVOT.y - R - 9} L${PIVOT.x + 1.7},${PIVOT.y - 96} Z`} />
+          </g>
+          <circle cx={PIVOT.x} cy={PIVOT.y} r="116" fill={`url(#hood-${d.side})`} />
+          <path d={arc(-31, 31, 116)} fill="none" stroke={d.accent} stroke-opacity="0.35" stroke-width="0.8" />
+          <path d={`M0,0 H${W} V30 Q${W / 2},62 0,44 Z`} fill={`url(#sheen-${d.side})`} />
+        </g>
+        <rect x="0.5" y="0.5" width={W - 1} height={H - 1} rx="10.5" fill="none" stroke="#fff" stroke-opacity="0.08" />
+      </svg>
+    ))}
+  </div>
+  <div class="screen">
+    <canvas data-spectrum width="1000" height="124" aria-hidden="true"></canvas>
+    <div class="screen-labels" aria-hidden="true">
+      <span>31</span><span>63</span><span>125</span><span>250</span><span>500</span><span>1k</span><span>2k</span><span>4k</span><span>8k</span><span>16k</span>
+    </div>
+  </div>
+</figure>
+
+<style>
+  .panel {
+    margin: 0;
+    padding: clamp(0.6rem, 1.4vw, 1rem);
+    border-radius: var(--app-radius-07);
+    background: linear-gradient(160deg, var(--card-raised), var(--card));
+    border: 1px solid var(--hairline);
+    box-shadow: 0 40px 90px -50px rgb(0 0 0 / 0.8), inset 0 1px 0 var(--overlay-highlight-faint);
+    display: grid;
+    gap: clamp(0.5rem, 1.2vw, 0.8rem);
+  }
+
+  .dials {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(0.5rem, 1.2vw, 0.8rem);
+  }
+
+  @media (max-width: 560px) {
+    .dials {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .dial {
+    width: 100%;
+    height: auto;
+    border-radius: 11px;
+  }
+
+  .dial .ink {
+    stroke: var(--meter-paper-ink);
+  }
+
+  .dial .dim {
+    opacity: 0.36;
+  }
+
+  .dial .scale {
+    font: 600 11px var(--font-display);
+  }
+
+  .dial .dim-text {
+    fill: var(--meter-paper-ink);
+    opacity: 0.36;
+  }
+
+  .dial .letter {
+    font: 300 30px var(--font-display);
+    fill: var(--accent);
+  }
+
+  .dial .caption {
+    font: 700 7px var(--font-display);
+    fill: var(--meter-paper-ink);
+    opacity: 0.47;
+    letter-spacing: 0.04em;
+  }
+
+  .dial .legend {
+    font: 700 24px var(--font-display);
+    fill: var(--accent);
+  }
+
+  .dial .tag rect {
+    fill: color-mix(in srgb, var(--meter-source-denon) 14%, transparent);
+    stroke: color-mix(in srgb, var(--meter-source-denon) 45%, transparent);
+    stroke-width: 0.7;
+  }
+
+  .dial .tag text {
+    font: 700 7.5px var(--font-display);
+    fill: var(--meter-source-denon);
+  }
+
+  .dial .readout {
+    font: 15px var(--font-readout);
+    fill: var(--meter-paper-ink);
+  }
+
+  .dial .readout-sub {
+    font: 7.5px var(--font-readout);
+    fill: var(--meter-paper-ink);
+    opacity: 0.5;
+  }
+
+  .dial .peak {
+    fill: var(--meter-peak-lamp-unlit-center);
+    stroke: #fff;
+    stroke-opacity: 0.25;
+    stroke-width: 0.6;
+  }
+
+  .dial .peak.lit {
+    fill: var(--meter-red-zone);
+    filter: drop-shadow(0 0 4px var(--meter-red-zone));
+  }
+
+  .dial .needle path {
+    fill: var(--meter-needle-tip);
+  }
+
+  .screen {
+    position: relative;
+    border-radius: var(--app-radius-04);
+    background: var(--meter-led-screen);
+    border: 1px solid var(--meter-led-screen-edge);
+    padding: 0.6rem 0.75rem 0.35rem;
+    overflow: hidden;
+  }
+
+  .screen::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, var(--overlay-highlight-faint), transparent 35%);
+    pointer-events: none;
+  }
+
+  .screen canvas {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1000 / 124;
+  }
+
+  .screen-labels {
+    display: flex;
+    justify-content: space-between;
+    padding-inline: 0.2rem;
+    font: 0.7rem var(--font-readout);
+    color: var(--meter-led-label);
+  }
+</style>
+
+<script>
+  // A synthetic program: a beat, a bass line and a wandering spectral tilt. It moves the needles like VU
+  // ballistics (300 ms) and the LED bars with fast attack and slow release, like the app.
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const dials = [...document.querySelectorAll<SVGElement>("[data-dial]")];
+  const canvas = document.querySelector<HTMLCanvasElement>("[data-spectrum]");
+  const BANDS = 31;
+  const ROWS = 20;
+  const MIN = -50;
+  const MAX = 50;
+  const deflect = (vu: number) => Math.pow(10, vu / 20) / Math.pow(10, 3 / 20);
+
+  const level = new Float32Array(BANDS);
+  const peaks = new Float32Array(BANDS);
+  const peakHold = new Float32Array(BANDS);
+  const vu = [0.2, 0.2];
+  let t = 0;
+  let last = performance.now();
+  let readoutAt = 0;
+
+  const heat = () => {
+    const css = getComputedStyle(document.documentElement).getPropertyValue("--meter-led-heat");
+    // Any colour form (the CSS minifier may turn rgb() into hex), each followed by its stop position.
+    return [...css.matchAll(/(#[0-9a-f]{3,8}|rgba?\([^)]*\))\s+([\d.]+)%/gi)].map((m) => [Number(m[2]) / 100, m[1]] as const);
+  };
+  let stops = heat();
+  const screen = () => getComputedStyle(document.documentElement).getPropertyValue("--meter-led-screen").trim();
+  const restyle = () => {
+    stops = heat();
+    draw();
+  };
+  new MutationObserver(restyle).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  matchMedia("(prefers-color-scheme: light)").addEventListener("change", restyle);
+
+  const target = (band: number, time: number) => {
+    const x = band / (BANDS - 1);
+    const beat = Math.pow(Math.max(0, Math.sin(time * Math.PI * 2 * 2.05)), 10);
+    const bass = Math.exp(-Math.pow((x - 0.12) / 0.12, 2)) * (0.55 + 0.45 * beat);
+    const mids = Math.exp(-Math.pow((x - (0.42 + 0.08 * Math.sin(time * 0.37))) / 0.2, 2)) * (0.62 + 0.18 * Math.sin(time * 1.3 + band));
+    const air = (1 - x) * 0.18 + 0.12 * Math.max(0, Math.sin(time * 6.1 + band * 1.7));
+    const swell = 0.82 + 0.18 * Math.sin(time * 0.21);
+    return Math.min(1, (bass + mids + air) * swell + 0.06 * Math.random());
+  };
+
+  const draw = () => {
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const { width, height } = canvas;
+    ctx.fillStyle = screen();
+    ctx.fillRect(0, 0, width, height);
+    const slot = width / BANDS;
+    const barW = Math.round(slot * 0.72);
+    const pitch = height / ROWS;
+    const gap = Math.max(1.5, pitch * 0.22);
+    const gradient = ctx.createLinearGradient(0, height, 0, 0);
+    for (const [o, c] of stops) gradient.addColorStop(o, c);
+    for (let i = 0; i < BANDS; i++) {
+      const x = Math.round(i * slot + (slot - barW) / 2);
+      const lit = Math.round(level[i] * ROWS);
+      for (let r = 0; r < ROWS; r++) {
+        const y = height - (r + 1) * pitch;
+        ctx.globalAlpha = r < lit ? 1 : 0.08;
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, y, barW, pitch - gap);
+      }
+      const pr = Math.round(peaks[i] * ROWS);
+      if (pr > lit && pr >= 2) {
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        ctx.fillRect(x, height - pr * pitch, barW, pitch - gap);
+      }
+    }
+    ctx.globalAlpha = 1;
+  };
+
+  const frame = (now: number) => {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    t += dt;
+    let energy = 0;
+    for (let i = 0; i < BANDS; i++) {
+      const goal = target(i, t);
+      level[i] += (goal - level[i]) * (goal > level[i] ? 0.55 : 0.12);
+      energy += level[i];
+      if (level[i] >= peaks[i] || now > peakHold[i]) {
+        peaks[i] = Math.max(level[i], peaks[i] - dt * 0.6);
+        if (level[i] >= peaks[i]) peakHold[i] = now + 900;
+      }
+    }
+    energy /= BANDS;
+    dials.forEach((dial, side) => {
+      const goal = Math.min(1.05, energy * (side === 0 ? 1.55 : 1.45) + 0.04 * Math.sin(t * 3 + side));
+      vu[side] += (goal - vu[side]) * Math.min(1, dt / 0.3);
+      const vuValue = 20 * Math.log10(Math.max(0.01, vu[side] * Math.pow(10, 3 / 20)));
+      const angle = MIN + Math.max(0, Math.min(1.04, deflect(vuValue))) * (MAX - MIN);
+      dial.querySelector<SVGGElement>("[data-needle]")!.style.transform = `rotate(${angle}deg)`;
+      dial.querySelector(".peak")?.classList.toggle("lit", vuValue >= 0);
+      (dial.querySelector(".lamp") as SVGElement).style.opacity = String(0.45 + 0.55 * Math.min(1, vu[side] / 0.75));
+      if (now > readoutAt) {
+        const dbfs = vuValue - 7.2;
+        dial.querySelector("[data-readout]")!.textContent = dbfs.toFixed(1);
+        dial.querySelector("[data-peak]")!.textContent = `dBFS · PK ${(dbfs + 2.4).toFixed(1)}`;
+      }
+    });
+    if (now > readoutAt) readoutAt = now + 90;
+  };
+
+  const loop = (now: number) => {
+    frame(now);
+    draw();
+    requestAnimationFrame(loop);
+  };
+
+  // Seed a believable still frame, then run (or hold it when motion is reduced).
+  const seed = performance.now();
+  for (let i = 1; i <= 90; i++) frame(seed + 16 * i);
+  last = performance.now();
+  draw();
+  if (!reduced) requestAnimationFrame(loop);
+</script>

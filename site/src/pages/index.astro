@@ -1,0 +1,436 @@
+---
+import Base from "../layouts/Base.astro";
+import FrontPanel from "../components/FrontPanel.astro";
+import Icon from "../components/Icon.astro";
+import Shot from "../components/Shot.astro";
+import { links, tour, url, versions } from "../data/site";
+
+const steps = [
+  {
+    title: "Download and install",
+    text: "Get the installer for Windows 10 or 11. It needs no .NET install. Windows may warn that the app is unsigned: click More info, then Run anyway.",
+  },
+  {
+    title: "Start it on the same network as the receiver",
+    text: "On the first start the app looks for the receiver and connects. If it does not, set Network Control to Always On in the receiver's setup menu.",
+  },
+  {
+    title: "Allow the firewall rule once",
+    text: "YouTube, PC audio, the jukebox and the phone remote stream through the app. Click Allow Firewall on the Music or Cast page, then Yes.",
+  },
+  {
+    title: "Make it yours",
+    text: "Choose Follow Windows, Dark or Light, and a skin that fits your screen. Add your lights, TV and scenes when you are ready.",
+  },
+];
+
+const skins = [
+  { file: "hifi-dark", name: "Hi-Fi", text: "Square corners, display type and amber-backlit dials, like a rack receiver." },
+  { file: "compact-light", name: "Compact", text: "Smaller type and spacing, so more fits on a laptop screen." },
+  { file: "large-dark", name: "Large", text: "Larger type and controls, readable from the sofa." },
+];
+
+const devices = [
+  { name: "Denon and Marantz receivers", text: "AV receivers and HEOS players on your network. Volume, inputs, sound modes, Audyssey and Zone 2." },
+  { name: "Philips Hue", text: "Rooms, scenes and lights that move with the music." },
+  { name: "LG webOS TVs", text: "Power, inputs, apps, the TV keyboard and Screen Off." },
+  { name: "Home Assistant", text: "Run scripts and scenes, and send the receiver's state to your dashboards." },
+  { name: "Chromecast", text: "See what plays on your Cast devices. A separate plugin download." },
+  { name: "Apple TV", text: "Pair once, then see what plays and pause it. A separate plugin download." },
+];
+---
+
+<Base current="home">
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <h1>The front panel of your Denon, on your PC.</h1>
+        <p class="lead">
+          Denon Desktop controls Denon and Marantz receivers from Windows. It streams YouTube, internet radio and your
+          PC's sound to the speakers, and shows the music on real VU meters.
+        </p>
+        <div class="actions">
+          <a class="button button-primary" href={links.installer}>Download for Windows</a>
+          <a class="button button-quiet" href={url("guide/")}>Read the guide</a>
+        </div>
+        <p class="fineprint">
+          Version {versions.app} for Windows 10 and 11, 64-bit. Free and open source.
+          <a href={url("download/")}>Other downloads and checksums</a>
+        </p>
+      </div>
+      <FrontPanel />
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="setup">
+    <div class="wrap">
+      <div class="section-intro">
+        <h2 id="setup">Set up in four steps</h2>
+        <p>No account and no cloud service. The app finds the receiver on your network by itself.</p>
+      </div>
+      <ol class="steps">
+        {steps.map((s) => (
+          <li>
+            <h3>{s.title}</h3>
+            <p>{s.text}</p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </section>
+
+  <section class="section tour" aria-labelledby="tour">
+    <div class="wrap">
+      <div class="section-intro">
+        <h2 id="tour">Every page of the app</h2>
+        <p>The left rail of the app, as it is. Choose a page to see it.</p>
+      </div>
+      <div class="tour-frame" data-tour>
+        <div class="rail" role="tablist" aria-label="App pages">
+          {tour.map((page, i) => (
+            <button role="tab" id={`tab-${page.id}`} aria-controls={`panel-${page.id}`} aria-selected={i === 0 ? "true" : "false"} tabindex={i === 0 ? 0 : -1}>
+              <Icon name={page.icon} size={22} />
+              <span>{page.label}</span>
+            </button>
+          ))}
+        </div>
+        {tour.map((page, i) => (
+          <div class="tour-panel" role="tabpanel" id={`panel-${page.id}`} aria-labelledby={`tab-${page.id}`} hidden={i !== 0}>
+            <div class="tour-text">
+              <h3>{page.title}</h3>
+              <p>{page.text}</p>
+              <a href={url(`guide/${page.guide}/`)}>How to use it</a>
+            </div>
+            <Shot name={page.shot} alt={`The ${page.title.toLowerCase()} page of Denon Desktop`} eager={i === 0} />
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="looks">
+    <div class="wrap">
+      <div class="section-intro">
+        <h2 id="looks">Dark, light, and a skin for every screen</h2>
+        <p>
+          The theme follows Windows, or you choose Dark or Light. The skin sets type, spacing, corners and the meters.
+          Any skin works with any theme, and both change at once. This site follows the same switch at the top.
+        </p>
+      </div>
+      <div class="skins">
+        {skins.map((s) => (
+          <figure>
+            <img class="shot" src={url(`shots/skins/${s.file}.webp`)} alt={`The control deck with the ${s.name} skin`} loading="lazy" decoding="async" width="1360" height="1000" />
+            <figcaption><strong>{s.name}.</strong> {s.text}</figcaption>
+          </figure>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="works">
+    <div class="wrap works">
+      <div class="section-intro">
+        <h2 id="works">Works with the rest of the room</h2>
+        <p>Scenes can set the receiver, the lights and the TV in one click. Each device has its own page in the app.</p>
+      </div>
+      <dl class="devices">
+        {devices.map((d) => (
+          <div>
+            <dt>{d.name}</dt>
+            <dd>{d.text}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  </section>
+
+  <section class="section local" aria-labelledby="local">
+    <div class="wrap local-grid">
+      <div>
+        <h2 id="local">Runs on your network</h2>
+        <p>
+          The app talks to the receiver, the lights and the TV over your own network. You need no account, and it
+          keeps its settings and logs on your PC. Only YouTube, the radio directory, song lyrics and the Hue bridge
+          search use the internet.
+        </p>
+        <p>
+          The phone remote is a web page the app serves on your Wi-Fi. Guests get their own QR code, and you can
+          revoke it at any time.
+        </p>
+      </div>
+      <div class="local-cta">
+        <a class="button button-primary" href={links.installer}>Download Denon Desktop {versions.app}</a>
+        <a href={url("guide/quick-start/")}>Start with the quick start</a>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  // The tour: a tab list (arrow keys move between pages, as in a toolbar).
+  const frame = document.querySelector("[data-tour]");
+  const tabs = [...(frame?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])];
+  const select = (tab: HTMLButtonElement, focus = false) => {
+    for (const t of tabs) {
+      const on = t === tab;
+      t.setAttribute("aria-selected", String(on));
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute("aria-controls")!)!.hidden = !on;
+    }
+    if (focus) tab.focus();
+  };
+  tabs.forEach((tab, i) => {
+    tab.addEventListener("click", () => select(tab));
+    tab.addEventListener("keydown", (e) => {
+      const next = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+      if (next) {
+        e.preventDefault();
+        select(tabs[(i + next + tabs.length) % tabs.length], true);
+      } else if (e.key === "Home" || e.key === "End") {
+        e.preventDefault();
+        select(tabs[e.key === "Home" ? 0 : tabs.length - 1], true);
+      }
+    });
+  });
+</script>
+
+<style>
+  .hero {
+    padding-block: clamp(2.5rem, 7vw, 5.5rem) clamp(3rem, 7vw, 5.5rem);
+    background:
+      radial-gradient(70rem 30rem at 85% 0%, var(--accent-cyan-subtle-bg), transparent 70%),
+      var(--chassis);
+  }
+
+  .hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr);
+    gap: clamp(2rem, 5vw, 4.5rem);
+    align-items: center;
+  }
+
+  @media (max-width: 980px) {
+    .hero-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .lead {
+    font-size: var(--step-1);
+    line-height: 1.5;
+    color: var(--text-soft);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin: 1.75rem 0 1rem;
+  }
+
+  .fineprint {
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+
+  .fineprint a {
+    display: inline-block;
+    margin-left: 0.25rem;
+  }
+
+  .steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 2rem;
+    counter-reset: step;
+  }
+
+  .steps li {
+    counter-increment: step;
+    border-top: 2px solid var(--accent-cyan);
+    padding-top: 1rem;
+  }
+
+  .steps h3::before {
+    content: counter(step);
+    display: block;
+    font: 2.25rem / 1 var(--font-readout);
+    color: var(--accent-cyan-text);
+    margin-bottom: 0.6rem;
+  }
+
+  .steps p {
+    color: var(--text-secondary);
+    font-size: 0.98rem;
+  }
+
+  .tour-frame {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    border: 1px solid var(--hairline);
+    border-radius: var(--app-radius-07);
+    background: var(--sidebar);
+    overflow: hidden;
+  }
+
+  .rail {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem 0.5rem;
+    border-right: 1px solid var(--hairline);
+  }
+
+  .rail button {
+    display: grid;
+    justify-items: center;
+    gap: 0.25rem;
+    padding: 0.6rem 0.25rem;
+    border: 0;
+    border-radius: var(--app-radius-04);
+    background: transparent;
+    color: var(--text-muted);
+    font: 600 0.78rem var(--font-ui);
+    cursor: pointer;
+  }
+
+  .rail button:hover {
+    color: var(--text-strong);
+    background: var(--control);
+  }
+
+  .rail button[aria-selected="true"] {
+    color: var(--accent-cyan-text);
+    background: var(--accent-cyan-subtle-bg);
+  }
+
+  .tour-panel {
+    padding: clamp(1rem, 2.5vw, 1.75rem);
+    background: var(--chassis);
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  .tour-panel[hidden] {
+    display: none;
+  }
+
+  .tour-text {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.25rem 2rem;
+    align-items: end;
+  }
+
+  .tour-text h3 {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: var(--step-2);
+  }
+
+  .tour-text p {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+
+  .tour-text a {
+    white-space: nowrap;
+    font-weight: 600;
+  }
+
+  @media (max-width: 720px) {
+    .tour-frame {
+      grid-template-columns: 1fr;
+    }
+
+    .rail {
+      flex-direction: row;
+      overflow-x: auto;
+      border-right: 0;
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .rail button {
+      min-width: 4.5rem;
+    }
+
+    .tour-text {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .skins {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    gap: 1.5rem;
+  }
+
+  .skins figure {
+    margin: 0;
+  }
+
+  .skins figcaption {
+    margin-top: 0.75rem;
+    color: var(--text-secondary);
+    font-size: 0.98rem;
+  }
+
+  .skins strong {
+    color: var(--text-strong);
+  }
+
+  .devices {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 0;
+    margin: 0;
+    border-top: 1px solid var(--hairline);
+  }
+
+  .devices div {
+    padding: 1.25rem 1.5rem 1.25rem 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .devices dt {
+    font: 600 var(--step-1) var(--font-display);
+    color: var(--text-strong);
+    margin-bottom: 0.3rem;
+  }
+
+  .devices dd {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+
+  .local {
+    background: linear-gradient(180deg, var(--chassis), var(--sidebar));
+  }
+
+  .local-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 3rem;
+    align-items: center;
+  }
+
+  .local-grid p {
+    color: var(--text-secondary);
+  }
+
+  .local-cta {
+    display: grid;
+    justify-items: start;
+    gap: 1rem;
+  }
+
+  @media (max-width: 860px) {
+    .local-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

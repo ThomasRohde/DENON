@@ -1,0 +1,387 @@
+---
+import Base from "../../layouts/Base.astro";
+import Shot from "../../components/Shot.astro";
+import help from "../../generated/help.json";
+import { topicShots, url } from "../../data/site";
+
+export function getStaticPaths() {
+  return help.topics.map((topic, i) => ({
+    params: { id: topic.id },
+    props: { topic, previous: help.topics[i - 1], next: help.topics[i + 1] },
+  }));
+}
+
+type Topic = (typeof help.topics)[number];
+interface Props {
+  topic: Topic;
+  previous?: Topic;
+  next?: Topic;
+}
+
+const { topic, previous, next } = Astro.props;
+const shot = topicShots[topic.id];
+const categories = [...new Set(help.topics.map((t) => t.category))];
+---
+
+<Base title={topic.title} description={topic.subtitle} current="guide">
+  <div class="wrap layout">
+    <nav class="toc" aria-label="Guide topics">
+      <a class="all" href={url("guide/")}>All topics</a>
+      {categories.map((category) => (
+        <div>
+          <p class="toc-group">{category}</p>
+          <ul>
+            {help.topics.filter((t) => t.category === category).map((t) => (
+              <li><a href={url(`guide/${t.id}/`)} aria-current={t.id === topic.id ? "page" : undefined}>{t.title}</a></li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </nav>
+
+    <article style={`--badge:${topic.accent}`}>
+      <header class="head">
+        <p class="meta"><span class="badge">{topic.badge}</span> {topic.category}</p>
+        <h1>{topic.title}</h1>
+        <p class="subtitle">{topic.subtitle}</p>
+      </header>
+
+      {shot && (
+        <div class={shot === "00-splash" ? "figure figure-small" : "figure"}>
+          <Shot name={shot} alt={`Denon Desktop: ${topic.title}`} eager />
+        </div>
+      )}
+
+      <p class="overview">{topic.overview}</p>
+
+      {topic.steps.length > 0 && (
+        <section aria-labelledby="steps">
+          <h2 id="steps">Step by step</h2>
+          <ol class="steps">
+            {topic.steps.map((s) => (
+              <li>
+                <h3>{s.title}</h3>
+                <p>{s.body}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      {topic.shortcuts && (
+        <section aria-labelledby="keys">
+          <h2 id="keys">All keyboard shortcuts</h2>
+          <div class="table">
+            <table>
+              <thead><tr><th scope="col">Keys</th><th scope="col">Where</th><th scope="col">What it does</th></tr></thead>
+              <tbody>
+                {help.shortcuts.map((s) => (
+                  <tr><td><kbd>{s.keys}</kbd></td><td>{s.where}</td><td>{s.what}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {topic.ports && (
+        <section aria-labelledby="ports">
+          <h2 id="ports">Network ports</h2>
+          <div class="table">
+            <table>
+              <thead><tr><th scope="col">Port</th><th scope="col">Used by</th><th scope="col">For</th></tr></thead>
+              <tbody>
+                {help.ports.map((p) => (
+                  <tr><td><code>{p.port}</code></td><td>{p.service}</td><td>{p.use}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {topic.tips.length > 0 && (
+        <section aria-labelledby="tips">
+          <h2 id="tips">Good to know</h2>
+          <ul class="tips">
+            {topic.tips.map((tip) => <li>{tip}</li>)}
+          </ul>
+        </section>
+      )}
+
+      {topic.faq.length > 0 && (
+        <section aria-labelledby="faq">
+          <h2 id="faq">If something does not work</h2>
+          <div class="faq">
+            {topic.faq.map((f) => (
+              <details>
+                <summary>{f.q}</summary>
+                <p>{f.a}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <nav class="pager" aria-label="Next and previous topic">
+        {previous ? <a rel="prev" href={url(`guide/${previous.id}/`)}><span>Previous</span>{previous.title}</a> : <span />}
+        {next && <a rel="next" class="next" href={url(`guide/${next.id}/`)}><span>Next</span>{next.title}</a>}
+      </nav>
+    </article>
+  </div>
+</Base>
+
+<style>
+  .layout {
+    display: grid;
+    grid-template-columns: 16rem minmax(0, 1fr);
+    gap: clamp(2rem, 5vw, 4.5rem);
+    padding-block: clamp(2rem, 5vw, 3.5rem) 5rem;
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+
+    .toc {
+      display: none;
+    }
+  }
+
+  .toc {
+    position: sticky;
+    top: 5rem;
+    max-height: calc(100vh - 6rem);
+    overflow-y: auto;
+    font-size: 0.9rem;
+    padding-right: 0.5rem;
+  }
+
+  .toc .all {
+    display: inline-block;
+    margin-bottom: 1rem;
+    font-weight: 600;
+  }
+
+  .toc-group {
+    margin: 1.1rem 0 0.35rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.82rem;
+  }
+
+  .toc ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .toc li a {
+    display: block;
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--app-radius-02);
+    color: var(--text-secondary);
+    text-decoration: none;
+    line-height: 1.35;
+  }
+
+  .toc li a:hover {
+    color: var(--text-strong);
+    background: var(--control);
+  }
+
+  .toc li a[aria-current="page"] {
+    color: var(--accent-cyan-text);
+    background: var(--accent-cyan-subtle-bg);
+  }
+
+  article {
+    max-width: 50rem;
+  }
+
+  .meta {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    font-weight: 600;
+  }
+
+  .badge {
+    padding: 0.15em 0.5em;
+    border-radius: var(--app-radius-02);
+    border: 1px solid color-mix(in srgb, var(--badge) 60%, transparent);
+    background: color-mix(in srgb, var(--badge) 14%, transparent);
+    color: color-mix(in srgb, var(--badge) 55%, var(--text-strong));
+    font: 700 0.75rem / 1.4 var(--font-ui);
+  }
+
+  h1 {
+    font-size: clamp(2rem, 4.2vw, 3rem);
+  }
+
+  .subtitle {
+    font-size: var(--step-1);
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .figure {
+    margin: 2rem 0;
+  }
+
+  .figure-small {
+    max-width: 30rem;
+  }
+
+  .overview {
+    font-size: 1.08rem;
+    color: var(--text-soft);
+  }
+
+  section {
+    margin-top: 2.75rem;
+  }
+
+  h2 {
+    font-size: var(--step-2);
+  }
+
+  .steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    counter-reset: step;
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .steps li {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 2.75rem minmax(0, 1fr);
+    column-gap: 0.75rem;
+    padding: 0.9rem 1rem;
+    border-radius: var(--app-radius-04);
+    background: var(--card);
+    border: 1px solid var(--hairline);
+  }
+
+  .steps li::before {
+    content: counter(step, decimal-leading-zero);
+    grid-row: span 2;
+    font: 1.15rem / 1.5 var(--font-readout);
+    color: var(--accent-cyan-text);
+  }
+
+  .steps h3 {
+    margin: 0 0 0.25rem;
+    font-size: 1.05rem;
+  }
+
+  .steps p {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+
+  .tips {
+    padding-left: 1.2rem;
+    color: var(--text-secondary);
+  }
+
+  .tips li + li {
+    margin-top: 0.5rem;
+  }
+
+  .tips li::marker {
+    color: var(--accent-cyan);
+  }
+
+  .faq {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  details {
+    border: 1px solid var(--hairline);
+    border-radius: var(--app-radius-04);
+    background: var(--card);
+    padding: 0.2rem 1rem;
+  }
+
+  summary {
+    cursor: pointer;
+    padding: 0.7rem 0;
+    font-weight: 600;
+    color: var(--text-strong);
+  }
+
+  details p {
+    color: var(--text-secondary);
+  }
+
+  .table {
+    overflow-x: auto;
+    border: 1px solid var(--hairline);
+    border-radius: var(--app-radius-04);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.94rem;
+  }
+
+  th,
+  td {
+    text-align: left;
+    vertical-align: top;
+    padding: 0.6rem 0.9rem;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  th {
+    background: var(--card-raised);
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  td:first-child {
+    white-space: nowrap;
+  }
+
+  .pager {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 3.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--hairline);
+  }
+
+  .pager a {
+    display: grid;
+    gap: 0.15rem;
+    text-decoration: none;
+    font-weight: 600;
+    max-width: 48%;
+  }
+
+  .pager .next {
+    text-align: right;
+    margin-left: auto;
+  }
+
+  .pager span {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 400;
+  }
+</style>

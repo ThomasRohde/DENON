@@ -5,6 +5,11 @@
 </p>
 
 <p align="center">
+  <a href="https://thomasrohde.github.io/DENON/"><strong>Website and guide</strong></a> ·
+  <a href="https://thomasrohde.github.io/DENON/download/">Download</a>
+</p>
+
+<p align="center">
   <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10.0-512BD4?style=flat-square&logo=dotnet" />
   <img alt="WPF Windows" src="https://img.shields.io/badge/Windows-10%20%2F%2011%20WPF-0078D6?style=flat-square&logo=windows" />
   <img alt="Protocols" src="https://img.shields.io/badge/Protocols-HEOS%20%3A1255%20%2B%20AVR%20Telnet%20%3A23-00D4FF?style=flat-square" />

@@ -1,0 +1,29 @@
+---
+import Base from "../layouts/Base.astro";
+import { url } from "../data/site";
+---
+
+<Base title="Page not found">
+  <div class="wrap missing">
+    <p class="code">-∞ dB</p>
+    <h1>This page is silent.</h1>
+    <p>The page you asked for does not exist, or it moved.</p>
+    <p><a class="button button-quiet" href={url("")}>Go to the overview</a> <a href={url("guide/")}>Open the guide</a></p>
+  </div>
+</Base>
+
+<style>
+  .missing {
+    padding-block: 6rem 8rem;
+  }
+
+  .code {
+    font: 2.5rem var(--font-readout);
+    color: var(--accent-cyan-text);
+    margin-bottom: 0.5rem;
+  }
+
+  .missing a + a {
+    margin-left: 1rem;
+  }
+</style>

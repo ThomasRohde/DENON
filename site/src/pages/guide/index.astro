@@ -1,0 +1,128 @@
+---
+import Base from "../../layouts/Base.astro";
+import help from "../../generated/help.json";
+import { slug, url } from "../../data/site";
+
+// The in-app Help & Guide, grouped by its categories in the app's order.
+const categories = [...new Set(help.topics.map((t) => t.category))];
+---
+
+<Base title="Guide" description="How to set up and use Denon Desktop: the same guide as the Help page in the app." current="guide">
+  <section class="wrap guide-home">
+    <header class="intro">
+      <h1>Guide</h1>
+      <p>
+        The same guide you find on the Help page in the app (press <kbd>F1</kbd> on any page). New here? Start with
+        the <a href={url("guide/quick-start/")}>quick start</a>.
+      </p>
+    </header>
+
+    {categories.map((category) => (
+      <section class="group" aria-labelledby={slug(category)}>
+        <h2 id={slug(category)}>{category}</h2>
+        <ul class="topics">
+          {help.topics.filter((t) => t.category === category).map((t) => (
+            <li>
+              <a href={url(`guide/${t.id}/`)} style={`--badge:${t.accent}`}>
+                <span class="badge">{t.badge}</span>
+                <span class="topic">
+                  <strong>{t.title}</strong>
+                  <span>{t.subtitle}</span>
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ))}
+  </section>
+</Base>
+
+<style>
+  .guide-home {
+    padding-block: clamp(2.5rem, 6vw, 4.5rem) 5rem;
+  }
+
+  .intro {
+    max-width: 44rem;
+    margin-bottom: 3rem;
+  }
+
+  .intro p {
+    font-size: var(--step-1);
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .group {
+    margin-top: 2.5rem;
+  }
+
+  .group h2 {
+    font-size: var(--step-1);
+    color: var(--text-secondary);
+    letter-spacing: 0;
+  }
+
+  .topics {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
+    gap: 0.75rem;
+  }
+
+  @media (max-width: 480px) {
+    .topics {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .topics a {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    height: 100%;
+    padding: 1rem 1.1rem;
+    border-radius: var(--app-radius-05);
+    background: var(--card);
+    border: 1px solid var(--hairline);
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .topics a:hover {
+    background: var(--card-raised);
+    border-color: color-mix(in srgb, var(--badge) 55%, var(--hairline));
+  }
+
+  .badge {
+    flex: none;
+    min-width: 3.6rem;
+    text-align: center;
+    padding: 0.2em 0.45em;
+    border-radius: var(--app-radius-02);
+    border: 1px solid color-mix(in srgb, var(--badge) 60%, transparent);
+    background: color-mix(in srgb, var(--badge) 14%, transparent);
+    color: color-mix(in srgb, var(--badge) 55%, var(--text-strong));
+    font: 700 0.72rem / 1.4 var(--font-ui);
+  }
+
+  .topic {
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .topic strong {
+    color: var(--text-strong);
+    font-family: var(--font-display);
+    font-weight: 600;
+  }
+
+  .topic span {
+    color: var(--text-secondary);
+    font-size: 0.94rem;
+    line-height: 1.45;
+  }
+</style>

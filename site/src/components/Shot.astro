@@ -1,0 +1,17 @@
+---
+// An app screenshot in Dark and in Light; the one that matches the site's theme shows.
+import { url } from "../data/site";
+
+interface Props {
+  name: string;
+  alt: string;
+  eager?: boolean;
+  class?: string;
+}
+
+const { name, alt, eager = false, class: className = "" } = Astro.props;
+const loading = eager ? "eager" : "lazy";
+---
+
+<img class={`shot shot-dark ${className}`} src={url(`shots/dark/${name}.webp`)} alt={alt} width="1360" height="1018" loading={loading} decoding="async" />
+<img class={`shot shot-light ${className}`} src={url(`shots/light/${name}.webp`)} alt="" width="1360" height="1018" loading={loading} decoding="async" />

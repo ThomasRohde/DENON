@@ -1,0 +1,16 @@
+---
+// One of the app's icons (Themes/Icons.xaml, 24x24 view box), drawn in the current text colour.
+import icons from "../generated/icons.json";
+
+interface Props {
+  name: keyof typeof icons;
+  size?: number;
+  class?: string;
+}
+
+const { name, size = 22, class: className } = Astro.props;
+---
+
+<svg class={className} width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+  <path d={icons[name]} fill="currentColor" />
+</svg>

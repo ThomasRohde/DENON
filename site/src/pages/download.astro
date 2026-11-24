@@ -1,0 +1,227 @@
+---
+import Base from "../layouts/Base.astro";
+import { links, url, versions } from "../data/site";
+
+const plugins = [
+  {
+    name: "Chromecast",
+    version: versions.chromecast,
+    href: links.chromecast,
+    folder: "Chromecast",
+    page: "Chromecast & Google Cast",
+    guide: "plugin-chromecast",
+    text: "Finds your Cast devices on the network and shows what plays on them. It can switch the receiver when a Cast device starts.",
+  },
+  {
+    name: "Apple TV",
+    version: versions.appleTv,
+    href: links.appleTv,
+    folder: "AppleTv",
+    page: "Apple TV",
+    guide: "plugin-apple-tv",
+    text: "Pairs with your Apple TV once, then shows what plays and lets you pause it. It can switch the receiver when the Apple TV wakes.",
+  },
+];
+---
+
+<Base title="Download" description={`Download Denon Desktop ${versions.app} for Windows 10 and 11, and the Chromecast and Apple TV plugins.`} current="download">
+  <div class="wrap page">
+    <header class="intro">
+      <h1>Download</h1>
+      <p>Version {versions.app} for Windows 10 and 11 (64-bit). Free and open source under the MIT license.</p>
+    </header>
+
+    <section class="choices" aria-label="Downloads">
+      <div class="choice recommended">
+        <h2>Installer</h2>
+        <p>Installs for your Windows user, adds a Start menu entry and an uninstaller. Updates install over the old version and keep your settings.</p>
+        <a class="button button-primary" href={links.installer}>Download the installer</a>
+        <p class="file"><code>DenonDesktop-Setup-win-x64.exe</code></p>
+      </div>
+      <div class="choice">
+        <h2>Portable</h2>
+        <p>One file that runs from any folder, with nothing to install. Settings are stored in your user profile, the same as with the installer.</p>
+        <a class="button button-quiet" href={links.portable}>Download the portable app</a>
+        <p class="file"><code>Denon.App.Desktop-win-x64.exe</code></p>
+      </div>
+    </section>
+
+    <section class="notes" aria-labelledby="before">
+      <h2 id="before">Before you start</h2>
+      <dl>
+        <div>
+          <dt>Windows warns about an unknown publisher</dt>
+          <dd>The app is not code-signed, so SmartScreen may stop it the first time. Click <strong>More info</strong>, then <strong>Run anyway</strong>. To check the file, compare its SHA-256 with <a href={links.checksums}>SHA256SUMS.txt</a> from the same release.</dd>
+        </div>
+        <div>
+          <dt>The receiver must accept network control</dt>
+          <dd>In the receiver's setup menu, set <strong>Network → Network Control</strong> to <strong>Always On</strong>. The PC and the receiver must be on the same network.</dd>
+        </div>
+        <div>
+          <dt>FFmpeg (optional)</dt>
+          <dd>With FFmpeg, YouTube plays as 320 kbps MP3 and PC audio casts as MP3. Install it with <code>winget install Gyan.FFmpeg</code>; the app finds it. Without it, the app streams M4A or lossless WAV.</dd>
+        </div>
+        <div>
+          <dt>WebView2 (for the Cinema window)</dt>
+          <dd>The YouTube video window uses Microsoft Edge WebView2, which Windows 11 and most Windows 10 PCs already have.</dd>
+        </div>
+      </dl>
+      <p class="more"><a href={url("guide/quick-start/")}>Then follow the quick start</a></p>
+    </section>
+
+    <section class="plugins" aria-labelledby="plugins">
+      <h2 id="plugins">Plugins</h2>
+      <p class="muted">Philips Hue, LG webOS TV and Home Assistant are built in. These two are separate downloads.</p>
+      <div class="plugin-grid">
+        {plugins.map((p) => (
+          <div class="plugin">
+            <h3>{p.name} <span class="v">{p.version}</span></h3>
+            <p>{p.text}</p>
+            <ol>
+              <li>Download <a href={p.href}><code>Denon.Plugin.{p.folder}-{p.version}.zip</code></a>.</li>
+              <li>Unzip it to <code>%LocalAppData%\DenonDesktop\plugins\external\{p.folder}\</code>.</li>
+              <li>Restart Denon Desktop and open <strong>Plugins → {p.page}</strong>.</li>
+            </ol>
+            <a href={url(`guide/${p.guide}/`)}>How to use the {p.name} plugin</a>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <p class="older">Older versions and release notes are on the <a href={links.releases}>GitHub releases page</a>.</p>
+  </div>
+</Base>
+
+<style>
+  .page {
+    padding-block: clamp(2.5rem, 6vw, 4.5rem) 5rem;
+  }
+
+  .intro p {
+    font-size: var(--step-1);
+    color: var(--text-secondary);
+  }
+
+  .choices {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+
+  .choice {
+    padding: 1.5rem;
+    border-radius: var(--app-radius-07);
+    border: 1px solid var(--hairline);
+    background: var(--card);
+  }
+
+  .choice.recommended {
+    border-color: var(--accent-cyan-border-strong);
+    background: linear-gradient(160deg, var(--accent-cyan-subtle-bg), var(--card) 60%);
+  }
+
+  .choice h2 {
+    font-size: var(--step-2);
+  }
+
+  .choice p {
+    color: var(--text-secondary);
+  }
+
+  .file {
+    margin: 0.8rem 0 0;
+    font-size: 0.85rem;
+  }
+
+  .notes,
+  .plugins {
+    margin-top: 4rem;
+  }
+
+  .notes h2,
+  .plugins h2 {
+    font-size: var(--step-2);
+  }
+
+  dl {
+    margin: 0;
+    border-top: 1px solid var(--hairline);
+  }
+
+  dl div {
+    display: grid;
+    grid-template-columns: minmax(12rem, 18rem) minmax(0, 1fr);
+    gap: 0.5rem 2rem;
+    padding: 1.1rem 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  @media (max-width: 720px) {
+    dl div {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  dt {
+    font-weight: 600;
+    color: var(--text-strong);
+  }
+
+  dd {
+    margin: 0;
+    color: var(--text-secondary);
+    max-width: 60ch;
+  }
+
+  .more {
+    margin-top: 1.25rem;
+    font-weight: 600;
+  }
+
+  .plugin-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+
+  .plugin {
+    padding: 1.5rem;
+    border-radius: var(--app-radius-05);
+    border: 1px solid var(--hairline);
+    background: var(--card);
+  }
+
+  .plugin h3 {
+    font-size: var(--step-1);
+  }
+
+  .v {
+    font: 600 0.75rem var(--font-ui);
+    color: var(--accent-cyan-text);
+    margin-left: 0.4rem;
+  }
+
+  .plugin p,
+  .plugin ol {
+    color: var(--text-secondary);
+  }
+
+  .plugin ol {
+    padding-left: 1.2rem;
+  }
+
+  .plugin li + li {
+    margin-top: 0.35rem;
+  }
+
+  .plugin code {
+    word-break: break-all;
+  }
+
+  .older {
+    margin-top: 3rem;
+    color: var(--text-muted);
+  }
+</style>

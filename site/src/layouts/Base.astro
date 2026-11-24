@@ -1,0 +1,246 @@
+---
+import "../styles/global.css";
+import { links, url, versions } from "../data/site";
+
+interface Props {
+  title?: string;
+  description?: string;
+  current?: "home" | "guide" | "download";
+}
+
+const {
+  title,
+  description = "Denon Desktop controls Denon and Marantz HEOS receivers from Windows, streams YouTube, radio and your PC's sound to them, and shows it all on VU meters.",
+  current,
+} = Astro.props;
+const fullTitle = title ? `${title} | Denon Desktop` : "Denon Desktop: your Denon or Marantz receiver, on your PC";
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const og = new URL(url("shots/og.png"), Astro.site);
+const nav = [
+  { id: "home", label: "Overview", href: url("") },
+  { id: "guide", label: "Guide", href: url("guide/") },
+  { id: "download", label: "Download", href: url("download/") },
+] as const;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/png" href={url("generated/denon_icon.png")} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={og} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#07090d" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#eef2f7" media="(prefers-color-scheme: light)" />
+    <script is:inline>
+      // The theme choice, applied before the first paint. "system" follows the OS, like the app's Follow Windows.
+      try {
+        const saved = localStorage.getItem("theme");
+        if (saved === "dark" || saved === "light") document.documentElement.dataset.theme = saved;
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="titlebar">
+      <div class="wrap titlebar-inner">
+        <a class="brand" href={url("")}>
+          <img src={url("generated/denon_icon.png")} alt="" width="30" height="30" />
+          <span>Denon Desktop</span>
+          <span class="version">{versions.app}</span>
+        </a>
+        <nav aria-label="Site">
+          <ul>
+            {nav.map((item) => (
+              <li><a href={item.href} aria-current={current === item.id ? "page" : undefined}>{item.label}</a></li>
+            ))}
+            <li><a href={links.repo}>GitHub</a></li>
+          </ul>
+        </nav>
+        <div class="theme" role="group" aria-label="Theme">
+          <button class="chip" type="button" data-theme-choice="system">Follow Windows</button>
+          <button class="chip" type="button" data-theme-choice="dark">Dark</button>
+          <button class="chip" type="button" data-theme-choice="light">Light</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <slot />
+    </main>
+
+    <footer class="footer">
+      <div class="wrap footer-inner">
+        <p>
+          Denon Desktop is free and open source under the <a href={links.license}>MIT license</a>.
+          It is not made, approved or supported by Denon, Marantz or Sound United. Denon, Marantz and HEOS are their
+          trademarks.
+        </p>
+        <ul>
+          <li><a href={links.releases}>Releases</a></li>
+          <li><a href={links.changelog}>What changed</a></li>
+          <li><a href={links.issues}>Report a problem</a></li>
+          <li><a href={links.repo}>Source code</a></li>
+        </ul>
+      </div>
+    </footer>
+
+    <script>
+      const root = document.documentElement;
+      const buttons = [...document.querySelectorAll<HTMLButtonElement>("[data-theme-choice]")];
+      const show = () => {
+        const current = root.dataset.theme ?? "system";
+        for (const b of buttons) b.setAttribute("aria-pressed", String(b.dataset.themeChoice === current));
+      };
+      for (const b of buttons) {
+        b.addEventListener("click", () => {
+          const choice = b.dataset.themeChoice!;
+          if (choice === "system") delete root.dataset.theme;
+          else root.dataset.theme = choice;
+          try {
+            localStorage.setItem("theme", choice);
+          } catch {}
+          show();
+        });
+      }
+      show();
+    </script>
+  </body>
+</html>
+
+<style>
+  .skip {
+    position: absolute;
+    left: -999px;
+    top: 0.5rem;
+    z-index: 10;
+    padding: 0.5rem 1rem;
+    background: var(--accent-cyan);
+    color: var(--accent-cyan-ink);
+    border-radius: var(--app-radius-03);
+  }
+
+  .skip:focus {
+    left: 0.5rem;
+  }
+
+  .titlebar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: color-mix(in srgb, var(--sidebar) 88%, transparent);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .titlebar-inner {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    min-height: 3.6rem;
+    flex-wrap: wrap;
+    padding-block: 0.4rem;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: var(--text-strong);
+    text-decoration: none;
+    font: 700 1.05rem var(--font-display);
+  }
+
+  .version {
+    font: 600 0.72rem var(--font-ui);
+    padding: 0.15em 0.55em;
+    border-radius: var(--app-radius-02);
+    background: var(--ink-08);
+    border: 1px solid var(--ink-12);
+    color: var(--accent-cyan-text);
+  }
+
+  nav ul {
+    display: flex;
+    gap: 0.25rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  nav a {
+    display: block;
+    padding: 0.35rem 0.7rem;
+    border-radius: var(--app-radius-03);
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  nav a:hover {
+    color: var(--text-strong);
+    background: var(--control);
+  }
+
+  nav a[aria-current="page"] {
+    color: var(--accent-cyan-text);
+    background: var(--accent-cyan-subtle-bg);
+  }
+
+  .theme {
+    margin-left: auto;
+    display: flex;
+    gap: 0.35rem;
+  }
+
+  @media (max-width: 720px) {
+    .theme {
+      margin-left: 0;
+    }
+
+    .titlebar {
+      position: static;
+    }
+  }
+
+  .footer {
+    border-top: 1px solid var(--hairline);
+    background: var(--sidebar);
+    padding-block: 2.5rem 3rem;
+    color: var(--text-muted);
+    font-size: var(--step--1);
+  }
+
+  .footer-inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem 3rem;
+    justify-content: space-between;
+  }
+
+  .footer p {
+    max-width: 46rem;
+    margin: 0;
+  }
+
+  .footer ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.5rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .footer a {
+    color: var(--text-secondary);
+  }
+</style>

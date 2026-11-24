@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- **Website** at https://thomasrohde.github.io/DENON/ (Astro, in `site/`, deployed by `.github/workflows/pages.yml`). It uses the app's design system: the Dark and Light palettes, the type and radius scales, the icons and the meter materials are generated from the app's XAML on every build, and the guide is built from the in-app Help topics, so the site follows the app. The home page has live VU meters and the LED spectrum, a tour of every page, and the skins; it follows Windows' light or dark mode or a Dark/Light switch.
+
 ## [2.2.2] - 2026-11-24
 
 ### Fixed

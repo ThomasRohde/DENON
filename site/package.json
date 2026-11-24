@@ -1,0 +1,15 @@
+{
+  "name": "denon-desktop-site",
+  "private": true,
+  "type": "module",
+  "description": "The Denon Desktop website (GitHub Pages): what the app does and how to use it.",
+  "scripts": {
+    "sync": "node scripts/sync-from-app.mjs",
+    "dev": "npm run sync && astro dev",
+    "build": "npm run sync && astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "7.4.10"
+  }
+}
