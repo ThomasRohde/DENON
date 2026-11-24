@@ -1470,7 +1470,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                 var days = Math.Clamp(GetInt(args, "days") ?? 7, 1, 90);
                 var top = Math.Clamp(GetInt(args, "top") ?? 10, 1, 50);
                 var now = DateTimeOffset.Now;
-                var since = new DateTimeOffset(now.LocalDateTime.Date.AddDays(-(days - 1)), now.Offset).AddHours(-12);
+                var since = WatchTimeReport.ReadFrom(now, days);
                 var events = _telemetry.ReadEventsSince(EventTelemetryLog.StreamMedia, since, "session.ended");
                 return BuildToolJson(WatchTimeReport.Build(events, now, days, top));
             }

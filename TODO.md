@@ -26,6 +26,16 @@ Phase 2 is done in 1.18.0: YouTube / YouTube Music and jukebox tracks are decode
 
 - [ ] Events written before 1.15.0 have no `coveredSec` / `exclusiveSec`. Readers must fall back to `durationSec`.
 
+## Insights page
+
+- [ ] Verify live on the installed app with the real event log (tested with the dev build on 40 days of made-up
+      events, Dark/Hi-Fi and Light/Default, Today to 90 days, phone width).
+- [ ] The Open Insights button sits at the bottom of the Settings left column. Consider a second entry point (Brain
+      page, tray menu or the status line).
+- [ ] A website screenshot of Insights (needs made-up data, not the personal log).
+- [ ] The activity feed lists the receiver-input session start under a cast or Apple TV session ("Started Media
+      Player"). Consider marking covered sessions quiet once they end.
+
 ## MCP: plugin tools
 
 The bridge returns JSON + images and uses declared parameters/hints since app 1.16.0 / SDK 1.16 (Chromecast plugin 0.2.0 uses it).

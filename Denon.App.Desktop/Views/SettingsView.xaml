@@ -186,7 +186,19 @@
                                    TextWrapping="Wrap"
                                    Margin="{skin:Space 0,0,0,12}" />
 
+                        <!-- Insights: the event log as charts and plain-language observations, in the browser -->
+                        <TextBlock Text="{Binding InsightsStatusText}"
+                                   FontSize="{DynamicResource FontSize05}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="{skin:Space 0,0,0,8}" />
+
                         <WrapPanel>
+                            <Button Content="Open Insights"
+                                    Command="{Binding OpenInsightsCommand}"
+                                    Style="{StaticResource PrimaryButton}"
+                                    ToolTip="Opens your watch and listen statistics in the browser (this PC only)"
+                                    Margin="{skin:Space 0,0,8,4}" />
                             <Button Content="Open Events Folder" Command="{Binding OpenEventsFolderCommand}" Style="{StaticResource SecondaryButton}" Margin="{skin:Space 0,0,8,4}" />
                             <Button Content="Clear Event History" Command="{Binding ClearTelemetryHistoryCommand}" Style="{StaticResource DangerButton}" Margin="{skin:Space 0,0,0,4}" />
                         </WrapPanel>

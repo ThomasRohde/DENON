@@ -30,6 +30,14 @@ public static class WatchTimeReport
 
     private sealed record Session(DateTimeOffset Start, string Kind, string App, string Title, int Seconds);
 
+    /// <summary>
+    /// Where to start reading events for the last <paramref name="days"/> local days up to today: midnight of the first
+    /// day, minus 12 h for sessions that started the evening before. Uses that day's own UTC offset, so a period that
+    /// crosses a summer-time change works.
+    /// </summary>
+    public static DateTimeOffset ReadFrom(DateTimeOffset now, int days) =>
+        new DateTimeOffset(DateTime.SpecifyKind(now.LocalDateTime.Date.AddDays(-(Math.Max(1, days) - 1)), DateTimeKind.Local)).AddHours(-12);
+
     public static Report Build(IEnumerable<JsonElement> events, DateTimeOffset now, int days, int top = 10)
     {
         days = Math.Clamp(days, 1, 90);
@@ -93,7 +101,7 @@ public static class WatchTimeReport
     }
 
     /// <summary>"what was used": the cast app, the TV app or channel, the receiver input or the HEOS source.</summary>
-    private static string AppLabel(string kind, JsonElement data, string title) => kind switch
+    public static string AppLabel(string kind, JsonElement data, string title) => kind switch
     {
         "cast" => GetString(data, "app") ?? GetString(data, "source") ?? "Cast",
         "appletv" => GetString(data, "app") ?? GetString(data, "source") ?? "Apple TV",

@@ -385,6 +385,7 @@ public sealed partial class MainViewModel
         HelpPortsReference.Add(new("TCP 1255", "HEOS CLI and LIVE PUSH", "Playback, volume, track data, artwork, favorites and queue, plus push events from the receiver"));
         HelpPortsReference.Add(new("TCP 18925", "Audio relay and Phone Remote", "Streams YouTube, PC Audio Cast and jukebox files to HEOS and serves the Phone Remote. Inbound: use Allow Firewall. Change it in Settings → Relay Port."));
         HelpPortsReference.Add(new("TCP 18926", "MCP server (HTTP)", "POST /mcp and SSE with a Bearer token. Localhost only by default. Change it in Brain → HTTP PORT."));
+        HelpPortsReference.Add(new("TCP (free port)", "Insights page (HTTP)", "127.0.0.1 only, a new port and key each app start. Settings → Open Insights opens it in the browser."));
         HelpPortsReference.Add(new("UDP 1900", "SSDP discovery", "Finds Denon / Marantz receivers, Philips Hue Bridges and LG webOS TVs on the LAN"));
         HelpPortsReference.Add(new("HTTPS 443 / HTTP 80", "Philips Hue Bridge API", "Rooms, lights, Hue scenes and Entertainment Areas on the LAN"));
         HelpPortsReference.Add(new("UDP 2100", "Hue Entertainment (DTLS)", "50 Hz light stream for Music Sync when an Entertainment Area exists"));
@@ -911,6 +912,42 @@ public sealed partial class MainViewModel
                 new("Open MCP & Room Brain →", "Mcp"),
             ],
             contextSection: "Mcp"));
+
+        _allHelpTopics.Add(new HelpGuideTopic(
+            id: "insights",
+            badge: "STATS",
+            accentHex: "#22D3EE",
+            category: "Reference",
+            title: "Insights: Your Watching & Listening",
+            subtitle: "Watch and listen time, your weekly rhythm, volume habits and who controls the room, in your browser.",
+            overview: "Insights shows the habit event log as charts and plain observations. It opens in your browser from a small web server inside the app. Only this PC can open it: the server listens on 127.0.0.1 and needs a key that the app gives the browser. Everything stays on this PC. The page uses the app's theme and skin, and changes with them.",
+            steps:
+            [
+                new("01", "Open Insights", "Open Settings. In SMART EVENT & HABIT LOGGING, click Open Insights. The page opens in your default browser."),
+                new("02", "Choose a period", "Click Today, 7 days, 30 days or 90 days at the top. The display shows the watch and listen time and the change against the period before."),
+                new("03", "Read the observations", "The cards under the display tell you your prime time, the top app, the longest sitting, volume differences and who made most changes."),
+                new("04", "Find your rhythm", "In WEEKLY RHYTHM, each light is one hour of one weekday. The brighter it glows, the more played then. The outlined light is now."),
+                new("05", "See what played", "TIME PER DAY, BY SOURCE, TOP APPS & INPUTS and MOST WATCHED show where the time went. Point at a bar or a slice for the numbers."),
+                new("06", "Check volume and control", "VOLUME shows each volume change and the average for each time of day. WHO'S IN CONTROL splits the changes between remotes and devices, Denon Desktop, the phone remote, automations and an AI agent."),
+                new("07", "Look back at the activity", "ACTIVITY lists the events, newest first. Filter by Media, Receiver, TV, Lighting or Control. Tick Connection events to also see connects and disconnects."),
+            ],
+            proTips:
+            [
+                "Time is counted once: when a cast plays through the TV and the receiver at the same time, only the cast counts.",
+                "RIGHT NOW updates every 5 seconds; the charts every minute.",
+                "An AI agent reads the same data over MCP: get_watch_time, get_listening_habits and get_activity_history.",
+            ],
+            troubleshooting:
+            [
+                new("The page says 'Open Insights from the app'?", "The page needs this run's key. The app makes a new key each time it starts. In the app, click Open Insights again."),
+                new("The charts are empty?", "Insights reads the habit event log. Make sure 'Record smart device, media & external remote events locally' is on in Settings. Sessions shorter than the media dwell filter are not recorded."),
+                new("The browser does not open?", "The line above the button then shows the address. Copy it into your browser."),
+            ],
+            quickJumps:
+            [
+                new("Open Settings →", "Settings"),
+            ],
+            contextSection: "Settings"));
 
         _allHelpTopics.Add(new HelpGuideTopic(
             id: "shortcuts-hotkeys",

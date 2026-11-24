@@ -141,6 +141,7 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<DenonMcpHttpServer>();
             builder.Services.AddSingleton<LyricsService>();
             builder.Services.AddSingleton<UpdateService>();
+            builder.Services.AddSingleton<InsightsServer>();
             builder.Services.AddSingleton<AcousticSyncCalibrationService>();
             builder.Services.AddSingleton<LiveAudioAnalyzerService>();
             builder.Services.AddHostedService(sp => sp.GetRequiredService<LiveAudioAnalyzerService>());
@@ -354,6 +355,15 @@ public partial class App : System.Windows.Application
             // so the installer can replace it (it starts the new version by itself).
             mainVm.ExitForUpdateRequested += () => _ = Dispatcher.InvokeAsync(ExitApplicationAsync);
             mainVm.StartUpdateChecks(_host.Services.GetRequiredService<UpdateService>(), allowInstall: requestedDataRoot is null);
+
+            // Settings -> Open Insights starts the local Insights page. --insights-url-file <file> starts it now and
+            // writes its address (with the key) to the file, without a browser (for tests).
+            var insights = _host.Services.GetRequiredService<InsightsServer>();
+            mainVm.AttachInsights(insights);
+            if (ArgValue(e.Args, "--insights-url-file") is { } insightsUrlFile)
+            {
+                await System.IO.File.WriteAllTextAsync(insightsUrlFile, await insights.StartAsync());
+            }
         }
         catch (Exception exception)
         {
