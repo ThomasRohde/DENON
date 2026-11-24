@@ -98,8 +98,7 @@ Design and decisions: `docs/theming.md` (branch `theming-2.0`).
       Default pixels); `SkinChanged` redraws the meters; skin chips in Settings → Appearance; `SkinTests`.
 - [x] Plugin pages follow the skin (`HostSkin` in each plugin; `HostSkin.Follow` for the code-built Chromecast and
       Apple TV pages). Screenshots checked for every skin in Dark and Large in Light, start and live switch.
-- [ ] Release the Chromecast and Apple TV plugins (theme brushes read at each use, `HostSkin`; done in code,
-      unreleased). With the current releases, their pages keep the theme colors live but not the skin sizes.
+- [x] Released Chromecast plugin 0.5.0 and Apple TV plugin 0.4.0 (theme brushes read at each use, `HostSkin`).
 - [ ] Check live in the installed app: tray flyout, YouTube cinema window, Chromecast and Apple TV pages in Light and
       in each skin (screenshot mode does not show them).
 - [ ] Refresh README screenshot 06 (Settings now has the Appearance card).

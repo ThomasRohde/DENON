@@ -2,7 +2,9 @@
 
 Released separately from Denon Desktop with tags `appletv-vX.Y.Z`.
 
-## [Unreleased]
+## [0.4.0] - 2026-11-24
+
+Needs Denon Desktop **1.22.0** or later (artwork). The live theme and skin switches come with Denon Desktop 2.0; with older versions the page keeps the Dark colors and the Default sizes, as before.
 
 ### Changed
 - **Follows live theme switches** (Denon Desktop 2.0): the page reads theme brushes at each use instead of caching them, so elements made after a switch get the new theme's colors.
