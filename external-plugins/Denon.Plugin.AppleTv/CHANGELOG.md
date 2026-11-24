@@ -2,6 +2,16 @@
 
 Released separately from Denon Desktop with tags `appletv-vX.Y.Z`.
 
+## [0.5.0] - 2026-11-24
+
+Needs Denon Desktop **2.5.0** or later. Older versions do not read the `APPLE TV LIVE` status and drop a live program from the now-playing hero.
+
+### Added
+- **Live programs that cannot pause** (for example DRTV live): the plugin reads the Apple TV's supported commands. While a program plays and the player does not list Pause, the status reads `APPLE TV LIVE • …`, the snapshot has `canPause: false`, and the Pause button on the Apple TV page is greyed out with a tooltip. Only an explicit Pause command counts, because the app sends Pause.
+
+### Changed
+- **Standby is logged as standby:** the remote's power button stops playback about 30 seconds before tvOS reports sleep. The watch log now waits up to 35 seconds after an app closes, so the session ends with `standby` instead of `app_closed`. A late session end carries `endedAt`, so Insights counts the real end time.
+
 ## [0.4.0] - 2026-11-24
 
 Needs Denon Desktop **1.22.0** or later (artwork). The live theme and skin switches come with Denon Desktop 2.0; with older versions the page keeps the Dark colors and the Default sizes, as before.
