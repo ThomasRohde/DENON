@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-11-24
+
 ### Added
 - **Insights.** Settings → Smart Event & Habit Logging → **Open Insights** opens your watching and listening statistics in the browser. A small web server inside the app (`Services/InsightsServer.cs`) serves the page on `127.0.0.1` only, on a free port, with a new key each app start (kept in a `SameSite=Strict`, `HttpOnly` cookie; strict Content-Security-Policy; no CDN or network beyond this PC). The page uses the app's live theme and skin (`ThemeCss` writes the palette, brushes, type, radii and meter materials as CSS) and changes with them. It shows the watch and listen time for Today, 7, 30 or 90 days on a front-panel display with the change against the period before; up to six plain observations (prime time, the top app, quieter late nights, who made most changes, the longest sitting, streaks); time per day (per hour for Today) by source; a weekly-rhythm LED matrix in the meter materials; top apps and inputs; most watched titles; volume changes in dB with averages per time of day and the learned habits; receiver use, inputs and sound modes; who is in control (remotes, the app, the phone remote, automations, an AI agent) and lighting; a filterable activity feed in plain sentences; and the room right now. Time is counted without double counting (`exclusiveSec`). The report is `Denon.App.Core/Insights/InsightsReport.cs`, the feed `ActivityFeed.cs`, with tests. Help & Guide has an Insights topic.
 
