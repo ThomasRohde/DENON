@@ -65,9 +65,11 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                     <TextBlock Text="BEARER AUTH TOKEN" FontSize="{DynamicResource FontSize01}" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" />
-                                    <TextBlock Text="{Binding McpBearerToken}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize05}" Foreground="{DynamicResource TextStrongBrush}" Margin="{skin:Space 0,2,0,0}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding McpBearerTokenDisplay}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize05}" Foreground="{DynamicResource TextStrongBrush}" Margin="{skin:Space 0,2,0,0}" TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="{skin:Space 8,0,0,0}">
+                                    <Button Content="{Binding SecretsToggleLabel}" Command="{Binding ToggleSecretsCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,4}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,5,0}"
+                                            ToolTip="Show or hide the token and the client config. It hides again when you leave the page." />
                                     <Button Content="Copy" Command="{Binding CopyMcpTokenCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,4}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,5,0}" />
                                     <Button Content="Regenerate" Command="{Binding RegenerateMcpTokenCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,4}" FontSize="{DynamicResource FontSize04}" />
                                 </StackPanel>
@@ -180,7 +182,7 @@
                                 <Button Content="Copy JSON" Command="{Binding CopyMcpConfigCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,3.5}" FontSize="{DynamicResource FontSize04}" HorizontalAlignment="Right" />
                             </DockPanel>
                             <Border Background="{DynamicResource SidebarBgBrush}" BorderBrush="{DynamicResource Ink08Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius03}" Padding="{skin:Space 12,10}">
-                                <TextBox Text="{Binding McpClientConfigPreview, Mode=OneWay}"
+                                <TextBox Text="{Binding McpClientConfigPreviewDisplay, Mode=OneWay}"
                                          IsReadOnly="True"
                                          Background="Transparent"
                                          BorderThickness="0"

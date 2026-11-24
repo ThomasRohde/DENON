@@ -24,9 +24,8 @@ be in the room.
   install", or any Delete or Clear button.
 - Type in the Health page's raw command boxes (AVR :23, HEOS :1255).
 - Copy, read out or record a token, a QR code, a pairing key or a "Copy Paired URL" address. Do not put them in a
-  finding or a screenshot. The Brain page shows the MCP bearer token in plain text, and the Phone QR / Owner QR /
-  Guest QR buttons show pairing codes: keep them out of every screenshot (take the screenshot of another area, or
-  skip it).
+  finding or a screenshot. Do not click Show (Brain page), Show QR, Owner QR, Guest QR or the title bar's Phone QR:
+  they reveal the token and the pairing QR. If one shows anyway, keep it out of every screenshot.
 
 **Only with the user's OK at the start (tier B).** Ask once before the run: "May I make small, reversible receiver
 changes (volume ±1 and ±5, mute, quick levels, one sound mode) and switch the app theme and skin? I put everything back."
@@ -87,7 +86,7 @@ Each test has an ID, a tier, the steps and what should happen. Do them in order;
 | A1 | A | Look at the title bar and the status line. | The model (AVR-X2400H), a green ONLINE pill with the firmware and LIVE PUSH. The status line shows the receiver address, the input, the volume, "Insights", the last sync time and the version. |
 | A2 | A | Click each page in the left rail: Deck, Music, Stations, Cast, Scenes, Plugins, Brain, Settings, Health, Help. | Each page opens in under a second, with no empty or broken areas, no clipped text and no error banners. The selected item is highlighted. |
 | A3 | A | Press Ctrl+1 to Ctrl+9 (1 Deck, 2 Music, 3 Scenes, 4 Cast, 5 Stations, 6 Plugins, 7 Settings, 8 Health, 9 Help). | Each key opens its page. |
-| A4 | A | On three different pages, press F1. Close the help with Esc or ✕. | Help opens on the topic for that page. |
+| A4 | A | On three different pages, press F1. Close the help with Esc. | Help opens on the topic for that page (Settings opens Quick Start). Esc goes back to the page it came from. |
 | A5 | A | Make the window small (drag a corner), then large, then maximize and restore. | The content reflows. Nothing overlaps or is cut off. The window cannot get smaller than its minimum. |
 | A6 | A | Minimize the window (it goes to the tray). Wait 10 s. Press Ctrl+Alt+D. | The window hides, then comes back on the same page. |
 | A7 | A | Click the tray icon (notification area). Look at the flyout. Press Esc. | The flyout shows VOLUME, QUICK INPUTS and PRESET STATIONS. Do not click an input or station. Esc closes it. |
@@ -112,7 +111,7 @@ Write down the start volume first. Put it back after each test.
 | C1 | B | In MASTER VOLUME, click +1, then −1. Then −5, then +5 (down first). | Each step changes the number by 1 (1 dB) or 5 (5 dB) both ways, and the receiver follows within a second. The status line and the tray flyout show the same value. |
 | C2 | B | Scroll the mouse wheel one notch up and one down over the volume card. | 2 steps (2 dB) per notch, then back. |
 | C3 | B | Press Ctrl+Up, then Ctrl+Down. | Same as C2. |
-| C4 | B | Click MUTE, wait 3 s, click it again (or press M twice). | The readout shows muted, the meters show muted, then it returns. |
+| C4 | B | Click MUTE, wait 3 s, click it again (or press M twice). | The line under the readout says "MUTED • …", the status line says "• Muted", and the meters show muted; then it returns. |
 | C5 | B | Click a QUICK LEVELS button that is at most 5 above the start volume (or below it), then set the start volume back. | The volume goes to that level smoothly. |
 | C6 | B | In SOUND MODE & DSP, click one other mode. Wait 5 s. Click the start mode. | The receiver changes mode; the chip on the now-playing card and the highlighted button follow. |
 | C7 | A | Do not click anything in INPUT SOURCE or POWER & ZONES. Only check that the current input and zone state are highlighted correctly. | The highlights match the receiver. |
@@ -121,9 +120,9 @@ Write down the start volume first. Put it back after each test.
 
 | ID | Tier | Steps | Expected |
 |---|---|---|---|
-| D1 | A | Music: type a search (for example "Miles Davis So What") and click Search / Load. Switch the Music, Videos and Playlists tabs. Do not click Play, Video, + Q or Play All. | Results load with titles and thumbnails. The UP NEXT QUEUE and RECENTLY CAST lists show. |
+| D1 | A | Music: type a search (for example "Miles Davis So What") and click Search / Load. Switch the Music, Videos and Playlists tabs. Do not click Play, Video, + Q or Play All. | Results load with titles and thumbnails. Each tab loads its own results at once. The UP NEXT QUEUE shows (RECENTLY CAST only after something was cast). |
 | D2 | A | Stations: look at PRESET STATIONS and RECEIVER HEOS FAVORITES (do not click Load from Receiver if it would start anything). In the Radio Browser directory, search "Jazz". Do not click Play, Test or + Save. | The station list and the search results show with names and bit rates. The filter chips work. |
-| D3 | A | Cast: look at PHONE REMOTE, CAST PC AUDIO TO DENON and LOCAL HI-RES / FLAC JUKEBOX. Do not click a QR, Copy, Allow Firewall, ON AIR or Play. | Each card explains its state. No token or QR is copied or saved. |
+| D3 | A | Cast: look at PHONE REMOTE, CAST PC AUDIO TO DENON and LOCAL HI-RES / FLAC JUKEBOX. Do not click Show QR, Owner QR, Guest QR, Copy, Allow Firewall, ON AIR or Play. | Each card explains its state. The QR is hidden behind "Show QR". No token or QR is copied or saved. |
 
 ### E. Scenes and acoustics (look, edit, never activate or save)
 
@@ -147,7 +146,7 @@ Write down the start volume first. Put it back after each test.
 
 | ID | Tier | Steps | Expected |
 |---|---|---|---|
-| G1 | A | Brain: read the MCP server status and settings. Do not copy, regenerate or save. The BEARER AUTH TOKEN shows in plain text: do not screenshot that card, and do not write the token down. | The endpoint, the permission tier and the safety ceiling show. |
+| G1 | A | Brain: read the MCP server status and settings. Do not click Show, Copy, Regenerate or Save. | The endpoint, the permission tier and the safety ceiling show. The token and the client config show dots instead of the token. |
 | G2 | A | Click Run Room Doctor. Read the insights. Do not click a fix. | A list of findings, or "all clear". |
 | G3 | A | Click "Insights" in the status line (or Settings → Open Insights). The page opens in the browser. | The page shows the watch time, RIGHT NOW (on Live TV: the channel logo, the program, a progress bar and the next program), the observations and the charts. |
 | G4 | A | In Insights, click Today, 7 days, 30 days, 90 days. Hover a bar, a slice and a channel tile. | Each period loads. Tooltips show numbers. LIVE TV CHANNELS shows logo tiles (or letters for channels without a logo). |

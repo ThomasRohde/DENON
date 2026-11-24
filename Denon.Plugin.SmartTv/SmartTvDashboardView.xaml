@@ -203,7 +203,8 @@
                         <Border Grid.Column="2" Style="{StaticResource TelemetryTile}">
                             <StackPanel>
                                 <TextBlock Text="NOW SHOWING" FontSize="{DynamicResource FontSize01}" FontWeight="Bold" Foreground="{DynamicResource TextFaintBrush}" />
-                                <TextBlock Text="{Binding NowShowingText}" FontSize="{DynamicResource FontSize06}" FontWeight="SemiBold" Foreground="{DynamicResource AccentCyanBrightBrush}" TextTrimming="CharacterEllipsis" Margin="{skin:Space 0,2,0,0}" />
+                                <TextBlock Text="{Binding NowShowingText}" FontSize="{DynamicResource FontSize06}" FontWeight="SemiBold" Foreground="{DynamicResource AccentCyanBrightBrush}" TextTrimming="CharacterEllipsis" Margin="{skin:Space 0,2,0,0}" ToolTip="{Binding NowShowingText}" />
+                                <TextBlock Text="{Binding NowShowingProgramText}" FontSize="{DynamicResource FontSize05}" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" ToolTip="{Binding NowShowingProgramText}" />
                             </StackPanel>
                         </Border>
                         <Border Grid.Column="4" Style="{StaticResource TelemetryTile}">

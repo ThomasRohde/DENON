@@ -106,7 +106,8 @@
 
                     <!-- OLED Track Metadata & Live Equalizer -->
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="{skin:Space 0,0,16,0}">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Wraps on a narrow window, so no chip hides under the transport buttons. -->
+                        <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <!-- Animated 5-bar Audio Visualizer when actively playing -->
                             <!-- Started and stopped by MainWindow.UpdateAnimations: it runs only while it shows on screen. -->
                             <StackPanel x:Name="EqBars"
@@ -176,7 +177,7 @@
                                     Padding="{skin:Space 8,2.5}"
                                     FontSize="{DynamicResource FontSize02}"
                                     ToolTip="Show or hide audio meters" />
-                        </StackPanel>
+                        </WrapPanel>
 
                         <TextBlock Text="{Binding NowPlayingTitle}"
                                    FontSize="{DynamicResource FontSize13}"
@@ -301,11 +302,7 @@
                     </Grid.RowDefinitions>
 
                     <DockPanel Grid.Row="0" Margin="{skin:Space 0,0,0,10}">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="QUICK SCENES &amp; STATIONS" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                            <TextBlock Text="  •  One-click AVR macros &amp; HEOS radio" FontSize="{DynamicResource FontSize05}" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="{skin:Space 8,0,0,0}">
                             <Button Content="Scenes &amp; EQ →"
                                     Command="{Binding NavigateCommand}"
                                     CommandParameter="Acoustics"
@@ -327,6 +324,11 @@
                                     Padding="{skin:Space 10,5}"
                                     FontSize="{DynamicResource FontSize05}" />
                         </StackPanel>
+                        <!-- The buttons dock first, so on a narrow window the subtitle shortens instead of running under them. -->
+                        <DockPanel VerticalAlignment="Center">
+                            <TextBlock DockPanel.Dock="Left" Text="QUICK SCENES &amp; STATIONS" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                            <TextBlock Text="  •  One-click AVR macros &amp; HEOS radio" FontSize="{DynamicResource FontSize05}" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        </DockPanel>
                     </DockPanel>
 
                     <ScrollViewer Grid.Row="1"
@@ -346,9 +348,14 @@
                                         <Button Command="{Binding DataContext.ActivateSceneCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 CommandParameter="{Binding}"
                                                 Style="{StaticResource HardwareChipButton}"
-                                                ToolTip="{Binding Description}"
                                                 Padding="{skin:Space 10,6}"
                                                 Margin="{skin:Space 0,0,7,7}">
+                                            <Button.ToolTip>
+                                                <StackPanel MaxWidth="{skin:Size 320}">
+                                                    <TextBlock Text="{Binding Description}" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding SummaryLine, StringFormat='One click runs this scene now: {0}'}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="{skin:Space 0,6,0,0}" />
+                                                </StackPanel>
+                                            </Button.ToolTip>
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                 <Border Background="{Binding AccentBrush}" BorderBrush="{DynamicResource BorderHairlineBrush}" BorderThickness="1" CornerRadius="{DynamicResource Radius01}" Padding="{skin:Space 5,1.5}" Margin="{skin:Space 0,0,7,0}">
                                                     <TextBlock Text="{Binding Badge}" FontSize="{DynamicResource FontSize01}" FontWeight="Black" Foreground="{Binding BadgeForegroundBrush}" />
@@ -392,7 +399,8 @@
                                                 <RowDefinition Height="Auto" />
                                             </Grid.RowDefinitions>
 
-                                            <Grid Grid.Row="0" Margin="{skin:Space 0,0,0,8}">
+                                            <Grid Grid.Row="0" Margin="{skin:Space 0,0,0,8}" Background="Transparent"
+                                                  ToolTip="Play starts this station on the receiver (HEOS). Low Vol starts it at the safety low volume.">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto" />
                                                     <ColumnDefinition Width="*" />

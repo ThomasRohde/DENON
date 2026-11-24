@@ -94,6 +94,11 @@ Native .NET (no Python), protocol logic ported from pyatv (MIT). See `external-p
       from `SET_STATE`, exposes `canPause` / `"APPLE TV LIVE • …"`, disables Pause with tooltip on the Apple TV
       dashboard, and gates the hero & tray flyout `PlayPauseCommand` via `CanPauseTransport`. Only an explicit
       `Pause` command counts (the app sends Pause, not TogglePlayPause).
+- [ ] From the computer-use test run (2026-11-24), not fixed yet: the left rail's buttons have no accessible names
+      (UI Automation sees them as empty; screen readers and test agents cannot find "Help" or "Brain"); low contrast of
+      "Synced …" and the version in the status line (Dark); "Normal 42" is highlighted at volume 41; QUICK INPUTS in the
+      tray flyout marks no input; the Brain habits say "Top input: MPLAY" (raw code); Room Doctor gives no sign that a
+      Rescan ran. F-02 (Help quick jumps do nothing) did not reproduce with real mouse clicks.
 - [ ] Verify live: a Live TV channel without guide data shows the channel only (the program boundary works: seen
       2026-11-24, DR1 "TVA" 17:15 in the hero and as its own watch-log session with the logo).
 - [ ] Channel logos: 16 of the 92 channel names on the Danish cable list have no logo in tv-logos (Viaplay Sport 1–3,

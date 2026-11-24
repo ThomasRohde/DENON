@@ -43,6 +43,7 @@ public sealed partial class MainViewModel : ObservableObject
     private CancellationTokenSource? _volumeDebounceCts;
     private bool _isDraggingVolume;
     private bool _suppressVolumeSend;
+    private readonly VolumeCommandGuard _volumeGuard = new();
 
     // Navigation
     private string _activeSection = "Control";
@@ -411,6 +412,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             if (SetProperty(ref _activeSection, value))
             {
+                HideSecrets();
                 UpdateMeterCaptureRequest();
                 if (string.Equals(value, "Acoustics", StringComparison.OrdinalIgnoreCase))
                 {
@@ -738,7 +740,18 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    public string SecondaryVolumeText => DisplayVolumeInDb ? $"VOL {TargetVolume} / {MaxVolume}" : $"VOL / {MaxVolume} • {VolumeDbLabel}";
+    /// <summary>
+    /// The line under the big readout: the other unit, and MUTED while muted. The receiver's MVMAX is not shown: it
+    /// follows the current volume (41 → 69, 44 → 72), so "41 / 69" changed with every step and meant nothing.
+    /// </summary>
+    public string SecondaryVolumeText
+    {
+        get
+        {
+            var other = DisplayVolumeInDb ? $"VOL {TargetVolume}" : VolumeDbLabel;
+            return IsMuted ? $"MUTED • {other}" : other;
+        }
+    }
 
     public bool IsMuted
     {
@@ -749,6 +762,7 @@ public sealed partial class MainViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(MuteButtonText));
                 OnPropertyChanged(nameof(IsActiveAndPlaying));
+                OnPropertyChanged(nameof(SecondaryVolumeText));
             }
         }
     }
@@ -1212,8 +1226,9 @@ public sealed partial class MainViewModel : ObservableObject
             LiveVolumeExact = status.VolumeExact;
             IsMuted = status.IsMuted;
 
-            // Never fight the user while they are actively dragging the volume slider!
-            if (!_isDraggingVolume)
+            // Never fight the user while they are actively dragging the volume slider, and keep a volume the app just
+            // sent until the receiver reports it (a stale update must not become the base of the next step).
+            if (!_isDraggingVolume && !_volumeGuard.ShouldHold(status.Volume))
             {
                 _suppressVolumeSend = true;
                 try
@@ -1249,7 +1264,7 @@ public sealed partial class MainViewModel : ObservableObject
             ConnectionBadgeText = isAwake ? "ONLINE" : "STANDBY";
             ConnectionBadgeTone = isAwake ? OnlineTone : StandbyTone;
             StatusMessage = snapshot.Status is not null
-                ? $"{(isAwake ? InputSourceDisplay : "Standby")} • {DenonVolumeMath.FormatDecibels(LiveVolume)} ({LiveVolume})"
+                ? $"{(isAwake ? InputSourceDisplay : "Standby")} • {DenonVolumeMath.FormatDecibels(LiveVolume)} ({LiveVolume}){(IsMuted ? " • Muted" : "")}"
                 : "Receiver connected.";
         }
         else
@@ -1343,6 +1358,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void ScheduleDebouncedVolumeApply(int level, bool immediate = false)
     {
+        _volumeGuard.Sent(level);
         _volumeDebounceCts?.Cancel();
         _volumeDebounceCts?.Dispose();
         var cts = new CancellationTokenSource();
@@ -1495,13 +1511,18 @@ public sealed partial class MainViewModel : ObservableObject
             _suppressVolumeSend = true;
             TargetVolume = lowVolume;
             _suppressVolumeSend = false;
+            _volumeGuard.Sent(lowVolume);
         }
 
         await ExecuteReceiverActionAsync(() => _receiverController.SetLowVolumeAsync(), "Safety low volume applied.");
     }
 
-    private Task ApplyVolumeAsync() =>
-        ExecuteReceiverActionAsync(() => _receiverController.SetVolumeAsync(TargetVolume), $"Volume set to {DenonVolumeMath.FormatDecibels(TargetVolume)} ({TargetVolume}).");
+    private Task ApplyVolumeAsync()
+    {
+        var level = TargetVolume;
+        _volumeGuard.Sent(level);
+        return ExecuteReceiverActionAsync(() => _receiverController.SetVolumeAsync(level), $"Volume set to {DenonVolumeMath.FormatDecibels(level)} ({level}).");
+    }
 
     private async Task StepVolumeAsync(int delta)
     {
@@ -1509,6 +1530,7 @@ public sealed partial class MainViewModel : ObservableObject
         _suppressVolumeSend = true;
         TargetVolume = next;
         _suppressVolumeSend = false;
+        _volumeGuard.Sent(next);
         await ExecuteReceiverActionAsync(() => _receiverController.SetVolumeAsync(next), $"Volume set to {DenonVolumeMath.FormatDecibels(next)} ({next}).");
     }
 
@@ -1522,6 +1544,7 @@ public sealed partial class MainViewModel : ObservableObject
         _suppressVolumeSend = true;
         TargetVolume = preset.Level;
         _suppressVolumeSend = false;
+        _volumeGuard.Sent(preset.Level);
         await ExecuteReceiverActionAsync(() => _receiverController.SetVolumeAsync(preset.Level), $"{preset.Name} volume ({preset.DbLabel}) applied.");
     }
 

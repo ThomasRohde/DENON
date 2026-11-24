@@ -145,6 +145,7 @@ public sealed partial class MainViewModel
         {
             IsGuestQrMode = string.Equals(param as string, "guest", StringComparison.OrdinalIgnoreCase);
             UpdateRemoteQrFromRelay(_relayServer.CurrentStatus, forceRegenerate: true);
+            ShowSecrets(); // Picking a QR means: show it.
         });
         RotateRemoteTokensCommand = new AsyncRelayCommand(_ => RotateRemoteTokensAsync());
         TogglePcCastCommand = new AsyncRelayCommand(_ => TogglePcCastAsync(), CanControlReceiver);

@@ -38,7 +38,20 @@
                             BorderThickness="1"
                             Padding="{skin:Space 8}"
                             VerticalAlignment="Center">
-                        <Image Source="{Binding RemoteQrImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                        <Grid>
+                            <!-- The QR holds the pairing key: hidden until Show QR (or Owner QR / Guest QR). -->
+                            <Image Source="{Binding RemoteQrImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"
+                                   Visibility="{Binding AreSecretsShown, Converter={StaticResource BoolToVis}}" />
+                            <Button Content="Show QR"
+                                    Command="{Binding ToggleSecretsCommand}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Padding="{skin:Space 10,6}"
+                                    FontSize="{DynamicResource FontSize04}"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    ToolTip="The QR code pairs a phone with this app. It stays hidden so a screenshot or screen share does not show it."
+                                    Visibility="{Binding AreSecretsHidden, Converter={StaticResource BoolToVis}}" />
+                        </Grid>
                     </Border>
 
                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
@@ -68,6 +81,7 @@
                         </Border>
 
                         <WrapPanel Margin="{skin:Space 0,0,0,6}">
+                            <Button Content="{Binding RemoteQrToggleLabel}" Command="{Binding ToggleSecretsCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,6,4}" />
                             <Button Content="Owner QR" Command="{Binding SetRemoteQrRoleCommand}" CommandParameter="owner" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,6,4}" />
                             <Button Content="Guest QR" Command="{Binding SetRemoteQrRoleCommand}" CommandParameter="guest" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,6,4}" />
                             <Button Content="{Binding PhoneRemoteToggleLabel}" Command="{Binding TogglePhoneRemoteEnabledCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,6,4}" />

@@ -81,6 +81,10 @@ public partial class MainWindow : Window
         var shown = IsShownOnScreen;
         var deckShown = shown && _viewModel.ActiveSection == "Control";
         _viewModel.SetWindowVisibleForMeters(shown);
+        if (!shown)
+        {
+            _viewModel.HideSecrets();
+        }
 
         if (deckShown && _viewModel.IsAnyAudioMeterVisible)
         {
@@ -221,6 +225,22 @@ public partial class MainWindow : Window
         if (actualKey == Key.F1 && modifiers == ModifierKeys.None)
         {
             _viewModel.OpenContextualHelp();
+            e.Handled = true;
+            return;
+        }
+
+        // Escape leaves Help for the page it was opened from, like "← Back" (not while typing in its search box).
+        if (actualKey == Key.Escape && modifiers == ModifierKeys.None && !isTyping && _viewModel.ActiveSection == "Help")
+        {
+            if (_viewModel.HasHelpReturnSection)
+            {
+                _viewModel.ReturnFromHelpCommand.Execute(null);
+            }
+            else
+            {
+                _viewModel.ActiveSection = "Control";
+            }
+
             e.Handled = true;
             return;
         }

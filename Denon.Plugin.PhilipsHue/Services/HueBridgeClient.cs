@@ -560,7 +560,11 @@ public sealed class HueBridgeClient : IDisposable
             var obj = prop.Value;
             var name = obj.TryGetProperty("name", out var nEl) ? nEl.GetString() : null;
             var groupId = obj.TryGetProperty("group", out var gEl) ? gEl.GetString() : string.Empty;
-            if (string.IsNullOrWhiteSpace(name))
+
+            // "recycle" scenes are the Hue app's (and other apps') own temporary scenes, often named by an ID such as
+            // "13n3NlxMbQ-8QYch"; the Hue app does not list them either.
+            var recycle = obj.TryGetProperty("recycle", out var rEl) && rEl.ValueKind == JsonValueKind.True;
+            if (string.IsNullOrWhiteSpace(name) || recycle)
             {
                 continue;
             }

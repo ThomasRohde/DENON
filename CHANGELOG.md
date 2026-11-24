@@ -4,6 +4,24 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Fixes from the first computer-use test run (`docs/testing/computer-use-test-script.md`).
+
+### Fixed
+- **Volume steps no longer drift (S1).** −5 then +5 could leave the receiver 5 dB louder: a status update with the old volume replaced the app's target before the receiver had taken the new one, and the next step counted from it. The app now keeps a volume it sent until the receiver reports it, or 4 s at most (`VolumeCommandGuard`). Steps, quick levels, the slider, the wheel and the safety low volume use it.
+- **Pairing secrets stay hidden on screen.** The Cast page shows the Phone Remote QR (it holds the pairing key) only after **Show QR**, Owner QR or Guest QR, and the title bar's Phone QR. The Brain page shows the MCP bearer token, and the token inside the client config, as dots until **Show**. Both hide again when you leave the page or the window hides. Copy buttons still copy the real values.
+- **Mute shows in the readout:** "MUTED • VOL 41" under the big number, and "• Muted" in the status line.
+- **The volume line no longer shows the receiver's MVMAX** ("41 / 69"): it follows the volume (41 → 69, 44 → 72) and changed with every step. It now says "VOL 41" (or the dB value).
+- **Esc leaves Help** for the page it was opened from (to the Deck when there is none), like "← Back".
+- **An empty Health activity filter says so** ("Nothing here for this filter and search.") instead of showing an empty grey box.
+- **The Automation Rules badge says "0/3 on"** (rules switched on, of all rules) instead of a bare "0".
+- **Music: the Music, Videos and Playlists tabs load their own results** for the current search at once.
+- **The LG webOS TV page shows the program** under NOW SHOWING ("TVA (1398) 18:30–18:50").
+- **Philips Hue: no scene chips with ID names.** The bridge's temporary "recycle" scenes (for example "13n3NlxMbQ-8QYch") are skipped, and in All Lights each scene name shows once.
+- **Narrow window:** the Deck's QUICK SCENES header shortens its subtitle instead of running under the buttons, and the now-playing chips wrap to a second line instead of hiding under the transport buttons.
+- **Tooltips say what a click does:** a quick scene chip says it runs the scene at once and lists what it sets; a station card explains Play and Low Vol.
+
 ## [2.6.1] - 2026-11-24
 
 ### Changed

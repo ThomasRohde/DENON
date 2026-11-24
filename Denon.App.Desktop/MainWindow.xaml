@@ -157,8 +157,7 @@
                                 <TextBlock Text="{Binding McpTitleBarBadge}" Foreground="{DynamicResource AccentEmeraldBrush}" FontWeight="SemiBold" />
                             </StackPanel>
                         </Button>
-                        <Button Command="{Binding NavigateCommand}"
-                                CommandParameter="CastRemote"
+                        <Button Command="{Binding ShowPhoneQrCommand}"
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 Style="{StaticResource SecondaryButton}"
                                 Padding="{skin:Space 9,4}"

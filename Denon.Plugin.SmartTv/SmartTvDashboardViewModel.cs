@@ -244,6 +244,11 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     }
     public string ModelSummary { get => _modelSummary; private set => Set(ref _modelSummary, value); }
     public string NowShowingText { get => _nowShowingText; private set => Set(ref _nowShowingText, value); }
+
+    private string _nowShowingProgramText = string.Empty;
+
+    /// <summary>On Live TV: the program from the TV's guide and its times, for example "Deadline 17:30–18:00".</summary>
+    public string NowShowingProgramText { get => _nowShowingProgramText; private set => Set(ref _nowShowingProgramText, value); }
     public string SoundOutputText { get => _soundOutputText; private set => Set(ref _soundOutputText, value); }
     public string ScreenStateText { get => _screenStateText; private set => Set(ref _screenStateText, value); }
     public bool IsScreenOff { get => _isScreenOff; private set => Set(ref _isScreenOff, value); }
@@ -443,6 +448,9 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
             }
 
             NowShowingText = state.NowShowingSummary;
+            NowShowingProgramText = state.IsLiveTv && state.CurrentProgram is { } program
+                ? $"{program.Name} {program.Start.LocalDateTime:HH:mm}–{program.End.LocalDateTime:HH:mm}"
+                : string.Empty;
             _soundOutputRaw = state.SoundOutput;
             SoundOutputText = state.SoundOutputLabel;
             Raise(nameof(IsAudioArcActive));

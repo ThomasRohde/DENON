@@ -1122,7 +1122,7 @@ public sealed class HueDashboardViewModel : HueObservableObject
 
         VisibleScenes.Clear();
         var filteredScenes = room is null || room.Id == "0"
-            ? _allScenesCache.Take(12)
+            ? _allScenesCache.DistinctBy(s => s.Name, StringComparer.OrdinalIgnoreCase).Take(12) // The same scene name in several rooms: once.
             : _allScenesCache.Where(s => string.Equals(s.GroupId, room.Id, StringComparison.OrdinalIgnoreCase)).Take(12);
 
         foreach (var scene in filteredScenes)

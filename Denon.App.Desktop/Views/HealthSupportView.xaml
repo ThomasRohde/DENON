@@ -164,7 +164,8 @@
                         BorderThickness="1"
                         CornerRadius="{DynamicResource Radius03}"
                         Padding="{skin:Space 8}">
-                    <ListBox ItemsSource="{Binding FilteredLogEntries}">
+                    <Grid>
+                    <ListBox x:Name="ActivityList" ItemsSource="{Binding FilteredLogEntries}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Grid>
@@ -194,6 +195,25 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
+                    <!-- An empty filter says so, instead of an empty grey box. -->
+                    <TextBlock Text="Nothing here for this filter and search."
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="{DynamicResource FontSize06}"
+                               Foreground="{DynamicResource TextMutedBrush}"
+                               IsHitTestVisible="False">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasItems, ElementName=ActivityList}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    </Grid>
                 </Border>
             </Grid>
         </Border>

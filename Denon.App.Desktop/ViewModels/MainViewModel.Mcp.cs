@@ -72,7 +72,13 @@ public sealed partial class MainViewModel
     public string McpBearerToken
     {
         get => _mcpBearerToken;
-        private set => SetProperty(ref _mcpBearerToken, value);
+        private set
+        {
+            if (SetProperty(ref _mcpBearerToken, value))
+            {
+                NotifySecretDisplays();
+            }
+        }
     }
 
     public string McpPermissionTierName
@@ -143,7 +149,13 @@ public sealed partial class MainViewModel
     public string McpClientConfigPreview
     {
         get => _mcpClientConfigPreview;
-        private set => SetProperty(ref _mcpClientConfigPreview, value);
+        private set
+        {
+            if (SetProperty(ref _mcpClientConfigPreview, value))
+            {
+                NotifySecretDisplays();
+            }
+        }
     }
 
     public string McpStatusMessage

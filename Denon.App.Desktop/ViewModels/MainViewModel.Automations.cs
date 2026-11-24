@@ -120,8 +120,9 @@ public sealed partial class MainViewModel
         private set => SetProperty(ref _automationsStatusText, value);
     }
 
+    /// <summary>"0/3 on": rules switched on, of all rules (a bare "0" read as "no rules").</summary>
     public string EnabledAutomationsBadge =>
-        AutomationRules.Count(static r => r.IsEnabled).ToString();
+        $"{AutomationRules.Count(static r => r.IsEnabled)}/{AutomationRules.Count} on";
 
     public ScenePresetEditor? ShortcutSceneToAdd
     {

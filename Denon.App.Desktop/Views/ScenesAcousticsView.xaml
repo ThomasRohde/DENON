@@ -32,7 +32,8 @@
                             infra:Chip.IsActive="{Binding AcousticsSubTab, Converter={StaticResource EqualityConverter}, ConverterParameter=Automations}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Automation Rules" VerticalAlignment="Center" />
-                            <Border Background="{DynamicResource Ink08Brush}" BorderBrush="{DynamicResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 6,1}" Margin="{skin:Space 8,0,0,0}" VerticalAlignment="Center">
+                            <Border Background="{DynamicResource Ink08Brush}" BorderBrush="{DynamicResource AccentBlueSubtleBgBrush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 6,1}" Margin="{skin:Space 8,0,0,0}" VerticalAlignment="Center"
+                                    ToolTip="Rules switched on, of all rules">
                                 <TextBlock Text="{Binding EnabledAutomationsBadge}" FontSize="{DynamicResource FontSize01}" FontWeight="Bold" Foreground="{DynamicResource AccentEmeraldBrush}" />
                             </Border>
                         </StackPanel>

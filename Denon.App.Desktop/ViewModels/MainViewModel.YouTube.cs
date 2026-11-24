@@ -69,9 +69,18 @@ public sealed partial class MainViewModel
         SearchYouTubeCommand = new AsyncRelayCommand(_ => SearchYouTubeAsync(), _ => !IsSearchingYouTube);
         SetYouTubeSearchModeCommand = new RelayCommand(param =>
         {
-            if (param is string modeStr && Enum.TryParse<YouTubeSearchMode>(modeStr, ignoreCase: true, out var parsed))
+            if (param is string modeStr && Enum.TryParse<YouTubeSearchMode>(modeStr, ignoreCase: true, out var parsed) &&
+                parsed != YouTubeSearchMode)
             {
                 YouTubeSearchMode = parsed;
+
+                // A tab switch after a search shows that tab's results at once (the old results stayed until Search).
+                var query = YouTubeSearchInput.Trim();
+                if (query.Length > 0 && !YouTubeMediaService.IsYouTubeUrl(query) && YouTubeSearchResults.Count > 0 &&
+                    SearchYouTubeCommand.CanExecute(null))
+                {
+                    SearchYouTubeCommand.Execute(null);
+                }
             }
         });
         PlayYouTubeTrackCommand = new AsyncRelayCommand(PlayYouTubeTrackAsync, CanControlReceiver);
