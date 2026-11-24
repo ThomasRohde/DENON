@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [2.2.2] - 2026-11-24
+
 ### Fixed
 From a Codex adversarial review of 2.x:
 - **Settings recovery is safe again.** When `settings.json` could not be read, saving the splash marker or the window placement wrote the recovered settings over it before you chose to save. Now only Save & Sync and Import write the file during a recovery. Every other save (window, splash marker, theme, skin, a receiver found by discovery, the dB display, plugin and MCP settings) stays in memory until then. A test checks that the file stays byte for byte.
