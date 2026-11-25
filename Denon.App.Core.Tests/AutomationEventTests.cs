@@ -558,6 +558,84 @@ public sealed class AutomationEventTests : IDisposable
     }
 
     [Fact]
+    public async Task Engine_OnlyARunThatActsUsesTheCooldown_AndSkipsAreLogged()
+    {
+        var graph = new AutomationGraph
+        {
+            Id = "home", Name = "home", Enabled = true, CooldownSeconds = 3600,
+            Nodes =
+            [
+                Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "home")),
+                Node("c", AutomationNodeTypes.ConditionEvent, ("filter", "who=owner")),
+                Node("a", AutomationNodeTypes.ActionScene, ("sceneId", "morning-coffee")),
+            ],
+            Edges = [Edge("t", "c"), Edge("c", "a", "yes")],
+        };
+        var rig = await CreateRigAsync(graph);
+        using var _ = rig.Cleanup;
+        var log = new List<AutomationActivityEntry>();
+        rig.Engine.ActivityLogged += e => { lock (log) log.Add(e); };
+
+        var t0 = DateTimeOffset.Now;
+        // 1. The check says no: nothing happens, and the cooldown is given back.
+        Assert.Single(await rig.Engine.HandleRoomEventAsync(Hook("home", ("who", "guest")), t0));
+        Assert.Empty(rig.Effects.Calls);
+
+        // 2. A minute later the check says yes: it runs although the cooldown is an hour.
+        Assert.Single(await rig.Engine.HandleRoomEventAsync(Hook("home", ("who", "owner")), t0.AddMinutes(1)));
+        Assert.Equal(new[] { "scene:morning-coffee" }, rig.Effects.Calls);
+
+        // 3. That run acted, so the next call is in the cooldown: skipped, and the log says so (once a minute at most).
+        Assert.Empty(await rig.Engine.HandleRoomEventAsync(Hook("home", ("who", "owner")), t0.AddMinutes(2)));
+        Assert.Empty(await rig.Engine.HandleRoomEventAsync(Hook("home", ("who", "owner")), t0.AddMinutes(2.5)));
+        var skips = log.Where(e => e.TriggerDetail.Contains("skipped")).ToList();
+        var skip = Assert.Single(skips);
+        Assert.True(skip.Skipped);
+        Assert.False(skip.Success); // shown as skipped, not as a successful run
+        Assert.Contains("Webhook 'home'", skip.TriggerDetail);
+        Assert.Contains($"until {t0.AddMinutes(61).LocalDateTime:HH:mm:ss}", skip.TriggerDetail);
+        Assert.Equal(new[] { "scene:morning-coffee" }, rig.Effects.Calls);
+
+        // 4. After the hour it runs again.
+        Assert.Single(await rig.Engine.HandleRoomEventAsync(Hook("home", ("who", "owner")), t0.AddMinutes(62)));
+        Assert.Equal(new[] { "scene:morning-coffee", "scene:morning-coffee" }, rig.Effects.Calls);
+    }
+
+    [Fact]
+    public async Task Engine_RunsThatChangeNothing_DoNotTripTheLoopGuard()
+    {
+        // A room-event automation whose check keeps saying no, and an unrelated one that acts.
+        var picky = new AutomationGraph
+        {
+            Id = "picky", Name = "picky", Enabled = true, CooldownSeconds = 0,
+            Nodes =
+            [
+                Node("t", AutomationNodeTypes.TriggerEvent, ("event", "volume.settled")),
+                Node("c", AutomationNodeTypes.ConditionEvent, ("filter", "to=never")),
+                Node("a", AutomationNodeTypes.ActionScene, ("sceneId", "movie-night")),
+            ],
+            Edges = [Edge("t", "c"), Edge("c", "a", "yes")],
+        };
+        var lights = SceneGraph("lights", Node("t", AutomationNodeTypes.TriggerEvent, ("event", "power.changed")), "late-night");
+        var rig = await CreateRigAsync(picky, lights);
+        using var _ = rig.Cleanup;
+
+        // 30 rejected runs within a minute (each gives back its cooldown, so each is tried).
+        var t0 = DateTimeOffset.Now;
+        for (var i = 0; i < 30; i++)
+        {
+            Assert.Single(await rig.Engine.HandleRoomEventAsync(Event("volume.settled", data: ("to", "40")), t0.AddSeconds(i)));
+        }
+
+        Assert.Empty(rig.Effects.Calls);
+        Assert.False(rig.Engine.EventTriggersPaused);
+
+        // The loop guard was not tripped: the other automation still runs.
+        Assert.Single(await rig.Engine.HandleRoomEventAsync(Event("power.changed", data: ("to", "on")), t0.AddSeconds(31)));
+        Assert.Equal(new[] { "scene:late-night" }, rig.Effects.Calls);
+    }
+
+    [Fact]
     public async Task Engine_ScheduleHonoursTheGraphCooldown()
     {
         var graph = SceneGraph("both", Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "home")), cooldown: 120);

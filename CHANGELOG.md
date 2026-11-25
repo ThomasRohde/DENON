@@ -4,6 +4,18 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **A run that changes nothing no longer uses up an automation's cooldown.** When its checks say no (for example
+  "the receiver is on"), or it only waits, the cooldown is given back, so the next real trigger runs. Before, a test of
+  the iPhone "arrive home" webhook while the receiver was on blocked the automation for its whole cooldown. Such a
+  run no longer counts toward the loop guard either, so a check that keeps saying no cannot pause every other event
+  automation.
+- **A trigger that the cooldown blocks is now in the activity log**, for example "Webhook 'arrive-home' → skipped: in
+  its cooldown until 10:38:58 (last run 09:38:58)", at most once a minute per automation. Before, a blocked webhook
+  looked as if it had never arrived.
+
 ## [2.9.0] - 2026-11-25
 
 ### Added
