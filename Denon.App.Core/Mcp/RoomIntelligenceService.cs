@@ -825,16 +825,22 @@ public sealed class RoomIntelligenceService
                 targetVolume = s.TargetVolume,
                 pluginActions = s.PluginActions.Select(a => $"{a.PluginId}:{a.ActionId}").ToArray(),
             }).ToArray(),
-            automationRules = settings.Automations.Select(r => new
+            automations = settings.AutomationGraphs.Select(g => new
             {
-                id = r.Id,
-                name = r.Name,
-                enabled = r.IsEnabled,
-                trigger = r.TriggerType.ToString(),
-                processes = r.ProcessNames,
-                scheduleTime = r.ScheduleTime,
-                days = r.DaysFilter,
-                targetSceneId = r.TargetSceneId,
+                id = g.Id,
+                name = g.Name,
+                enabled = g.Enabled,
+                triggers = g.Nodes.Where(n => AutomationNodeTypes.IsTrigger(n.Type)).Select(n => n.Type).ToArray(),
+                nodes = g.Nodes.Count,
+            }).ToArray(),
+            automationNodeTypes = AutomationNodeTypes.All.Select(t => new
+            {
+                type = t.Type,
+                group = t.Group,
+                title = t.Title,
+                description = t.Description,
+                ports = t.Ports,
+                config = t.Fields.Select(f => new { key = f.Key, kind = f.Kind, required = f.Required, help = f.Help, options = f.Options?.Select(o => o.Value).ToArray() }).ToArray(),
             }).ToArray(),
             plugins = _pluginHost.GetPlugins().Select(p => new
             {

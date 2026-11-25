@@ -4,7 +4,8 @@ using Denon.App.Core.Models;
 namespace Denon.App.Core.Services;
 
 /// <summary>
-/// Matching rules for the RoomEvent and Webhook triggers of <see cref="AutomationRule"/>.
+/// Matching for the event and webhook trigger nodes of an <see cref="AutomationGraph"/>, and the shared
+/// "key=value" filter.
 /// </summary>
 public static partial class AutomationTriggers
 {
@@ -83,17 +84,18 @@ public static partial class AutomationTriggers
     }
 
     /// <summary>
-    /// True when <paramref name="rule"/> fires on <paramref name="roomEvent"/>. The enabled state and the
-    /// cooldown are checked by the engine, not here. RoomEvent rules never fire on changes made by an automation, so a rule cannot
-    /// trigger itself. An event name ending in "*" matches every event that starts with the rest, e.g. "cast.*".
+    /// True when the trigger node fires on <paramref name="roomEvent"/>. Only trigger.event and trigger.webhook react
+    /// to events; the enabled state and the cooldown are checked by the engine. Room event triggers never fire on
+    /// changes made by an automation, so an automation cannot start itself. An event name ending in "*" matches every
+    /// event that starts with the rest, e.g. "cast.*".
     /// </summary>
-    public static bool Matches(AutomationRule rule, RoomEvent roomEvent)
+    public static bool Matches(AutomationNode trigger, RoomEvent roomEvent)
     {
-        switch (rule.TriggerType)
+        switch (trigger.Type)
         {
-            case AutomationTriggerType.RoomEvent:
+            case AutomationNodeTypes.TriggerEvent:
             {
-                var wanted = rule.EventName?.Trim() ?? string.Empty;
+                var wanted = trigger.Get("event");
                 if (wanted.Length == 0 ||
                     string.Equals(roomEvent.Origin, AutomationOrigin, StringComparison.OrdinalIgnoreCase))
                 {
@@ -103,22 +105,31 @@ public static partial class AutomationTriggers
                 var nameMatches = wanted.EndsWith('*')
                     ? roomEvent.Event.StartsWith(wanted[..^1], StringComparison.OrdinalIgnoreCase)
                     : string.Equals(roomEvent.Event, wanted, StringComparison.OrdinalIgnoreCase);
-                return nameMatches && FilterMatches(roomEvent, ParseFilter(rule.DataFilter));
+                return nameMatches && FilterMatches(roomEvent, ParseFilter(trigger.Get("filter")));
             }
 
-            case AutomationTriggerType.Webhook:
+            case AutomationNodeTypes.TriggerWebhook:
             {
-                var hook = NormalizeHookName(rule.WebhookName);
+                var hook = NormalizeHookName(trigger.Get("hook"));
                 return hook is not null &&
                        string.Equals(roomEvent.Event, WebhookEventName, StringComparison.Ordinal) &&
                        string.Equals(roomEvent.GetText("hook"), hook, StringComparison.Ordinal) &&
-                       FilterMatches(roomEvent, ParseFilter(rule.DataFilter));
+                       FilterMatches(roomEvent, ParseFilter(trigger.Get("filter")));
             }
 
             default:
                 return false;
         }
     }
+
+    /// <summary>"Weekdays", "Weekends", or anything else for every day.</summary>
+    public static bool MatchesDays(string? days, DayOfWeek day) =>
+        (days?.Trim().ToLowerInvariant()) switch
+        {
+            "weekdays" => day is >= DayOfWeek.Monday and <= DayOfWeek.Friday,
+            "weekends" => day is DayOfWeek.Saturday or DayOfWeek.Sunday,
+            _ => true,
+        };
 
     /// <summary>A short line for the activity log, e.g. "power.changed (from=standby, to=on)".</summary>
     public static string Describe(RoomEvent roomEvent)

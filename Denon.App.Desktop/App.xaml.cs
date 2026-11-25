@@ -142,6 +142,7 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<DenonMcpHttpServer>();
             builder.Services.AddSingleton<LyricsService>();
             builder.Services.AddSingleton<UpdateService>();
+            builder.Services.AddSingleton<AutomationEditorApi>();
             builder.Services.AddSingleton<InsightsServer>();
             builder.Services.AddSingleton<AcousticSyncCalibrationService>();
             builder.Services.AddSingleton<LiveAudioAnalyzerService>();

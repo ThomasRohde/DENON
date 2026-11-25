@@ -9,26 +9,36 @@ namespace Denon.App.Core.Services;
 
 public sealed record AutomationActivityEntry(DateTimeOffset Timestamp, string RuleName, string TriggerDetail, bool Success);
 
+/// <summary>
+/// Runs the automation graphs in settings: room events and webhooks from the <see cref="RoomEventBus"/>, schedules
+/// and app starts from a 3-second tick. See docs/automation-graphs.md.
+/// </summary>
 public sealed class AutomationEngineService : BackgroundService
 {
-    /// <summary>RoomEvent rules wait at least this long between runs, whatever their cooldown says.</summary>
-    public static readonly TimeSpan MinRoomEventCooldown = TimeSpan.FromSeconds(10);
+    /// <summary>Event triggers start a graph at most this often, whatever its cooldown says.</summary>
+    public static readonly TimeSpan MinEventCooldown = TimeSpan.FromSeconds(10);
 
-    /// <summary>More event-triggered runs than this within <see cref="LoopWindow"/> pauses event triggers.</summary>
+    /// <summary>App-start triggers start a graph at most this often.</summary>
+    public static readonly TimeSpan MinAppLaunchCooldown = TimeSpan.FromSeconds(10);
+
+    /// <summary>More event-started runs than this within <see cref="LoopWindow"/> pauses event triggers.</summary>
     public const int LoopRunLimit = 20;
 
     public static readonly TimeSpan LoopWindow = TimeSpan.FromMinutes(1);
 
     private readonly AppSettingsStore _settingsStore;
     private readonly ReceiverController _receiverController;
+    private readonly ReceiverStateStore _stateStore;
     private readonly PluginHostService _pluginHost;
     private readonly EventTelemetryLog _telemetry;
     private readonly RoomEventBus _eventBus;
     private readonly AppLogStore _logStore;
+    private readonly RoomEffects _effects;
 
-    private readonly Dictionary<string, DateTimeOffset> _lastAppTriggerByRule = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, DateOnly> _lastScheduleDayByRule = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, DateTimeOffset> _lastEventTriggerByRule = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _gate = new();
+    private readonly Dictionary<string, DateTimeOffset> _lastRunByGraph = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, DateOnly> _lastScheduleDayByNode = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, AutomationRun> _lastRunResult = new(StringComparer.Ordinal);
     private readonly Queue<DateTimeOffset> _recentEventRuns = new();
     private readonly Channel<RoomEvent> _pendingEvents = Channel.CreateBounded<RoomEvent>(new BoundedChannelOptions(256)
     {
@@ -43,6 +53,7 @@ public sealed class AutomationEngineService : BackgroundService
     public AutomationEngineService(
         AppSettingsStore settingsStore,
         ReceiverController receiverController,
+        ReceiverStateStore stateStore,
         PluginHostService pluginHost,
         EventTelemetryLog telemetry,
         RoomEventBus eventBus,
@@ -50,123 +61,66 @@ public sealed class AutomationEngineService : BackgroundService
     {
         _settingsStore = settingsStore;
         _receiverController = receiverController;
+        _stateStore = stateStore;
         _pluginHost = pluginHost;
         _telemetry = telemetry;
         _eventBus = eventBus;
         _logStore = logStore;
+        _effects = new RoomEffects(this);
     }
 
+    /// <summary>A short line per finished run (not dry runs), for the activity log in the app.</summary>
     public event Action<AutomationActivityEntry>? ActivityLogged;
 
-    /// <summary>The latest room events from the live bus, newest first, for the rule editor.</summary>
+    /// <summary>Every finished run, dry runs included.</summary>
+    public event Action<AutomationRun>? RunCompleted;
+
+    /// <summary>Lets tests replace the room. Null: the real receiver, scenes and plugins.</summary>
+    public IAutomationEffects? EffectsOverride { get; set; }
+
+    /// <summary>True while the loop guard pauses event triggers.</summary>
+    public bool EventTriggersPaused => DateTimeOffset.Now < _eventTriggersPausedUntil;
+
+    /// <summary>The latest room events from the live bus, newest first.</summary>
     public IReadOnlyList<RoomEvent> GetRecentEvents(int max = 20) => _eventBus.GetRecent(max);
 
-    public async Task<string> TriggerRuleNowAsync(
-        AutomationRule rule,
-        string triggerDetail = "Manual test",
-        CancellationToken cancellationToken = default)
+    /// <summary>The last run of each graph since the app started.</summary>
+    public IReadOnlyDictionary<string, AutomationRun> GetLastRuns()
     {
-        var executedParts = new List<string>();
-        var success = true;
-
-        try
+        lock (_gate)
         {
-            _telemetry.MarkOrigin("avr", "automation", "automation.triggered", new Dictionary<string, object?>
-            {
-                ["ruleName"] = rule.Name,
-                ["trigger"] = triggerDetail,
-            });
-            _telemetry.MarkOrigin("tv", "automation");
-            _telemetry.MarkOrigin("lighting", "automation");
-
-            ScenePreset? targetScene = null;
-            if (!string.IsNullOrWhiteSpace(rule.TargetSceneId))
-            {
-                targetScene = _settingsStore.Current.Receiver.Scenes
-                    .FirstOrDefault(s => string.Equals(s.Id, rule.TargetSceneId, StringComparison.OrdinalIgnoreCase));
-            }
-
-            if (targetScene is not null)
-            {
-                try
-                {
-                    await _receiverController.ApplySceneAsync(targetScene, cancellationToken);
-                    executedParts.Add($"Scene '{targetScene.Name}'");
-                }
-                catch (Exception ex)
-                {
-                    success = false;
-                    executedParts.Add($"Scene '{targetScene.Name}' skipped ({ex.Message})");
-                    _logStore.Warning($"[Automation:{rule.Name}] Scene '{targetScene.Name}' failed: {ex.Message}");
-                }
-            }
-
-            if (rule.PluginActions is { Count: > 0 })
-            {
-                // Deduplicate only IDENTICAL (pluginId, actionId, parameters) steps already run by targetScene
-                // so distinct parameterized calls to the same action (e.g. two different Hue rooms) are preserved!
-                static string BuildStepKey(ScenePluginActionStep step)
-                {
-                    var paramKey = step.Parameters is { Count: > 0 }
-                        ? string.Join("&", step.Parameters
-                            .OrderBy(static kv => kv.Key, StringComparer.OrdinalIgnoreCase)
-                            .Select(static kv => $"{kv.Key.Trim().ToLowerInvariant()}={kv.Value?.Trim()}"))
-                        : string.Empty;
-                    return $"{step.PluginId}:{step.ActionId}:{paramKey}";
-                }
-
-                var sceneActionKeys = new HashSet<string>(
-                    (targetScene?.PluginActions ?? []).Select(BuildStepKey),
-                    StringComparer.OrdinalIgnoreCase);
-
-                var extraSteps = rule.PluginActions
-                    .Where(a => !sceneActionKeys.Contains(BuildStepKey(a)))
-                    .ToList();
-
-                if (extraSteps.Count > 0)
-                {
-                    var outcomes = await _pluginHost.ExecuteActionChainAsync(extraSteps, cancellationToken);
-                    var okCount = outcomes.Count(static o => o.Result.Success);
-                    var failCount = outcomes.Count - okCount;
-                    if (failCount > 0)
-                    {
-                        success = false;
-                        var firstErr = outcomes.First(static o => !o.Result.Success).Result.Message;
-                        executedParts.Add($"{okCount}/{outcomes.Count} plugin step(s) ok ({failCount} failed: {firstErr})");
-                    }
-                    else
-                    {
-                        executedParts.Add($"{okCount} plugin step(s)");
-                    }
-                }
-            }
-
-            var summary = executedParts.Count > 0
-                ? $"{triggerDetail} → {string.Join(" + ", executedParts)}"
-                : $"{triggerDetail} → no actions configured";
-
-            _logStore.Info($"[Automation] {rule.Name}: {summary}");
-            ActivityLogged?.Invoke(new AutomationActivityEntry(DateTimeOffset.Now, rule.Name, summary, success));
-            return summary;
+            return new Dictionary<string, AutomationRun>(_lastRunResult, StringComparer.Ordinal);
         }
-        catch (Exception ex)
-        {
-            var err = $"{triggerDetail} failed: {ex.Message}";
-            _logStore.Warning($"[Automation] {rule.Name}: {err}");
-            ActivityLogged?.Invoke(new AutomationActivityEntry(DateTimeOffset.Now, rule.Name, err, false));
-            return err;
-        }
+    }
+
+    /// <summary>
+    /// Runs <paramref name="graph"/> now from one trigger (the first one when <paramref name="triggerNodeId"/> is
+    /// null), as the editor's Dry run and Run now do. <paramref name="data"/> stands in for the event data. Ignores
+    /// the enabled state and the cooldown.
+    /// </summary>
+    public async Task<AutomationRun> RunGraphNowAsync(
+        AutomationGraph graph,
+        string? triggerNodeId,
+        IReadOnlyDictionary<string, object?>? data,
+        bool dryRun,
+        CancellationToken ct = default)
+    {
+        var trigger = (triggerNodeId is null ? null : graph.FindNode(triggerNodeId))
+                      ?? graph.Nodes.FirstOrDefault(static n => AutomationNodeTypes.IsTrigger(n.Type))
+                      ?? throw new InvalidOperationException("The automation has no trigger.");
+        var roomEvent = new RoomEvent(DateTimeOffset.Now, "control", "automation", "manual", "desktop_ui", data);
+        return await RunAsync(graph, trigger, roomEvent, dryRun ? "Dry run" : "Run now", dryRun, ct);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Room events and webhooks: the bus handler only queues; one loop runs the rules in order.
+        // Room events and webhooks: the bus handler only queues; one loop runs the graphs in order.
         using var subscription = _eventBus.Subscribe(e => _pendingEvents.Writer.TryWrite(e));
         var eventLoop = RunEventTriggersAsync(stoppingToken);
 
         try
         {
-            // Let app finish startup and establish an initial process baseline so already-running apps don't fire immediately
+            // Let the app start, and take a process baseline so programs that already run do not fire.
             await Task.Delay(TimeSpan.FromSeconds(4), stoppingToken);
             _previousProcessNames = SnapshotRunningProcessNames();
             _hasBaselineSnapshot = true;
@@ -174,7 +128,7 @@ public sealed class AutomationEngineService : BackgroundService
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
-                await EvaluateRulesTickAsync(stoppingToken);
+                await EvaluateTickAsync(DateTimeOffset.Now, stoppingToken);
             }
         }
         catch (OperationCanceledException)
@@ -206,58 +160,126 @@ public sealed class AutomationEngineService : BackgroundService
     }
 
     /// <summary>
-    /// Runs every enabled RoomEvent or Webhook rule that matches <paramref name="roomEvent"/> and is out of its
-    /// cooldown. Returns the names of the rules it ran. Public for tests.
+    /// Starts every enabled graph with an event or webhook trigger that matches <paramref name="roomEvent"/> and is out
+    /// of its cooldown (one run per graph). Returns the runs. Public for tests.
     /// </summary>
-    public async Task<IReadOnlyList<string>> HandleRoomEventAsync(RoomEvent roomEvent, DateTimeOffset now, CancellationToken ct = default)
+    public async Task<IReadOnlyList<AutomationRun>> HandleRoomEventAsync(RoomEvent roomEvent, DateTimeOffset now, CancellationToken ct = default)
     {
-        var rules = (_settingsStore.Current.Automations ?? [])
-            .Where(r => r.IsEnabled &&
-                        r.TriggerType is AutomationTriggerType.RoomEvent or AutomationTriggerType.Webhook &&
-                        AutomationTriggers.Matches(r, roomEvent))
-            .ToList();
-        if (rules.Count == 0)
+        var runs = new List<AutomationRun>();
+        foreach (var graph in EnabledGraphs())
         {
-            return [];
-        }
-
-        var ran = new List<string>();
-        foreach (var rule in rules)
-        {
-            var isWebhook = rule.TriggerType == AutomationTriggerType.Webhook;
-            var cooldown = TimeSpan.FromSeconds(Math.Clamp(rule.CooldownSeconds, 0, 86400));
-            if (!isWebhook && cooldown < MinRoomEventCooldown)
-            {
-                cooldown = MinRoomEventCooldown;
-            }
-
-            if (_lastEventTriggerByRule.TryGetValue(rule.Id, out var last) && now - last < cooldown)
+            var trigger = graph.Nodes.FirstOrDefault(n => AutomationTriggers.Matches(n, roomEvent));
+            if (trigger is null)
             {
                 continue;
             }
 
-            if (!isWebhook && !AllowEventRun(now, rule.Name))
+            var isWebhook = trigger.Type == AutomationNodeTypes.TriggerWebhook;
+            if (!IsOutOfCooldown(graph, now, isWebhook ? TimeSpan.Zero : MinEventCooldown) ||
+                (!isWebhook && !AllowEventRun(now, graph.Name)))
             {
                 continue;
             }
 
-            _lastEventTriggerByRule[rule.Id] = now;
+            MarkRun(graph, now);
             var detail = isWebhook
                 ? $"Webhook '{roomEvent.GetText("hook")}'"
                 : $"Event {AutomationTriggers.Describe(roomEvent)}";
-            await TriggerRuleNowAsync(rule, detail, ct);
-            ran.Add(rule.Name);
+            runs.Add(await RunAsync(graph, trigger, roomEvent, detail, dryRun: false, ct, now));
         }
 
-        return ran;
+        return runs;
+    }
+
+    /// <summary>Schedules and app starts. Public for tests.</summary>
+    public async Task EvaluateTickAsync(DateTimeOffset now, CancellationToken ct)
+    {
+        var graphs = EnabledGraphs();
+        if (graphs.Count == 0)
+        {
+            return;
+        }
+
+        var today = DateOnly.FromDateTime(now.LocalDateTime);
+        var currentTime = TimeOnly.FromDateTime(now.LocalDateTime);
+
+        var appTriggers = graphs.SelectMany(g => g.Nodes.Where(static n => n.Type == AutomationNodeTypes.TriggerAppLaunch).Select(n => (g, n))).ToList();
+        if (appTriggers.Count > 0)
+        {
+            var current = SnapshotRunningProcessNames();
+            if (_hasBaselineSnapshot)
+            {
+                foreach (var (graph, node) in appTriggers)
+                {
+                    var started = ParseProcessList(node.Get("processes"))
+                        .FirstOrDefault(p => current.Contains(p) && !_previousProcessNames.Contains(p));
+                    if (started is not null && IsOutOfCooldown(graph, now, MinAppLaunchCooldown))
+                    {
+                        MarkRun(graph, now);
+                        _ = RunAsync(graph, node, null, $"'{started}.exe' started", dryRun: false, ct, now);
+                    }
+                }
+            }
+
+            _previousProcessNames = current;
+            _hasBaselineSnapshot = true;
+        }
+
+        foreach (var graph in graphs)
+        {
+            foreach (var node in graph.Nodes.Where(static n => n.Type == AutomationNodeTypes.TriggerSchedule))
+            {
+                if (!AutomationTriggers.MatchesDays(node.Get("days"), now.LocalDateTime.DayOfWeek) ||
+                    !AutomationGraphValidator.TryParseTime(node.Get("time"), out var at) ||
+                    currentTime.Hour != at.Hour || currentTime.Minute != at.Minute)
+                {
+                    continue;
+                }
+
+                var key = $"{graph.Id}/{node.Id}";
+                if (_lastScheduleDayByNode.TryGetValue(key, out var lastDay) && lastDay == today)
+                {
+                    continue;
+                }
+
+                _lastScheduleDayByNode[key] = today;
+                MarkRun(graph, now);
+                await RunAsync(graph, node, null, $"Scheduled {at:HH\\:mm}", dryRun: false, ct, now);
+            }
+        }
+    }
+
+    private List<AutomationGraph> EnabledGraphs() =>
+        (_settingsStore.Current.AutomationGraphs ?? []).Where(static g => g.Enabled).ToList();
+
+    private bool IsOutOfCooldown(AutomationGraph graph, DateTimeOffset now, TimeSpan minimum)
+    {
+        var cooldown = TimeSpan.FromSeconds(Math.Clamp(graph.CooldownSeconds, 0, 86400));
+        if (cooldown < minimum)
+        {
+            cooldown = minimum;
+        }
+
+        lock (_gate)
+        {
+            return !_lastRunByGraph.TryGetValue(graph.Id, out var last) || now - last >= cooldown;
+        }
+    }
+
+    private void MarkRun(AutomationGraph graph, DateTimeOffset now)
+    {
+        lock (_gate)
+        {
+            _lastRunByGraph[graph.Id] = now;
+        }
     }
 
     /// <summary>
-    /// Loop breaker: rules that react to room events can set off each other (scene → power.changed → scene).
-    /// After <see cref="LoopRunLimit"/> event-triggered runs within <see cref="LoopWindow"/>, event triggers
-    /// pause for one window. Webhooks are not counted: each one is a call from outside.
+    /// Loop breaker: graphs that react to room events can set off each other (scene → power.changed → scene).
+    /// After <see cref="LoopRunLimit"/> event-started runs within <see cref="LoopWindow"/>, event triggers pause for
+    /// one window. Webhooks are not counted: each one is a call from outside.
     /// </summary>
-    private bool AllowEventRun(DateTimeOffset now, string ruleName)
+    private bool AllowEventRun(DateTimeOffset now, string graphName)
     {
         if (now < _eventTriggersPausedUntil)
         {
@@ -273,7 +295,7 @@ public sealed class AutomationEngineService : BackgroundService
         {
             _eventTriggersPausedUntil = now + LoopWindow;
             _recentEventRuns.Clear();
-            var message = $"Paused event triggers for {LoopWindow.TotalSeconds:0} s: {LoopRunLimit} runs in {LoopWindow.TotalSeconds:0} s looks like a loop (last: '{ruleName}').";
+            var message = $"Paused event triggers for {LoopWindow.TotalSeconds:0} s: {LoopRunLimit} runs in {LoopWindow.TotalSeconds:0} s looks like a loop (last: '{graphName}').";
             _logStore.Warning($"[Automation] {message}");
             ActivityLogged?.Invoke(new AutomationActivityEntry(now, "Loop guard", message, false));
             return false;
@@ -283,88 +305,58 @@ public sealed class AutomationEngineService : BackgroundService
         return true;
     }
 
-    private async Task EvaluateRulesTickAsync(CancellationToken ct)
+    private async Task<AutomationRun> RunAsync(
+        AutomationGraph graph,
+        AutomationNode trigger,
+        RoomEvent? roomEvent,
+        string detail,
+        bool dryRun,
+        CancellationToken ct,
+        DateTimeOffset? at = null)
     {
-        var rules = _settingsStore.Current.Automations;
-        if (rules is null || rules.Count == 0)
+        if (!dryRun)
         {
-            return;
+            // Changes made by this run are "automation" in the event log, so they never start an event trigger.
+            _telemetry.MarkOrigin("avr", AutomationTriggers.AutomationOrigin, "automation.triggered", new Dictionary<string, object?>
+            {
+                ["automation"] = graph.Name,
+                ["trigger"] = detail,
+            });
+            _telemetry.MarkOrigin("tv", AutomationTriggers.AutomationOrigin);
+            _telemetry.MarkOrigin("lighting", AutomationTriggers.AutomationOrigin);
         }
 
-        var enabledRules = rules.Where(static r => r.IsEnabled).ToList();
-        if (enabledRules.Count == 0)
+        AutomationRun run;
+        try
         {
-            return;
+            run = await AutomationGraphRunner.RunAsync(graph, trigger, roomEvent, detail, EffectsOverride ?? _effects, dryRun, at ?? DateTimeOffset.Now, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            run = new AutomationRun(at ?? DateTimeOffset.Now, graph.Id, graph.Name, detail, dryRun, false, $"{detail} → failed: {ex.Message}", []);
         }
 
-        var now = DateTimeOffset.Now;
-        var today = DateOnly.FromDateTime(now.LocalDateTime);
-
-        // 1. Evaluate AppLaunch triggers if any are enabled
-        var appRules = enabledRules.Where(static r => r.TriggerType == AutomationTriggerType.AppLaunch).ToList();
-        if (appRules.Count > 0)
+        lock (_gate)
         {
-            var currentProcesses = SnapshotRunningProcessNames();
-            if (_hasBaselineSnapshot)
-            {
-                foreach (var rule in appRules)
-                {
-                    var watched = ParseProcessList(rule.ProcessNames);
-                    if (watched.Count == 0)
-                    {
-                        continue;
-                    }
-
-                    var newlyLaunched = watched.FirstOrDefault(proc =>
-                        currentProcesses.Contains(proc) && !_previousProcessNames.Contains(proc));
-
-                    if (newlyLaunched is null)
-                    {
-                        continue;
-                    }
-
-                    var cooldown = TimeSpan.FromSeconds(Math.Clamp(rule.CooldownSeconds, 10, 86400));
-                    if (_lastAppTriggerByRule.TryGetValue(rule.Id, out var lastFired) &&
-                        (now - lastFired) < cooldown)
-                    {
-                        continue;
-                    }
-
-                    _lastAppTriggerByRule[rule.Id] = now;
-                    _ = TriggerRuleNowAsync(rule, $"Detected '{newlyLaunched}.exe' launch", ct);
-                }
-            }
-
-            _previousProcessNames = currentProcesses;
-            _hasBaselineSnapshot = true;
+            _lastRunResult[graph.Id] = run;
         }
 
-        // 2. Evaluate TimeOfDay triggers
-        var scheduleRules = enabledRules.Where(static r => r.TriggerType == AutomationTriggerType.TimeOfDay).ToList();
-        foreach (var rule in scheduleRules)
+        if (!dryRun)
         {
-            if (!MatchesDaysFilter(rule.DaysFilter, now.DayOfWeek))
+            if (run.Success)
             {
-                continue;
+                _logStore.Info($"[Automation] {graph.Name}: {run.Summary}");
+            }
+            else
+            {
+                _logStore.Warning($"[Automation] {graph.Name}: {run.Summary}");
             }
 
-            if (!TimeOnly.TryParseExact(rule.ScheduleTime?.Trim(), "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var scheduledTime))
-            {
-                continue;
-            }
-
-            var currentTime = TimeOnly.FromDateTime(now.LocalDateTime);
-            if (currentTime.Hour == scheduledTime.Hour && currentTime.Minute == scheduledTime.Minute)
-            {
-                if (_lastScheduleDayByRule.TryGetValue(rule.Id, out var lastDay) && lastDay == today)
-                {
-                    continue;
-                }
-
-                _lastScheduleDayByRule[rule.Id] = today;
-                await TriggerRuleNowAsync(rule, $"Scheduled {rule.ScheduleTime} ({rule.DaysFilter})", ct);
-            }
+            ActivityLogged?.Invoke(new AutomationActivityEntry(run.At, graph.Name, run.Summary, run.Success));
         }
+
+        RunCompleted?.Invoke(run);
+        return run;
     }
 
     private static HashSet<string> SnapshotRunningProcessNames()
@@ -397,26 +389,91 @@ public sealed class AutomationEngineService : BackgroundService
         return names;
     }
 
-    private static List<string> ParseProcessList(string? raw)
+    private static List<string> ParseProcessList(string? raw) =>
+        string.IsNullOrWhiteSpace(raw)
+            ? []
+            : raw.Split([',', ';', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(static s => s.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? s[..^4] : s)
+                .Where(static s => !string.IsNullOrWhiteSpace(s))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+    /// <summary>The real room: the receiver, the Smart Scenes and the plugins.</summary>
+    private sealed class RoomEffects(AutomationEngineService engine) : IAutomationEffects
     {
-        if (string.IsNullOrWhiteSpace(raw))
+        public ReceiverFacts GetReceiverFacts()
         {
-            return [];
+            var snapshot = engine._stateStore.Snapshot;
+            var status = snapshot.Status;
+            return status is null || !snapshot.IsConnected
+                ? new ReceiverFacts(null, null, null)
+                : new ReceiverFacts(status is { IsPoweredOn: true, IsMainZoneOn: true }, status.InputSource, status.IsMuted);
         }
 
-        return raw
-            .Split([',', ';', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(static s => s.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? s[..^4] : s)
-            .Where(static s => !string.IsNullOrWhiteSpace(s))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
+        public string DescribeScene(string sceneId) =>
+            FindScene(sceneId)?.Name ?? sceneId;
 
-    private static bool MatchesDaysFilter(string? filter, DayOfWeek day) =>
-        (filter?.Trim().ToLowerInvariant()) switch
+        public string DescribePluginAction(string pluginId, string actionId)
         {
-            "weekdays" => day is >= DayOfWeek.Monday and <= DayOfWeek.Friday,
-            "weekends" => day is DayOfWeek.Saturday or DayOfWeek.Sunday,
-            _ => true,
-        };
+            var plugin = engine._pluginHost.GetPlugins().FirstOrDefault(p => string.Equals(p.Id, pluginId, StringComparison.OrdinalIgnoreCase));
+            var action = plugin?.Actions.FirstOrDefault(a => string.Equals(a.ActionId, actionId, StringComparison.OrdinalIgnoreCase));
+            return plugin is null ? $"{pluginId}: {actionId}" : $"{plugin.Name}: {action?.DisplayName ?? actionId}";
+        }
+
+        public async Task RunSceneAsync(string sceneId, CancellationToken ct)
+        {
+            var scene = FindScene(sceneId) ?? throw new InvalidOperationException($"No Smart Scene '{sceneId}'.");
+            await engine._receiverController.ApplySceneAsync(scene, ct);
+        }
+
+        public async Task<(bool Success, string Message)> RunPluginActionAsync(
+            string pluginId, string actionId, IReadOnlyDictionary<string, string>? parameters, CancellationToken ct)
+        {
+            var result = await engine._pluginHost.ExecuteActionAsync(pluginId, actionId, parameters, ct);
+            return (result.Success, result.Message);
+        }
+
+        public async Task<string> RunReceiverCommandAsync(string command, string value, CancellationToken ct)
+        {
+            var receiver = engine._receiverController;
+            switch (command)
+            {
+                case "power_on":
+                    await receiver.SetPowerAsync(true, ct);
+                    return "Receiver on";
+                case "power_off":
+                    await receiver.SetPowerAsync(false, ct);
+                    return "Receiver standby";
+                case "mute":
+                    await receiver.SetMuteAsync(true, ct);
+                    return "Receiver muted";
+                case "unmute":
+                    await receiver.SetMuteAsync(false, ct);
+                    return "Receiver unmuted";
+                case "volume":
+                {
+                    var requested = int.Parse(value, NumberStyles.Integer, CultureInfo.InvariantCulture);
+                    var ceiling = Math.Clamp(engine._settingsStore.Current.Mcp.MaxSafeVolume, 15, 98);
+                    var level = Math.Clamp(requested, 0, ceiling);
+                    await receiver.SetVolumeAsync(level, ct);
+                    return level < requested
+                        ? $"Receiver volume {DenonVolumeMath.FormatDecibels(level)} (capped from {requested} at the safe volume {ceiling})"
+                        : $"Receiver volume {DenonVolumeMath.FormatDecibels(level)}";
+                }
+                case "input":
+                    await receiver.SetInputSourceAsync(value, ct);
+                    return $"Receiver input {DenonCatalog.GetFriendlyInputName(value)}";
+                case "sound_mode":
+                    await receiver.SetSoundModeAsync(value, ct);
+                    return $"Receiver sound mode {value}";
+                default:
+                    throw new InvalidOperationException($"Unknown receiver command '{command}'.");
+            }
+        }
+
+        public Task DelayAsync(TimeSpan delay, CancellationToken ct) => Task.Delay(delay, ct);
+
+        private ScenePreset? FindScene(string sceneId) =>
+            engine._settingsStore.Current.Receiver.Scenes.FirstOrDefault(s => string.Equals(s.Id, sceneId, StringComparison.OrdinalIgnoreCase));
+    }
 }

@@ -38,6 +38,10 @@
     <EmbeddedResource Include="Insights\index.html" LogicalName="Insights.index.html" />
     <EmbeddedResource Include="Insights\insights.css" LogicalName="Insights.insights.css" />
     <EmbeddedResource Include="Insights\insights.js" LogicalName="Insights.insights.js" />
+    <!-- The automation node editor, served by the same server (Services/AutomationEditorApi.cs, docs/automation-graphs.md). -->
+    <EmbeddedResource Include="Automations\index.html" LogicalName="Automations.index.html" />
+    <EmbeddedResource Include="Automations\editor.css" LogicalName="Automations.editor.css" />
+    <EmbeddedResource Include="Automations\editor.js" LogicalName="Automations.editor.js" />
   </ItemGroup>
 
   <ItemGroup>

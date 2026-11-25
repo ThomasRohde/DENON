@@ -335,20 +335,20 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
 
         _telemetry.Record(EventTelemetryLog.StreamControl, AutomationTriggers.WebhookDevice, AutomationTriggers.WebhookEventName, AutomationTriggers.WebhookOrigin, data);
 
-        var listening = (_settingsStore.Current.Automations ?? [])
-            .Where(r => r.IsEnabled &&
-                        r.TriggerType == AutomationTriggerType.Webhook &&
-                        AutomationTriggers.NormalizeHookName(r.WebhookName) == name)
-            .Select(static r => r.Name)
+        var listening = (_settingsStore.Current.AutomationGraphs ?? [])
+            .Where(g => g.Enabled && g.Nodes.Any(n =>
+                n.Type == AutomationNodeTypes.TriggerWebhook &&
+                AutomationTriggers.NormalizeHookName(n.Get("hook")) == name))
+            .Select(static g => g.Name)
             .ToList();
 
-        _logStore.Info($"[Webhook] '{name}' received; {listening.Count} enabled rule(s) listen to it.");
+        _logStore.Info($"[Webhook] '{name}' received; {listening.Count} enabled automation(s) listen to it.");
         return JsonOk(new
         {
             hook = name,
-            rules = listening,
+            automations = listening,
             message = listening.Count == 0
-                ? $"Received '{name}', but no enabled automation rule listens to it."
+                ? $"Received '{name}', but no enabled automation listens to it."
                 : $"Received '{name}': {string.Join(", ", listening)}.",
         });
     }

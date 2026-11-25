@@ -7,23 +7,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Added
-- **Automation rules react to the room:** a new **Room Event** trigger runs a rule when an event happens, such as
-  `power.changed`, `input.changed`, `session.started`, `appletv.woke` or `cast.*`. An optional **Only when** filter
-  of `key=value` terms narrows it down, for example `stream=avr, to=on` or `origin!=desktop_ui`. The rule editor
-  lists the latest room events; click one to use it.
+- **Automations are graphs, built in a node editor.** Scenes & Acoustics → Automation Rules → **Open automation
+  editor** opens a window with a canvas: drag in a trigger, conditions and actions, and connect them. See
+  `docs/automation-graphs.md`.
+  - **Triggers:** a room event (`power.changed`, `input.changed`, `session.started`, `appletv.woke`, `cast.*` …, with
+    an **Only when** filter such as `stream=avr, to=on`), a webhook, a schedule, or a program that starts.
+  - **Conditions** with a yes and a no output: the event's data, a time window (may pass midnight), and the
+    receiver right now (power, input, mute).
+  - **Actions:** a Smart Scene, a plugin action with its parameters, a receiver command (power, mute, volume, input,
+    sound mode) and a wait. An automation's volume is capped at the safe volume, as for AI agents.
+  - **Dry run** shows what would happen now, step by step, without changing anything; **Run now** runs it. The
+    editor lists the latest room events, and one click makes a trigger from an event.
+  - The Automation Rules tab lists the automations with an on/off switch, the last run, Run now and Edit.
+  - Four example automations, all off: media player → Movie Night, Night Guard at 22:00, receiver on in the evening
+    → lights, and an iPhone "arrive home" webhook.
 - **Webhook trigger for iPhone Shortcuts and other devices:** `POST /api/hooks/{name}` on the Phone Remote port
-  (`18925`, owner token as `Authorization: Bearer`) runs every enabled rule with that hook name. A JSON body adds
-  fields that the filter can test (`{"focus":"Sleep"}` and `focus=Sleep`). The answer names the rules that listen.
-  The rule editor shows the URL and can copy it and the owner token.
+  (`18925`, owner token as `Authorization: Bearer`) starts every enabled automation with that hook name. The JSON
+  body's fields become event data that filters and conditions can test (`{"focus":"Sleep"}` and `focus=Sleep`). The
+  answer names the automations that listen.
 - **Live room event bus** (`RoomEventBus`): every event that the event log records is also published live in the
   app, whether or not event logging is on. The automation engine is its first user.
+- MCP: `create_or_update_automation` saves a validated graph (it starts off unless the call says `enabled: true`),
+  and `denon://catalog/capabilities` lists the node types. It replaces `create_automation_rule`.
 
 ### Changed
+- **Automation rules are replaced by automation graphs** (`automationGraphs` in settings.json). Old rules are not
+  carried over.
 - The event monitor now runs when event logging is off, so automations still see the events; with logging off,
   nothing is written to disk.
-- Loop protection for event rules: changes made by an automation never trigger a Room Event rule, Room Event rules
-  wait at least 10 s between runs, and more than 20 event-triggered runs in a minute pause event triggers for a
-  minute. Webhook rules may repeat at once (cooldown 0 is allowed).
+- Loop protection: changes made by an automation never start a room event trigger, event triggers start an
+  automation at most every 10 s, and more than 20 event-started runs in a minute pause event triggers for a minute.
+  Webhooks may repeat at once (cooldown 0 is allowed).
+- The Insights server (`127.0.0.1`, cookie key) also serves the editor and its API. Requests that change
+  automations need the header `X-Denon-Request: 1` and come only from the server's own pages.
 
 ## [2.8.0] - 2026-11-24
 

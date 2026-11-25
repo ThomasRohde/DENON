@@ -328,7 +328,7 @@ public sealed partial class MainViewModel
 
                 case "scenes":
                     item.IsComplete = ScenePresets.Count > 0;
-                    item.StatusSummary = $"{ScenePresets.Count} Smart Scenes and {AutomationRules.Count} automation rules";
+                    item.StatusSummary = $"{ScenePresets.Count} Smart Scenes and {AutomationItems.Count} automations";
                     break;
             }
 
@@ -589,8 +589,8 @@ public sealed partial class MainViewModel
             accentHex: "#8B5CF6",
             category: "Scenes & Acoustics",
             title: "Smart Scenes, Automations & Acoustics",
-            subtitle: "Scenes that set several devices, rules that run on an app start, a schedule, a room event or a webhook, and live Audyssey and tone settings.",
-            overview: "A Smart Scene sets the receiver (power, volume, input, sound mode) and can run plugin actions in order, for example on Philips Hue, the LG TV or Home Assistant. You can run a scene from the app, a hotkey, the Phone Remote, an automation rule or an AI agent.",
+            subtitle: "Scenes that set several devices, automations that run on a room event, a webhook, a schedule or an app start, and live Audyssey and tone settings.",
+            overview: "A Smart Scene sets the receiver (power, volume, input, sound mode) and can run plugin actions in order, for example on Philips Hue, the LG TV or Home Assistant. You can run a scene from the app, a hotkey, the Phone Remote, an automation or an AI agent.",
             steps:
             [
                 new("01", "Run a scene", "In Scenes, click ▶ Activate on a scene. The app has Movie Night, Late Night, Pure Hi-Fi, Morning Jazz and Party Multi-Ch."),
@@ -598,23 +598,23 @@ public sealed partial class MainViewModel
                 new("03", "Edit a scene", "Click Edit on a scene and change the fields in SCENE EDITOR."),
                 new("04", "Add plugin actions", "In PLUGIN ACTION CHAIN, click + Step for each action. Set a delay in milliseconds for each step."),
                 new("05", "Save the scenes", "Click Save Scenes."),
-                new("06", "Add an automation rule", "Click Automation Rules. Click + App Trigger to run a scene when a program starts, + Schedule to run it at a time, + Room Event to run it when something happens (for example the receiver turns on), or + Webhook to run it when an iPhone Shortcut calls a URL."),
-                new("07", "Test and save the rules", "Click Test to run a rule now. Click Save Automations to keep your changes. AUTOMATION ACTIVITY LOG shows what ran."),
+                new("06", "Build an automation", "Click Automation Rules, then Open automation editor. Drag a trigger onto the canvas (a room event, a webhook, a schedule or an app start), add checks and actions, connect them, and click Save."),
+                new("07", "Try it and switch it on", "Click Dry run in the editor to see what would happen now without changing anything. Then switch the automation on in the list. AUTOMATION ACTIVITY LOG shows what ran."),
                 new("08", "Tune the acoustics", "In Smart Scenes & Acoustics → LIVE ACOUSTIC TUNING & AUDYSSEY, set MultEQ, Dynamic EQ, Dynamic Volume, Audio Restorer, the display dimmer, Subwoofer and Dialog levels, and Bass and Treble. Click Sync from AVR to read the values from the receiver."),
             ],
             proTips:
             [
                 "Give a scene a global hotkey: Settings → SHORTCUT EDITOR & COLLISION CHECKER → + Scene Key.",
                 "Tick 'Show on-screen TV toast on Smart Scenes' in the LG TV plugin to see a message on the TV when a scene runs.",
-                "In an App Trigger, type process names without .exe, separated by commas (for example vlc, mpv, Plex).",
-                "In a Room Event rule, click an event under RECENT ROOM EVENTS to use it. Then narrow it in Only when, for example stream=avr, to=on for 'the receiver turns on'.",
-                "For an iPhone Shortcut: Automation → a trigger (join home Wi-Fi, a Focus, an NFC tag) → Get Contents of URL with the rule's URL, method POST and the header Authorization: Bearer <owner token>. Use Copy URL and Copy owner token in the rule.",
+                "In the editor, open Recent events and click Use as trigger to build an automation from something that just happened. Then narrow it in Only when, for example stream=avr, to=on for 'the receiver turns on'.",
+                "A condition has a yes and a no output: connect different actions to each, for example a scene in the evening and nothing at night.",
+                "For an iPhone Shortcut: Automation → a trigger (join home Wi-Fi, a Focus, an NFC tag) → Get Contents of URL with the webhook's URL from the editor, method POST and the header Authorization: Bearer <owner token>.",
             ],
             troubleshooting:
             [
-                new("An app trigger did not run a second time?", "A rule runs once when the program starts and then waits for its Cooldown (seconds). Click Test to check a rule at once."),
-                new("A room event rule does not run?", "Changes made by an automation never start a room event rule, and a room event rule waits at least 10 seconds between runs. If more than 20 event rules run in one minute, the app pauses them for a minute and says so in AUTOMATION ACTIVITY LOG."),
-                new("The Shortcut gets 401 or no answer?", "Use the owner token (not the guest token) and the PC's address on your Wi-Fi. Phone Remote must be on, and the firewall must allow port 18925 (Cast & Remote → Allow Firewall). The answer says which rules listen to the hook."),
+                new("An automation did not run a second time?", "After a run it waits for its cooldown (seconds, set in the editor). An automation started by a room event waits at least 10 seconds. Click Run now to check it at once."),
+                new("A room event automation does not run?", "Changes made by an automation never start a room event trigger. If more than 20 event-started runs happen in one minute, the app pauses event triggers for a minute and says so in AUTOMATION ACTIVITY LOG. Use Dry run in the editor to see which check said no."),
+                new("The Shortcut gets 401 or no answer?", "Use the owner token (not the guest token) and the PC's address on your Wi-Fi. Phone Remote must be on, and the firewall must allow port 18925 (Cast & Remote → Allow Firewall). The answer names the automations that listen to the hook."),
                 new("A plugin step fails with 'Missing … parameter'?", "Fill in the required action parameters shown under PLUGIN ACTION CHAIN (for example entityId for Home Assistant or roomId for Philips Hue) and click Save Scenes."),
                 new("Bass and Treble do not change?", "The receiver turns off tone control while Dynamic EQ is ON."),
             ],

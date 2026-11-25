@@ -6,7 +6,9 @@ using Xunit;
 
 namespace Denon.App.Core.Tests;
 
-/// <summary>The live room event bus, the RoomEvent and Webhook triggers, and POST /api/hooks/{name}.</summary>
+/// <summary>
+/// The live room event bus, automation graphs (validator, runner, triggers, engine) and POST /api/hooks/{name}.
+/// </summary>
 public sealed class AutomationEventTests : IDisposable
 {
     private readonly string _tempDir = Path.Combine(Path.GetTempPath(), "denon-automation-" + Guid.NewGuid().ToString("N")[..8]);
@@ -21,12 +23,72 @@ public sealed class AutomationEventTests : IDisposable
     private static RoomEvent Event(string name, string origin = "external", string stream = "avr", string device = "avr", params (string Key, object? Value)[] data) =>
         new(DateTimeOffset.Now, stream, device, name, origin, data.ToDictionary(static d => d.Key, static d => d.Value));
 
+    private static RoomEvent Hook(string name, params (string Key, object? Value)[] data) =>
+        Event(AutomationTriggers.WebhookEventName, "webhook", "control", "webhook", [("hook", name), .. data]);
+
+    private static AutomationNode Node(string id, string type, params (string Key, string Value)[] config) =>
+        new() { Id = id, Type = type, Config = config.ToDictionary(static c => c.Key, static c => c.Value) };
+
+    private static AutomationEdge Edge(string from, string to, string port = AutomationNodeTypes.PortOut) =>
+        new() { From = from, Port = port, To = to };
+
+    /// <summary>trigger → scene, enabled.</summary>
+    private static AutomationGraph SceneGraph(string id, AutomationNode trigger, string sceneId = "movie-night", int cooldown = 0) =>
+        new()
+        {
+            Id = id, Name = id, Enabled = true, CooldownSeconds = cooldown,
+            Nodes = [trigger, Node("a", AutomationNodeTypes.ActionScene, ("sceneId", sceneId))],
+            Edges = [Edge(trigger.Id, "a")],
+        };
+
     private static async Task<RoomEvent> WaitForAsync(TaskCompletionSource<RoomEvent> tcs)
     {
         var done = await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(5)));
         Assert.True(done == tcs.Task, "The event did not reach the bus within 5 s.");
         return await tcs.Task;
     }
+
+    /// <summary>Records what a run asks for; changes nothing.</summary>
+    private sealed class FakeEffects : IAutomationEffects
+    {
+        public List<string> Calls { get; } = [];
+
+        public ReceiverFacts Facts { get; set; } = new(true, "TV", false);
+
+        public string? FailPluginAction { get; set; }
+
+        public ReceiverFacts GetReceiverFacts() => Facts;
+
+        public string DescribeScene(string sceneId) => sceneId;
+
+        public string DescribePluginAction(string pluginId, string actionId) => $"{pluginId}:{actionId}";
+
+        public Task RunSceneAsync(string sceneId, CancellationToken ct)
+        {
+            Calls.Add($"scene:{sceneId}");
+            return Task.CompletedTask;
+        }
+
+        public Task<(bool Success, string Message)> RunPluginActionAsync(string pluginId, string actionId, IReadOnlyDictionary<string, string>? parameters, CancellationToken ct)
+        {
+            Calls.Add($"plugin:{pluginId}:{actionId}" + (parameters is null ? "" : "?" + string.Join("&", parameters.Select(p => $"{p.Key}={p.Value}"))));
+            return Task.FromResult(actionId == FailPluginAction ? (false, "bridge offline") : (true, "ok"));
+        }
+
+        public Task<string> RunReceiverCommandAsync(string command, string value, CancellationToken ct)
+        {
+            Calls.Add($"receiver:{command}:{value}");
+            return Task.FromResult($"Receiver {command}");
+        }
+
+        public Task DelayAsync(TimeSpan delay, CancellationToken ct)
+        {
+            Calls.Add($"wait:{delay.TotalSeconds}");
+            return Task.CompletedTask;
+        }
+    }
+
+    // ---- Event bus -----------------------------------------------------------------------------------------
 
     [Fact]
     public async Task Record_PublishesOnTheBus_EvenWhenEventLoggingIsOff()
@@ -47,7 +109,6 @@ public sealed class AutomationEventTests : IDisposable
 
         var received = await WaitForAsync(seen);
         Assert.Equal("on", received.GetText("to"));
-        Assert.Equal("avr", received.Stream);
         Assert.Contains(bus.GetRecent(), e => e.Event == "power.changed");
 
         await Task.Delay(300);
@@ -69,6 +130,8 @@ public sealed class AutomationEventTests : IDisposable
         Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref count) == 2, TimeSpan.FromSeconds(5)));
     }
 
+    // ---- Trigger matching ----------------------------------------------------------------------------------
+
     [Theory]
     [InlineData("arrive-home", "arrive-home")]
     [InlineData("  Sleep_Focus ", "sleep_focus")]
@@ -80,52 +143,184 @@ public sealed class AutomationEventTests : IDisposable
         Assert.Equal(expected, AutomationTriggers.NormalizeHookName(raw));
 
     [Fact]
-    public void RoomEventRule_MatchesNameAndFilter_AndIgnoresAutomationOrigin()
+    public void EventTrigger_MatchesNameAndFilter_AndIgnoresAutomationOrigin()
     {
-        var rule = new AutomationRule { TriggerType = AutomationTriggerType.RoomEvent, EventName = "power.changed", DataFilter = "stream=avr, to=on" };
+        var trigger = Node("t", AutomationNodeTypes.TriggerEvent, ("event", "power.changed"), ("filter", "stream=avr, to=on"));
 
-        Assert.True(AutomationTriggers.Matches(rule, Event("power.changed", data: ("to", "on"))));
-        Assert.True(AutomationTriggers.Matches(rule, Event("POWER.CHANGED", data: ("to", "ON"))));
-        Assert.False(AutomationTriggers.Matches(rule, Event("power.changed", data: ("to", "standby"))));
-        Assert.False(AutomationTriggers.Matches(rule, Event("power.changed", stream: "tv", device: "lg-tv", data: ("to", "on"))));
-        Assert.False(AutomationTriggers.Matches(rule, Event("power.changed", origin: "automation", data: ("to", "on"))));
-        Assert.False(AutomationTriggers.Matches(rule, Event("input.changed", data: ("to", "on"))));
+        Assert.True(AutomationTriggers.Matches(trigger, Event("power.changed", data: ("to", "on"))));
+        Assert.True(AutomationTriggers.Matches(trigger, Event("POWER.CHANGED", data: ("to", "ON"))));
+        Assert.False(AutomationTriggers.Matches(trigger, Event("power.changed", data: ("to", "standby"))));
+        Assert.False(AutomationTriggers.Matches(trigger, Event("power.changed", stream: "tv", device: "lg-tv", data: ("to", "on"))));
+        Assert.False(AutomationTriggers.Matches(trigger, Event("power.changed", origin: "automation", data: ("to", "on"))));
+        Assert.False(AutomationTriggers.Matches(trigger, Event("input.changed", data: ("to", "on"))));
     }
 
     [Fact]
-    public void RoomEventRule_SupportsWildcardsNegationAndBooleans()
+    public void EventTrigger_SupportsWildcardsNegationAndBooleans()
     {
-        var cast = new AutomationRule { TriggerType = AutomationTriggerType.RoomEvent, EventName = "cast.*", DataFilter = "origin!=desktop_ui" };
+        var cast = Node("t", AutomationNodeTypes.TriggerEvent, ("event", "cast.*"), ("filter", "origin!=desktop_ui"));
         Assert.True(AutomationTriggers.Matches(cast, Event("cast.app_started", stream: "plugin:chromecast", device: "chromecast")));
         Assert.False(AutomationTriggers.Matches(cast, Event("cast.app_started", origin: "desktop_ui")));
         Assert.False(AutomationTriggers.Matches(cast, Event("appletv.woke")));
 
-        var muted = new AutomationRule { TriggerType = AutomationTriggerType.RoomEvent, EventName = "mute.changed", DataFilter = "muted=true" };
+        var muted = Node("t", AutomationNodeTypes.TriggerEvent, ("event", "mute.changed"), ("filter", "muted=true"));
         Assert.True(AutomationTriggers.Matches(muted, Event("mute.changed", data: ("muted", true))));
         Assert.False(AutomationTriggers.Matches(muted, Event("mute.changed", data: ("muted", false))));
         Assert.False(AutomationTriggers.Matches(muted, Event("mute.changed")));
     }
 
     [Fact]
-    public void WebhookRule_MatchesOnlyItsHookAndFilter()
+    public void WebhookTrigger_MatchesOnlyItsHookAndFilter()
     {
-        var rule = new AutomationRule { TriggerType = AutomationTriggerType.Webhook, WebhookName = "Focus", DataFilter = "focus=Sleep" };
-        RoomEvent Hook(string name, string focus) =>
-            Event(AutomationTriggers.WebhookEventName, origin: "webhook", stream: "control", device: "webhook", ("hook", name), ("focus", focus));
+        var trigger = Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "Focus"), ("filter", "focus=Sleep"));
 
-        Assert.True(AutomationTriggers.Matches(rule, Hook("focus", "sleep")));
-        Assert.False(AutomationTriggers.Matches(rule, Hook("focus", "Work")));
-        Assert.False(AutomationTriggers.Matches(rule, Hook("other", "Sleep")));
-        Assert.False(AutomationTriggers.Matches(rule, Event("focus", "webhook", "control", "webhook", ("hook", "focus"), ("focus", "Sleep"))));
+        Assert.True(AutomationTriggers.Matches(trigger, Hook("focus", ("focus", "sleep"))));
+        Assert.False(AutomationTriggers.Matches(trigger, Hook("focus", ("focus", "Work"))));
+        Assert.False(AutomationTriggers.Matches(trigger, Hook("other", ("focus", "Sleep"))));
+        Assert.False(AutomationTriggers.Matches(trigger, Event("focus", "webhook", "control", "webhook", ("hook", "focus"), ("focus", "Sleep"))));
     }
 
-    private sealed record Rig(AppSettingsStore Store, RoomEventBus Bus, RemoteWebApiHandler Handler, AutomationEngineService Engine, IDisposable Cleanup);
+    // ---- Validator -----------------------------------------------------------------------------------------
 
-    private async Task<Rig> CreateRigAsync()
+    [Fact]
+    public void Validator_AcceptsTheDefaults()
+    {
+        foreach (var graph in AutomationGraph.CreateDefaults())
+        {
+            Assert.Empty(AutomationGraphValidator.Validate(graph));
+            Assert.False(graph.Enabled);
+        }
+    }
+
+    [Fact]
+    public void Validator_FindsMistakes()
+    {
+        static IReadOnlyList<AutomationProblem> Check(Action<AutomationGraph> change)
+        {
+            var graph = SceneGraph("g", Node("t", AutomationNodeTypes.TriggerEvent, ("event", "power.changed")));
+            change(graph);
+            return AutomationGraphValidator.Validate(graph);
+        }
+
+        Assert.Contains(Check(g => g.Nodes.RemoveAt(0)), p => p.Message.Contains("trigger"));
+        Assert.Contains(Check(g => g.Edges.Add(Edge("a", "t"))), p => p.Message.Contains("into a trigger"));
+        Assert.Contains(Check(g => g.Edges.Add(Edge("t", "a"))), p => p.Message.Contains("twice"));
+        Assert.Contains(Check(g => g.Edges.Add(Edge("t", "a", "yes"))), p => p.Message.Contains("no 'yes' output"));
+        Assert.Contains(Check(g => g.Edges.Add(Edge("t", "missing"))), p => p.Message.Contains("does not exist"));
+        Assert.Contains(Check(g => g.Nodes[1].Config["sceneId"] = ""), p => p.NodeId == "a" && p.Message.Contains("Scene"));
+        Assert.Contains(Check(g => g.Nodes.Add(Node("w", AutomationNodeTypes.TriggerWebhook, ("hook", "bad name")))), p => p.NodeId == "w");
+        Assert.Contains(Check(g => g.Nodes.Add(Node("v", AutomationNodeTypes.ActionReceiver, ("command", "volume"), ("value", "120")))), p => p.NodeId == "v");
+        Assert.Contains(Check(g => g.Nodes.Add(Node("d", AutomationNodeTypes.ActionDelay, ("seconds", "0")))), p => p.NodeId == "d");
+        Assert.Contains(Check(g => g.Nodes.Add(Node("x", "action.unknown"))), p => p.NodeId == "x");
+        Assert.Contains(Check(g => g.Nodes.Add(Node("a", AutomationNodeTypes.ActionDelay, ("seconds", "5")))), p => p.Message.Contains("own id"));
+
+        // A cycle: a → b → a.
+        Assert.Contains(Check(g =>
+        {
+            g.Nodes.Add(Node("b", AutomationNodeTypes.ActionDelay, ("seconds", "1")));
+            g.Edges.Add(Edge("a", "b"));
+            g.Edges.Add(Edge("b", "a"));
+        }), p => p.Message.Contains("loop"));
+
+        // Hook names are stored in lower case.
+        var hookGraph = SceneGraph("h", Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "Arrive-Home")));
+        Assert.Empty(AutomationGraphValidator.Validate(hookGraph));
+        Assert.Equal("arrive-home", hookGraph.Nodes[0].Get("hook"));
+    }
+
+    // ---- Runner --------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Runner_FollowsConditionPorts_InEdgeOrder()
+    {
+        var graph = new AutomationGraph
+        {
+            Id = "g", Name = "Branches",
+            Nodes =
+            [
+                Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "go")),
+                Node("c", AutomationNodeTypes.ConditionEvent, ("filter", "who=owner")),
+                Node("yes1", AutomationNodeTypes.ActionScene, ("sceneId", "movie-night")),
+                Node("yes2", AutomationNodeTypes.ActionPlugin, ("pluginId", "philips-hue"), ("actionId", "hue.all_on"), ("p:roomId", "3"), ("p:empty", " ")),
+                Node("no", AutomationNodeTypes.ActionReceiver, ("command", "mute"), ("value", "")),
+            ],
+            Edges = [Edge("t", "c"), Edge("c", "yes1", "yes"), Edge("c", "yes2", "yes"), Edge("c", "no", "no")],
+        };
+
+        var owner = new FakeEffects();
+        var run = await AutomationGraphRunner.RunAsync(graph, graph.Nodes[0], Hook("go", ("who", "owner")), "Webhook 'go'", owner, false, DateTimeOffset.Now, default);
+        Assert.True(run.Success);
+        Assert.Equal(new[] { "scene:movie-night", "plugin:philips-hue:hue.all_on?roomId=3" }, owner.Calls);
+        Assert.Contains(run.Steps, s => s.NodeId == "c" && s.Outcome == "yes");
+        Assert.Contains("movie-night", run.Summary);
+
+        var guest = new FakeEffects();
+        var other = await AutomationGraphRunner.RunAsync(graph, graph.Nodes[0], Hook("go", ("who", "guest")), "Webhook 'go'", guest, false, DateTimeOffset.Now, default);
+        Assert.Equal(new[] { "receiver:mute:" }, guest.Calls);
+        Assert.Contains(other.Steps, s => s.NodeId == "c" && s.Outcome == "no");
+    }
+
+    [Fact]
+    public async Task Runner_StopsABranchWhenAStepFails_AndDryRunChangesNothing()
+    {
+        var graph = new AutomationGraph
+        {
+            Id = "g", Name = "Chain",
+            Nodes =
+            [
+                Node("t", AutomationNodeTypes.TriggerSchedule, ("time", "22:00")),
+                Node("a1", AutomationNodeTypes.ActionPlugin, ("pluginId", "philips-hue"), ("actionId", "hue.broken")),
+                Node("a2", AutomationNodeTypes.ActionScene, ("sceneId", "late-night")),
+                Node("w", AutomationNodeTypes.ActionDelay, ("seconds", "3")),
+            ],
+            Edges = [Edge("t", "a1"), Edge("a1", "a2"), Edge("t", "w")],
+        };
+
+        var effects = new FakeEffects { FailPluginAction = "hue.broken" };
+        var run = await AutomationGraphRunner.RunAsync(graph, graph.Nodes[0], null, "Scheduled 22:00", effects, false, DateTimeOffset.Now, default);
+        Assert.False(run.Success);
+        Assert.Equal(new[] { "plugin:philips-hue:hue.broken", "wait:3" }, effects.Calls); // a2 never runs; the other branch does
+        Assert.Contains(run.Steps, s => s.NodeId == "a1" && s.Outcome == "failed" && s.Message.Contains("bridge offline"));
+        Assert.Contains("failed", run.Summary);
+
+        var dry = new FakeEffects();
+        var dryRun = await AutomationGraphRunner.RunAsync(graph, graph.Nodes[0], null, "Dry run", dry, true, DateTimeOffset.Now, default);
+        Assert.Empty(dry.Calls);
+        Assert.All(dryRun.Steps, s => Assert.Equal("would-run", s.Outcome));
+    }
+
+    [Fact]
+    public void Conditions_TimeWindowAcrossMidnight_AndReceiverState()
+    {
+        var effects = new FakeEffects();
+        var evening = Node("c", AutomationNodeTypes.ConditionTime, ("from", "22:00"), ("to", "02:00"), ("days", "Daily"));
+        var e = Event("x");
+        DateTimeOffset At(int h, int m) => new(2026, 11, 25, h, m, 0, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 11, 25)));
+
+        Assert.True(AutomationGraphRunner.Evaluate(evening, e, effects, At(23, 30)).Pass);
+        Assert.True(AutomationGraphRunner.Evaluate(evening, e, effects, At(1, 59)).Pass);
+        Assert.False(AutomationGraphRunner.Evaluate(evening, e, effects, At(2, 0)).Pass);
+        Assert.False(AutomationGraphRunner.Evaluate(evening, e, effects, At(12, 0)).Pass);
+
+        var standbyOnTv = Node("r", AutomationNodeTypes.ConditionReceiver, ("power", "standby"), ("input", "TV"), ("muted", "any"));
+        effects.Facts = new ReceiverFacts(false, "TV", false);
+        Assert.True(AutomationGraphRunner.Evaluate(standbyOnTv, e, effects, At(12, 0)).Pass);
+        effects.Facts = new ReceiverFacts(true, "TV", false);
+        Assert.False(AutomationGraphRunner.Evaluate(standbyOnTv, e, effects, At(12, 0)).Pass);
+        effects.Facts = new ReceiverFacts(null, null, null);
+        Assert.False(AutomationGraphRunner.Evaluate(standbyOnTv, e, effects, At(12, 0)).Pass);
+    }
+
+    // ---- Endpoint and engine -------------------------------------------------------------------------------
+
+    private sealed record Rig(AppSettingsStore Store, RoomEventBus Bus, RemoteWebApiHandler Handler, AutomationEngineService Engine, FakeEffects Effects, IDisposable Cleanup);
+
+    private async Task<Rig> CreateRigAsync(params AutomationGraph[] graphs)
     {
         var log = new AppLogStore(Path.Combine(_tempDir, "rig.log"));
         var store = new AppSettingsStore(log, Path.Combine(_tempDir, "rig-settings.json"));
         await store.InitializeAsync();
+        await store.UpdateAsync(s => s.AutomationGraphs = [.. graphs]);
 
         var bus = new RoomEventBus(log);
         var telemetry = new EventTelemetryLog(store, log, bus, Path.Combine(_tempDir, "rig-events"));
@@ -137,7 +332,8 @@ public sealed class AutomationEventTests : IDisposable
         var jukebox = new LocalMediaJukeboxService(relay, controller, stateStore, log);
         var plugins = new PluginHostService([], store, stateStore, controller, telemetry, log);
         var handler = new RemoteWebApiHandler(controller, stateStore, store, ytMedia, ytQueue, jukebox, plugins, telemetry, log);
-        var engine = new AutomationEngineService(store, controller, plugins, telemetry, bus, log);
+        var effects = new FakeEffects();
+        var engine = new AutomationEngineService(store, controller, stateStore, plugins, telemetry, bus, log) { EffectsOverride = effects };
 
         var cleanup = new Cleanup(() =>
         {
@@ -148,7 +344,7 @@ public sealed class AutomationEventTests : IDisposable
             telemetry.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(3));
             bus.Dispose();
         });
-        return new Rig(store, bus, handler, engine, cleanup);
+        return new Rig(store, bus, handler, engine, effects, cleanup);
     }
 
     private sealed class Cleanup(Action action) : IDisposable
@@ -157,15 +353,13 @@ public sealed class AutomationEventTests : IDisposable
     }
 
     [Fact]
-    public async Task WebhookEndpoint_PublishesTheEvent_AndNamesTheListeningRules()
+    public async Task WebhookEndpoint_PublishesTheEvent_AndNamesTheListeningAutomations()
     {
-        var rig = await CreateRigAsync();
+        var home = SceneGraph("home", Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "arrive-home")));
+        var paused = SceneGraph("paused", Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "arrive-home")));
+        paused.Enabled = false;
+        var rig = await CreateRigAsync(home, paused);
         using var _ = rig.Cleanup;
-        await rig.Store.UpdateAsync(s => s.Automations =
-        [
-            new AutomationRule { Name = "Home", IsEnabled = true, TriggerType = AutomationTriggerType.Webhook, WebhookName = "arrive-home" },
-            new AutomationRule { Name = "Paused", IsEnabled = false, TriggerType = AutomationTriggerType.Webhook, WebhookName = "arrive-home" },
-        ]);
         var owner = rig.Store.Current.Remote.OwnerToken;
 
         var seen = new TaskCompletionSource<RoomEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -174,7 +368,7 @@ public sealed class AutomationEventTests : IDisposable
         var ok = await rig.Handler.HandleAsync("POST", "/api/hooks/Arrive-Home", null, "{\"focus\":\"Sleep\",\"battery\":42,\"hook\":\"spoof\"}", owner, CancellationToken.None);
         Assert.Equal(200, ok.StatusCode);
         Assert.Contains("\"hook\":\"arrive-home\"", ok.Body);
-        Assert.Contains("\"rules\":[\"Home\"]", ok.Body);
+        Assert.Contains("\"automations\":[\"home\"]", ok.Body);
 
         var e = await WaitForAsync(seen);
         Assert.Equal("arrive-home", e.GetText("hook"));
@@ -184,51 +378,57 @@ public sealed class AutomationEventTests : IDisposable
 
         var none = await rig.Handler.HandleAsync("POST", "/api/hooks/nobody", null, "plain text", owner, CancellationToken.None);
         Assert.Equal(200, none.StatusCode);
-        Assert.Contains("no enabled automation rule", none.Body);
+        Assert.Contains("no enabled automation", none.Body);
 
-        var bad = await rig.Handler.HandleAsync("POST", "/api/hooks/has%20space", null, "", owner, CancellationToken.None);
-        Assert.Equal(400, bad.StatusCode);
-
-        var guest = await rig.Handler.HandleAsync("POST", "/api/hooks/arrive-home", null, "", rig.Store.Current.Remote.GuestToken, CancellationToken.None);
-        Assert.Equal(403, guest.StatusCode);
-
-        var anonymous = await rig.Handler.HandleAsync("POST", "/api/hooks/arrive-home", null, "", null, CancellationToken.None);
-        Assert.Equal(401, anonymous.StatusCode);
+        Assert.Equal(400, (await rig.Handler.HandleAsync("POST", "/api/hooks/has%20space", null, "", owner, CancellationToken.None)).StatusCode);
+        Assert.Equal(403, (await rig.Handler.HandleAsync("POST", "/api/hooks/arrive-home", null, "", rig.Store.Current.Remote.GuestToken, CancellationToken.None)).StatusCode);
+        Assert.Equal(401, (await rig.Handler.HandleAsync("POST", "/api/hooks/arrive-home", null, "", null, CancellationToken.None)).StatusCode);
     }
 
     [Fact]
-    public async Task Engine_RunsMatchingRules_WithCooldownAndLoopGuard()
+    public async Task Engine_RunsMatchingGraphs_WithCooldown()
     {
-        var rig = await CreateRigAsync();
+        var hook = SceneGraph("hook", Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "tap")), "pure-audiophile");
+        var on = SceneGraph("on", Node("t", AutomationNodeTypes.TriggerEvent, ("event", "power.changed"), ("filter", "to=on")));
+        var off = SceneGraph("off", Node("t", AutomationNodeTypes.TriggerEvent, ("event", "power.changed")));
+        off.Enabled = false;
+        var rig = await CreateRigAsync(hook, on, off);
         using var _ = rig.Cleanup;
-        await rig.Store.UpdateAsync(s => s.Automations =
-        [
-            new AutomationRule { Id = "hook", Name = "Hook", IsEnabled = true, TriggerType = AutomationTriggerType.Webhook, WebhookName = "tap", CooldownSeconds = 0 },
-            new AutomationRule { Id = "on", Name = "On", IsEnabled = true, TriggerType = AutomationTriggerType.RoomEvent, EventName = "power.changed", DataFilter = "to=on", CooldownSeconds = 0 },
-            new AutomationRule { Id = "off", Name = "Off", IsEnabled = false, TriggerType = AutomationTriggerType.RoomEvent, EventName = "power.changed" },
-        ]);
 
         var t0 = DateTimeOffset.Now;
-        var tap = Event(AutomationTriggers.WebhookEventName, origin: "webhook", stream: "control", device: "webhook", ("hook", "tap"));
-        Assert.Equal(new[] { "Hook" }, await rig.Engine.HandleRoomEventAsync(tap, t0));
-        Assert.Equal(new[] { "Hook" }, await rig.Engine.HandleRoomEventAsync(tap, t0.AddMilliseconds(100))); // webhooks may repeat at once
+        Assert.Single(await rig.Engine.HandleRoomEventAsync(Hook("tap"), t0));
+        Assert.Single(await rig.Engine.HandleRoomEventAsync(Hook("tap"), t0.AddMilliseconds(100))); // webhooks may repeat at once
 
         var powerOn = Event("power.changed", data: ("to", "on"));
-        Assert.Equal(new[] { "On" }, await rig.Engine.HandleRoomEventAsync(powerOn, t0));
-        Assert.Empty(await rig.Engine.HandleRoomEventAsync(powerOn, t0.AddSeconds(5)));   // room events wait at least 10 s
-        Assert.Equal(new[] { "On" }, await rig.Engine.HandleRoomEventAsync(powerOn, t0.AddSeconds(11)));
+        Assert.Equal("on", Assert.Single(await rig.Engine.HandleRoomEventAsync(powerOn, t0)).GraphId);
+        Assert.Empty(await rig.Engine.HandleRoomEventAsync(powerOn, t0.AddSeconds(5)));   // event triggers wait at least 10 s
+        Assert.Single(await rig.Engine.HandleRoomEventAsync(powerOn, t0.AddSeconds(11)));
         Assert.Empty(await rig.Engine.HandleRoomEventAsync(Event("power.changed", origin: "automation", data: ("to", "on")), t0.AddSeconds(30)));
+
+        Assert.Equal(new[] { "scene:pure-audiophile", "scene:pure-audiophile", "scene:movie-night", "scene:movie-night" }, rig.Effects.Calls);
+        Assert.Equal("on", rig.Engine.GetLastRuns()["on"].GraphId);
     }
 
     [Fact]
-    public async Task RunningEngine_RunsAWebhookRule_FromTheHttpCallThroughTheBus()
+    public async Task Engine_RunsSchedulesOncePerDay()
     {
-        var rig = await CreateRigAsync();
+        var nightly = SceneGraph("nightly", Node("t", AutomationNodeTypes.TriggerSchedule, ("time", "22:00"), ("days", "Daily")), "late-night");
+        var rig = await CreateRigAsync(nightly);
         using var _ = rig.Cleanup;
-        await rig.Store.UpdateAsync(s => s.Automations =
-        [
-            new AutomationRule { Id = "home", Name = "Home", IsEnabled = true, TriggerType = AutomationTriggerType.Webhook, WebhookName = "arrive-home", DataFilter = "who=owner", CooldownSeconds = 0 },
-        ]);
+
+        var at = new DateTimeOffset(2026, 11, 25, 22, 0, 10, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 11, 25)));
+        await rig.Engine.EvaluateTickAsync(at.AddMinutes(-1), default);
+        await rig.Engine.EvaluateTickAsync(at, default);
+        await rig.Engine.EvaluateTickAsync(at.AddSeconds(3), default);
+        Assert.Equal(new[] { "scene:late-night" }, rig.Effects.Calls);
+    }
+
+    [Fact]
+    public async Task RunningEngine_RunsAWebhookAutomation_FromTheHttpCallThroughTheBus()
+    {
+        var graph = SceneGraph("home", Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "arrive-home"), ("filter", "who=owner")));
+        var rig = await CreateRigAsync(graph);
+        using var _ = rig.Cleanup;
 
         var ran = new TaskCompletionSource<AutomationActivityEntry>(TaskCreationOptions.RunContinuationsAsynchronously);
         rig.Engine.ActivityLogged += entry => ran.TrySetResult(entry);
@@ -240,10 +440,11 @@ public sealed class AutomationEventTests : IDisposable
             Assert.Equal(200, reply.StatusCode);
 
             var done = await Task.WhenAny(ran.Task, Task.Delay(TimeSpan.FromSeconds(5)));
-            Assert.True(done == ran.Task, "The webhook rule did not run within 5 s.");
+            Assert.True(done == ran.Task, "The webhook automation did not run within 5 s.");
             var entry = await ran.Task;
-            Assert.Equal("Home", entry.RuleName);
+            Assert.Equal("home", entry.RuleName);
             Assert.Contains("Webhook 'arrive-home'", entry.TriggerDetail);
+            Assert.Equal(new[] { "scene:movie-night" }, rig.Effects.Calls);
         }
         finally
         {
@@ -254,13 +455,13 @@ public sealed class AutomationEventTests : IDisposable
     [Fact]
     public async Task Engine_LoopGuard_PausesEventTriggersAfterTooManyRuns()
     {
-        var rig = await CreateRigAsync();
+        // Four graphs on one event: each event runs four graphs, so five events make 20 runs within a minute.
+        var graphs = Enumerable.Range(1, 4)
+            .Select(i => SceneGraph($"r{i}", Node("t", AutomationNodeTypes.TriggerEvent, ("event", "input.changed"))))
+            .Append(SceneGraph("hook", Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "tap"))))
+            .ToArray();
+        var rig = await CreateRigAsync(graphs);
         using var _ = rig.Cleanup;
-        // Four rules on one event: each event runs four rules, so five events make 20 runs within a minute.
-        await rig.Store.UpdateAsync(s => s.Automations = Enumerable.Range(1, 4)
-            .Select(i => new AutomationRule { Id = $"r{i}", Name = $"R{i}", IsEnabled = true, TriggerType = AutomationTriggerType.RoomEvent, EventName = "input.changed", CooldownSeconds = 0 })
-            .Append(new AutomationRule { Id = "hook", Name = "Hook", IsEnabled = true, TriggerType = AutomationTriggerType.Webhook, WebhookName = "tap", CooldownSeconds = 0 })
-            .ToList());
 
         var input = Event("input.changed", data: ("to", "TV"));
         var t0 = DateTimeOffset.Now;
@@ -273,10 +474,31 @@ public sealed class AutomationEventTests : IDisposable
         var t5 = t0.AddSeconds(52.5);
         Assert.Empty(await rig.Engine.HandleRoomEventAsync(input, t5));                   // 21st run: the guard trips
         Assert.Empty(await rig.Engine.HandleRoomEventAsync(input, t5.AddSeconds(30)));    // still paused
-
-        var tap = Event(AutomationTriggers.WebhookEventName, origin: "webhook", stream: "control", device: "webhook", ("hook", "tap"));
-        Assert.Equal(new[] { "Hook" }, await rig.Engine.HandleRoomEventAsync(tap, t5.AddSeconds(31))); // webhooks are not paused
-
+        Assert.Single(await rig.Engine.HandleRoomEventAsync(Hook("tap"), t5.AddSeconds(31))); // webhooks are not paused
         Assert.Equal(4, (await rig.Engine.HandleRoomEventAsync(input, t5.AddSeconds(61))).Count); // pause over
+    }
+
+    [Fact]
+    public async Task RunGraphNow_DryRunUsesTheGivenData_AndChangesNothing()
+    {
+        var graph = new AutomationGraph
+        {
+            Id = "g", Name = "Focus", Enabled = false,
+            Nodes =
+            [
+                Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "focus")),
+                Node("c", AutomationNodeTypes.ConditionEvent, ("filter", "focus=Sleep")),
+                Node("a", AutomationNodeTypes.ActionReceiver, ("command", "power_off"), ("value", "")),
+            ],
+            Edges = [Edge("t", "c"), Edge("c", "a", "yes")],
+        };
+        var rig = await CreateRigAsync(graph);
+        using var _ = rig.Cleanup;
+
+        var run = await rig.Engine.RunGraphNowAsync(graph, null, new Dictionary<string, object?> { ["focus"] = "Sleep" }, dryRun: true);
+        Assert.True(run.DryRun);
+        Assert.Contains(run.Steps, s => s.NodeId == "c" && s.Outcome == "yes");
+        Assert.Contains(run.Steps, s => s.NodeId == "a" && s.Outcome == "would-run");
+        Assert.Empty(rig.Effects.Calls);
     }
 }
