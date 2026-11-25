@@ -323,6 +323,32 @@ public sealed class AutomationEventTests : IDisposable
     }
 
     [Fact]
+    public async Task Runner_ChecksATimeWindowWhenItIsReached_NotWhenTheRunStarted()
+    {
+        var graph = new AutomationGraph
+        {
+            Id = "g", Name = "Late wait",
+            Nodes =
+            [
+                Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "go")),
+                Node("w", AutomationNodeTypes.ActionDelay, ("seconds", "120")),
+                Node("c", AutomationNodeTypes.ConditionTime, ("from", "17:00"), ("to", "22:00"), ("days", "Daily")),
+                Node("a", AutomationNodeTypes.ActionScene, ("sceneId", "movie-night")),
+            ],
+            Edges = [Edge("t", "w"), Edge("w", "c"), Edge("c", "a", "yes")],
+        };
+
+        // The run starts at 21:59; the wait takes 2 minutes, so the window is checked at 22:01.
+        var elapsed = TimeSpan.Zero;
+        var effects = new FakeEffects { OnDelay = () => elapsed = TimeSpan.FromMinutes(2) };
+        var start = new DateTimeOffset(2026, 11, 25, 21, 59, 0, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 11, 25)));
+        var run = await AutomationGraphRunner.RunAsync(graph, graph.Nodes[0], Hook("go"), "Webhook 'go'", effects, false, start, default, () => elapsed);
+
+        Assert.Contains(run.Steps, s => s.NodeId == "c" && s.Outcome == "no" && s.Message.Contains("22:01"));
+        Assert.Equal(new[] { "wait:120" }, effects.Calls);
+    }
+
+    [Fact]
     public void Conditions_TimeWindowAcrossMidnight_AndReceiverState()
     {
         var effects = new FakeEffects();
@@ -342,6 +368,14 @@ public sealed class AutomationEventTests : IDisposable
         Assert.False(AutomationGraphRunner.Evaluate(standbyOnTv, e, effects, At(12, 0)).Pass);
         effects.Facts = new ReceiverFacts(null, null, null);
         Assert.False(AutomationGraphRunner.Evaluate(standbyOnTv, e, effects, At(12, 0)).Pass);
+
+        // Unknown mute state passes neither "muted" nor "not muted".
+        var notMuted = Node("m", AutomationNodeTypes.ConditionReceiver, ("power", "any"), ("input", ""), ("muted", "no"));
+        var muted = Node("m", AutomationNodeTypes.ConditionReceiver, ("power", "any"), ("input", ""), ("muted", "yes"));
+        Assert.False(AutomationGraphRunner.Evaluate(notMuted, e, effects, At(12, 0)).Pass);
+        Assert.False(AutomationGraphRunner.Evaluate(muted, e, effects, At(12, 0)).Pass);
+        effects.Facts = new ReceiverFacts(true, "TV", false);
+        Assert.True(AutomationGraphRunner.Evaluate(notMuted, e, effects, At(12, 0)).Pass);
     }
 
     // ---- Endpoint and engine -------------------------------------------------------------------------------

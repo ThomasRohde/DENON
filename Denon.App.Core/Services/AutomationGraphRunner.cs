@@ -52,8 +52,13 @@ public static class AutomationGraphRunner
         IAutomationEffects effects,
         bool dryRun,
         DateTimeOffset now,
-        CancellationToken ct)
+        CancellationToken ct,
+        Func<TimeSpan>? elapsed = null)
     {
+        // Conditions are checked when they are reached: a Wait or a slow step before a time window moves the clock.
+        // `now` is the run's start; `elapsed` is the real time since then (tests can pass their own).
+        var started = System.Diagnostics.Stopwatch.GetTimestamp();
+        elapsed ??= () => System.Diagnostics.Stopwatch.GetElapsedTime(started);
         var steps = new List<AutomationStep> { new(trigger.Id, dryRun ? "would-run" : "ran", triggerDetail) };
         var done = new List<string>();
         var success = true;
@@ -82,7 +87,7 @@ public static class AutomationGraphRunner
 
             if (AutomationNodeTypes.IsCondition(node.Type))
             {
-                var (pass, why) = Evaluate(node, eventForConditions, effects, now);
+                var (pass, why) = Evaluate(node, eventForConditions, effects, now + elapsed());
                 steps.Add(new(node.Id, pass ? "yes" : "no", why));
                 await FollowAsync(node, pass ? AutomationNodeTypes.PortYes : AutomationNodeTypes.PortNo);
                 return;
@@ -193,10 +198,11 @@ public static class AutomationGraphRunner
                 switch (node.Get("muted"))
                 {
                     case "yes" when facts.IsMuted != true:
-                        pass = false; reasons.Add("the receiver is not muted");
+                        pass = false; reasons.Add(facts.IsMuted is null ? "the mute state is not known" : "the receiver is not muted");
                         break;
-                    case "no" when facts.IsMuted == true:
-                        pass = false; reasons.Add("the receiver is muted");
+                    case "no" when facts.IsMuted != false:
+                        // Unknown (no connection yet) is not "not muted", as unknown is not "muted" above.
+                        pass = false; reasons.Add(facts.IsMuted is null ? "the mute state is not known" : "the receiver is muted");
                         break;
                 }
 
