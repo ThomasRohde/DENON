@@ -23,6 +23,16 @@ Published copy (private): https://claude.ai/artifact/Dw8Q9LHFajrqLbUKnAwnjU
   (the item, its line and section, and "update TODO.md and the CHANGELOG, run the tests, do not commit"). Choose how
   the session starts: **Plan first** (`--permission-mode plan`, the default), **Ask before edits** or **Accept edits**.
   The list follows `TODO.md` while you work, so a ticked or removed item shows at once.
+  To pick several items, tick their boxes, Ctrl+click or Shift+click (a range), or use **Pick all** on a section.
+  The prompt for one session then changes with the pick:
+  - Items from one section: Claude looks for one shared change first.
+  - Items from several sections: Claude keeps the changes separate.
+  - Items that name the same code, file or class: the prompt names those links.
+  - Ticked items: Claude only checks that nothing is left.
+  - More than five items: Claude stops cleanly when its context gets full.
+
+  In every case, Claude first proposes an order, then finishes and ticks one item at a time, and reports per item, so
+  you can commit the items one by one. **How the prompt fits this pick** shows those choices before you start.
 
 `TODO.md` stays Markdown. The deck reads it as it is: a `## ` heading is a section, and `- [ ]` / `- [x]` with the
 lines indented under it is an item. An item's ID is a hash of its section and text, so keep that format.
