@@ -4,6 +4,27 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Automation rules react to the room:** a new **Room Event** trigger runs a rule when an event happens, such as
+  `power.changed`, `input.changed`, `session.started`, `appletv.woke` or `cast.*`. An optional **Only when** filter
+  of `key=value` terms narrows it down, for example `stream=avr, to=on` or `origin!=desktop_ui`. The rule editor
+  lists the latest room events; click one to use it.
+- **Webhook trigger for iPhone Shortcuts and other devices:** `POST /api/hooks/{name}` on the Phone Remote port
+  (`18925`, owner token as `Authorization: Bearer`) runs every enabled rule with that hook name. A JSON body adds
+  fields that the filter can test (`{"focus":"Sleep"}` and `focus=Sleep`). The answer names the rules that listen.
+  The rule editor shows the URL and can copy it and the owner token.
+- **Live room event bus** (`RoomEventBus`): every event that the event log records is also published live in the
+  app, whether or not event logging is on. The automation engine is its first user.
+
+### Changed
+- The event monitor now runs when event logging is off, so automations still see the events; with logging off,
+  nothing is written to disk.
+- Loop protection for event rules: changes made by an automation never trigger a Room Event rule, Room Event rules
+  wait at least 10 s between runs, and more than 20 event-triggered runs in a minute pause event triggers for a
+  minute. Webhook rules may repeat at once (cooldown 0 is allowed).
+
 ## [2.8.0] - 2026-11-24
 
 ### Added

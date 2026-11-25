@@ -4,6 +4,12 @@ public enum AutomationTriggerType
 {
     AppLaunch = 0,
     TimeOfDay = 1,
+
+    /// <summary>A room event on the live event bus, e.g. power.changed or session.started.</summary>
+    RoomEvent = 2,
+
+    /// <summary>A call to POST /api/hooks/{name} on the Phone Remote API, e.g. from an iPhone Shortcut.</summary>
+    Webhook = 3,
 }
 
 public sealed class ScenePluginActionStep
@@ -55,6 +61,24 @@ public sealed class AutomationRule
     public string DaysFilter { get; set; } = "Daily";
 
     /// <summary>
+    /// RoomEvent trigger: the event name to react to, e.g. "power.changed", "input.changed", "session.started",
+    /// "appletv.woke" or "cast.app_started".
+    /// </summary>
+    public string EventName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Webhook trigger: the hook name in POST /api/hooks/{name}, e.g. "arrive-home".
+    /// </summary>
+    public string WebhookName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// RoomEvent and Webhook triggers: optional "key=value" pairs that the event data must all match,
+    /// separated by commas, e.g. "to=on" or "focus=Sleep, device=lg-tv". Case does not matter.
+    /// "key!=value" means the value must differ. "device=" and "origin=" also match the event itself.
+    /// </summary>
+    public string DataFilter { get; set; } = string.Empty;
+
+    /// <summary>
     /// Optional Smart Scene ID to activate when triggered.
     /// </summary>
     public string? TargetSceneId { get; set; }
@@ -65,7 +89,7 @@ public sealed class AutomationRule
     public List<ScenePluginActionStep> PluginActions { get; set; } = [];
 
     /// <summary>
-    /// Minimum seconds between repeated AppLaunch triggers for this rule.
+    /// Minimum seconds between two runs of this rule by an app launch, a room event or a webhook.
     /// </summary>
     public int CooldownSeconds { get; set; } = 120;
 
@@ -79,6 +103,9 @@ public sealed class AutomationRule
             ProcessNames = ProcessNames,
             ScheduleTime = ScheduleTime,
             DaysFilter = DaysFilter,
+            EventName = EventName,
+            WebhookName = WebhookName,
+            DataFilter = DataFilter,
             TargetSceneId = TargetSceneId,
             PluginActions = PluginActions.Select(static s => s.Clone()).ToList(),
             CooldownSeconds = CooldownSeconds,

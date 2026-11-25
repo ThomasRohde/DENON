@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Denon.App.Core.Models;
+using Denon.App.Core.Services;
 using Denon.App.Desktop.Infrastructure;
 using Denon.App.PluginSdk;
 
@@ -25,6 +26,9 @@ public sealed class AutomationRuleEditor : ObservableObject
     private string _processNames = string.Empty;
     private string _scheduleTime = "22:00";
     private string _daysFilter = "Daily";
+    private string _eventName = string.Empty;
+    private string _webhookName = string.Empty;
+    private string _dataFilter = string.Empty;
     private string _targetSceneId = string.Empty;
     private string _cooldownSecondsText = "120";
     private bool _isSelected;
@@ -62,6 +66,10 @@ public sealed class AutomationRuleEditor : ObservableObject
             {
                 OnPropertyChanged(nameof(IsAppLaunchTrigger));
                 OnPropertyChanged(nameof(IsTimeScheduleTrigger));
+                OnPropertyChanged(nameof(IsRoomEventTrigger));
+                OnPropertyChanged(nameof(IsWebhookTrigger));
+                OnPropertyChanged(nameof(UsesCooldown));
+                OnPropertyChanged(nameof(UsesDataFilter));
                 OnPropertyChanged(nameof(TriggerBadge));
                 OnPropertyChanged(nameof(SummaryLine));
             }
@@ -72,7 +80,65 @@ public sealed class AutomationRuleEditor : ObservableObject
 
     public bool IsTimeScheduleTrigger => TriggerType == AutomationTriggerType.TimeOfDay;
 
-    public string TriggerBadge => TriggerType == AutomationTriggerType.AppLaunch ? "APP LAUNCH" : "SCHEDULE";
+    public bool IsRoomEventTrigger => TriggerType == AutomationTriggerType.RoomEvent;
+
+    public bool IsWebhookTrigger => TriggerType == AutomationTriggerType.Webhook;
+
+    public bool UsesCooldown => TriggerType != AutomationTriggerType.TimeOfDay;
+
+    public bool UsesDataFilter => IsRoomEventTrigger || IsWebhookTrigger;
+
+    public string TriggerBadge => TriggerType switch
+    {
+        AutomationTriggerType.AppLaunch => "APP LAUNCH",
+        AutomationTriggerType.TimeOfDay => "SCHEDULE",
+        AutomationTriggerType.RoomEvent => "ROOM EVENT",
+        AutomationTriggerType.Webhook => "WEBHOOK",
+        _ => "TRIGGER",
+    };
+
+    public string EventName
+    {
+        get => _eventName;
+        set
+        {
+            if (SetProperty(ref _eventName, value))
+            {
+                OnPropertyChanged(nameof(SummaryLine));
+            }
+        }
+    }
+
+    public string WebhookName
+    {
+        get => _webhookName;
+        set
+        {
+            if (SetProperty(ref _webhookName, value))
+            {
+                OnPropertyChanged(nameof(SummaryLine));
+                OnPropertyChanged(nameof(WebhookNameError));
+            }
+        }
+    }
+
+    /// <summary>Shown under the hook name when it cannot be used in a URL.</summary>
+    public string WebhookNameError =>
+        string.IsNullOrWhiteSpace(WebhookName) || AutomationTriggers.NormalizeHookName(WebhookName) is not null
+            ? string.Empty
+            : "Use letters, digits, '-' or '_' only (at most 64), e.g. arrive-home.";
+
+    public string DataFilter
+    {
+        get => _dataFilter;
+        set
+        {
+            if (SetProperty(ref _dataFilter, value))
+            {
+                OnPropertyChanged(nameof(SummaryLine));
+            }
+        }
+    }
 
     public string StatusLabel => IsEnabled ? "ACTIVE" : "PAUSED";
 
@@ -144,9 +210,14 @@ public sealed class AutomationRuleEditor : ObservableObject
     {
         get
         {
-            var trigger = TriggerType == AutomationTriggerType.AppLaunch
-                ? (string.IsNullOrWhiteSpace(ProcessNames) ? "No apps set" : $"When {ProcessNames} launches")
-                : $"At {ScheduleTime} ({DaysFilter})";
+            var filter = string.IsNullOrWhiteSpace(DataFilter) ? string.Empty : $" [{DataFilter.Trim()}]";
+            var trigger = TriggerType switch
+            {
+                AutomationTriggerType.AppLaunch => string.IsNullOrWhiteSpace(ProcessNames) ? "No apps set" : $"When {ProcessNames} launches",
+                AutomationTriggerType.RoomEvent => string.IsNullOrWhiteSpace(EventName) ? "No event set" : $"On {EventName.Trim()}{filter}",
+                AutomationTriggerType.Webhook => string.IsNullOrWhiteSpace(WebhookName) ? "No hook name set" : $"On webhook '{WebhookName.Trim()}'{filter}",
+                _ => $"At {ScheduleTime} ({DaysFilter})",
+            };
 
             var actions = new List<string>();
             if (!string.IsNullOrWhiteSpace(TargetSceneId))
@@ -183,6 +254,9 @@ public sealed class AutomationRuleEditor : ObservableObject
             ProcessNames = model.ProcessNames,
             ScheduleTime = model.ScheduleTime,
             DaysFilter = string.IsNullOrWhiteSpace(model.DaysFilter) ? "Daily" : model.DaysFilter,
+            EventName = model.EventName ?? string.Empty,
+            WebhookName = model.WebhookName ?? string.Empty,
+            DataFilter = model.DataFilter ?? string.Empty,
             TargetSceneId = model.TargetSceneId ?? string.Empty,
             CooldownSecondsText = model.CooldownSeconds.ToString(),
         };
@@ -209,8 +283,12 @@ public sealed class AutomationRuleEditor : ObservableObject
             ProcessNames = ProcessNames.Trim(),
             ScheduleTime = string.IsNullOrWhiteSpace(ScheduleTime) ? "22:00" : ScheduleTime.Trim(),
             DaysFilter = string.IsNullOrWhiteSpace(DaysFilter) ? "Daily" : DaysFilter.Trim(),
+            EventName = EventName.Trim(),
+            WebhookName = AutomationTriggers.NormalizeHookName(WebhookName) ?? WebhookName.Trim(),
+            DataFilter = DataFilter.Trim(),
             TargetSceneId = string.IsNullOrWhiteSpace(TargetSceneId) ? null : TargetSceneId.Trim(),
             PluginActions = PluginActions.Select(static s => s.ToModel()).ToList(),
-            CooldownSeconds = int.TryParse(CooldownSecondsText, out var cd) ? Math.Clamp(cd, 10, 86400) : 120,
+            // App launches wait at least 10 s and room events 10 s (the engine enforces both); a webhook may repeat at once.
+            CooldownSeconds = int.TryParse(CooldownSecondsText, out var cd) ? Math.Clamp(cd, 0, 86400) : 120,
         };
 }

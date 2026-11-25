@@ -40,7 +40,7 @@
                     </Button>
                 </StackPanel>
 
-                <TextBlock Text="Chain Philips Hue &amp; plugin actions onto Smart Scenes, or auto-trigger on App Launch &amp; Night Guard schedules"
+                <TextBlock Text="Chain plugin actions onto Smart Scenes, and run them on app launches, schedules, room events or webhooks"
                            FontSize="{DynamicResource FontSize04}"
                            Foreground="{DynamicResource TextMutedBrush}"
                            HorizontalAlignment="Right"
@@ -701,14 +701,18 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <DockPanel Grid.Row="0" Margin="{skin:Space 0,0,0,12}">
-                            <TextBlock Text="AUTOMATION TRIGGERS" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button Content="+ App Trigger" Command="{Binding AddAppLaunchRuleCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,5,0}" />
-                                <Button Content="+ Schedule" Command="{Binding AddScheduleRuleCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,5,0}" />
-                                <Button Content="Save Automations" Command="{Binding SaveAutomationsCommand}" Style="{StaticResource PrimaryButton}" Padding="{skin:Space 11,5}" FontSize="{DynamicResource FontSize04}" />
-                            </StackPanel>
-                        </DockPanel>
+                        <StackPanel Grid.Row="0" Margin="{skin:Space 0,0,0,12}">
+                            <DockPanel Margin="{skin:Space 0,0,0,8}">
+                                <Button DockPanel.Dock="Right" Content="Save Automations" Command="{Binding SaveAutomationsCommand}" Style="{StaticResource PrimaryButton}" Padding="{skin:Space 11,5}" FontSize="{DynamicResource FontSize04}" />
+                                <TextBlock Text="AUTOMATION TRIGGERS" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                            </DockPanel>
+                            <WrapPanel>
+                                <Button Content="+ App Trigger" Command="{Binding AddAppLaunchRuleCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,5,5}" ToolTip="Run when a program starts on this PC" />
+                                <Button Content="+ Schedule" Command="{Binding AddScheduleRuleCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,5,5}" ToolTip="Run at a time of day" />
+                                <Button Content="+ Room Event" Command="{Binding AddRoomEventRuleCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,5,5}" ToolTip="Run when something happens in the room, e.g. the receiver turns on or a cast starts" />
+                                <Button Content="+ Webhook" Command="{Binding AddWebhookRuleCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,5,5}" ToolTip="Run when an iPhone Shortcut or another device calls a URL" />
+                            </WrapPanel>
+                        </StackPanel>
 
                         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                             <ItemsControl ItemsSource="{Binding AutomationRules}">
@@ -779,8 +783,82 @@
                                 <!-- AppLaunch Fields -->
                                 <StackPanel Visibility="{Binding IsAppLaunchTrigger, Converter={StaticResource BoolToVis}}" Margin="{skin:Space 0,0,0,8}">
                                     <TextBlock Text="Watched Process Names (comma-separated, without .exe)" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,3}" />
-                                    <TextBox Text="{Binding ProcessNames, UpdateSourceTrigger=PropertyChanged}" FontFamily="{DynamicResource MonoFont}" Padding="{skin:Space 8,6}" FontSize="{DynamicResource FontSize05}" Margin="{skin:Space 0,0,0,6}" />
-                                    <TextBlock Text="Cooldown (seconds)" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,3}" />
+                                    <TextBox Text="{Binding ProcessNames, UpdateSourceTrigger=PropertyChanged}" FontFamily="{DynamicResource MonoFont}" Padding="{skin:Space 8,6}" FontSize="{DynamicResource FontSize05}" />
+                                </StackPanel>
+
+                                <!-- Room Event Fields -->
+                                <StackPanel Visibility="{Binding IsRoomEventTrigger, Converter={StaticResource BoolToVis}}" Margin="{skin:Space 0,0,0,8}">
+                                    <TextBlock Text="Event name (pick one or type it; cast.* matches every cast event)" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,3}" />
+                                    <ComboBox IsEditable="True"
+                                              ItemsSource="{Binding DataContext.KnownRoomEventNames, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              Text="{Binding EventName, UpdateSourceTrigger=PropertyChanged}"
+                                              FontFamily="{DynamicResource MonoFont}"
+                                              FontSize="{DynamicResource FontSize05}"
+                                              Margin="{skin:Space 0,0,0,6}" />
+                                    <TextBlock Text="Changes made by an automation never trigger a room event rule, so a rule cannot start itself."
+                                               TextWrapping="Wrap" FontSize="{DynamicResource FontSize03}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,6}" />
+                                    <Border Background="{DynamicResource Ink03Brush}" BorderBrush="{DynamicResource Ink11Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius04}" Padding="{skin:Space 8}">
+                                        <StackPanel>
+                                            <DockPanel Margin="{skin:Space 0,0,0,4}">
+                                                <Button DockPanel.Dock="Right" Content="Refresh"
+                                                        Command="{Binding DataContext.RefreshRecentRoomEventsCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        Style="{StaticResource SecondaryButton}" Padding="{skin:Space 8,3}" FontSize="{DynamicResource FontSize03}" />
+                                                <TextBlock Text="RECENT ROOM EVENTS (click one to use it)" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                                            </DockPanel>
+                                            <ItemsControl ItemsSource="{Binding DataContext.RecentRoomEvents, RelativeSource={RelativeSource AncestorType=Window}}" MaxHeight="{skin:Size 180}">
+                                                <ItemsControl.Template>
+                                                    <ControlTemplate TargetType="ItemsControl">
+                                                        <ScrollViewer VerticalScrollBarVisibility="Auto"><ItemsPresenter /></ScrollViewer>
+                                                    </ControlTemplate>
+                                                </ItemsControl.Template>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Command="{Binding DataContext.UseRecentRoomEventCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                Style="{StaticResource SecondaryButton}"
+                                                                HorizontalContentAlignment="Left"
+                                                                Padding="{skin:Space 6,3}"
+                                                                Margin="{skin:Space 0,0,0,3}">
+                                                            <TextBlock Text="{Binding Line}" ToolTip="{Binding Line}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize03}" TextTrimming="CharacterEllipsis" />
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- Webhook Fields -->
+                                <StackPanel Visibility="{Binding IsWebhookTrigger, Converter={StaticResource BoolToVis}}" Margin="{skin:Space 0,0,0,8}">
+                                    <TextBlock Text="Hook name (letters, digits, '-' or '_')" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,3}" />
+                                    <TextBox Text="{Binding WebhookName, UpdateSourceTrigger=PropertyChanged}" FontFamily="{DynamicResource MonoFont}" Padding="{skin:Space 8,6}" FontSize="{DynamicResource FontSize05}" Margin="{skin:Space 0,0,0,3}" />
+                                    <TextBlock Text="{Binding WebhookNameError}" Foreground="{DynamicResource AccentAmberTextBrush}" FontSize="{DynamicResource FontSize03}" TextWrapping="Wrap" Margin="{skin:Space 0,0,0,3}" />
+                                    <TextBlock TextWrapping="Wrap" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="{skin:Space 0,0,0,6}">
+                                        <Run Text="POST " /><Run Text="{Binding DataContext.WebhookBaseUrl, RelativeSource={RelativeSource AncestorType=Window}, Mode=OneWay}" FontFamily="{DynamicResource MonoFont}" /><Run Text="{Binding WebhookName, Mode=OneWay}" FontFamily="{DynamicResource MonoFont}" />
+                                    </TextBlock>
+                                    <StackPanel Orientation="Horizontal" Margin="{skin:Space 0,0,0,6}">
+                                        <Button Content="Copy URL" Command="{Binding DataContext.CopyWebhookUrlCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,4}" FontSize="{DynamicResource FontSize03}" Margin="{skin:Space 0,0,5,0}" />
+                                        <Button Content="Copy owner token" Command="{Binding DataContext.CopyWebhookTokenCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,4}" FontSize="{DynamicResource FontSize03}" />
+                                    </StackPanel>
+                                    <TextBlock TextWrapping="Wrap" FontSize="{DynamicResource FontSize03}" Foreground="{DynamicResource TextMutedBrush}"
+                                               Text="iPhone: Shortcuts → Automation → pick a trigger (join home Wi-Fi, a Focus, NFC tag) → Get Contents of URL → Method POST, header Authorization: Bearer &lt;owner token&gt;. A JSON body adds data you can filter on, e.g. {&quot;focus&quot;:&quot;Sleep&quot;} and focus=Sleep." />
+                                </StackPanel>
+
+                                <!-- Data filter (room events and webhooks) -->
+                                <StackPanel Visibility="{Binding UsesDataFilter, Converter={StaticResource BoolToVis}}" Margin="{skin:Space 0,0,0,8}">
+                                    <TextBlock Text="Only when (optional key=value terms, comma-separated; key!=value for 'not')" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,3}" />
+                                    <TextBox Text="{Binding DataFilter, UpdateSourceTrigger=PropertyChanged}" FontFamily="{DynamicResource MonoFont}" Padding="{skin:Space 8,6}" FontSize="{DynamicResource FontSize05}" Margin="{skin:Space 0,0,0,3}" />
+                                    <TextBlock Visibility="{Binding IsRoomEventTrigger, Converter={StaticResource BoolToVis}}"
+                                               Text="Examples: stream=avr, to=on   ·   device=lg-tv   ·   to=TV   ·   origin!=desktop_ui" TextWrapping="Wrap" FontSize="{DynamicResource FontSize03}" Foreground="{DynamicResource TextMutedBrush}" />
+                                    <TextBlock Visibility="{Binding IsWebhookTrigger, Converter={StaticResource BoolToVis}}"
+                                               Text="Tests the fields of the JSON body, e.g. focus=Sleep or who!=guest. Leave empty to run on every call." TextWrapping="Wrap" FontSize="{DynamicResource FontSize03}" Foreground="{DynamicResource TextMutedBrush}" />
+                                </StackPanel>
+
+                                <!-- Cooldown (all but schedules) -->
+                                <StackPanel Visibility="{Binding UsesCooldown, Converter={StaticResource BoolToVis}}" Margin="{skin:Space 0,0,0,8}">
+                                    <TextBlock Text="Cooldown (seconds between runs; room events wait at least 10)" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,3}" />
                                     <TextBox Text="{Binding CooldownSecondsText, UpdateSourceTrigger=PropertyChanged}" Padding="{skin:Space 8,6}" FontSize="{DynamicResource FontSize05}" Width="{skin:Size 100}" HorizontalAlignment="Left" />
                                 </StackPanel>
 

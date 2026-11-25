@@ -6,6 +6,8 @@ using Denon.App.PluginSdk;
 
 namespace Denon.App.Desktop.ViewModels;
 
+public sealed record RecentRoomEventItem(string EventName, string Stream, string Line);
+
 public sealed partial class MainViewModel
 {
     private AutomationEngineService _automationEngine = null!;
@@ -16,7 +18,7 @@ public sealed partial class MainViewModel
     private string _sceneActionDelayMsText = "0";
     private PluginActionChoice? _selectedRulePluginAction;
     private string _ruleActionDelayMsText = "0";
-    private string _automationsStatusText = "Automate Smart Scenes & plugin actions when apps launch or on a daily schedule.";
+    private string _automationsStatusText = "Run Smart Scenes and plugin actions when an app starts, at a time, on a room event or on a webhook call.";
 
     // Shortcut quick-bind pickers (Settings Shortcut Editor)
     private ScenePresetEditor? _shortcutSceneToAdd;
@@ -33,6 +35,52 @@ public sealed partial class MainViewModel
     public bool HasPendingRuleActionParameters => PendingRuleActionParameters.Count > 0;
 
     public IReadOnlyList<string> ScheduleDayOptions { get; } = ["Daily", "Weekdays", "Weekends"];
+
+    /// <summary>Event names a Room Event rule can react to. The box also takes any other name, and "cast.*".</summary>
+    public IReadOnlyList<string> KnownRoomEventNames { get; } =
+    [
+        "power.changed",
+        "input.changed",
+        "sound_mode.changed",
+        "mute.changed",
+        "volume.settled",
+        "zone2.changed",
+        "sleep_timer.changed",
+        "connection.changed",
+        "session.started",
+        "session.ended",
+        "app.changed",
+        "scene.activated",
+        "lighting.state_changed",
+        "appletv.woke",
+        "appletv.slept",
+        "appletv.playback_changed",
+        "cast.app_started",
+        "cast.playback_changed",
+        "cast.app_ended",
+        "homepod.connected",
+        "homepod.disconnected",
+    ];
+
+    /// <summary>The latest events on the live bus, so a rule can be built from something that really happened.</summary>
+    public ObservableCollection<RecentRoomEventItem> RecentRoomEvents { get; } = [];
+
+    /// <summary>"http://192.168.1.10:18925/api/hooks/" while the Phone Remote server runs, else empty.</summary>
+    public string WebhookBaseUrl
+    {
+        get
+        {
+            var baseUrl = _relayServer.CurrentStatus.EndpointBaseUrl;
+            return string.IsNullOrWhiteSpace(baseUrl) ? string.Empty : baseUrl.TrimEnd('/') + "/api/hooks/";
+        }
+    }
+
+    public RelayCommand AddRoomEventRuleCommand { get; private set; } = null!;
+    public RelayCommand AddWebhookRuleCommand { get; private set; } = null!;
+    public RelayCommand RefreshRecentRoomEventsCommand { get; private set; } = null!;
+    public RelayCommand UseRecentRoomEventCommand { get; private set; } = null!;
+    public RelayCommand CopyWebhookUrlCommand { get; private set; } = null!;
+    public RelayCommand CopyWebhookTokenCommand { get; private set; } = null!;
 
     public RelayCommand SetAcousticsSubTabCommand { get; private set; } = null!;
     public RelayCommand AddPluginActionToSceneCommand { get; private set; } = null!;
@@ -70,6 +118,11 @@ public sealed partial class MainViewModel
                 }
 
                 OnPropertyChanged(nameof(HasSelectedAutomationRule));
+                OnPropertyChanged(nameof(WebhookBaseUrl));
+                if (value is { IsRoomEventTrigger: true })
+                {
+                    RefreshRecentRoomEvents();
+                }
             }
         }
     }
@@ -160,6 +213,12 @@ public sealed partial class MainViewModel
         });
         AddAppLaunchRuleCommand = new RelayCommand(_ => AddAutomationRule(AutomationTriggerType.AppLaunch));
         AddScheduleRuleCommand = new RelayCommand(_ => AddAutomationRule(AutomationTriggerType.TimeOfDay));
+        AddRoomEventRuleCommand = new RelayCommand(_ => AddAutomationRule(AutomationTriggerType.RoomEvent));
+        AddWebhookRuleCommand = new RelayCommand(_ => AddAutomationRule(AutomationTriggerType.Webhook));
+        RefreshRecentRoomEventsCommand = new RelayCommand(_ => RefreshRecentRoomEvents());
+        UseRecentRoomEventCommand = new RelayCommand(UseRecentRoomEvent);
+        CopyWebhookUrlCommand = new RelayCommand(_ => CopyWebhookUrl());
+        CopyWebhookTokenCommand = new RelayCommand(_ => CopyWebhookToken());
         RemoveAutomationRuleCommand = new RelayCommand(RemoveAutomationRule);
         AddPluginActionToRuleCommand = new RelayCommand(_ => AddPluginActionToSelectedRule());
         RemovePluginActionFromRuleCommand = new RelayCommand(RemovePluginActionFromSelectedRule);
@@ -363,14 +422,23 @@ public sealed partial class MainViewModel
         var editor = new AutomationRuleEditor
         {
             Id = $"auto-{Guid.NewGuid().ToString("N")[..6]}",
-            Name = triggerType == AutomationTriggerType.AppLaunch ? "New App Launch Rule" : "New Scheduled Rule",
+            Name = triggerType switch
+            {
+                AutomationTriggerType.AppLaunch => "New App Launch Rule",
+                AutomationTriggerType.RoomEvent => "New Room Event Rule",
+                AutomationTriggerType.Webhook => "New Webhook Rule",
+                _ => "New Scheduled Rule",
+            },
             IsEnabled = true,
             TriggerType = triggerType,
             ProcessNames = triggerType == AutomationTriggerType.AppLaunch ? "vlc, Plex" : string.Empty,
             ScheduleTime = "22:00",
             DaysFilter = "Daily",
+            EventName = triggerType == AutomationTriggerType.RoomEvent ? "power.changed" : string.Empty,
+            DataFilter = triggerType == AutomationTriggerType.RoomEvent ? "stream=avr, to=on" : string.Empty,
+            WebhookName = triggerType == AutomationTriggerType.Webhook ? $"hook-{Guid.NewGuid().ToString("N")[..4]}" : string.Empty,
             TargetSceneId = ScenePresets.FirstOrDefault()?.Id ?? string.Empty,
-            CooldownSecondsText = "120",
+            CooldownSecondsText = triggerType == AutomationTriggerType.Webhook ? "0" : "120",
         };
 
         AutomationRules.Add(editor);
@@ -436,6 +504,70 @@ public sealed partial class MainViewModel
         var summary = await _automationEngine.TriggerRuleNowAsync(target.ToModel(), "Manual test");
         AutomationsStatusText = $"Tested '{target.Name}': {summary}";
         StatusMessage = summary;
+    }
+
+    private void RefreshRecentRoomEvents()
+    {
+        RecentRoomEvents.Clear();
+        foreach (var e in _automationEngine.GetRecentEvents(20))
+        {
+            RecentRoomEvents.Add(new RecentRoomEventItem(
+                e.Event,
+                e.Stream,
+                $"{e.Timestamp.LocalDateTime:HH:mm:ss}  {AutomationTriggers.Describe(e)}  ·  {e.Stream}/{e.Device}, {e.Origin}"));
+        }
+    }
+
+    private void UseRecentRoomEvent(object? parameter)
+    {
+        if (parameter is not RecentRoomEventItem item || SelectedAutomationRule is not { IsRoomEventTrigger: true } rule)
+        {
+            return;
+        }
+
+        rule.EventName = item.EventName;
+        rule.DataFilter = $"stream={item.Stream}";
+        AutomationsStatusText = $"Rule '{rule.Name}' now reacts to {item.EventName} on the {item.Stream} stream. Add data terms such as to=on if needed, then Save Automations.";
+    }
+
+    private void CopyWebhookUrl()
+    {
+        var hook = AutomationTriggers.NormalizeHookName(SelectedAutomationRule?.WebhookName);
+        if (hook is null || string.IsNullOrEmpty(WebhookBaseUrl))
+        {
+            AutomationsStatusText = string.IsNullOrEmpty(WebhookBaseUrl)
+                ? "The Phone Remote server is not running, so there is no webhook URL yet."
+                : "Give the rule a hook name first (letters, digits, '-' or '_').";
+            return;
+        }
+
+        try
+        {
+            System.Windows.Clipboard.SetText(WebhookBaseUrl + hook);
+            AutomationsStatusText = $"Copied {WebhookBaseUrl}{hook}. In Shortcuts use Get Contents of URL, method POST, with the owner token as an Authorization: Bearer header.";
+        }
+        catch
+        {
+        }
+    }
+
+    private void CopyWebhookToken()
+    {
+        var remote = _settingsStore.Current.Remote;
+        if (!remote.RequirePairing)
+        {
+            AutomationsStatusText = "Pairing is off in Phone Remote, so webhooks need no token.";
+            return;
+        }
+
+        try
+        {
+            System.Windows.Clipboard.SetText(remote.OwnerToken);
+            AutomationsStatusText = "Copied the Phone Remote owner token. Send it as the header Authorization: Bearer <token>. Rotate it in Phone Remote if it leaks.";
+        }
+        catch
+        {
+        }
     }
 
     private async Task SaveAutomationsAsync()

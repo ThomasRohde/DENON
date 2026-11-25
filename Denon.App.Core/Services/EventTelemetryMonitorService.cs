@@ -94,12 +94,10 @@ public sealed class EventTelemetryMonitorService : BackgroundService
         {
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
+                // Runs whether or not event logging is on: the events also feed the live RoomEventBus
+                // (automations). EventTelemetryLog.Record decides what is written to disk.
                 var nowUtc = DateTimeOffset.UtcNow;
                 var cfg = _settingsStore.Current.Telemetry;
-                if (!cfg.Enabled)
-                {
-                    continue;
-                }
 
                 bool isSystemAwake;
                 lock (_sync)
@@ -131,7 +129,7 @@ public sealed class EventTelemetryMonitorService : BackgroundService
                 }
 
                 // Daily retention & disk-cap pruning
-                if (nowUtc - _lastPruneUtc >= TimeSpan.FromHours(24))
+                if (cfg.Enabled && nowUtc - _lastPruneUtc >= TimeSpan.FromHours(24))
                 {
                     _lastPruneUtc = nowUtc;
                     _telemetry.PruneOldFiles();
@@ -147,35 +145,11 @@ public sealed class EventTelemetryMonitorService : BackgroundService
         }
     }
 
-    private void OnReceiverStateChanged(ReceiverStateSnapshot snapshot)
-    {
-        if (!_telemetry.IsEnabled)
-        {
-            return;
-        }
+    private void OnReceiverStateChanged(ReceiverStateSnapshot snapshot) => ProcessReceiverSnapshot(snapshot);
 
-        ProcessReceiverSnapshot(snapshot);
-    }
+    private void OnYouTubeQueueChanged(YouTubeQueueSnapshot _) => ProcessReceiverSnapshot(_stateStore.Snapshot);
 
-    private void OnYouTubeQueueChanged(YouTubeQueueSnapshot _)
-    {
-        if (!_telemetry.IsEnabled)
-        {
-            return;
-        }
-
-        ProcessReceiverSnapshot(_stateStore.Snapshot);
-    }
-
-    private void OnPluginsChanged()
-    {
-        if (!_telemetry.IsEnabled)
-        {
-            return;
-        }
-
-        ProcessPluginSnapshots();
-    }
+    private void OnPluginsChanged() => ProcessPluginSnapshots();
 
     private void ProcessReceiverSnapshot(ReceiverStateSnapshot snapshot)
     {

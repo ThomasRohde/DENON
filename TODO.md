@@ -50,6 +50,24 @@ Phase 2 is done in 1.18.0: YouTube / YouTube Music and jukebox tracks are decode
       `session.ended` quiet once a receiver-input session ends covered by a Chromecast or Apple TV session (uncovered
       and still-running sessions stay visible).
 
+## Automations
+
+Room Event and Webhook triggers and the live `RoomEventBus` are in [Unreleased]. The plan after them: automations as
+a graph (trigger → conditions → actions, saved as JSON), then a node editor (a web page served by the app in WebView2,
+on React Flow), then Claude writing graphs through the `architect_automation` MCP prompt.
+
+- [ ] **A real iPhone Shortcut over Wi-Fi is not tested.** Checked on 2026-11-25 in a debug build: the Room Event
+      and Webhook editors (recent events, Copy URL gives the LAN address), and `POST /api/hooks/{name}` on
+      127.0.0.1 (200 with the listening rules, 401 without a token, 400 for a bad name). Still to do: a Shortcut on the
+      iPhone (Phone Remote on, firewall open on `18925`) that runs a saved rule.
+- [ ] **Phone Remote `/api/volume` ignores the safe-volume cap** (MCP clamps to `MaxSafeVolume` 65; the remote API
+      clamps only to 0–98). A Shortcut or the remote can set any volume. Apply the same cap.
+- [ ] Conditions on the current state (for example "only when the receiver is on"): the filter sees only the event's
+      own data today. Belongs to the graph model.
+- [ ] MCP `create_automation_rule` makes only scene rules; let it create Room Event and Webhook rules (event name,
+      hook name, filter, plugin actions).
+- [ ] `PluginReceiverEventType.VolumeChanged` is declared but never sent, and mute changes are not sent to plugins.
+
 ## MCP: plugin tools
 
 The bridge returns JSON + images and uses declared parameters/hints since app 1.16.0 / SDK 1.16 (Chromecast plugin 0.2.0 uses it).

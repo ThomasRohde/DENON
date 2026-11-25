@@ -112,6 +112,7 @@ public partial class App : System.Windows.Application
             var builder = Host.CreateApplicationBuilder();
             builder.Services.AddSingleton<AppLogStore>();
             builder.Services.AddSingleton<AppSettingsStore>();
+            builder.Services.AddSingleton<RoomEventBus>();
             builder.Services.AddSingleton<EventTelemetryLog>();
             builder.Services.AddSingleton<ReceiverStateStore>();
             builder.Services.AddSingleton<HeosClient>();
