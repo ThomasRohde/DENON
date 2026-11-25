@@ -50,6 +50,22 @@ Phase 2 is done in 1.18.0: YouTube / YouTube Music and jukebox tracks are decode
       `session.ended` quiet once a receiver-input session ends covered by a Chromecast or Apple TV session (uncovered
       and still-running sessions stay visible).
 
+## Automations
+
+Automation graphs (trigger → conditions → actions), the node editor (`Denon.App.Desktop/Automations`, served by the
+Insights server in a WebView2 window), webhooks and the live `RoomEventBus` are in [Unreleased] on the branch
+`automations-v2`. See `docs/automation-graphs.md`. Next: Claude writing graphs through the `architect_automation` MCP
+prompt is wired (`create_or_update_automation`) but not tried with a real agent.
+
+- [ ] **A real iPhone Shortcut over Wi-Fi is not tested.** Checked on 2026-11-25 in a debug build: `POST
+      /api/hooks/{name}` on 127.0.0.1 (200 with the listening automations, 401 without a token, 400 for a bad name).
+      Still to do: a Shortcut on the iPhone (Phone Remote on, firewall open on `18925`) that runs a saved automation.
+- [ ] **Decide:** should the Phone Remote's `/api/volume` use the safe-volume cap (`MaxSafeVolume`, 65)? MCP agents and
+      automations are capped; the Phone Remote, and so a Shortcut that calls it, only stops at the receiver's maximum.
+      Left as it is because the remote is the owner at the couch.
+- [ ] A node that two branches reach runs once per branch. Fine for now; a "join" node would need run state.
+- [ ] `PluginReceiverEventType.VolumeChanged` is declared but never sent, and mute changes are not sent to plugins.
+
 ## MCP: plugin tools
 
 The bridge returns JSON + images and uses declared parameters/hints since app 1.16.0 / SDK 1.16 (Chromecast plugin 0.2.0 uses it).

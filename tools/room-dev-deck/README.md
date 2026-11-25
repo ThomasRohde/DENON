@@ -18,11 +18,33 @@ Published copy (private): https://claude.ai/artifact/Dw8Q9LHFajrqLbUKnAwnjU
   It does not open the receiver's Telnet port 23: the receiver takes one Telnet client, and the app holds it.
 - **Release:** versions in the projects against the newest tags, the working tree, GitHub Actions runs (with an alert
   when one finishes), the `[Unreleased]` changelog, open TODO items, and a SHA-256 check of a release.
-- **TODO:** the items in `TODO.md`, by section, with search. Pick one to see its full text, then **Start in Claude
-  Code**: it opens Windows Terminal in the repository with a new `claude` session and a prompt you can edit first
-  (the item, its line and section, and "update TODO.md and the CHANGELOG, run the tests, do not commit"). Choose how
-  the session starts: **Plan first** (`--permission-mode plan`, the default), **Ask before edits** or **Accept edits**.
+- **TODO:** the items in `TODO.md`, by section, with search. Pick one to see its full text and a prompt you can edit
+  (the item, its line and section, and "update TODO.md and the CHANGELOG, run the tests, do not commit"). Then press
+  **Copy prompt** and paste it into a Claude Code session that is already open on the repository. That is the
+  quickest way. If the clipboard API is blocked, the deck uses the copy command and then Windows `Set-Clipboard`.
+  **Or start a new session** has two other ways:
+  - **New session in the Claude app** opens `claude://code/new?q=<prompt>&folder=<repo>`. The app opens a new Code
+    session with the prompt in the message box. It asks you to trust the folder, and you press Enter to send; the
+    app does that for every link from outside. It takes at most 14,336 characters of prompt.
+  - **Start in a terminal** opens Windows Terminal with a new `claude` CLI session and sends the prompt at once. Choose
+    how it starts: **Plan first** (`--permission-mode plan`, the default), **Ask before edits** or **Accept edits**.
   The list follows `TODO.md` while you work, so a ticked or removed item shows at once.
+  To pick several items, tick their boxes, Ctrl+click or Shift+click (a range), or use **Pick all** on a section.
+  The prompt for one session then changes with the pick:
+  - Items from one section: Claude looks for one shared change first.
+  - Items from several sections: Claude keeps the changes separate.
+  - Items that name the same code, file or class: the prompt names those links.
+  - Ticked items: Claude only checks that nothing is left.
+  - More than five items: Claude stops cleanly when its context gets full.
+
+  In every case, Claude first proposes an order, then finishes and ticks one item at a time, and reports per item, so
+  you can commit the items one by one. **How the prompt fits this pick** shows those choices before you start.
+
+  For the terminal: the new terminal starts from the Claude app, so it inherits the app's `CLAUDE_*` and `ANTHROPIC_*` variables. With
+  them, `claude` uses the app's short-lived sign-in and its first answer is "please run /login", which uses up the
+  prompt. The start script therefore removes these variables. It keeps any that you set in the Windows User or Machine
+  environment. When the CLI is not signed in, the script runs `claude auth login` first and then sends the prompt. If
+  sign-in still fails, the script puts the prompt on the clipboard.
 
 `TODO.md` stays Markdown. The deck reads it as it is: a `## ` heading is a section, and `- [ ]` / `- [x]` with the
 lines indented under it is an item. An item's ID is a hash of its section and text, so keep that format.

@@ -1,0 +1,22 @@
+<Window x:Class="Denon.App.Desktop.AutomationEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        xmlns:skin="clr-namespace:Denon.App.Desktop.Infrastructure.Theming"
+        Title="Automations — Denon Desktop"
+        Width="1280"
+        Height="820"
+        MinWidth="900"
+        MinHeight="560"
+        Background="{DynamicResource ChassisBgBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
+        Icon="denon_icon.ico"
+        WindowStartupLocation="CenterOwner">
+    <Grid>
+        <wv2:WebView2 x:Name="EditorWebView" DefaultBackgroundColor="Transparent" />
+        <StackPanel x:Name="FailurePanel" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="{skin:Size 520}">
+            <TextBlock x:Name="FailureText" TextWrapping="Wrap" FontSize="{DynamicResource FontSize06}" Margin="{skin:Space 0,0,0,12}" />
+            <Button Content="Open in the browser" Click="OpenInBrowser_Click" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Padding="{skin:Space 12,6}" />
+        </StackPanel>
+    </Grid>
+</Window>

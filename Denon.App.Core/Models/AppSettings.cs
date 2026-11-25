@@ -18,7 +18,7 @@ public sealed class AppSettings
 
     public TelemetrySettings Telemetry { get; set; } = new();
 
-    public List<AutomationRule> Automations { get; set; } = AutomationRule.CreateDefaults();
+    public List<AutomationGraph> AutomationGraphs { get; set; } = AutomationGraph.CreateDefaults();
 
     public AppSettings Clone() =>
         new()
@@ -31,7 +31,7 @@ public sealed class AppSettings
             Mcp = Mcp.Clone(),
             Remote = Remote.Clone(),
             Telemetry = Telemetry.Clone(),
-            Automations = Automations.Select(static a => a.Clone()).ToList(),
+            AutomationGraphs = AutomationGraphs.Select(static a => a.Clone()).ToList(),
         };
 
     public static AppSettings CreateDefault() => new();

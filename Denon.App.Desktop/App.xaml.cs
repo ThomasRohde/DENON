@@ -112,6 +112,7 @@ public partial class App : System.Windows.Application
             var builder = Host.CreateApplicationBuilder();
             builder.Services.AddSingleton<AppLogStore>();
             builder.Services.AddSingleton<AppSettingsStore>();
+            builder.Services.AddSingleton<RoomEventBus>();
             builder.Services.AddSingleton<EventTelemetryLog>();
             builder.Services.AddSingleton<ReceiverStateStore>();
             builder.Services.AddSingleton<HeosClient>();
@@ -141,6 +142,7 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<DenonMcpHttpServer>();
             builder.Services.AddSingleton<LyricsService>();
             builder.Services.AddSingleton<UpdateService>();
+            builder.Services.AddSingleton<AutomationEditorApi>();
             builder.Services.AddSingleton<InsightsServer>();
             builder.Services.AddSingleton<AcousticSyncCalibrationService>();
             builder.Services.AddSingleton<LiveAudioAnalyzerService>();

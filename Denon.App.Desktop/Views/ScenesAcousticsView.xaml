@@ -40,7 +40,7 @@
                     </Button>
                 </StackPanel>
 
-                <TextBlock Text="Chain Philips Hue &amp; plugin actions onto Smart Scenes, or auto-trigger on App Launch &amp; Night Guard schedules"
+                <TextBlock Text="Chain plugin actions onto Smart Scenes, and run them on app launches, schedules, room events or webhooks"
                            FontSize="{DynamicResource FontSize04}"
                            Foreground="{DynamicResource TextMutedBrush}"
                            HorizontalAlignment="Right"
@@ -677,7 +677,7 @@
         </Border>
         </Grid>
 
-        <!-- Sub-View 2: Smart Automation Rules (App Launch Watchers & Schedules) -->
+        <!-- Sub-View 2: Automations (edited in the node editor window) -->
         <Grid Grid.Row="1" Visibility="{Binding AcousticsSubTab, Converter={StaticResource EqualityToVis}, ConverterParameter=Automations}">
 
             <Grid.RowDefinitions>
@@ -686,277 +686,68 @@
                 <RowDefinition Height="{skin:Size 130}" />
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.1*" />
-                    <ColumnDefinition Width="{skin:Size 14}" />
-                    <ColumnDefinition Width="0.9*" />
-                </Grid.ColumnDefinitions>
+            <Border Grid.Row="0" Style="{StaticResource SurfaceCard}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
 
-                <!-- Left: Automation Rules List -->
-                <Border Grid.Column="0" Style="{StaticResource SurfaceCard}">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" Margin="{skin:Space 0,0,0,12}">
+                        <Button DockPanel.Dock="Right"
+                                Content="Open automation editor"
+                                Command="{Binding OpenAutomationEditorCommand}"
+                                Style="{StaticResource PrimaryButton}"
+                                Padding="{skin:Space 12,6}"
+                                FontSize="{DynamicResource FontSize04}" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="AUTOMATIONS" Style="{StaticResource SectionLabelStyle}" />
+                            <TextBlock Text="Build an automation from a trigger, checks and actions in the editor. Switch it on here."
+                                       FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="{skin:Space 0,3,12,0}" />
+                        </StackPanel>
+                    </DockPanel>
 
-                        <DockPanel Grid.Row="0" Margin="{skin:Space 0,0,0,12}">
-                            <TextBlock Text="AUTOMATION TRIGGERS" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button Content="+ App Trigger" Command="{Binding AddAppLaunchRuleCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,5,0}" />
-                                <Button Content="+ Schedule" Command="{Binding AddScheduleRuleCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,5,0}" />
-                                <Button Content="Save Automations" Command="{Binding SaveAutomationsCommand}" Style="{StaticResource PrimaryButton}" Padding="{skin:Space 11,5}" FontSize="{DynamicResource FontSize04}" />
-                            </StackPanel>
-                        </DockPanel>
-
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                            <ItemsControl ItemsSource="{Binding AutomationRules}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Background="{DynamicResource CardElevatedBrush}" BorderBrush="{DynamicResource Ink11Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius05}" Padding="{skin:Space 12}" Margin="{skin:Space 0,0,0,8}">
-                                            <DockPanel>
-                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <CheckBox IsChecked="{Binding IsEnabled}" Style="{StaticResource ToggleSwitchStyle}" Margin="{skin:Space 0,0,8,0}" ToolTip="Enable or pause this automation rule (click Save Automations to persist)" />
-                                                    <Button Content="Test"
-                                                            Command="{Binding DataContext.TestAutomationRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                            CommandParameter="{Binding}"
-                                                            Style="{StaticResource SecondaryButton}"
-                                                            Padding="{skin:Space 9,4}"
-                                                            FontSize="{DynamicResource FontSize03}"
-                                                            Margin="{skin:Space 0,0,5,0}" />
-                                                    <Button Content="Edit"
-                                                            Command="{Binding DataContext.SelectAutomationRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                            CommandParameter="{Binding}"
-                                                            Style="{StaticResource SecondaryButton}"
-                                                            Padding="{skin:Space 9,4}"
-                                                            FontSize="{DynamicResource FontSize03}" />
-                                                </StackPanel>
-                                                <StackPanel VerticalAlignment="Center">
-                                                    <StackPanel Orientation="Horizontal" Margin="{skin:Space 0,0,0,3}">
-                                                        <Border Background="{DynamicResource Ink11Brush}" BorderBrush="{DynamicResource Ink14Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 6,1.5}" Margin="{skin:Space 0,0,8,0}">
-                                                            <TextBlock Text="{Binding TriggerBadge}" FontSize="{DynamicResource FontSize00}" FontWeight="Bold" Foreground="{DynamicResource AccentCyanBrightBrush}" />
-                                                        </Border>
-                                                        <TextBlock Text="{Binding Name}" FontSize="{DynamicResource FontSize08}" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                                                    </StackPanel>
-                                                    <TextBlock Text="{Binding SummaryLine}" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                </StackPanel>
-                                            </DockPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
-                    </Grid>
-                </Border>
-
-                <!-- Right: Selected Rule Editor -->
-                <Border Grid.Column="2" Style="{StaticResource SurfaceCard}">
-                    <Grid DataContext="{Binding SelectedAutomationRule}">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-
-                        <DockPanel Grid.Row="0" Margin="{skin:Space 0,0,0,10}">
-                            <TextBlock Text="RULE EDITOR" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
-                            <Button Content="Delete Rule"
-                                    Command="{Binding DataContext.RemoveAutomationRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                    CommandParameter="{Binding}"
-                                    Style="{StaticResource DangerButton}"
-                                    Padding="{skin:Space 8,4}"
-                                    FontSize="{DynamicResource FontSize03}"
-                                    HorizontalAlignment="Right" />
-                        </DockPanel>
-
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="{skin:Space 0,0,6,0}">
-                            <StackPanel>
-                                <TextBlock Text="Rule Name" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,3}" />
-                                <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Padding="{skin:Space 8,6}" FontSize="{DynamicResource FontSize06}" Margin="{skin:Space 0,0,0,8}" />
-
-                                <CheckBox Content="Rule enabled" IsChecked="{Binding IsEnabled}" Style="{StaticResource ToggleSwitchStyle}" Margin="{skin:Space 0,0,0,8}" />
-
-                                <!-- AppLaunch Fields -->
-                                <StackPanel Visibility="{Binding IsAppLaunchTrigger, Converter={StaticResource BoolToVis}}" Margin="{skin:Space 0,0,0,8}">
-                                    <TextBlock Text="Watched Process Names (comma-separated, without .exe)" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,3}" />
-                                    <TextBox Text="{Binding ProcessNames, UpdateSourceTrigger=PropertyChanged}" FontFamily="{DynamicResource MonoFont}" Padding="{skin:Space 8,6}" FontSize="{DynamicResource FontSize05}" Margin="{skin:Space 0,0,0,6}" />
-                                    <TextBlock Text="Cooldown (seconds)" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,3}" />
-                                    <TextBox Text="{Binding CooldownSecondsText, UpdateSourceTrigger=PropertyChanged}" Padding="{skin:Space 8,6}" FontSize="{DynamicResource FontSize05}" Width="{skin:Size 100}" HorizontalAlignment="Left" />
-                                </StackPanel>
-
-                                <!-- TimeOfDay Schedule Fields -->
-                                <Grid Visibility="{Binding IsTimeScheduleTrigger, Converter={StaticResource BoolToVis}}" Margin="{skin:Space 0,0,0,8}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="{skin:Size 10}" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock Text="Local Time (24h HH:mm)" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,3}" />
-                                        <TextBox Text="{Binding ScheduleTime, UpdateSourceTrigger=PropertyChanged}" FontFamily="{DynamicResource MonoFont}" Padding="{skin:Space 8,6}" FontSize="{DynamicResource FontSize06}" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Text="Days" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,3}" />
-                                        <ComboBox ItemsSource="{Binding DataContext.ScheduleDayOptions, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                  SelectedItem="{Binding DaysFilter}" />
-                                    </StackPanel>
-                                </Grid>
-
-                                <TextBlock Text="Activate Smart Scene (optional Scene ID, e.g. movie-night, late-night)" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,3}" />
-                                <ComboBox ItemsSource="{Binding DataContext.ScenePresets, RelativeSource={RelativeSource AncestorType=Window}}"
-                                          SelectedValuePath="Id"
-                                          DisplayMemberPath="Name"
-                                          SelectedValue="{Binding TargetSceneId}"
-                                          Margin="{skin:Space 0,0,0,10}" />
-
-                                <Border Background="{DynamicResource Ink03Brush}" BorderBrush="{DynamicResource Ink11Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius04}" Padding="{skin:Space 10}">
-                                    <StackPanel>
-                                        <TextBlock Text="EXTRA PLUGIN ACTIONS" Style="{StaticResource SectionLabelStyle}" Margin="{skin:Space 0,0,0,6}" />
-                                        <Grid Margin="{skin:Space 0,0,0,8}">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="{skin:Size 6}" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <ComboBox Grid.Column="0"
-                                                      ItemsSource="{Binding DataContext.AvailablePluginActions, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                      SelectedItem="{Binding DataContext.SelectedRulePluginAction, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                      DisplayMemberPath="FullLabel"
-                                                      FontSize="{DynamicResource FontSize05}" />
-                                            <Button Grid.Column="2"
-                                                    Content="+ Add"
-                                                    Command="{Binding DataContext.AddPluginActionToRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                    Style="{StaticResource SecondaryButton}"
-                                                    Padding="{skin:Space 10,5}"
-                                                    FontSize="{DynamicResource FontSize04}" />
-                                        </Grid>
-                                        <!-- Declared action parameters for the selected automation action -->
-                                        <Border Background="{DynamicResource CardBgBrush}"
-                                                BorderBrush="{DynamicResource Ink11Brush}"
-                                                BorderThickness="1"
-                                                CornerRadius="{DynamicResource Radius03}"
-                                                Padding="{skin:Space 8,6}"
-                                                Margin="{skin:Space 0,0,0,8}"
-                                                Visibility="{Binding DataContext.HasPendingRuleActionParameters, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}">
-                                            <StackPanel>
-                                                <TextBlock Text="ACTION PARAMETERS" FontSize="{DynamicResource FontSize01}" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,5}" />
-                                                <ItemsControl ItemsSource="{Binding DataContext.PendingRuleActionParameters, RelativeSource={RelativeSource AncestorType=Window}}">
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <StackPanel Margin="{skin:Space 0,0,0,6}">
-                                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="{skin:Space 0,0,0,2}">
-                                                                    <TextBlock Text="{Binding Name}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize03}" FontWeight="SemiBold" Foreground="{DynamicResource TextStrongBrush}" VerticalAlignment="Center" />
-                                                                    <Border Background="{DynamicResource AccentAmberSubtleBgBrush}"
-                                                                            BorderBrush="{DynamicResource AccentAmberBrush}"
-                                                                            BorderThickness="1"
-                                                                            CornerRadius="{DynamicResource Radius01}"
-                                                                            Padding="{skin:Space 5,0.5}"
-                                                                            Margin="{skin:Space 6,0,0,0}"
-                                                                            VerticalAlignment="Center"
-                                                                            Visibility="{Binding Required, Converter={StaticResource BoolToVis}}">
-                                                                        <TextBlock Text="REQUIRED" FontSize="{DynamicResource FontSize00}" FontWeight="Bold" Foreground="{DynamicResource AccentAmberTextBrush}" />
-                                                                    </Border>
-                                                                </StackPanel>
-                                                                <TextBlock Text="{Binding Description}"
-                                                                           FontSize="{DynamicResource FontSize02}"
-                                                                           Foreground="{DynamicResource TextMutedBrush}"
-                                                                           TextWrapping="Wrap"
-                                                                           Margin="{skin:Space 0,0,0,3}"
-                                                                           Visibility="{Binding HasDescription, Converter={StaticResource BoolToVis}}" />
-                                                                <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
-                                                                         Tag="{Binding PlaceholderText}"
-                                                                         FontFamily="{DynamicResource MonoFont}"
-                                                                         Padding="{skin:Space 7,4}"
-                                                                         FontSize="{DynamicResource FontSize04}" />
-                                                            </StackPanel>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding AutomationItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource CardElevatedBrush}" BorderBrush="{DynamicResource Ink11Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius05}" Padding="{skin:Space 12}" Margin="{skin:Space 0,0,0,8}">
+                                        <DockPanel>
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <CheckBox IsChecked="{Binding Enabled}" Style="{StaticResource ToggleSwitchStyle}" Margin="{skin:Space 0,0,8,0}" ToolTip="Switch this automation on or off (saved at once)" />
+                                                <Button Content="Run now"
+                                                        Command="{Binding DataContext.RunAutomationNowCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource SecondaryButton}"
+                                                        Padding="{skin:Space 9,4}"
+                                                        FontSize="{DynamicResource FontSize03}"
+                                                        Margin="{skin:Space 0,0,5,0}"
+                                                        ToolTip="Run the actions now, as if the trigger fired. This changes the room." />
+                                                <Button Content="Edit"
+                                                        Command="{Binding DataContext.OpenAutomationEditorCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource SecondaryButton}"
+                                                        Padding="{skin:Space 9,4}"
+                                                        FontSize="{DynamicResource FontSize03}" />
                                             </StackPanel>
-                                        </Border>
-
-                                        <ItemsControl ItemsSource="{Binding PluginActions}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Background="{DynamicResource CardElevatedBrush}" BorderBrush="{DynamicResource Ink12Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 8,6}" Margin="{skin:Space 0,0,0,6}">
-                                                        <StackPanel>
-                                                            <DockPanel>
-                                                                <Button DockPanel.Dock="Right"
-                                                                        Content="✕"
-                                                                        Command="{Binding DataContext.RemovePluginActionFromRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                        CommandParameter="{Binding}"
-                                                                        Style="{StaticResource DangerButton}"
-                                                                        Padding="{skin:Space 6,2}"
-                                                                        FontSize="{DynamicResource FontSize02}" />
-                                                                <TextBlock Text="{Binding DisplayName}" FontSize="{DynamicResource FontSize05}" VerticalAlignment="Center" />
-                                                            </DockPanel>
-                                                            <ItemsControl ItemsSource="{Binding Parameters}"
-                                                                          Margin="{skin:Space 0,6,0,0}"
-                                                                          Visibility="{Binding HasParameters, Converter={StaticResource BoolToVis}}">
-                                                                <ItemsControl.ItemTemplate>
-                                                                    <DataTemplate>
-                                                                        <StackPanel Margin="{skin:Space 0,0,0,5}">
-                                                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="{skin:Space 0,0,0,2}">
-                                                                                <TextBlock Text="{Binding Name}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize02}" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
-                                                                                <Border CornerRadius="{DynamicResource Radius01}"
-                                                                                        BorderThickness="1"
-                                                                                        Padding="{skin:Space 5,0.5}"
-                                                                                        Margin="{skin:Space 6,0,0,0}"
-                                                                                        VerticalAlignment="Center"
-                                                                                        Visibility="{Binding Required, Converter={StaticResource BoolToVis}}">
-                                                                                    <Border.Style>
-                                                                                        <Style TargetType="Border">
-                                                                                            <Setter Property="Background" Value="{DynamicResource AccentEmeraldSubtleBgBrush}" />
-                                                                                            <Setter Property="BorderBrush" Value="{DynamicResource AccentEmeraldBorderBrush}" />
-                                                                                            <Style.Triggers>
-                                                                                                <DataTrigger Binding="{Binding IsMissingRequired}" Value="True">
-                                                                                                    <Setter Property="Background" Value="{DynamicResource AccentCrimsonBgBrush}" />
-                                                                                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentCrimsonBrush}" />
-                                                                                                </DataTrigger>
-                                                                                            </Style.Triggers>
-                                                                                        </Style>
-                                                                                    </Border.Style>
-                                                                                    <TextBlock Text="REQUIRED" FontSize="{DynamicResource FontSize00}" FontWeight="Bold">
-                                                                                        <TextBlock.Style>
-                                                                                            <Style TargetType="TextBlock">
-                                                                                                <Setter Property="Foreground" Value="{DynamicResource AccentEmeraldTextBrush}" />
-                                                                                                <Style.Triggers>
-                                                                                                    <DataTrigger Binding="{Binding IsMissingRequired}" Value="True">
-                                                                                                        <Setter Property="Foreground" Value="{DynamicResource AccentCrimsonTextBrush}" />
-                                                                                                    </DataTrigger>
-                                                                                                </Style.Triggers>
-                                                                                            </Style>
-                                                                                        </TextBlock.Style>
-                                                                                    </TextBlock>
-                                                                                </Border>
-                                                                            </StackPanel>
-                                                                            <TextBlock Text="{Binding Description}"
-                                                                                       FontSize="{DynamicResource FontSize01}"
-                                                                                       Foreground="{DynamicResource TextMutedBrush}"
-                                                                                       TextWrapping="Wrap"
-                                                                                       Margin="{skin:Space 0,0,0,2}"
-                                                                                       Visibility="{Binding HasDescription, Converter={StaticResource BoolToVis}}" />
-                                                                            <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
-                                                                                     Tag="{Binding PlaceholderText}"
-                                                                                     FontFamily="{DynamicResource MonoFont}"
-                                                                                     Padding="{skin:Space 7,4}"
-                                                                                     FontSize="{DynamicResource FontSize04}" />
-                                                                        </StackPanel>
-                                                                    </DataTemplate>
-                                                                </ItemsControl.ItemTemplate>
-                                                            </ItemsControl>
-                                                        </StackPanel>
+                                            <StackPanel VerticalAlignment="Center" Margin="{skin:Space 0,0,10,0}">
+                                                <StackPanel Orientation="Horizontal" Margin="{skin:Space 0,0,0,3}">
+                                                    <Border Background="{DynamicResource Ink11Brush}" BorderBrush="{DynamicResource Ink14Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 6,1.5}" Margin="{skin:Space 0,0,8,0}">
+                                                        <TextBlock Text="{Binding TriggerBadge}" FontSize="{DynamicResource FontSize00}" FontWeight="Bold" Foreground="{DynamicResource AccentCyanBrightBrush}" />
                                                     </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </Grid>
-                </Border>
-            </Grid>
+                                                    <TextBlock Text="{Binding Name}" FontSize="{DynamicResource FontSize08}" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding Summary}" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding LastRunText}" FontSize="{DynamicResource FontSize03}" Foreground="{DynamicResource TextMutedBrush}" TextTrimming="CharacterEllipsis" Margin="{skin:Space 0,2,0,0}" ToolTip="{Binding LastRunText}" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
 
             <!-- Bottom: Live Automation Activity Feed -->
             <Border Grid.Row="2" Style="{StaticResource SurfaceCard}" Padding="{skin:Space 14,10}">

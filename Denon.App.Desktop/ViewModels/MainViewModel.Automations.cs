@@ -6,17 +6,129 @@ using Denon.App.PluginSdk;
 
 namespace Denon.App.Desktop.ViewModels;
 
+public sealed record PluginActionChoice(
+    string PluginId,
+    string PluginName,
+    string ActionId,
+    string ActionName,
+    string FullLabel,
+    IReadOnlyList<PluginActionParameter>? Parameters = null)
+{
+    public IReadOnlyList<PluginActionParameter> DeclaredParameters => Parameters ?? [];
+}
+
+/// <summary>One automation in the Automation Rules list. The graph itself is edited in the node editor.</summary>
+public sealed class AutomationGraphItem : ObservableObject
+{
+    private readonly Action<AutomationGraphItem, bool> _onEnabledChanged;
+    private bool _enabled;
+    private string _lastRunText = "Not run since the app started";
+    private bool _lastRunFailed;
+
+    public AutomationGraphItem(AutomationGraph graph, Action<AutomationGraphItem, bool> onEnabledChanged)
+    {
+        _onEnabledChanged = onEnabledChanged;
+        Id = graph.Id;
+        Name = graph.Name;
+        _enabled = graph.Enabled;
+        (TriggerBadge, Summary) = Describe(graph);
+    }
+
+    public string Id { get; }
+
+    public string Name { get; }
+
+    public string TriggerBadge { get; }
+
+    public string Summary { get; }
+
+    public bool Enabled
+    {
+        get => _enabled;
+        set
+        {
+            if (SetProperty(ref _enabled, value))
+            {
+                _onEnabledChanged(this, value);
+            }
+        }
+    }
+
+    public string LastRunText
+    {
+        get => _lastRunText;
+        private set => SetProperty(ref _lastRunText, value);
+    }
+
+    public bool LastRunFailed
+    {
+        get => _lastRunFailed;
+        private set => SetProperty(ref _lastRunFailed, value);
+    }
+
+    public void ApplyRun(AutomationRun run)
+    {
+        LastRunText = $"{(run.DryRun ? "Dry run" : "Ran")} {run.At.LocalDateTime:HH:mm:ss}: {run.Summary}";
+        LastRunFailed = !run.Success;
+    }
+
+    /// <summary>Sets the switch without saving (the settings already say so).</summary>
+    public void SyncEnabled(bool enabled)
+    {
+        if (_enabled != enabled)
+        {
+            _enabled = enabled;
+            OnPropertyChanged(nameof(Enabled));
+        }
+    }
+
+    private static (string Badge, string Summary) Describe(AutomationGraph graph)
+    {
+        var triggers = graph.Nodes.Where(static n => AutomationNodeTypes.IsTrigger(n.Type)).ToList();
+        var conditions = graph.Nodes.Count(static n => AutomationNodeTypes.IsCondition(n.Type));
+        var actions = graph.Nodes.Count(static n => AutomationNodeTypes.Find(n.Type)?.Group == AutomationNodeTypes.GroupAction);
+
+        var badge = triggers.Count switch
+        {
+            0 => "NO TRIGGER",
+            > 1 => $"{triggers.Count} TRIGGERS",
+            _ => triggers[0].Type switch
+            {
+                AutomationNodeTypes.TriggerEvent => "ROOM EVENT",
+                AutomationNodeTypes.TriggerWebhook => "WEBHOOK",
+                AutomationNodeTypes.TriggerSchedule => "SCHEDULE",
+                AutomationNodeTypes.TriggerAppLaunch => "APP START",
+                _ => "TRIGGER",
+            },
+        };
+
+        var when = triggers.Count == 0
+            ? "No trigger yet"
+            : string.Join(" or ", triggers.Select(static t => t.Type switch
+            {
+                AutomationNodeTypes.TriggerEvent => $"On {t.Get("event")}" + (t.Get("filter").Length > 0 ? $" [{t.Get("filter")}]" : string.Empty),
+                AutomationNodeTypes.TriggerWebhook => $"On webhook '{t.Get("hook")}'",
+                AutomationNodeTypes.TriggerSchedule => $"At {t.Get("time")} ({t.Get("days")})",
+                AutomationNodeTypes.TriggerAppLaunch => $"When {t.Get("processes")} starts",
+                _ => t.Type,
+            }));
+
+        var then = actions == 0
+            ? "no actions yet"
+            : (conditions > 0 ? $"{conditions} check(s), " : string.Empty) + $"{actions} action(s)";
+        return (badge, $"{when}  →  {then}");
+    }
+}
+
 public sealed partial class MainViewModel
 {
     private AutomationEngineService _automationEngine = null!;
+    private AutomationEditorWindow? _automationEditorWindow;
 
     private string _acousticsSubTab = "Scenes";
-    private AutomationRuleEditor? _selectedAutomationRule;
     private PluginActionChoice? _selectedScenePluginAction;
     private string _sceneActionDelayMsText = "0";
-    private PluginActionChoice? _selectedRulePluginAction;
-    private string _ruleActionDelayMsText = "0";
-    private string _automationsStatusText = "Automate Smart Scenes & plugin actions when apps launch or on a daily schedule.";
+    private string _automationsStatusText = "Automations run Smart Scenes, plugin actions and receiver commands on room events, webhooks, schedules or app starts.";
 
     // Shortcut quick-bind pickers (Settings Shortcut Editor)
     private ScenePresetEditor? _shortcutSceneToAdd;
@@ -24,28 +136,17 @@ public sealed partial class MainViewModel
 
     public ObservableCollection<PluginActionChoice> AvailablePluginActions { get; } = [];
     public ObservableCollection<PluginActionParameterEditor> PendingSceneActionParameters { get; } = [];
-    public ObservableCollection<PluginActionParameterEditor> PendingRuleActionParameters { get; } = [];
-    public ObservableCollection<AutomationRuleEditor> AutomationRules { get; } = [];
+    public ObservableCollection<AutomationGraphItem> AutomationItems { get; } = [];
     public ObservableCollection<string> AutomationActivityLog { get; } = [];
 
     public bool HasPendingSceneActionParameters => PendingSceneActionParameters.Count > 0;
-
-    public bool HasPendingRuleActionParameters => PendingRuleActionParameters.Count > 0;
-
-    public IReadOnlyList<string> ScheduleDayOptions { get; } = ["Daily", "Weekdays", "Weekends"];
 
     public RelayCommand SetAcousticsSubTabCommand { get; private set; } = null!;
     public RelayCommand AddPluginActionToSceneCommand { get; private set; } = null!;
     public RelayCommand RemovePluginActionFromSceneCommand { get; private set; } = null!;
 
-    public RelayCommand SelectAutomationRuleCommand { get; private set; } = null!;
-    public RelayCommand AddAppLaunchRuleCommand { get; private set; } = null!;
-    public RelayCommand AddScheduleRuleCommand { get; private set; } = null!;
-    public RelayCommand RemoveAutomationRuleCommand { get; private set; } = null!;
-    public RelayCommand AddPluginActionToRuleCommand { get; private set; } = null!;
-    public RelayCommand RemovePluginActionFromRuleCommand { get; private set; } = null!;
-    public AsyncRelayCommand TestAutomationRuleCommand { get; private set; } = null!;
-    public AsyncRelayCommand SaveAutomationsCommand { get; private set; } = null!;
+    public AsyncRelayCommand OpenAutomationEditorCommand { get; private set; } = null!;
+    public AsyncRelayCommand RunAutomationNowCommand { get; private set; } = null!;
 
     public RelayCommand AddSceneShortcutCommand { get; private set; } = null!;
     public RelayCommand AddPluginActionShortcutCommand { get; private set; } = null!;
@@ -56,25 +157,6 @@ public sealed partial class MainViewModel
         get => _acousticsSubTab;
         set => SetProperty(ref _acousticsSubTab, value);
     }
-
-    public AutomationRuleEditor? SelectedAutomationRule
-    {
-        get => _selectedAutomationRule;
-        set
-        {
-            if (SetProperty(ref _selectedAutomationRule, value))
-            {
-                foreach (var rule in AutomationRules)
-                {
-                    rule.IsSelected = ReferenceEquals(rule, value);
-                }
-
-                OnPropertyChanged(nameof(HasSelectedAutomationRule));
-            }
-        }
-    }
-
-    public bool HasSelectedAutomationRule => SelectedAutomationRule is not null;
 
     public PluginActionChoice? SelectedScenePluginAction
     {
@@ -95,34 +177,15 @@ public sealed partial class MainViewModel
         set => SetProperty(ref _sceneActionDelayMsText, value);
     }
 
-    public PluginActionChoice? SelectedRulePluginAction
-    {
-        get => _selectedRulePluginAction;
-        set
-        {
-            if (SetProperty(ref _selectedRulePluginAction, value))
-            {
-                RebuildPendingParameters(PendingRuleActionParameters, value?.DeclaredParameters);
-                OnPropertyChanged(nameof(HasPendingRuleActionParameters));
-            }
-        }
-    }
-
-    public string RuleActionDelayMsText
-    {
-        get => _ruleActionDelayMsText;
-        set => SetProperty(ref _ruleActionDelayMsText, value);
-    }
-
     public string AutomationsStatusText
     {
         get => _automationsStatusText;
         private set => SetProperty(ref _automationsStatusText, value);
     }
 
-    /// <summary>"0/3 on": rules switched on, of all rules (a bare "0" read as "no rules").</summary>
+    /// <summary>"0/4 on": automations switched on, of all automations (a bare "0" read as "none").</summary>
     public string EnabledAutomationsBadge =>
-        $"{AutomationRules.Count(static r => r.IsEnabled)}/{AutomationRules.Count} on";
+        $"{AutomationItems.Count(static r => r.Enabled)}/{AutomationItems.Count} on";
 
     public ScenePresetEditor? ShortcutSceneToAdd
     {
@@ -151,20 +214,8 @@ public sealed partial class MainViewModel
         AddPluginActionToSceneCommand = new RelayCommand(_ => AddPluginActionToSelectedScene());
         RemovePluginActionFromSceneCommand = new RelayCommand(RemovePluginActionFromSelectedScene);
 
-        SelectAutomationRuleCommand = new RelayCommand(param =>
-        {
-            if (param is AutomationRuleEditor rule)
-            {
-                SelectedAutomationRule = rule;
-            }
-        });
-        AddAppLaunchRuleCommand = new RelayCommand(_ => AddAutomationRule(AutomationTriggerType.AppLaunch));
-        AddScheduleRuleCommand = new RelayCommand(_ => AddAutomationRule(AutomationTriggerType.TimeOfDay));
-        RemoveAutomationRuleCommand = new RelayCommand(RemoveAutomationRule);
-        AddPluginActionToRuleCommand = new RelayCommand(_ => AddPluginActionToSelectedRule());
-        RemovePluginActionFromRuleCommand = new RelayCommand(RemovePluginActionFromSelectedRule);
-        TestAutomationRuleCommand = new AsyncRelayCommand(TestAutomationRuleAsync);
-        SaveAutomationsCommand = new AsyncRelayCommand(_ => SaveAutomationsAsync());
+        OpenAutomationEditorCommand = new AsyncRelayCommand(OpenAutomationEditorAsync);
+        RunAutomationNowCommand = new AsyncRelayCommand(RunAutomationNowAsync);
 
         AddSceneShortcutCommand = new RelayCommand(_ => AddSceneHotkeyBinding());
         AddPluginActionShortcutCommand = new RelayCommand(_ => AddPluginActionHotkeyBinding());
@@ -181,6 +232,8 @@ public sealed partial class MainViewModel
 
             AutomationsStatusText = $"[{entry.RuleName}] {entry.TriggerDetail}";
         });
+        _automationEngine.RunCompleted += run => _ = _dispatcher.InvokeAsync(() =>
+            AutomationItems.FirstOrDefault(i => i.Id == run.GraphId)?.ApplyRun(run));
 
         _pluginHost.PluginsChanged += () => _ = _dispatcher.InvokeAsync(RefreshAvailablePluginActions);
         RefreshAvailablePluginActions();
@@ -189,7 +242,6 @@ public sealed partial class MainViewModel
     private void RefreshAvailablePluginActions()
     {
         var prevSceneKey = SelectedScenePluginAction is null ? null : $"{SelectedScenePluginAction.PluginId}:{SelectedScenePluginAction.ActionId}";
-        var prevRuleKey = SelectedRulePluginAction is null ? null : $"{SelectedRulePluginAction.PluginId}:{SelectedRulePluginAction.ActionId}";
         var prevShortcutKey = ShortcutPluginActionToAdd is null ? null : $"{ShortcutPluginActionToAdd.PluginId}:{ShortcutPluginActionToAdd.ActionId}";
 
         // PluginsChanged also fires for plain status reports. Keep what the user is typing in the parameter
@@ -212,7 +264,6 @@ public sealed partial class MainViewModel
         }
 
         var sceneDraft = SnapshotPendingParameters(PendingSceneActionParameters);
-        var ruleDraft = SnapshotPendingParameters(PendingRuleActionParameters);
 
         AvailablePluginActions.Clear();
         foreach (var choice in fresh)
@@ -222,19 +273,12 @@ public sealed partial class MainViewModel
 
         SelectedScenePluginAction = AvailablePluginActions.FirstOrDefault(a => $"{a.PluginId}:{a.ActionId}" == prevSceneKey)
                                     ?? AvailablePluginActions.FirstOrDefault();
-        SelectedRulePluginAction = AvailablePluginActions.FirstOrDefault(a => $"{a.PluginId}:{a.ActionId}" == prevRuleKey)
-                                   ?? AvailablePluginActions.FirstOrDefault();
         ShortcutPluginActionToAdd = AvailablePluginActions.FirstOrDefault(a => $"{a.PluginId}:{a.ActionId}" == prevShortcutKey)
                                     ?? AvailablePluginActions.FirstOrDefault();
 
         if (SelectedScenePluginAction is { } scene && $"{scene.PluginId}:{scene.ActionId}" == prevSceneKey)
         {
             RestorePendingParameters(PendingSceneActionParameters, sceneDraft);
-        }
-
-        if (SelectedRulePluginAction is { } rule && $"{rule.PluginId}:{rule.ActionId}" == prevRuleKey)
-        {
-            RestorePendingParameters(PendingRuleActionParameters, ruleDraft);
         }
 
         SyncPluginActionDescriptors();
@@ -252,14 +296,6 @@ public sealed partial class MainViewModel
         foreach (var scene in ScenePresets)
         {
             foreach (var step in scene.PluginActions)
-            {
-                step.ApplyDescriptors(FindPluginActionParameters(step.PluginId, step.ActionId));
-            }
-        }
-
-        foreach (var rule in AutomationRules)
-        {
-            foreach (var step in rule.PluginActions)
             {
                 step.ApplyDescriptors(FindPluginActionParameters(step.PluginId, step.ActionId));
             }
@@ -308,17 +344,118 @@ public sealed partial class MainViewModel
 
     private void LoadAutomationsFromSettings(AppSettings settings)
     {
-        var previousId = SelectedAutomationRule?.Id;
-        AutomationRules.Clear();
-        foreach (var rule in settings.Automations ?? AutomationRule.CreateDefaults())
+        var graphs = settings.AutomationGraphs ?? [];
+        var runs = _automationEngine.GetLastRuns();
+
+        // A saved switch from this list comes back as a settings reload: keep the same items when nothing else changed.
+        var sameShape = graphs.Count == AutomationItems.Count &&
+                        graphs.Zip(AutomationItems).All(p => p.First.Id == p.Second.Id && p.First.Name == p.Second.Name &&
+                                                            new AutomationGraphItem(p.First, static (_, _) => { }).Summary == p.Second.Summary);
+        if (sameShape)
         {
-            AutomationRules.Add(AutomationRuleEditor.FromModel(rule, FindPluginActionParameters));
+            foreach (var (graph, item) in graphs.Zip(AutomationItems))
+            {
+                item.SyncEnabled(graph.Enabled);
+            }
+        }
+        else
+        {
+            AutomationItems.Clear();
+            foreach (var graph in graphs)
+            {
+                var item = new AutomationGraphItem(graph, OnAutomationEnabledChanged);
+                if (runs.TryGetValue(graph.Id, out var run))
+                {
+                    item.ApplyRun(run);
+                }
+
+                AutomationItems.Add(item);
+            }
         }
 
-        SelectedAutomationRule = AutomationRules.FirstOrDefault(r => string.Equals(r.Id, previousId, StringComparison.OrdinalIgnoreCase))
-                                 ?? AutomationRules.FirstOrDefault();
         ShortcutSceneToAdd = ScenePresets.FirstOrDefault();
         OnPropertyChanged(nameof(EnabledAutomationsBadge));
+    }
+
+    private void OnAutomationEnabledChanged(AutomationGraphItem item, bool enabled)
+    {
+        OnPropertyChanged(nameof(EnabledAutomationsBadge));
+        _ = SaveAutomationEnabledAsync(item, enabled);
+    }
+
+    private async Task SaveAutomationEnabledAsync(AutomationGraphItem item, bool enabled)
+    {
+        var found = false;
+        try
+        {
+            await _settingsStore.UpdateAsync(s =>
+            {
+                if (s.AutomationGraphs.FirstOrDefault(g => g.Id == item.Id) is { } graph)
+                {
+                    graph.Enabled = enabled;
+                    found = true;
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            item.SyncEnabled(!enabled);
+            OnPropertyChanged(nameof(EnabledAutomationsBadge));
+            AutomationsStatusText = $"Could not save '{item.Name}': {ex.Message}";
+            return;
+        }
+
+        if (!found)
+        {
+            // Deleted in the editor (or by an agent) since the list was drawn: the settings reload removes the row.
+            item.SyncEnabled(!enabled);
+            OnPropertyChanged(nameof(EnabledAutomationsBadge));
+            AutomationsStatusText = $"'{item.Name}' no longer exists, so nothing was switched.";
+            return;
+        }
+
+        AutomationsStatusText = $"'{item.Name}' is {(enabled ? "on" : "off")}.";
+    }
+
+    private async Task OpenAutomationEditorAsync(object? parameter)
+    {
+        if (_insightsServer is null)
+        {
+            AutomationsStatusText = "The automation editor is not ready yet. Try again in a moment.";
+            return;
+        }
+
+        if (_automationEditorWindow is null)
+        {
+            _automationEditorWindow = new AutomationEditorWindow(_insightsServer)
+            {
+                Owner = System.Windows.Application.Current?.MainWindow,
+            };
+            _automationEditorWindow.Closed += (_, _) => _automationEditorWindow = null;
+        }
+
+        await _automationEditorWindow.ShowEditorAsync((parameter as AutomationGraphItem)?.Id);
+    }
+
+    private async Task RunAutomationNowAsync(object? parameter)
+    {
+        if (parameter is not AutomationGraphItem item ||
+            _settingsStore.Current.AutomationGraphs.FirstOrDefault(g => g.Id == item.Id) is not { } graph)
+        {
+            return;
+        }
+
+        AutomationsStatusText = $"Running '{item.Name}'...";
+        try
+        {
+            var run = await _automationEngine.RunGraphNowAsync(graph.Clone(), null, null, dryRun: false);
+            AutomationsStatusText = $"'{item.Name}': {run.Summary}";
+            StatusMessage = AutomationsStatusText;
+        }
+        catch (Exception ex)
+        {
+            AutomationsStatusText = $"'{item.Name}' could not run: {ex.Message}";
+        }
     }
 
     private void AddPluginActionToSelectedScene()
@@ -356,96 +493,6 @@ public sealed partial class MainViewModel
 
         SelectedScene.PluginActions.Remove(step);
         SelectedScene.NotifyPluginActionsChanged();
-    }
-
-    private void AddAutomationRule(AutomationTriggerType triggerType)
-    {
-        var editor = new AutomationRuleEditor
-        {
-            Id = $"auto-{Guid.NewGuid().ToString("N")[..6]}",
-            Name = triggerType == AutomationTriggerType.AppLaunch ? "New App Launch Rule" : "New Scheduled Rule",
-            IsEnabled = true,
-            TriggerType = triggerType,
-            ProcessNames = triggerType == AutomationTriggerType.AppLaunch ? "vlc, Plex" : string.Empty,
-            ScheduleTime = "22:00",
-            DaysFilter = "Daily",
-            TargetSceneId = ScenePresets.FirstOrDefault()?.Id ?? string.Empty,
-            CooldownSecondsText = "120",
-        };
-
-        AutomationRules.Add(editor);
-        SelectedAutomationRule = editor;
-        OnPropertyChanged(nameof(EnabledAutomationsBadge));
-        AutomationsStatusText = $"Created '{editor.Name}'. Configure trigger & actions, then click Save Automations.";
-    }
-
-    private void RemoveAutomationRule(object? parameter)
-    {
-        var target = parameter as AutomationRuleEditor ?? SelectedAutomationRule;
-        if (target is null)
-        {
-            return;
-        }
-
-        var name = target.Name;
-        AutomationRules.Remove(target);
-        SelectedAutomationRule = AutomationRules.FirstOrDefault();
-        OnPropertyChanged(nameof(EnabledAutomationsBadge));
-        AutomationsStatusText = $"Removed rule '{name}'. Click Save Automations to persist.";
-    }
-
-    private void AddPluginActionToSelectedRule()
-    {
-        if (SelectedAutomationRule is null || SelectedRulePluginAction is null)
-        {
-            return;
-        }
-
-        var delayMs = int.TryParse(RuleActionDelayMsText?.Trim(), out var d) ? Math.Clamp(d, 0, 30_000) : 0;
-        SelectedAutomationRule.PluginActions.Add(new ScenePluginActionStepEditor(
-            SelectedRulePluginAction.PluginId,
-            SelectedRulePluginAction.ActionId,
-            SelectedRulePluginAction.FullLabel,
-            delayMs,
-            PendingRuleActionParameters.Select(static p => p.Clone())));
-        SelectedAutomationRule.NotifyPluginActionsChanged();
-        RebuildPendingParameters(PendingRuleActionParameters, SelectedRulePluginAction.DeclaredParameters);
-        OnPropertyChanged(nameof(HasPendingRuleActionParameters));
-    }
-
-    private void RemovePluginActionFromSelectedRule(object? parameter)
-    {
-        if (SelectedAutomationRule is null || parameter is not ScenePluginActionStepEditor step)
-        {
-            return;
-        }
-
-        SelectedAutomationRule.PluginActions.Remove(step);
-        SelectedAutomationRule.NotifyPluginActionsChanged();
-    }
-
-    private async Task TestAutomationRuleAsync(object? parameter)
-    {
-        var target = parameter as AutomationRuleEditor ?? SelectedAutomationRule;
-        if (target is null)
-        {
-            return;
-        }
-
-        AutomationsStatusText = $"Testing automation '{target.Name}'...";
-        var summary = await _automationEngine.TriggerRuleNowAsync(target.ToModel(), "Manual test");
-        AutomationsStatusText = $"Tested '{target.Name}': {summary}";
-        StatusMessage = summary;
-    }
-
-    private async Task SaveAutomationsAsync()
-    {
-        var updated = _settingsStore.Current.Clone();
-        updated.Automations = AutomationRules.Select(static r => r.ToModel()).ToList();
-        await _settingsStore.SaveAsync(updated);
-        OnPropertyChanged(nameof(EnabledAutomationsBadge));
-        AutomationsStatusText = $"Saved {updated.Automations.Count} automation rule(s) ({updated.Automations.Count(static r => r.IsEnabled)} active).";
-        StatusMessage = AutomationsStatusText;
     }
 
     private void AddSceneHotkeyBinding()

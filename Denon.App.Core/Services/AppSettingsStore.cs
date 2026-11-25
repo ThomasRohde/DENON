@@ -426,6 +426,9 @@ public sealed class AppSettingsStore
         normalized.Media.CinemaSyncOffsetMs = Math.Clamp(normalized.Media.CinemaSyncOffsetMs, 0, 8000);
         normalized.Shortcuts ??= new ShortcutSettings();
         normalized.Shortcuts.Bindings = NormalizeShortcuts(normalized.Shortcuts.Bindings);
+        normalized.AutomationGraphs = normalized.AutomationGraphs is null
+            ? AutomationGraph.CreateDefaults()
+            : normalized.AutomationGraphs.Where(static g => g is not null).ToList();
         normalized.Mcp ??= new McpServerSettings();
         normalized.Mcp.Port = normalized.Mcp.Port is >= 1024 and <= 65535 ? normalized.Mcp.Port : 18926;
         normalized.Mcp.MaxSafeVolume = Math.Clamp(normalized.Mcp.MaxSafeVolume, 20, 95);

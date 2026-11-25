@@ -52,11 +52,21 @@ public sealed class InsightsServer : IAsyncDisposable
     private string _icons = "{}";
     private (DateTime ReadUtc, IReadOnlyDictionary<string, string> Map)? _logoIndex;
 
-    public InsightsServer(EventTelemetryLog telemetry, RoomIntelligenceService intelligence, AppLogStore log)
+    private readonly AutomationEditorApi _automations;
+
+    public InsightsServer(EventTelemetryLog telemetry, RoomIntelligenceService intelligence, AutomationEditorApi automations, AppLogStore log)
     {
         _telemetry = telemetry;
         _intelligence = intelligence;
+        _automations = automations;
         _log = log;
+    }
+
+    /// <summary>The automation editor's address with this run's key (starts the server if needed).</summary>
+    public async Task<string> StartAutomationEditorAsync()
+    {
+        var withKey = await StartAsync();
+        return $"{Address}automations/?key={withKey[(withKey.IndexOf("?key=", StringComparison.Ordinal) + 5)..]}";
     }
 
     /// <summary>The page address, without the key (for display), or null while the server is off.</summary>
@@ -177,7 +187,11 @@ public sealed class InsightsServer : IAsyncDisposable
                 return;
             }
 
-            if (request.HttpMethod != "GET")
+            var path = url.AbsolutePath;
+
+            // Only the automation editor's API changes anything; everything else is read-only.
+            var changes = request.HttpMethod is "PUT" or "POST" or "DELETE";
+            if (request.HttpMethod != "GET" && !(changes && AutomationEditorApi.Owns(path)))
             {
                 // No body: a HEAD response must not carry one.
                 response.StatusCode = 405;
@@ -186,15 +200,13 @@ public sealed class InsightsServer : IAsyncDisposable
                 return;
             }
 
-            var path = url.AbsolutePath;
-
             // The address the app opens carries the key: keep it in a cookie and drop it from the address.
             if (request.QueryString["key"] is { } key)
             {
                 if (FixedTimeEquals(key, _key))
                 {
                     response.Headers.Add("Set-Cookie", $"{CookieName}={_key}; Path=/; HttpOnly; SameSite=Strict");
-                    response.Redirect("/");
+                    response.Redirect(path == "/automations/" ? "/automations/" : "/");
                     response.Close();
                     return;
                 }
@@ -203,7 +215,7 @@ public sealed class InsightsServer : IAsyncDisposable
                 return;
             }
 
-            if (_assets.TryGetValue(path, out var asset) && path != "/")
+            if (_assets.TryGetValue(path, out var asset) && path is not "/" and not "/automations/")
             {
                 response.Headers["Cache-Control"] = "no-cache";
                 await WriteAsync(response, 200, asset.Type, asset.Body);
@@ -232,10 +244,26 @@ public sealed class InsightsServer : IAsyncDisposable
                 return;
             }
 
+            if (AutomationEditorApi.Owns(path))
+            {
+                var (status, body) = await _automations.HandleAsync(request, path, ct);
+                await WriteJsonAsync(response, body, status);
+                return;
+            }
+
             switch (path)
             {
                 case "/":
                     await WriteAsync(response, 200, "text/html; charset=utf-8", _assets["/"].Body);
+                    break;
+
+                case "/automations":
+                    response.Redirect("/automations/");
+                    response.Close();
+                    break;
+
+                case "/automations/":
+                    await WriteAsync(response, 200, "text/html; charset=utf-8", _assets["/automations/"].Body);
                     break;
 
                 case "/icons.json":
@@ -415,6 +443,9 @@ public sealed class InsightsServer : IAsyncDisposable
                      ("/", "Insights.index.html", "text/html; charset=utf-8"),
                      ("/insights.css", "Insights.insights.css", "text/css; charset=utf-8"),
                      ("/insights.js", "Insights.insights.js", "text/javascript; charset=utf-8"),
+                     ("/automations/", "Automations.index.html", "text/html; charset=utf-8"),
+                     ("/automations/editor.css", "Automations.editor.css", "text/css; charset=utf-8"),
+                     ("/automations/editor.js", "Automations.editor.js", "text/javascript; charset=utf-8"),
                  })
         {
             using var stream = assembly.GetManifestResourceStream(name)

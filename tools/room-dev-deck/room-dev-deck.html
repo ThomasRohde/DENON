@@ -236,13 +236,29 @@ table.t tr:last-child td { border-bottom: 0; }
 .todo-list h3 { margin: 0; padding: 9px 12px 5px; font-size: 13px; font-weight: 600; color: var(--muted); position: sticky; top: 0;
   background: var(--panel); display: flex; gap: 8px; z-index: 1; }
 .todo-list h3 span { color: var(--faint); font-weight: 400; }
-.todo-list button { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line-2); background: none;
-  padding: 7px 12px; cursor: pointer; font-size: 14.5px; line-height: 1.3; }
-.todo-list button:hover { background: var(--panel-2); }
-.todo-list button[aria-current="true"] { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
-.todo-list button.done { color: var(--faint); text-decoration: line-through; }
-.todo-list button small { display: block; color: var(--faint); font-size: 12.5px; margin-top: 2px; text-decoration: none; }
-.todo-list button small .tag { margin-left: 4px; }
+.todo-list h3 .pick-all { margin-left: auto; border: 0; background: none; padding: 0; color: var(--accent); font-size: 12.5px; font-weight: 500; cursor: pointer; }
+.todo-list h3 .pick-all:hover { text-decoration: underline; }
+.todo-row { display: flex; align-items: flex-start; border-top: 1px solid var(--line-2); }
+.todo-row:hover { background: var(--panel-2); }
+.todo-row.picked { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.todo-row input { flex: none; margin: 10px 0 0 12px; width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+.todo-row .item { flex: 1; min-width: 0; text-align: left; border: 0; background: none; color: inherit; padding: 7px 12px 7px 9px;
+  cursor: pointer; font: inherit; font-size: 14.5px; line-height: 1.3; user-select: none; }
+.todo-row .item.done { color: var(--faint); text-decoration: line-through; }
+.todo-row .item small { display: block; color: var(--faint); font-size: 12.5px; margin-top: 2px; text-decoration: none; }
+.todo-row .item small .tag { margin-left: 4px; }
+.picks { margin: 2px 14px 10px; padding: 0 0 0 24px; }
+.picks li { border-top: 1px solid var(--line-2); padding: 6px 0; }
+.picks li:first-child { border-top: 0; }
+.picks .pick { display: flex; gap: 10px; align-items: flex-start; }
+.picks details { flex: 1; min-width: 0; }
+.picks summary { cursor: pointer; font-size: 15px; line-height: 1.35; }
+.picks summary .faint { font-size: 13px; margin-left: 6px; }
+.picks summary .tag { margin-left: 6px; }
+.picks .md { margin-top: 6px; font-size: 14.5px; }
+.links { margin: 0 14px 12px; padding: 8px 10px; border-left: 3px solid var(--accent); color: var(--muted); font-size: 14px; }
+.links ul { margin: 4px 0 0; padding-left: 18px; } .links li { margin: 2px 0; }
+.links code { font: 12.5px var(--mono); }
 .todo-head { padding: 12px 14px 4px; }
 .todo-head .sel-title { font-size: 21px; }
 .md { font-size: 15.5px; line-height: 1.5; overflow-wrap: anywhere; }
@@ -254,6 +270,10 @@ table.t tr:last-child td { border-bottom: 0; }
 .launch h3 { margin: 0; font-size: 16px; font-weight: 600; }
 .launch textarea { min-height: 200px; font: 13px/1.5 var(--mono); }
 .launch .note { font-size: 13.5px; color: var(--muted); }
+.term-start { border-top: 1px dashed var(--line-2); padding-top: 8px; }
+.term-start summary { cursor: pointer; font-size: 14px; color: var(--muted); }
+.term-start[open] summary { margin-bottom: 8px; }
+.term-start .row + .row { margin-top: 8px; }
 
 /* ---------- ask drawer ---------- */
 .drawer { position: fixed; z-index: 40; top: 0; right: 0; bottom: 0; width: min(520px, 100vw); background: var(--panel);
@@ -424,7 +444,7 @@ table.t tr:last-child td { border-bottom: 0; }
       </div>
       <div class="mcp-grid todo-grid">
         <div class="card"><div class="todo-list" id="todo-list"></div></div>
-        <div class="card" id="todo-card"><div class="empty">Pick an item on the left. Then start a Claude Code session on it, with a prompt you can edit first.</div></div>
+        <div class="card" id="todo-card"><div class="empty">Pick an item on the left. Tick more boxes, Ctrl+click or Shift+click to pick several. Then copy a prompt for Claude Code that fits the pick.</div></div>
       </div>
     </section>
   </main>
@@ -1353,7 +1373,7 @@ function showResult(box, t, args, r, ms) {
   const flat = parts.map((p) => p.json !== undefined ? JSON.stringify(p.json, null, 2) : p.text || "[image]").join("\n\n");
   box.append(el("div", { class: "result-head" }, el("span", { class: err ? "bad" : "ok", text: err ? "Tool error" : "OK" }), el("span", { class: "muted", text: `${ms} ms · ${flat.length.toLocaleString()} characters` }),
     el("span", { style: "flex:1" }),
-    el("button", { class: "btn small", text: "Copy", onclick: () => navigator.clipboard.writeText(flat).then(() => toast("Copied."), () => toast("Copy failed.")) }),
+    el("button", { class: "btn small", text: "Copy", onclick: () => copyText(flat).then(() => toast("Copied."), (e) => toast("Copy failed: " + errText(e))) }),
     P.sample ? el("button", { class: "btn small", text: "Explain with Claude", onclick: () => openAsk({ label: `MCP tool ${t.name}`, summary: `${flat.length.toLocaleString()} characters of result`, text: `The app's MCP tool ${t.name} was called with arguments ${JSON.stringify(args)}.\nTool description: ${t.description}\nResult${err ? " (marked isError)" : ""}:\n${flat.slice(0, 120000)}` }, "Explain this result. Is anything in it wrong, missing or inconsistent?") }) : null));
   for (const p of parts) {
     if (p.img) box.append(el("img", { src: p.img, alt: "Image from the tool" }));
@@ -1535,7 +1555,8 @@ async function relTodo() {
 // =====================================================================
 // TODO mode: pick an item in TODO.md and start Claude Code on it
 // =====================================================================
-const TD = { items: [], sections: [], sel: store.get("todoSel", null), q: "", showDone: false, sig: "", started: store.get("todoStarted", {}), drafts: {} };
+const TD = { items: [], sections: [], picks: store.get("todoPicks", []), anchor: null, q: "", showDone: false, sig: "", started: store.get("todoStarted", {}), drafts: {} };
+const PICK_HELP = "Pick an item on the left. Tick more boxes, Ctrl+click or Shift+click to pick several. Then copy a prompt for Claude Code that fits the pick.";
 const todoPath = () => repoPath() + "\\TODO.md";
 function hashId(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
 function parseTodo(txt) {
@@ -1599,20 +1620,57 @@ function renderTodoList() {
   const list = todoMatches();
   const bySection = new Map(); for (const i of list) { if (!bySection.has(i.section)) bySection.set(i.section, []); bySection.get(i.section).push(i); }
   for (const [name, items] of bySection) {
-    box.append(el("h3", {}, name, el("span", { text: String(items.length) })));
+    const open = items.filter((i) => !i.done), allPicked = open.length > 0 && open.every((i) => TD.picks.includes(i.id));
+    box.append(el("h3", {}, name, el("span", { text: String(items.length) }),
+      open.length > 1 ? el("button", { class: "pick-all", text: allPicked ? "Unpick all" : "Pick all", title: allPicked ? "Unpick the open items in this section" : "Add the open items in this section to the pick",
+        onclick: () => todoSetPicks(allPicked ? TD.picks.filter((id) => !open.some((i) => i.id === id)) : [...TD.picks, ...open.map((i) => i.id)]) }) : null));
     for (const i of items) {
-      const started = TD.started[i.id];
-      box.append(el("button", { class: i.done ? "done" : "", "aria-current": String(TD.sel === i.id), onclick: () => todoSelect(i.id) },
-        i.title, el("small", {}, `Line ${i.line}`, started ? el("span", { class: "tag info", text: "Started " + hhmm(started) }) : null)));
+      const started = TD.started[i.id], picked = TD.picks.includes(i.id);
+      const cb = el("input", { type: "checkbox", "aria-label": "Pick: " + i.title }); cb.checked = picked;
+      cb.addEventListener("change", () => todoToggle(i.id));
+      box.append(el("div", { class: "todo-row" + (picked ? " picked" : "") }, cb,
+        el("button", { class: "item" + (i.done ? " done" : ""), "aria-current": String(picked), "data-id": i.id, onclick: (e) => todoClick(i.id, e) },
+          i.title, el("small", {}, `Line ${i.line}`, started ? el("span", { class: "tag info", text: "Started " + hhmm(started) }) : null))));
     }
   }
   if (!list.length) box.append(el("div", { class: "empty", text: TD.items.length ? "No item matches." : "TODO.md has no items." }));
 }
-function todoSelect(id) {
-  TD.sel = id; store.set("todoSel", id);
+// The pick is a set of item ids. A plain click picks one item; a tick, Ctrl+click or Shift+click changes the set.
+function todoSetPicks(ids) {
+  TD.picks = [...new Set(ids)]; store.set("todoPicks", TD.picks);
   renderTodoList(); renderTodoCard();
-  $("#todo-list [aria-current='true']")?.scrollIntoView({ block: "nearest" });
 }
+function todoSelect(id) {
+  TD.anchor = id; todoSetPicks([id]);
+  $(`#todo-list [data-id="${id}"]`)?.scrollIntoView({ block: "nearest" });
+}
+function todoToggle(id) { TD.anchor = id; todoSetPicks(TD.picks.includes(id) ? TD.picks.filter((x) => x !== id) : [...TD.picks, id]); }
+function todoClick(id, e) {
+  if (e.shiftKey && TD.anchor) {
+    const vis = todoMatches().map((i) => i.id), a = vis.indexOf(TD.anchor), b = vis.indexOf(id);
+    if (a >= 0 && b >= 0) { todoSetPicks([...TD.picks, ...vis.slice(Math.min(a, b), Math.max(a, b) + 1)]); return; }
+  }
+  if (e.ctrlKey || e.metaKey) { todoToggle(id); return; }
+  todoSelect(id);
+}
+const pickedItems = () => TD.picks.map((id) => TD.items.find((i) => i.id === id)).filter(Boolean).sort((a, b) => a.line - b.line);
+// Names that tie items together: code spans, file names and PascalCase names that two items both mention.
+function itemNames(i) {
+  const names = new Set();
+  for (const m of i.text.matchAll(/`([^`\n]{4,60})`/g)) { const k = m[1].trim(); if (!/^[\d\s.:%-]+$/.test(k)) names.add(k); }
+  for (const m of i.text.matchAll(/\b[\w-]+(?:\.[\w-]+)*\.(?:cs|csproj|xaml|json|jsonl|md|ps1|mjs|js|ts|astro|iss|ya?ml|html|py)\b/g)) names.add(m[0]);
+  for (const m of i.text.matchAll(/\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+\b/g)) names.add(m[0]);
+  return names;
+}
+function todoLinks(items) {
+  const names = items.map(itemNames), out = [];
+  for (let a = 0; a < items.length; a++) for (let b = a + 1; b < items.length; b++) {
+    const shared = [...names[a]].filter((k) => names[b].has(k));
+    if (shared.length) out.push({ a, b, names: shared.slice(0, 3) });
+  }
+  return out;
+}
+const codeList = (names) => names.map((k) => "`" + k.replace(/`/g, "") + "`").join(", ");
 function todoPrompt(i) {
   return [
     `Work on this open item from TODO.md in this repository.`,
@@ -1629,59 +1687,171 @@ function todoPrompt(i) {
     `- Do not commit or push. Tell me what changed and what is not verified.`,
   ].filter((x) => x != null).join("\n");
 }
+function todoPromptMany(items) {
+  // The prompt changes with the pick: one section or several, names the items share, ticked items, a long list.
+  const secs = [...new Set(items.map((i) => i.section))], links = todoLinks(items), n = items.length;
+  const L = [`Work on these ${n} items from TODO.md in this repository, in one session.`];
+  if (secs.length === 1) L.push(`They are all in the section "${secs[0]}". Look for a shared cause or one change that solves several of them before you work on each one alone.`);
+  else L.push(`They come from ${secs.length} sections: ${secs.join(", ")}. Treat them as separate changes unless the code shows a real link.`);
+  if (links.length) {
+    L.push("", "These items name the same things, so check whether they touch the same code:");
+    for (const l of links) L.push(`- Items ${l.a + 1} and ${l.b + 1}: ${codeList(l.names)}`);
+  }
+  for (const s of secs) {
+    const its = items.filter((i) => i.section === s);
+    L.push("", `## ${s}`);
+    if (its[0].about) L.push(`About this section: ${its[0].about}`);
+    for (const i of its) {
+      L.push("", `Item ${items.indexOf(i) + 1} (TODO.md line ${i.line}${i.done ? "; already ticked, so only check that nothing is left" : ""}):`, i.text);
+    }
+  }
+  L.push("", "How to work:",
+    `- First read the code for all ${n} items. Then tell me the order you will take them in and why${links.length || secs.length === 1 ? ", and which items one change can solve together" : ""}.`,
+    "- Finish one item before you start the next: make the change, run the tests that cover it, then tick or remove the item in TODO.md and add its entry to the right CHANGELOG, as the top of TODO.md says. TODO.md then shows how far you got if the session stops.",
+    "- If an item is blocked or much bigger than it looks, stop work on that item, tell me why, and go on with the next one.");
+  if (n > 5) L.push(`- ${n} items is a long list for one session. If the context gets full, stop after a finished item and tell me which items are left.`);
+  L.push("", "When you are done:",
+    "- Do not commit or push.",
+    "- Give me a short report per item: what changed, which files, what you tested and what is not verified. Keep the items apart, so I can commit them one at a time.");
+  return L.join("\n");
+}
 const LAUNCH_MODES = [
   ["plan", "Plan first", "Claude reads the code and proposes a plan. It edits nothing until you approve."],
   ["default", "Ask before edits", "Claude asks before each edit and command."],
   ["acceptEdits", "Accept edits", "Claude edits files without asking; commands still ask."],
 ];
+const TODO_FACTS = "You help the developer of Denon Desktop: a .NET 10 WPF app for Denon AV receivers, with plugins for an LG webOS TV, Philips Hue, Home Assistant, Apple TV, Chromecast and HomePods, an MCP server and an Insights web page. You cannot see the code.";
 function renderTodoCard() {
   const card = $("#todo-card"); card.textContent = "";
-  const i = TD.items.find((x) => x.id === TD.sel);
-  if (!i) { card.append(el("div", { class: "empty", text: TD.sel ? "That item is no longer in TODO.md. It was done, removed or reworded." : "Pick an item on the left. Then start a Claude Code session on it, with a prompt you can edit first." })); return; }
-  const started = TD.started[i.id];
+  const items = pickedItems();
+  if (!items.length) { card.append(el("div", { class: "empty", text: TD.picks.length ? "The picked items are no longer in TODO.md. They were removed or reworded." : PICK_HELP })); return; }
+  if (items.length === 1) renderTodoOne(card, items[0]); else renderTodoMany(card, items);
+  const gone = TD.picks.length - items.length;
+  if (gone) card.append(el("div", { class: "about", text: `${gone} picked ${gone === 1 ? "item is" : "items are"} no longer in TODO.md (removed or reworded) and left out.` }));
+  renderTodoLaunch(card, items);
+}
+function renderTodoOne(card, i) {
   card.append(el("div", { class: "todo-head" },
     el("div", { class: "muted", style: "font-size:13.5px", text: `${i.section} · TODO.md line ${i.line} · ${i.done ? "done" : "open"}` }),
     el("p", { class: "sel-title", text: i.title })));
   const body = el("div", { class: "md", style: "padding:4px 14px 6px" }); renderMd(i.text, body); card.append(body);
   if (i.about) card.append(el("div", { class: "about" }, el("b", { text: "About this section: " }), i.about));
+}
+function renderTodoMany(card, items) {
+  const secs = [...new Set(items.map((i) => i.section))], links = todoLinks(items);
+  card.append(el("div", { class: "todo-head" },
+    el("div", { class: "muted", style: "font-size:13.5px", text: secs.length === 1 ? `All from ${secs[0]}` : `From ${secs.length} sections` }),
+    el("p", { class: "sel-title", text: `${items.length} items in one session` })));
+  const ol = el("ol", { class: "picks" });
+  for (const i of items) {
+    const d = el("details", {}, el("summary", {}, el("b", { text: i.title }), el("span", { class: "faint", text: `${i.section}, line ${i.line}` }),
+      i.done ? el("span", { class: "tag ok", text: "done" }) : null));
+    const body = el("div", { class: "md" }); renderMd(i.text, body); d.append(body);
+    ol.append(el("li", {}, el("div", { class: "pick" }, d, el("button", { class: "btn small", text: "Unpick", "aria-label": "Unpick: " + i.title, onclick: () => todoToggle(i.id) }))));
+  }
+  card.append(ol);
+  // Say what shaped the prompt, so the pick is easy to check before it starts.
+  const notes = [];
+  notes.push(secs.length === 1 ? "One section: the prompt asks Claude to look for one shared change first." : "Several sections: the prompt asks for separate changes unless the code links them.");
+  for (const l of links) notes.push(el("span", {}, `Items ${l.a + 1} and ${l.b + 1} both name `, ...l.names.flatMap((k, n) => [n ? ", " : "", el("code", { text: k })]), "."));
+  const ticked = items.filter((i) => i.done).length;
+  if (ticked) notes.push(`${ticked} ${ticked === 1 ? "item is" : "items are"} already ticked: Claude only checks that nothing is left.`);
+  if (items.length > 5) notes.push(`${items.length} items is a lot for one session. The prompt tells Claude to stop cleanly when the context gets full.`);
+  card.append(el("div", { class: "links" }, el("b", { text: "How the prompt fits this pick" }), el("ul", {}, notes.map((x) => el("li", {}, x)))));
+}
+function renderTodoLaunch(card, items) {
+  const many = items.length > 1, key = items.map((i) => i.id).join(",");
+  const fresh = () => many ? todoPromptMany(items) : todoPrompt(items[0]);
   const prompt = el("textarea", { "aria-label": "Prompt for Claude Code", spellcheck: "false" });
-  prompt.value = TD.drafts[i.id] ?? todoPrompt(i);
-  prompt.addEventListener("input", () => { TD.drafts[i.id] = prompt.value; });
+  prompt.value = TD.drafts[key] ?? fresh();
+  prompt.addEventListener("input", () => { TD.drafts[key] = prompt.value; });
+  const tipFor = (v) => (LAUNCH_MODES.find(([m]) => m === v)?.[2] || "") + (many && v !== "plan" ? " With several items, Plan first lets you approve the order before Claude edits." : "");
   const modeSel = store.get("launchMode", "plan");
   const modes = el("div", { class: "seg", role: "radiogroup", "aria-label": "How Claude Code starts" },
     LAUNCH_MODES.map(([v, label, tip]) => el("button", { "aria-pressed": String(v === modeSel), title: tip, onclick: (e) => {
       store.set("launchMode", v); e.currentTarget.parentElement.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === e.currentTarget)));
-      hint.textContent = tip;
+      hint.textContent = tipFor(v);
     } }, label)));
-  const hint = el("span", { class: "note", text: LAUNCH_MODES.find(([v]) => v === modeSel)?.[2] || "" });
-  const go = el("button", { class: "btn primary", text: "Start in Claude Code" });
+  const hint = el("span", { class: "note", text: tipFor(modeSel) });
+  const markStarted = () => { const now = Date.now(); for (const i of items) TD.started[i.id] = now; store.set("todoStarted", TD.started); renderTodoList(); renderTodoCard(); };
+  // Copy is the main hand-off: paste into any Claude Code session that is already open and trusted.
+  // The app link and the terminal stay as other ways; the app asks to trust the folder and to press Enter for a link.
+  const copy = el("button", { class: "btn primary", text: "Copy prompt" });
+  copy.addEventListener("click", () => copyText(prompt.value, prompt).then(
+    () => toast("Copied. Paste it into a Claude Code session (Ctrl+V) and send it."), (e) => toast("Copy failed: " + errText(e) + ". Select the prompt and copy it by hand.")));
+  const go = el("button", { class: "btn", text: "New session in the Claude app" });
   go.addEventListener("click", async () => {
     go.disabled = true;
     try {
-      await launchClaude(i, prompt.value, store.get("launchMode", "plan"));
-      TD.started[i.id] = Date.now(); store.set("todoStarted", TD.started);
-      toast("Claude Code is starting in a new terminal window.");
-      renderTodoList(); renderTodoCard();
-    } catch (e) { toast("Could not start Claude Code: " + errText(e)); go.disabled = false; }
+      await openInDesktop(prompt.value);
+      toast("A new Claude Code session is open in the Claude app, with the prompt in the message box.");
+      markStarted();
+    } catch (e) { toast("Could not open the Claude app: " + errText(e)); go.disabled = false; }
   });
+  const term = el("button", { class: "btn", text: "Start in a terminal" });
+  term.addEventListener("click", async () => {
+    term.disabled = true;
+    try {
+      await launchClaude(many ? `${items.length} TODO items` : items[0].title, prompt.value, store.get("launchMode", "plan"));
+      toast("Claude Code is starting in a new terminal window.");
+      markStarted();
+    } catch (e) { toast("Could not start Claude Code: " + errText(e)); term.disabled = false; }
+  });
+  const ask = many
+    ? { label: `TODO: ${items.length} items`, summary: `${items.length} items from TODO.md`, q: "In what order would you take these items, and which belong together?",
+        text: "Open items from TODO.md:\n\n" + items.map((i, n) => `Item ${n + 1} (section "${i.section}"):\n${i.text}`).join("\n\n"),
+        rule: "Answer in short, plain English: a proposed order with one line of reason per item, which items one change could solve together, and risks or open questions. Use short bullets. No preamble." }
+    : { label: "TODO: " + items[0].title, summary: "one item from TODO.md", q: "How would you approach this item?",
+        text: `An open item from TODO.md (section "${items[0].section}"):\n\n${items[0].text}${items[0].about ? "\n\nAbout this section: " + items[0].about : ""}`,
+        rule: "Answer in short, plain English: what the item asks, a likely approach, open questions to settle first, and what to test. Use short bullets. No preamble." };
+  const started = items.map((i) => TD.started[i.id]).filter(Boolean);
   card.append(el("div", { class: "launch" },
-    el("h3", { text: "Ask Claude Code to work on it" }),
+    el("h3", { text: many ? `Ask Claude Code to work on these ${items.length} items` : "Ask Claude Code to work on it" }),
     prompt,
-    el("div", { class: "row" }, modes, hint),
-    el("div", { class: "row" }, go,
-      el("button", { class: "btn", text: "Copy prompt", onclick: () => navigator.clipboard.writeText(prompt.value).then(() => toast("Copied."), () => toast("Copy failed.")) }),
-      el("button", { class: "btn", text: "Reset prompt", onclick: () => { delete TD.drafts[i.id]; prompt.value = todoPrompt(i); } }),
-      P.sample ? el("button", { class: "btn", text: "Quick take from Claude", onclick: () => openAsk({
-        label: "TODO: " + i.title, summary: "one item from TODO.md",
-        facts: "You help the developer of Denon Desktop: a .NET 10 WPF app for Denon AV receivers, with plugins for an LG webOS TV, Philips Hue, Home Assistant, Apple TV, Chromecast and HomePods, an MCP server and an Insights web page. You cannot see the code.",
-        text: `An open item from TODO.md (section "${i.section}"):\n\n${i.text}${i.about ? "\n\nAbout this section: " + i.about : ""}`,
-        rule: "Answer in short, plain English: what the item asks, a likely approach, open questions to settle first, and what to test. Use short bullets. No preamble.",
-      }, "How would you approach this item?") }) : null),
-    el("div", { class: "note", text: started
-      ? `Started in Claude Code at ${hhmm(started)}. Starting again opens a second session.`
-      : `Opens Windows Terminal in ${repoPath()} with a new Claude Code session. The session works on your files, not on a copy.` })));
+    el("div", { class: "row" }, copy,
+      el("button", { class: "btn", text: "Reset prompt", onclick: () => { delete TD.drafts[key]; prompt.value = fresh(); } }),
+      P.sample ? el("button", { class: "btn", text: "Quick take from Claude", onclick: () => openAsk({ label: ask.label, summary: ask.summary, facts: TODO_FACTS, text: ask.text, rule: ask.rule }, ask.q) }) : null,
+      many ? el("button", { class: "btn", text: "Clear pick", onclick: () => todoSetPicks([]) }) : null),
+    el("div", { class: "note", text: (started.length
+      ? (many ? `${started.length} of these items were started in a new session before, last at ${hhmm(Math.max(...started))}. `
+        : `Started in a new session at ${hhmm(started[0])}. `)
+      : "") + "Paste the prompt into a Claude Code session that is open on this repository: that is the quickest way." }),
+    el("details", { class: "term-start" },
+      el("summary", { text: "Or start a new session" }),
+      el("div", { class: "row" }, go,
+        el("span", { class: "note", text: "The Claude app opens a new Code session with the prompt in the message box. It asks you to trust the folder, and you press Enter to send." })),
+      el("div", { class: "row" }, term, modes),
+      el("div", { class: "row" }, el("span", { class: "note", text: `Opens Windows Terminal in ${repoPath()} with the claude CLI and sends the prompt at once. ` }), hint))));
 }
-async function launchClaude(item, prompt, mode) {
+// The clipboard API can be blocked in an artifact window. Then try the copy command on the text box, and last
+// Windows' own Set-Clipboard with the text from a file, so quotes and new lines stay as they are.
+async function copyText(text, box) {
+  try { await navigator.clipboard.writeText(text); return; } catch {}
+  if (box) {
+    const [s, e] = [box.selectionStart, box.selectionEnd];
+    box.focus(); box.select();
+    const ok = document.execCommand?.("copy");
+    box.setSelectionRange(s, e);
+    if (ok) return;
+  }
+  if (!P.desktop?.fs) throw new Error("the clipboard is blocked here");
+  const f = tmpFile("txt");
+  await P.fs.writeFile(f, text, "utf8");
+  try {
+    const r = await ps(`Set-Clipboard -Value (Get-Content -Raw -Encoding UTF8 -LiteralPath ${psq(f)})`, 15000);
+    if (r.code !== 0) throw new Error((r.stderr || "Set-Clipboard failed").trim());
+  } finally { P.fs.rm(f, { force: true }).catch(() => {}); }
+}
+// The Claude app's claude://code/new link opens a new Code session with the prompt in its message box.
+const DESKTOP_PROMPT_MAX = 14336; // the app cuts q at this length
+async function openInDesktop(prompt) {
+  if (!prompt.trim()) throw new Error("The prompt is empty.");
+  if (prompt.length > DESKTOP_PROMPT_MAX) throw new Error(`the prompt has ${prompt.length} characters and the app takes at most ${DESKTOP_PROMPT_MAX}. Pick fewer items, shorten it, or start in a terminal.`);
+  const url = `claude://code/new?q=${encodeURIComponent(prompt)}&folder=${encodeURIComponent(repoPath())}`;
+  const r = await ps(`Start-Process -FilePath ${psq(url)}`, 20000);
+  if (r.code !== 0) throw new Error((r.stderr || "Start-Process failed").trim());
+}
+async function launchClaude(title, prompt, mode) {
   // The prompt goes through a file, so quotes and new lines reach Claude Code unchanged.
   const dir = `${P.env.TEMP}\\room-dev-deck-todo`, id = Date.now().toString(36);
   await P.fs.mkdir(dir, { recursive: true });
@@ -1695,9 +1865,26 @@ async function launchClaude(item, prompt, mode) {
   // Windows PowerShell 5.1 breaks double quotes inside native arguments; pwsh 7 passes them as they are.
   const promptExpr = hasPwsh ? "$prompt" : "($prompt -replace '\"', \"'\")";
   await P.fs.writeFile(script, "﻿" + [
-    `$Host.UI.RawUI.WindowTitle = ${psq("Claude Code: " + item.title.slice(0, 50))}`,
+    `$Host.UI.RawUI.WindowTitle = ${psq("Claude Code: " + title.slice(0, 50))}`,
     `Set-Location -LiteralPath ${psq(repoPath())}`,
     `$prompt = Get-Content -Raw -Encoding UTF8 -LiteralPath ${psq(promptFile)}`,
+    // The deck runs inside the Claude app, and the new terminal inherits the app's CLAUDE_*/ANTHROPIC_* variables.
+    // With them, claude uses the app's short-lived sign-in and fails on the first message, which loses the prompt.
+    // Remove them, but keep the ones set in the Windows User or Machine environment.
+    `$own = @([Environment]::GetEnvironmentVariables('User').Keys) + @([Environment]::GetEnvironmentVariables('Machine').Keys)`,
+    `Get-ChildItem env: | Where-Object { $_.Name -match '^(CLAUDE|ANTHROPIC|MCP_|AI_AGENT$|CODEX_COMPANION|DISABLE_AUTOUPDATER$|DISABLE_MICROCOMPACT$)' -and $own -notcontains $_.Name } | ForEach-Object { Remove-Item -LiteralPath ('env:' + $_.Name) }`,
+    // Sign in first when needed, so the prompt is not spent on a "please run /login" answer.
+    `function Test-ClaudeLogin { try { (& claude auth status 2>$null | Out-String | ConvertFrom-Json).loggedIn -eq $true } catch { $false } }`,
+    `if (-not (Test-ClaudeLogin)) {`,
+    `  Write-Host 'Claude Code is not signed in on this PC. Sign in first; the prompt waits.' -ForegroundColor Yellow`,
+    `  & claude auth login`,
+    `  if (-not (Test-ClaudeLogin)) {`,
+    `    Set-Clipboard -Value $prompt`,
+    `    Write-Host 'Still not signed in. The prompt is on the clipboard: run /login, then paste it.' -ForegroundColor Yellow`,
+    `    & claude ${flag.trim()}`,
+    `    return`,
+    `  }`,
+    `}`,
     `& claude ${flag}${promptExpr}`,
   ].join("\r\n") + "\r\n", "utf8");
   const shell = hasPwsh ? "pwsh" : "powershell";
@@ -1986,7 +2173,7 @@ function showGate(kind) {
       el("li", {}, el("b", { text: "MCP" }), el("span", { text: "Every tool on the app's MCP server, a form for its arguments, the JSON result and a history." })),
       el("li", {}, el("b", { text: "LAN" }), el("span", { text: "Port checks for each device, and read-only probes for Apple TV and HomePod now playing." })),
       el("li", {}, el("b", { text: "Release" }), el("span", { text: "Versions against tags, GitHub Actions runs with alerts, the unreleased changelog, and a checksum check of a release." })),
-      el("li", {}, el("b", { text: "TODO" }), el("span", { text: "Every item in TODO.md. Pick one and start a Claude Code session on it, with a prompt you can edit first." }))));
+      el("li", {}, el("b", { text: "TODO" }), el("span", { text: "Every item in TODO.md. Pick one or several and copy a prompt for Claude Code that fits the pick." }))));
   const act = el("div", { class: "act" });
   if (kind === "install") {
     const b = el("button", { class: "btn primary", text: "Install as app" });

@@ -16,6 +16,8 @@ public sealed record RemoteWebResponse(int StatusCode, string ContentType, strin
 
 public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
 {
+    private const string HooksPrefix = "/api/hooks/";
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly ReceiverController _receiverController;
@@ -127,6 +129,11 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
             if (role != "owner" && lowerPath != "/api/youtube/queue")
             {
                 return JsonError(403, "Owner access required for this control. Guests can search and queue YouTube tracks.");
+            }
+
+            if (lowerPath.StartsWith(HooksPrefix, StringComparison.Ordinal))
+            {
+                return HandleWebhook(path[HooksPrefix.Length..], body);
             }
 
             using var doc = string.IsNullOrWhiteSpace(body)
@@ -308,6 +315,86 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
             _logStore.Warning($"Phone Remote API error ({method} {path}): {ex.Message}");
             return JsonError(500, ex.Message);
         }
+    }
+
+    /// <summary>
+    /// POST /api/hooks/{name}: publishes "webhook.received" on the event bus (and the control log) for
+    /// automation rules with a Webhook trigger. A JSON object body adds its simple fields to the event data
+    /// (at most 20, values up to 500 characters); any other body is kept as "text".
+    /// </summary>
+    private RemoteWebResponse HandleWebhook(string rawName, string body)
+    {
+        var name = AutomationTriggers.NormalizeHookName(WebUtility.UrlDecode(rawName).TrimEnd('/'));
+        if (name is null)
+        {
+            return JsonError(400, "Use a hook name of letters, digits, '-' or '_' (at most 64 characters), as in /api/hooks/arrive-home.");
+        }
+
+        var data = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["hook"] = name };
+        ReadWebhookPayload(body, data);
+
+        _telemetry.Record(EventTelemetryLog.StreamControl, AutomationTriggers.WebhookDevice, AutomationTriggers.WebhookEventName, AutomationTriggers.WebhookOrigin, data);
+
+        var listening = (_settingsStore.Current.AutomationGraphs ?? [])
+            .Where(g => g.Enabled && g.Nodes.Any(n =>
+                n.Type == AutomationNodeTypes.TriggerWebhook &&
+                AutomationTriggers.NormalizeHookName(n.Get("hook")) == name))
+            .Select(static g => g.Name)
+            .ToList();
+
+        _logStore.Info($"[Webhook] '{name}' received; {listening.Count} enabled automation(s) listen to it.");
+        return JsonOk(new
+        {
+            hook = name,
+            automations = listening,
+            message = listening.Count == 0
+                ? $"Received '{name}', but no enabled automation listens to it."
+                : $"Received '{name}': {string.Join(", ", listening)}.",
+        });
+    }
+
+    private static void ReadWebhookPayload(string body, Dictionary<string, object?> data)
+    {
+        const int maxFields = 20, maxValue = 500;
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return;
+        }
+
+        static string Clip(string s) => s.Length <= maxValue ? s : s[..maxValue];
+
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                {
+                    if (data.Count > maxFields || prop.Name.Equals("hook", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    data[prop.Name] = prop.Value.ValueKind switch
+                    {
+                        JsonValueKind.String => Clip(prop.Value.GetString() ?? string.Empty),
+                        JsonValueKind.True => true,
+                        JsonValueKind.False => false,
+                        JsonValueKind.Number => prop.Value.TryGetInt64(out var l) ? l : prop.Value.GetDouble(),
+                        JsonValueKind.Null => null,
+                        _ => Clip(prop.Value.GetRawText()),
+                    };
+                }
+
+                return;
+            }
+        }
+        catch (JsonException)
+        {
+            // Not JSON: keep it as text.
+        }
+
+        data["text"] = Clip(body.Trim());
     }
 
     private static string ResolveAccessRole(RemoteAccessSettings cfg, string candidateToken)

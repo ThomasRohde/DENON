@@ -33,8 +33,8 @@ public sealed class ReviewVerificationTests : IDisposable
     private AppLogStore CreateIsolatedLog(string name = "app.log") =>
         new(Path.Combine(_tempDir, name));
 
-    private EventTelemetryLog CreateIsolatedTelemetry(AppSettingsStore store, AppLogStore log, string folder = "events") =>
-        new(store, log, Path.Combine(_tempDir, folder));
+    private EventTelemetryLog CreateIsolatedTelemetry(AppSettingsStore store, AppLogStore log, string folder = "events", RoomEventBus? bus = null) =>
+        new(store, log, bus ?? new RoomEventBus(log), Path.Combine(_tempDir, folder));
 
     private static int GetFreeTcpPort()
     {

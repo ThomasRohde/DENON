@@ -140,7 +140,7 @@ public sealed class RoomMicMeterTests
             var logStore = new AppLogStore();
             var settingsStore = new AppSettingsStore(logStore, Path.Combine(tempDir, "settings.json"));
             var stateStore = new ReceiverStateStore();
-            var telemetry = new EventTelemetryLog(settingsStore, logStore, Path.Combine(tempDir, "events"));
+            var telemetry = new EventTelemetryLog(settingsStore, logStore, new RoomEventBus(logStore), Path.Combine(tempDir, "events"));
             var controller = new ReceiverController(
                 new HeosClient(),
                 new DenonAvrClient(),

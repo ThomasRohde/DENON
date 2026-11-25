@@ -66,6 +66,7 @@ public sealed class EventTelemetryLog : IAsyncDisposable
 
     private readonly AppSettingsStore _settingsStore;
     private readonly AppLogStore _logStore;
+    private readonly RoomEventBus _eventBus;
     private readonly string _eventsDir;
     private readonly string _pluginEventsDir;
     private readonly Channel<TelemetryEventEnvelope> _channel;
@@ -78,15 +79,16 @@ public sealed class EventTelemetryLog : IAsyncDisposable
     private long _sessionEventCount;
     private bool _disposed;
 
-    public EventTelemetryLog(AppSettingsStore settingsStore, AppLogStore logStore)
-        : this(settingsStore, logStore, AppDataPaths.EventsLogsDirectory)
+    public EventTelemetryLog(AppSettingsStore settingsStore, AppLogStore logStore, RoomEventBus eventBus)
+        : this(settingsStore, logStore, eventBus, AppDataPaths.EventsLogsDirectory)
     {
     }
 
-    public EventTelemetryLog(AppSettingsStore settingsStore, AppLogStore logStore, string eventsDirectory)
+    public EventTelemetryLog(AppSettingsStore settingsStore, AppLogStore logStore, RoomEventBus eventBus, string eventsDirectory)
     {
         _settingsStore = settingsStore;
         _logStore = logStore;
+        _eventBus = eventBus;
         _eventsDir = eventsDirectory;
         _pluginEventsDir = Path.Combine(eventsDirectory, "plugins");
 
@@ -162,7 +164,8 @@ public sealed class EventTelemetryLog : IAsyncDisposable
     }
 
     /// <summary>
-    /// Enqueues a structured habit-ready event to the target monthly JSONL stream without blocking the caller.
+    /// Publishes the event on the live <see cref="RoomEventBus"/> (always), and when event logging is on, also
+    /// enqueues it to the daily JSONL file of its stream without blocking the caller.
     /// </summary>
     public void Record(
         string stream,
@@ -171,7 +174,7 @@ public sealed class EventTelemetryLog : IAsyncDisposable
         string origin,
         IReadOnlyDictionary<string, object?>? data = null)
     {
-        if (_disposed || !IsEnabled)
+        if (_disposed)
         {
             return;
         }
@@ -185,15 +188,27 @@ public sealed class EventTelemetryLog : IAsyncDisposable
             data = _sessionOverlap.Annotate(device?.Trim() ?? string.Empty, eventName?.Trim() ?? string.Empty, data, now);
         }
 
+        var cleanDevice = string.IsNullOrWhiteSpace(device) ? cleanStream : device.Trim();
+        var cleanEvent = string.IsNullOrWhiteSpace(eventName) ? "event" : eventName.Trim();
+        var cleanOrigin = string.IsNullOrWhiteSpace(origin) ? "app" : origin.Trim();
+        var cleanData = data is { Count: > 0 } ? data : null;
+
+        _eventBus.Publish(new RoomEvent(now, cleanStream, cleanDevice, cleanEvent, cleanOrigin, cleanData));
+
+        if (!IsEnabled)
+        {
+            return;
+        }
+
         var envelope = new TelemetryEventEnvelope(
             Timestamp: now.ToString("yyyy-MM-ddTHH:mm:sszzz", CultureInfo.InvariantCulture),
             DayOfWeek: now.ToString("ddd", CultureInfo.InvariantCulture),
             TimeBlock: RoomIntelligenceService.GetCurrentTimeBlock(),
             Stream: cleanStream,
-            Device: string.IsNullOrWhiteSpace(device) ? cleanStream : device.Trim(),
-            Event: string.IsNullOrWhiteSpace(eventName) ? "event" : eventName.Trim(),
-            Origin: string.IsNullOrWhiteSpace(origin) ? "app" : origin.Trim(),
-            Data: data is { Count: > 0 } ? data : null);
+            Device: cleanDevice,
+            Event: cleanEvent,
+            Origin: cleanOrigin,
+            Data: cleanData);
 
         if (_channel.Writer.TryWrite(envelope))
         {

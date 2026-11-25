@@ -699,7 +699,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
             {
                 uri = "denon://catalog/capabilities",
                 name = "Inputs, Sound Modes, Smart Scenes, Rules & Plugins Catalog",
-                description = "Complete reference of valid AVR input codes, sound mode codes, configured Smart Scenes, Automation Rules, and all installed Plugin Actions.",
+                description = "Complete reference of valid AVR input codes, sound mode codes, configured Smart Scenes, automations and their node types, and all installed Plugin Actions.",
                 mimeType = "application/json",
             },
             new
@@ -901,7 +901,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
             new
             {
                 name = "architect_automation",
-                description = "Synthesize a validated Smart Scene and/or Automation Rule from a plain-English habit description.",
+                description = "Build a validated Smart Scene and/or automation graph from a plain-English habit description.",
                 arguments = new[]
                 {
                     new { name = "habit", description = "Natural language trigger & actions (e.g. 'When I open Plex after 8pm, dim Hue and switch TV to HDMI 2')", required = true },
@@ -928,8 +928,8 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                 $"Optimize Denon AVR acoustics for: \"{GetString(args, "goal", "clear dialogue at moderate volume")}\". " +
                 "Read denon://room/state first, then use avr_tune_acoustics safely and explain what each adjustment does.",
             "architect_automation" =>
-                $"Create a Denon Desktop Smart Scene and/or Automation Rule for this habit: \"{GetString(args, "habit", "movie night automation")}\". " +
-                "Read denon://catalog/capabilities to use valid input codes, sound modes, and plugin action IDs, then call create_or_update_scene and/or create_automation_rule.",
+                $"Create a Denon Desktop Smart Scene and/or automation for this habit: \"{GetString(args, "habit", "movie night automation")}\". " +
+                "Read denon://catalog/capabilities to use valid input codes, sound modes, and plugin action IDs and automation node types, then call create_or_update_scene and/or create_or_update_automation (a trigger, optional conditions, then actions).",
             _ => throw new McpInvalidParamsException($"Unknown prompt '{name}'."),
         };
 
@@ -1216,7 +1216,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
 
             // Generative Smart Scene & Automation Architect
             Tool("list_scenes_and_rules",
-                "List all configured Smart Scenes and Automation Rules.",
+                "List all configured Smart Scenes and automations (graphs of trigger, condition and action nodes).",
                 EmptySchema(),
                 title: "List Smart Scenes & Automations",
                 readOnly: true, idempotent: true,
@@ -1242,17 +1242,17 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                     ("plugin_action_id", "string", "Optional plugin action ID to chain (e.g. 'hue.movie_dim', 'tv.screen_off')", false)),
                 title: "Create or Update Smart Scene",
                 idempotent: true),
-            Tool("create_automation_rule",
-                "Create a persistent Automation Rule (App Launch Watcher or Time-of-Day Schedule) in settings.json.",
+            Tool("create_or_update_automation",
+                "Create or replace an automation graph in settings.json. Nodes: trigger.event (config event, filter), trigger.webhook (hook, filter), " +
+                "trigger.schedule (time HH:mm, days), trigger.app_launch (processes), condition.event (filter), condition.time (from, to, days), " +
+                "condition.receiver (power any/on/standby, input, muted any/yes/no), action.scene (sceneId), action.plugin (pluginId, actionId, p:<param>), " +
+                "action.receiver (command power_on/power_off/mute/unmute/volume/input/sound_mode, value), action.delay (seconds). " +
+                "Edges {from, port, to}: port 'out', or 'yes'/'no' after a condition. No cycles. Read denon://catalog/capabilities for node types, scenes and plugin actions. " +
+                "The automation starts disabled unless enabled is true; the user turns it on in the app.",
                 ObjSchema(
-                    ("name", "string", "Friendly rule name", true),
-                    ("trigger_type", "string", "'AppLaunch' or 'TimeOfDay'", true),
-                    ("enabled", "boolean", "Whether the rule starts enabled (default true)", false),
-                    ("process_names", "string", "For AppLaunch: comma-separated process names without .exe (e.g. 'vlc, Plex')", false),
-                    ("schedule_time", "string", "For TimeOfDay: 24-hour HH:mm local time (e.g. '22:30')", false),
-                    ("days_filter", "string", "Daily, Weekdays, or Weekends (default Daily)", false),
-                    ("target_scene_id", "string", "Smart Scene ID to activate when triggered", false)),
-                title: "Create Automation Rule"),
+                    ("automation", "object", "{ id?, name, enabled?, cooldownSeconds?, nodes: [{ id, type, x?, y?, config }], edges: [{ from, port, to }] }. Without id a new one is made.", true)),
+                title: "Create or Update Automation",
+                idempotent: true),
         };
 
         // Zero-config auto-bridge: expose enabled plugin actions as annotated MCP tools
@@ -1308,7 +1308,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                 return BuildToolJson(new
                 {
                     scenes = _settingsStore.Current.Receiver.Scenes,
-                    automations = _settingsStore.Current.Automations,
+                    automations = _settingsStore.Current.AutomationGraphs,
                 });
 
             case "avr_get_acoustics":
@@ -1775,9 +1775,9 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
                 EnsureFullOrchestration(cfg, toolName);
                 return await ExecuteCreateOrUpdateSceneAsync(args, cfg, ct);
 
-            case "create_automation_rule":
+            case "create_or_update_automation":
                 EnsureFullOrchestration(cfg, toolName);
-                return await ExecuteCreateAutomationRuleAsync(args, ct);
+                return await ExecuteCreateOrUpdateAutomationAsync(args, ct);
         }
 
         throw new McpInvalidParamsException($"Unknown MCP tool '{toolName}'.");
@@ -2124,31 +2124,78 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         return BuildToolJson(new { saved = true, scene });
     }
 
-    private async Task<object> ExecuteCreateAutomationRuleAsync(JsonElement args, CancellationToken ct)
+    private async Task<object> ExecuteCreateOrUpdateAutomationAsync(JsonElement args, CancellationToken ct)
     {
-        var name = RequireString(args, "name");
-        var triggerRaw = RequireString(args, "trigger_type");
-        var triggerType = triggerRaw.Equals("TimeOfDay", StringComparison.OrdinalIgnoreCase)
-            ? AutomationTriggerType.TimeOfDay
-            : AutomationTriggerType.AppLaunch;
-
-        var rule = new AutomationRule
+        if (!args.TryGetProperty("automation", out var element) || element.ValueKind != JsonValueKind.Object)
         {
-            Id = "mcp-" + Guid.NewGuid().ToString("N")[..6],
-            Name = name,
-            IsEnabled = GetBool(args, "enabled") ?? true,
-            TriggerType = triggerType,
-            ProcessNames = GetString(args, "process_names"),
-            ScheduleTime = GetString(args, "schedule_time", "22:00"),
-            DaysFilter = GetString(args, "days_filter", "Daily"),
-            TargetSceneId = GetString(args, "target_scene_id"),
-            CooldownSeconds = 120,
-        };
+            return BuildToolError("Pass 'automation' as an object with name, nodes and edges.");
+        }
 
-        var updated = _settingsStore.Current.Clone();
-        updated.Automations.Add(rule);
-        await _settingsStore.SaveAsync(updated, ct);
-        return BuildToolJson(new { created = true, rule });
+        AutomationGraph? graph;
+        try
+        {
+            graph = element.Deserialize<AutomationGraph>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        }
+        catch (JsonException ex)
+        {
+            return BuildToolError($"The automation is not valid JSON for a graph: {ex.Message}");
+        }
+
+        if (graph is null)
+        {
+            return BuildToolError("The automation is empty.");
+        }
+
+        if (string.IsNullOrWhiteSpace(graph.Id) || !element.TryGetProperty("id", out _))
+        {
+            graph.Id = AutomationGraph.NewId("mcp");
+        }
+
+        // An agent-made automation stays off until the user turns it on, unless the call says enabled: true.
+        graph.Enabled = element.TryGetProperty("enabled", out var enabledEl) && enabledEl.ValueKind == JsonValueKind.True;
+        LayOutIfUnplaced(graph);
+
+        var problems = AutomationGraphValidator.Validate(graph);
+        if (problems.Count > 0)
+        {
+            return BuildToolError("The automation was not saved:\n" + string.Join("\n", problems.Select(p => p.NodeId is null ? $"- {p.Message}" : $"- node {p.NodeId}: {p.Message}")));
+        }
+
+        // Inside the store's lock, so an editor save at the same moment is not undone.
+        var replaced = false;
+        await _settingsStore.UpdateAsync(s => replaced = AutomationGraph.Upsert(s.AutomationGraphs, graph), ct);
+        return BuildToolJson(new { saved = true, replaced, automation = graph });
+    }
+
+    /// <summary>Agents rarely send positions: put unplaced nodes in columns by their distance from a trigger.</summary>
+    private static void LayOutIfUnplaced(AutomationGraph graph)
+    {
+        if (graph.Nodes.Any(static n => n.X != 0 || n.Y != 0))
+        {
+            return;
+        }
+
+        var depth = graph.Nodes.ToDictionary(static n => n.Id, static n => AutomationNodeTypes.IsTrigger(n.Type) ? 0 : -1, StringComparer.Ordinal);
+        for (var pass = 0; pass < graph.Nodes.Count; pass++)
+        {
+            foreach (var edge in graph.Edges)
+            {
+                if (depth.TryGetValue(edge.From, out var d) && d >= 0 && depth.ContainsKey(edge.To) && depth[edge.To] < d + 1)
+                {
+                    depth[edge.To] = d + 1;
+                }
+            }
+        }
+
+        foreach (var column in graph.Nodes.GroupBy(n => Math.Max(0, depth[n.Id])))
+        {
+            var row = 0;
+            foreach (var node in column)
+            {
+                node.X = 60 + column.Key * 260;
+                node.Y = 80 + row++ * 150;
+            }
+        }
     }
 
     private bool IsAuthorized(HttpListenerRequest req)
