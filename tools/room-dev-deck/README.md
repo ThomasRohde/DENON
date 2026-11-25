@@ -34,6 +34,12 @@ Published copy (private): https://claude.ai/artifact/Dw8Q9LHFajrqLbUKnAwnjU
   In every case, Claude first proposes an order, then finishes and ticks one item at a time, and reports per item, so
   you can commit the items one by one. **How the prompt fits this pick** shows those choices before you start.
 
+  The new terminal starts from the Claude app, so it inherits the app's `CLAUDE_*` and `ANTHROPIC_*` variables. With
+  them, `claude` uses the app's short-lived sign-in and its first answer is "please run /login", which uses up the
+  prompt. The start script therefore removes these variables. It keeps any that you set in the Windows User or Machine
+  environment. When the CLI is not signed in, the script runs `claude auth login` first and then sends the prompt. If
+  sign-in still fails, the script puts the prompt on the clipboard.
+
 `TODO.md` stays Markdown. The deck reads it as it is: a `## ` heading is a section, and `- [ ]` / `- [x]` with the
 lines indented under it is an item. An item's ID is a hash of its section and text, so keep that format.
 

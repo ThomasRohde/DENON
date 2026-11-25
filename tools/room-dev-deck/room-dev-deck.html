@@ -1818,6 +1818,23 @@ async function launchClaude(title, prompt, mode) {
     `$Host.UI.RawUI.WindowTitle = ${psq("Claude Code: " + title.slice(0, 50))}`,
     `Set-Location -LiteralPath ${psq(repoPath())}`,
     `$prompt = Get-Content -Raw -Encoding UTF8 -LiteralPath ${psq(promptFile)}`,
+    // The deck runs inside the Claude app, and the new terminal inherits the app's CLAUDE_*/ANTHROPIC_* variables.
+    // With them, claude uses the app's short-lived sign-in and fails on the first message, which loses the prompt.
+    // Remove them, but keep the ones set in the Windows User or Machine environment.
+    `$own = @([Environment]::GetEnvironmentVariables('User').Keys) + @([Environment]::GetEnvironmentVariables('Machine').Keys)`,
+    `Get-ChildItem env: | Where-Object { $_.Name -match '^(CLAUDE|ANTHROPIC|MCP_|AI_AGENT$|CODEX_COMPANION|DISABLE_AUTOUPDATER$|DISABLE_MICROCOMPACT$)' -and $own -notcontains $_.Name } | ForEach-Object { Remove-Item -LiteralPath ('env:' + $_.Name) }`,
+    // Sign in first when needed, so the prompt is not spent on a "please run /login" answer.
+    `function Test-ClaudeLogin { try { (& claude auth status 2>$null | Out-String | ConvertFrom-Json).loggedIn -eq $true } catch { $false } }`,
+    `if (-not (Test-ClaudeLogin)) {`,
+    `  Write-Host 'Claude Code is not signed in on this PC. Sign in first; the prompt waits.' -ForegroundColor Yellow`,
+    `  & claude auth login`,
+    `  if (-not (Test-ClaudeLogin)) {`,
+    `    Set-Clipboard -Value $prompt`,
+    `    Write-Host 'Still not signed in. The prompt is on the clipboard: run /login, then paste it.' -ForegroundColor Yellow`,
+    `    & claude ${flag.trim()}`,
+    `    return`,
+    `  }`,
+    `}`,
     `& claude ${flag}${promptExpr}`,
   ].join("\r\n") + "\r\n", "utf8");
   const shell = hasPwsh ? "pwsh" : "powershell";
