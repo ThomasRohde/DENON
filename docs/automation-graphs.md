@@ -65,8 +65,9 @@ AI agents: nobody watches an automation when it runs.
 ## Editor API (Insights server, `127.0.0.1`, cookie key)
 
 The editor page is `/automations/` (assets `/automations/editor.js` and `/automations/editor.css`). Requests that
-change something (`PUT`, `POST`, `DELETE`) must send the header `X-Denon-Request: 1` and, when they have a body, the
-content type `application/json`. All answers are JSON.
+change something (`PUT`, `POST`, `DELETE`) must send the header `X-Denon-Request: 1` and an `Origin` that is the
+server's own (browsers send it on these methods), and, when they have a body, the content type `application/json`.
+A body over 512 KB gets `413`. All answers are JSON.
 
 | Request | Answer |
 |---|---|

@@ -385,6 +385,7 @@ public sealed partial class MainViewModel
 
     private async Task SaveAutomationEnabledAsync(AutomationGraphItem item, bool enabled)
     {
+        var found = false;
         try
         {
             await _settingsStore.UpdateAsync(s =>
@@ -392,14 +393,28 @@ public sealed partial class MainViewModel
                 if (s.AutomationGraphs.FirstOrDefault(g => g.Id == item.Id) is { } graph)
                 {
                     graph.Enabled = enabled;
+                    found = true;
                 }
             });
-            AutomationsStatusText = $"'{item.Name}' is {(enabled ? "on" : "off")}.";
         }
         catch (Exception ex)
         {
+            item.SyncEnabled(!enabled);
+            OnPropertyChanged(nameof(EnabledAutomationsBadge));
             AutomationsStatusText = $"Could not save '{item.Name}': {ex.Message}";
+            return;
         }
+
+        if (!found)
+        {
+            // Deleted in the editor (or by an agent) since the list was drawn: the settings reload removes the row.
+            item.SyncEnabled(!enabled);
+            OnPropertyChanged(nameof(EnabledAutomationsBadge));
+            AutomationsStatusText = $"'{item.Name}' no longer exists, so nothing was switched.";
+            return;
+        }
+
+        AutomationsStatusText = $"'{item.Name}' is {(enabled ? "on" : "off")}.";
     }
 
     private async Task OpenAutomationEditorAsync(object? parameter)

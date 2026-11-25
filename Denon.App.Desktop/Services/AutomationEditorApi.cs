@@ -54,14 +54,28 @@ public sealed class AutomationEditorApi
                 return (403, new { error = "Send the header X-Denon-Request: 1 with requests that change something." });
             }
 
-            // A browser sends Origin on these requests: only this server's own pages may change automations.
-            if (request.Headers["Origin"] is { Length: > 0 } origin &&
+            // Browsers (WebView2 too) send Origin on PUT, POST and DELETE: only this server's own pages may change
+            // automations, and a request without an Origin is refused.
+            var origin = request.Headers["Origin"];
+            if (string.IsNullOrEmpty(origin) ||
                 !string.Equals(origin.TrimEnd('/'), $"{request.Url!.Scheme}://{request.Url.Authority}", StringComparison.OrdinalIgnoreCase))
             {
-                return (403, new { error = "Wrong origin." });
+                return (403, new { error = "Changes are only accepted from the automation editor page." });
             }
         }
 
+        try
+        {
+            return await RouteAsync(request, method, rest, ct);
+        }
+        catch (InvalidDataException ex)
+        {
+            return (413, new { error = ex.Message });
+        }
+    }
+
+    private async Task<(int Status, object Body)> RouteAsync(HttpListenerRequest request, string method, string rest, CancellationToken ct)
+    {
         switch (method, rest)
         {
             case ("GET", ""):
