@@ -8,7 +8,11 @@ using Microsoft.Extensions.Hosting;
 
 namespace Denon.App.Core.Services;
 
-public sealed record AutomationActivityEntry(DateTimeOffset Timestamp, string RuleName, string TriggerDetail, bool Success);
+/// <summary>
+/// A line for the automation activity log. <see cref="Skipped"/>: the trigger fired but the automation did not run
+/// (its cooldown), which is neither a success nor a failure.
+/// </summary>
+public sealed record AutomationActivityEntry(DateTimeOffset Timestamp, string RuleName, string TriggerDetail, bool Success, bool Skipped = false);
 
 /// <summary>
 /// Runs the automation graphs in settings: room events and webhooks from the <see cref="RoomEventBus"/>, schedules
@@ -393,7 +397,7 @@ public sealed class AutomationEngineService : BackgroundService
 
         var message = $"{detail} → skipped: in its cooldown until {until.LocalDateTime:HH:mm:ss} (last run {last.LocalDateTime:HH:mm:ss}).";
         _logStore.Info($"[Automation] {graph.Name}: {message}");
-        ActivityLogged?.Invoke(new AutomationActivityEntry(now, graph.Name, message, true));
+        ActivityLogged?.Invoke(new AutomationActivityEntry(now, graph.Name, message, Success: false, Skipped: true));
     }
 
     private bool IsOutOfCooldownLocked(AutomationGraph graph, DateTimeOffset now, TimeSpan minimum)

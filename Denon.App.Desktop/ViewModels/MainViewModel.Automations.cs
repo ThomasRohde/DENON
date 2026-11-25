@@ -223,7 +223,8 @@ public sealed partial class MainViewModel
 
         _automationEngine.ActivityLogged += entry => _ = _dispatcher.InvokeAsync(() =>
         {
-            var icon = entry.Success ? "✓" : "⚠";
+            // ✓ ran, ⚠ failed, – skipped (the trigger fired but the cooldown held the automation back).
+            var icon = entry.Skipped ? "–" : entry.Success ? "✓" : "⚠";
             AutomationActivityLog.Insert(0, $"{entry.Timestamp.LocalDateTime:HH:mm:ss}  {icon}  [{entry.RuleName}] {entry.TriggerDetail}");
             while (AutomationActivityLog.Count > 30)
             {

@@ -590,6 +590,8 @@ public sealed class AutomationEventTests : IDisposable
         Assert.Empty(await rig.Engine.HandleRoomEventAsync(Hook("home", ("who", "owner")), t0.AddMinutes(2.5)));
         var skips = log.Where(e => e.TriggerDetail.Contains("skipped")).ToList();
         var skip = Assert.Single(skips);
+        Assert.True(skip.Skipped);
+        Assert.False(skip.Success); // shown as skipped, not as a successful run
         Assert.Contains("Webhook 'home'", skip.TriggerDetail);
         Assert.Contains($"until {t0.AddMinutes(61).LocalDateTime:HH:mm:ss}", skip.TriggerDetail);
         Assert.Equal(new[] { "scene:morning-coffee" }, rig.Effects.Calls);
