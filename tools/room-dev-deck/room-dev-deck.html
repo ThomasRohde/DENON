@@ -270,6 +270,10 @@ table.t tr:last-child td { border-bottom: 0; }
 .launch h3 { margin: 0; font-size: 16px; font-weight: 600; }
 .launch textarea { min-height: 200px; font: 13px/1.5 var(--mono); }
 .launch .note { font-size: 13.5px; color: var(--muted); }
+.term-start { border-top: 1px dashed var(--line-2); padding-top: 8px; }
+.term-start summary { cursor: pointer; font-size: 14px; color: var(--muted); }
+.term-start[open] summary { margin-bottom: 8px; }
+.term-start .row + .row { margin-top: 8px; }
 
 /* ---------- ask drawer ---------- */
 .drawer { position: fixed; z-index: 40; top: 0; right: 0; bottom: 0; width: min(520px, 100vw); background: var(--panel);
@@ -440,7 +444,7 @@ table.t tr:last-child td { border-bottom: 0; }
       </div>
       <div class="mcp-grid todo-grid">
         <div class="card"><div class="todo-list" id="todo-list"></div></div>
-        <div class="card" id="todo-card"><div class="empty">Pick an item on the left. Tick more boxes, Ctrl+click or Shift+click to pick several. Then start one Claude Code session on them, with a prompt you can edit first.</div></div>
+        <div class="card" id="todo-card"><div class="empty">Pick an item on the left. Tick more boxes, Ctrl+click or Shift+click to pick several. Then copy a prompt for Claude Code that fits the pick.</div></div>
       </div>
     </section>
   </main>
@@ -1369,7 +1373,7 @@ function showResult(box, t, args, r, ms) {
   const flat = parts.map((p) => p.json !== undefined ? JSON.stringify(p.json, null, 2) : p.text || "[image]").join("\n\n");
   box.append(el("div", { class: "result-head" }, el("span", { class: err ? "bad" : "ok", text: err ? "Tool error" : "OK" }), el("span", { class: "muted", text: `${ms} ms · ${flat.length.toLocaleString()} characters` }),
     el("span", { style: "flex:1" }),
-    el("button", { class: "btn small", text: "Copy", onclick: () => navigator.clipboard.writeText(flat).then(() => toast("Copied."), () => toast("Copy failed.")) }),
+    el("button", { class: "btn small", text: "Copy", onclick: () => copyText(flat).then(() => toast("Copied."), (e) => toast("Copy failed: " + errText(e))) }),
     P.sample ? el("button", { class: "btn small", text: "Explain with Claude", onclick: () => openAsk({ label: `MCP tool ${t.name}`, summary: `${flat.length.toLocaleString()} characters of result`, text: `The app's MCP tool ${t.name} was called with arguments ${JSON.stringify(args)}.\nTool description: ${t.description}\nResult${err ? " (marked isError)" : ""}:\n${flat.slice(0, 120000)}` }, "Explain this result. Is anything in it wrong, missing or inconsistent?") }) : null));
   for (const p of parts) {
     if (p.img) box.append(el("img", { src: p.img, alt: "Image from the tool" }));
@@ -1552,7 +1556,7 @@ async function relTodo() {
 // TODO mode: pick an item in TODO.md and start Claude Code on it
 // =====================================================================
 const TD = { items: [], sections: [], picks: store.get("todoPicks", []), anchor: null, q: "", showDone: false, sig: "", started: store.get("todoStarted", {}), drafts: {} };
-const PICK_HELP = "Pick an item on the left. Tick more boxes, Ctrl+click or Shift+click to pick several. Then start one Claude Code session on them, with a prompt you can edit first.";
+const PICK_HELP = "Pick an item on the left. Tick more boxes, Ctrl+click or Shift+click to pick several. Then copy a prompt for Claude Code that fits the pick.";
 const todoPath = () => repoPath() + "\\TODO.md";
 function hashId(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
 function parseTodo(txt) {
@@ -1769,15 +1773,29 @@ function renderTodoLaunch(card, items) {
       hint.textContent = tipFor(v);
     } }, label)));
   const hint = el("span", { class: "note", text: tipFor(modeSel) });
-  const go = el("button", { class: "btn primary", text: "Start in Claude Code" });
+  const markStarted = () => { const now = Date.now(); for (const i of items) TD.started[i.id] = now; store.set("todoStarted", TD.started); renderTodoList(); renderTodoCard(); };
+  // Copy is the main hand-off: paste into any Claude Code session that is already open and trusted.
+  // The app link and the terminal stay as other ways; the app asks to trust the folder and to press Enter for a link.
+  const copy = el("button", { class: "btn primary", text: "Copy prompt" });
+  copy.addEventListener("click", () => copyText(prompt.value, prompt).then(
+    () => toast("Copied. Paste it into a Claude Code session (Ctrl+V) and send it."), (e) => toast("Copy failed: " + errText(e) + ". Select the prompt and copy it by hand.")));
+  const go = el("button", { class: "btn", text: "New session in the Claude app" });
   go.addEventListener("click", async () => {
     go.disabled = true;
     try {
+      await openInDesktop(prompt.value);
+      toast("A new Claude Code session is open in the Claude app, with the prompt in the message box.");
+      markStarted();
+    } catch (e) { toast("Could not open the Claude app: " + errText(e)); go.disabled = false; }
+  });
+  const term = el("button", { class: "btn", text: "Start in a terminal" });
+  term.addEventListener("click", async () => {
+    term.disabled = true;
+    try {
       await launchClaude(many ? `${items.length} TODO items` : items[0].title, prompt.value, store.get("launchMode", "plan"));
-      const now = Date.now(); for (const i of items) TD.started[i.id] = now; store.set("todoStarted", TD.started);
       toast("Claude Code is starting in a new terminal window.");
-      renderTodoList(); renderTodoCard();
-    } catch (e) { toast("Could not start Claude Code: " + errText(e)); go.disabled = false; }
+      markStarted();
+    } catch (e) { toast("Could not start Claude Code: " + errText(e)); term.disabled = false; }
   });
   const ask = many
     ? { label: `TODO: ${items.length} items`, summary: `${items.length} items from TODO.md`, q: "In what order would you take these items, and which belong together?",
@@ -1790,16 +1808,48 @@ function renderTodoLaunch(card, items) {
   card.append(el("div", { class: "launch" },
     el("h3", { text: many ? `Ask Claude Code to work on these ${items.length} items` : "Ask Claude Code to work on it" }),
     prompt,
-    el("div", { class: "row" }, modes, hint),
-    el("div", { class: "row" }, go,
-      el("button", { class: "btn", text: "Copy prompt", onclick: () => navigator.clipboard.writeText(prompt.value).then(() => toast("Copied."), () => toast("Copy failed.")) }),
+    el("div", { class: "row" }, copy,
       el("button", { class: "btn", text: "Reset prompt", onclick: () => { delete TD.drafts[key]; prompt.value = fresh(); } }),
       P.sample ? el("button", { class: "btn", text: "Quick take from Claude", onclick: () => openAsk({ label: ask.label, summary: ask.summary, facts: TODO_FACTS, text: ask.text, rule: ask.rule }, ask.q) }) : null,
       many ? el("button", { class: "btn", text: "Clear pick", onclick: () => todoSetPicks([]) }) : null),
-    el("div", { class: "note", text: started.length
-      ? (many ? `${started.length} of these items were started in Claude Code before, last at ${hhmm(Math.max(...started))}. Starting again opens another session.`
-        : `Started in Claude Code at ${hhmm(started[0])}. Starting again opens a second session.`)
-      : `Opens Windows Terminal in ${repoPath()} with a new Claude Code session. The session works on your files, not on a copy.` })));
+    el("div", { class: "note", text: (started.length
+      ? (many ? `${started.length} of these items were started in a new session before, last at ${hhmm(Math.max(...started))}. `
+        : `Started in a new session at ${hhmm(started[0])}. `)
+      : "") + "Paste the prompt into a Claude Code session that is open on this repository: that is the quickest way." }),
+    el("details", { class: "term-start" },
+      el("summary", { text: "Or start a new session" }),
+      el("div", { class: "row" }, go,
+        el("span", { class: "note", text: "The Claude app opens a new Code session with the prompt in the message box. It asks you to trust the folder, and you press Enter to send." })),
+      el("div", { class: "row" }, term, modes),
+      el("div", { class: "row" }, el("span", { class: "note", text: `Opens Windows Terminal in ${repoPath()} with the claude CLI and sends the prompt at once. ` }), hint))));
+}
+// The clipboard API can be blocked in an artifact window. Then try the copy command on the text box, and last
+// Windows' own Set-Clipboard with the text from a file, so quotes and new lines stay as they are.
+async function copyText(text, box) {
+  try { await navigator.clipboard.writeText(text); return; } catch {}
+  if (box) {
+    const [s, e] = [box.selectionStart, box.selectionEnd];
+    box.focus(); box.select();
+    const ok = document.execCommand?.("copy");
+    box.setSelectionRange(s, e);
+    if (ok) return;
+  }
+  if (!P.desktop?.fs) throw new Error("the clipboard is blocked here");
+  const f = tmpFile("txt");
+  await P.fs.writeFile(f, text, "utf8");
+  try {
+    const r = await ps(`Set-Clipboard -Value (Get-Content -Raw -Encoding UTF8 -LiteralPath ${psq(f)})`, 15000);
+    if (r.code !== 0) throw new Error((r.stderr || "Set-Clipboard failed").trim());
+  } finally { P.fs.rm(f, { force: true }).catch(() => {}); }
+}
+// The Claude app's claude://code/new link opens a new Code session with the prompt in its message box.
+const DESKTOP_PROMPT_MAX = 14336; // the app cuts q at this length
+async function openInDesktop(prompt) {
+  if (!prompt.trim()) throw new Error("The prompt is empty.");
+  if (prompt.length > DESKTOP_PROMPT_MAX) throw new Error(`the prompt has ${prompt.length} characters and the app takes at most ${DESKTOP_PROMPT_MAX}. Pick fewer items, shorten it, or start in a terminal.`);
+  const url = `claude://code/new?q=${encodeURIComponent(prompt)}&folder=${encodeURIComponent(repoPath())}`;
+  const r = await ps(`Start-Process -FilePath ${psq(url)}`, 20000);
+  if (r.code !== 0) throw new Error((r.stderr || "Start-Process failed").trim());
 }
 async function launchClaude(title, prompt, mode) {
   // The prompt goes through a file, so quotes and new lines reach Claude Code unchanged.
@@ -2123,7 +2173,7 @@ function showGate(kind) {
       el("li", {}, el("b", { text: "MCP" }), el("span", { text: "Every tool on the app's MCP server, a form for its arguments, the JSON result and a history." })),
       el("li", {}, el("b", { text: "LAN" }), el("span", { text: "Port checks for each device, and read-only probes for Apple TV and HomePod now playing." })),
       el("li", {}, el("b", { text: "Release" }), el("span", { text: "Versions against tags, GitHub Actions runs with alerts, the unreleased changelog, and a checksum check of a release." })),
-      el("li", {}, el("b", { text: "TODO" }), el("span", { text: "Every item in TODO.md. Pick one or several and start a Claude Code session on them, with a prompt that fits the pick and that you can edit first." }))));
+      el("li", {}, el("b", { text: "TODO" }), el("span", { text: "Every item in TODO.md. Pick one or several and copy a prompt for Claude Code that fits the pick." }))));
   const act = el("div", { class: "act" });
   if (kind === "install") {
     const b = el("button", { class: "btn primary", text: "Install as app" });
