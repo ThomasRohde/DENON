@@ -2115,6 +2115,19 @@ function applyList(data) {
 }
 
 // ---------------------------------------------------------------- start
+// For the app's editor window (AutomationEditorWindow): closing it asks first when there are unsaved changes.
+window.denonEditor = {
+  isDirty: () => isDirty(),
+  async saveForClose() {
+    let ok = false;
+    try {
+      ok = (await save()) === true && !isDirty();
+    } finally {
+      window.chrome?.webview?.postMessage({ type: "saved", ok });
+    }
+  },
+};
+
 async function start() {
   try {
     state.paletteCollapsed = localStorage.getItem("automations.palette") === "collapsed";

@@ -4,6 +4,7 @@ using System.Windows;
 using Denon.App.Core.Infrastructure;
 using Denon.App.Desktop.Services;
 using Microsoft.Web.WebView2.Core;
+using MessageBox = System.Windows.MessageBox;
 
 namespace Denon.App.Desktop;
 
@@ -15,12 +16,121 @@ public partial class AutomationEditorWindow : Window
 {
     private readonly InsightsServer _server;
     private bool _ready;
+    private bool _closeConfirmed;
+    private bool _askingToClose;
     private string _lastUrl = string.Empty;
 
     public AutomationEditorWindow(InsightsServer server)
     {
         _server = server;
         InitializeComponent();
+        Closing += OnClosing;
+    }
+
+    /// <summary>
+    /// A closing window would drop the page and its unsaved changes without a word (the page's own "leave?" prompt
+    /// does not run when the window closes). So the window asks the page, and with unsaved changes offers Save,
+    /// Discard or Cancel. When the app exits it closes without asking.
+    /// </summary>
+    private async void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (_closeConfirmed || !_ready || App.IsExiting || EditorWebView.CoreWebView2 is null)
+        {
+            return;
+        }
+
+        e.Cancel = true; // Decide after asking the page (async), then close again.
+        if (_askingToClose)
+        {
+            return;
+        }
+
+        _askingToClose = true;
+        try
+        {
+            string dirty;
+            try
+            {
+                dirty = await EditorWebView.CoreWebView2.ExecuteScriptAsync("window.denonEditor?.isDirty() === true");
+            }
+            catch
+            {
+                dirty = "false"; // The page is gone or broken: nothing to keep.
+            }
+
+            if (dirty != "true")
+            {
+                CloseConfirmed();
+                return;
+            }
+
+            var answer = MessageBox.Show(
+                this,
+                "This automation has changes that are not saved.\n\nYes: save, then close.\nNo: close without saving.\nCancel: keep editing.",
+                "Save the automation?",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Question,
+                MessageBoxResult.Cancel);
+
+            switch (answer)
+            {
+                case MessageBoxResult.Yes:
+                    // The page saves and answers with a "saved" web message (OnWebMessageReceived closes on success).
+                    try
+                    {
+                        await EditorWebView.CoreWebView2.ExecuteScriptAsync("window.denonEditor?.saveForClose()");
+                    }
+                    catch (Exception ex)
+                    {
+                        // Keep the window open: the changes are still in the page.
+                        MessageBox.Show(this, $"The automation could not be saved: {ex.Message}", "Not saved",
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+
+                    break;
+                case MessageBoxResult.No:
+                    CloseConfirmed();
+                    break;
+            }
+        }
+        finally
+        {
+            _askingToClose = false;
+        }
+    }
+
+    private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(e.WebMessageAsJson);
+            var root = doc.RootElement;
+            if (root.ValueKind != System.Text.Json.JsonValueKind.Object ||
+                !root.TryGetProperty("type", out var type) || type.GetString() != "saved")
+            {
+                return;
+            }
+
+            if (root.TryGetProperty("ok", out var ok) && ok.ValueKind == System.Text.Json.JsonValueKind.True)
+            {
+                CloseConfirmed();
+            }
+            else
+            {
+                MessageBox.Show(this, "The automation was not saved. The editor shows what to fix.", "Not saved",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // Not one of ours.
+        }
+    }
+
+    private void CloseConfirmed()
+    {
+        _closeConfirmed = true;
+        Dispatcher.BeginInvoke(Close);
     }
 
     /// <summary>Shows the editor, opened on <paramref name="graphId"/> when given.</summary>
@@ -67,6 +177,7 @@ public partial class AutomationEditorWindow : Window
                 core.Settings.IsStatusBarEnabled = false;
                 core.NavigationStarting += OnNavigationStarting;
                 core.NewWindowRequested += OnNewWindowRequested;
+                core.WebMessageReceived += OnWebMessageReceived;
                 _ready = true;
             }
 

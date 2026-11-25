@@ -12,6 +12,21 @@ namespace Denon.App.Core.Services;
 /// A line for the automation activity log. <see cref="Skipped"/>: the trigger fired but the automation did not run
 /// (its cooldown), which is neither a success nor a failure.
 /// </summary>
+public enum TriggerOutcomeKind
+{
+    /// <summary>The run started; <see cref="TriggerOutcome.Run"/> completes with its result.</summary>
+    Started,
+
+    /// <summary>The cooldown held it back until <see cref="TriggerOutcome.Until"/>.</summary>
+    Skipped,
+
+    /// <summary>The loop guard has paused event triggers.</summary>
+    Paused,
+}
+
+/// <summary>What one automation did with one trigger.</summary>
+public sealed record TriggerOutcome(AutomationGraph Graph, TriggerOutcomeKind Kind, DateTimeOffset? Until, Task<AutomationRun>? Run);
+
 public sealed record AutomationActivityEntry(DateTimeOffset Timestamp, string RuleName, string TriggerDetail, bool Success, bool Skipped = false);
 
 /// <summary>
@@ -56,6 +71,7 @@ public sealed class AutomationEngineService : BackgroundService
     private HashSet<string> _previousProcessNames = new(StringComparer.OrdinalIgnoreCase);
     private bool _hasBaselineSnapshot;
     private DateTimeOffset _eventTriggersPausedUntil = DateTimeOffset.MinValue;
+    private CancellationToken _stopping = CancellationToken.None;
 
     public AutomationEngineService(
         AppSettingsStore settingsStore,
@@ -130,6 +146,7 @@ public sealed class AutomationEngineService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        _stopping = stoppingToken;
         // Room events and webhooks: the bus handler only queues; one loop runs the graphs in order.
         using var subscription = _eventBus.Subscribe(e => _pendingEvents.Writer.TryWrite(e));
         var eventLoop = RunEventTriggersAsync(stoppingToken);
@@ -165,6 +182,12 @@ public sealed class AutomationEngineService : BackgroundService
     {
         await foreach (var roomEvent in _pendingEvents.Reader.ReadAllAsync(ct))
         {
+            // A webhook call is started by the webhook API itself (HandleWebhookCall), which answers with the outcome.
+            if (roomEvent.Event == AutomationTriggers.WebhookEventName && roomEvent.Origin == AutomationTriggers.WebhookOrigin)
+            {
+                continue;
+            }
+
             // The graphs are chosen, checked and marked here, in order; their runs go on in the background, so a
             // graph that waits neither holds up the next event nor starts later graphs with a stale clock.
             Observe(HandleRoomEventAsync(roomEvent, DateTimeOffset.Now, ct), $"Event trigger on {roomEvent.Event}");
@@ -184,9 +207,19 @@ public sealed class AutomationEngineService : BackgroundService
     /// returns its task, all at <paramref name="now"/>; the runs then go side by side. The task completes with the
     /// finished runs. Public for tests.
     /// </summary>
-    public Task<IReadOnlyList<AutomationRun>> HandleRoomEventAsync(RoomEvent roomEvent, DateTimeOffset now, CancellationToken ct = default)
+    public Task<IReadOnlyList<AutomationRun>> HandleRoomEventAsync(RoomEvent roomEvent, DateTimeOffset now, CancellationToken ct = default) =>
+        WhenAllRuns(StartForEvent(roomEvent, now, ct).Where(static o => o.Run is not null).Select(static o => o.Run!).ToList());
+
+    /// <summary>
+    /// A webhook call (POST /api/hooks/{name}): starts the listening automations at once and says what each one did,
+    /// so the caller (an iPhone Shortcut) can show it. The engine does not also take this event from the bus.
+    /// </summary>
+    public IReadOnlyList<TriggerOutcome> HandleWebhookCall(RoomEvent webhookEvent) =>
+        StartForEvent(webhookEvent, DateTimeOffset.Now, _stopping);
+
+    private List<TriggerOutcome> StartForEvent(RoomEvent roomEvent, DateTimeOffset now, CancellationToken ct)
     {
-        var runs = new List<Task<AutomationRun>>();
+        var outcomes = new List<TriggerOutcome>();
         foreach (var graph in EnabledGraphs())
         {
             var trigger = graph.Nodes.FirstOrDefault(n => AutomationTriggers.Matches(n, roomEvent));
@@ -203,12 +236,14 @@ public sealed class AutomationEngineService : BackgroundService
             if (!IsOutOfCooldown(graph, now, minimum))
             {
                 ReportCooldownSkip(graph, now, minimum, detail);
+                outcomes.Add(new TriggerOutcome(graph, TriggerOutcomeKind.Skipped, CooldownUntil(graph, minimum), null));
                 continue;
             }
 
             LoopTicket? ticket = null;
             if (!isWebhook && (ticket = AllowEventRun(now, graph.Name)) is null)
             {
+                outcomes.Add(new TriggerOutcome(graph, TriggerOutcomeKind.Paused, null, null));
                 continue;
             }
 
@@ -216,14 +251,34 @@ public sealed class AutomationEngineService : BackgroundService
             {
                 ReturnLoopTicket(ticket); // A schedule or app start of this graph got there first: no run, no count.
                 ReportCooldownSkip(graph, now, minimum, detail);
+                outcomes.Add(new TriggerOutcome(graph, TriggerOutcomeKind.Skipped, CooldownUntil(graph, minimum), null));
                 continue;
             }
 
-            runs.Add(RunAsync(graph, trigger, roomEvent, detail, dryRun: false, ct, now, mark, ticket));
+            outcomes.Add(new TriggerOutcome(graph, TriggerOutcomeKind.Started, null,
+                RunAsync(graph, trigger, roomEvent, detail, dryRun: false, ct, now, mark, ticket)));
         }
 
-        return WhenAllRuns(runs);
+        return outcomes;
     }
+
+    /// <summary>When the graph's cooldown ends, from its last run (null when it has none).</summary>
+    private DateTimeOffset? CooldownUntil(AutomationGraph graph, TimeSpan minimum)
+    {
+        lock (_gate)
+        {
+            if (!_lastRunByGraph.TryGetValue(graph.Id, out var last))
+            {
+                return null;
+            }
+
+            var cooldown = TimeSpan.FromSeconds(Math.Clamp(graph.CooldownSeconds, 0, 86400));
+            return last + (cooldown < minimum ? minimum : cooldown);
+        }
+    }
+
+    /// <summary>True when the run changed the room (a scene, plugin or receiver step ran or failed). Public for the webhook reply.</summary>
+    public static bool RunActed(AutomationGraph graph, AutomationRun run) => ActedOnTheRoom(graph, run);
 
     private static async Task<IReadOnlyList<AutomationRun>> WhenAllRuns(List<Task<AutomationRun>> runs) =>
         runs.Count == 0 ? [] : await Task.WhenAll(runs);

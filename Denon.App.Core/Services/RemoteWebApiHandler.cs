@@ -28,7 +28,11 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
     private readonly LocalMediaJukeboxService _localJukeboxService;
     private readonly PluginHostService _pluginHost;
     private readonly EventTelemetryLog _telemetry;
+    private readonly AutomationEngineService _automations;
     private readonly AppLogStore _logStore;
+
+    /// <summary>How long a webhook call waits for its automations before it answers "still running".</summary>
+    internal static TimeSpan WebhookReplyWait { get; set; } = TimeSpan.FromSeconds(4);
 
     public RemoteWebApiHandler(
         ReceiverController receiverController,
@@ -39,6 +43,7 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
         LocalMediaJukeboxService localJukeboxService,
         PluginHostService pluginHost,
         EventTelemetryLog telemetry,
+        AutomationEngineService automations,
         AppLogStore logStore)
     {
         _receiverController = receiverController;
@@ -49,6 +54,7 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
         _localJukeboxService = localJukeboxService;
         _pluginHost = pluginHost;
         _telemetry = telemetry;
+        _automations = automations;
         _logStore = logStore;
     }
 
@@ -133,7 +139,7 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
 
             if (lowerPath.StartsWith(HooksPrefix, StringComparison.Ordinal))
             {
-                return HandleWebhook(path[HooksPrefix.Length..], body);
+                return await HandleWebhookAsync(path[HooksPrefix.Length..], body, cancellationToken);
             }
 
             using var doc = string.IsNullOrWhiteSpace(body)
@@ -318,11 +324,12 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
     }
 
     /// <summary>
-    /// POST /api/hooks/{name}: publishes "webhook.received" on the event bus (and the control log) for
-    /// automation rules with a Webhook trigger. A JSON object body adds its simple fields to the event data
-    /// (at most 20, values up to 500 characters); any other body is kept as "text".
+    /// POST /api/hooks/{name}: publishes "webhook.received" on the event bus (and the control log) and starts the
+    /// automations with a matching Webhook trigger. A JSON object body adds its simple fields to the event data
+    /// (at most 20, values up to 500 characters); any other body is kept as "text". The reply waits a few seconds
+    /// for the runs and says what each automation did, so an iPhone Shortcut can show it.
     /// </summary>
-    private RemoteWebResponse HandleWebhook(string rawName, string body)
+    private async Task<RemoteWebResponse> HandleWebhookAsync(string rawName, string body, CancellationToken ct)
     {
         var name = AutomationTriggers.NormalizeHookName(WebUtility.UrlDecode(rawName).TrimEnd('/'));
         if (name is null)
@@ -333,24 +340,69 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
         var data = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["hook"] = name };
         ReadWebhookPayload(body, data);
 
-        _telemetry.Record(EventTelemetryLog.StreamControl, AutomationTriggers.WebhookDevice, AutomationTriggers.WebhookEventName, AutomationTriggers.WebhookOrigin, data);
+        var published = _telemetry.Record(EventTelemetryLog.StreamControl, AutomationTriggers.WebhookDevice, AutomationTriggers.WebhookEventName, AutomationTriggers.WebhookOrigin, data);
+        IReadOnlyList<TriggerOutcome> outcomes = published is null ? [] : _automations.HandleWebhookCall(published);
 
-        var listening = (_settingsStore.Current.AutomationGraphs ?? [])
-            .Where(g => g.Enabled && g.Nodes.Any(n =>
-                n.Type == AutomationNodeTypes.TriggerWebhook &&
-                AutomationTriggers.NormalizeHookName(n.Get("hook")) == name))
-            .Select(static g => g.Name)
-            .ToList();
-
-        _logStore.Info($"[Webhook] '{name}' received; {listening.Count} enabled automation(s) listen to it.");
-        return JsonOk(new
+        var runs = outcomes.Where(static o => o.Run is not null).Select(static o => (Task)o.Run!).ToList();
+        if (runs.Count > 0)
         {
-            hook = name,
-            automations = listening,
-            message = listening.Count == 0
-                ? $"Received '{name}', but no enabled automation listens to it."
-                : $"Received '{name}': {string.Join(", ", listening)}.",
-        });
+            try
+            {
+                await Task.WhenAll(runs).WaitAsync(WebhookReplyWait, ct);
+            }
+            catch (TimeoutException)
+            {
+                // Answer with what is done; the rest is "still running".
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // A failed run is reported per automation below.
+            }
+        }
+
+        var results = outcomes.Select(DescribeWebhookOutcome).ToList();
+        var listening = results.Select(static r => r.Automation).ToList();
+        var message = results.Count == 0
+            ? $"Received '{name}', but no enabled automation listens to it."
+            : string.Join("\n", results.Select(static r => r.Message));
+
+        _logStore.Info($"[Webhook] '{name}' received; {results.Count} enabled automation(s) listen to it.");
+        return JsonOk(new { hook = name, automations = listening, results, message });
+    }
+
+    private sealed record WebhookResult(string Automation, string Outcome, string Message);
+
+    /// <summary>One automation's line in the webhook reply: ran, nothing, skipped, paused, failed or running.</summary>
+    private static WebhookResult DescribeWebhookOutcome(TriggerOutcome outcome)
+    {
+        var name = outcome.Graph.Name;
+        switch (outcome.Kind)
+        {
+            case TriggerOutcomeKind.Skipped:
+                var until = outcome.Until is { } at
+                    ? $" until {at.ToLocalTime().ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)}"
+                    : string.Empty;
+                return new(name, "skipped", $"{name}: skipped, in its cooldown{until}.");
+            case TriggerOutcomeKind.Paused:
+                return new(name, "paused", $"{name}: skipped, event automations are paused after too many runs.");
+        }
+
+        var run = outcome.Run!;
+        if (!run.IsCompleted)
+        {
+            return new(name, "running", $"{name}: still running.");
+        }
+
+        if (!run.IsCompletedSuccessfully)
+        {
+            return new(name, "failed", $"{name}: failed: {run.Exception?.GetBaseException().Message ?? "cancelled"}");
+        }
+
+        var result = run.Result;
+        var prefix = result.Trigger + " → ";
+        var what = result.Summary.StartsWith(prefix, StringComparison.Ordinal) ? result.Summary[prefix.Length..] : result.Summary;
+        var kind = !result.Success ? "failed" : AutomationEngineService.RunActed(outcome.Graph, result) ? "ran" : "nothing";
+        return new(name, kind, kind == "ran" ? $"{name}: ran {what}" : $"{name}: {what}");
     }
 
     private static void ReadWebhookPayload(string body, Dictionary<string, object?> data)

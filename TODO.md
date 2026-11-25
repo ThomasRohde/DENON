@@ -57,9 +57,8 @@ Insights server in a WebView2 window), webhooks and the live `RoomEventBus` are 
 `docs/automation-graphs.md`. Next: Claude writing graphs through the `architect_automation` MCP
 prompt is wired (`create_or_update_automation`) but not tried with a real agent.
 
-- [ ] **A real iPhone Shortcut over Wi-Fi is not tested.** Checked on 2026-11-25 in a debug build: `POST
-      /api/hooks/{name}` on 127.0.0.1 (200 with the listening automations, 401 without a token, 400 for a bad name).
-      Still to do: a Shortcut on the iPhone (Phone Remote on, firewall open on `18925`) that runs a saved automation.
+- [x] **A real iPhone Shortcut over Wi-Fi works** (2026-11-25): "arrive home" on joining the home Wi-Fi runs Morning
+      Jazz. The reply now says what each automation did; check it on the iPhone with Show Result after 2.9.2.
 - [ ] **Decide:** should the Phone Remote's `/api/volume` use the safe-volume cap (`MaxSafeVolume`, 65)? MCP agents and
       automations are capped; the Phone Remote, and so a Shortcut that calls it, only stops at the receiver's maximum.
       Left as it is because the remote is the owner at the couch.

@@ -608,7 +608,7 @@ public sealed partial class MainViewModel
                 "Tick 'Show on-screen TV toast on Smart Scenes' in the LG TV plugin to see a message on the TV when a scene runs.",
                 "In the editor, open Recent events and click Use as trigger to build an automation from something that just happened. Then narrow it in Only when, for example stream=avr, to=on for 'the receiver turns on'.",
                 "A condition has a yes and a no output: connect different actions to each, for example a scene in the evening and nothing at night.",
-                "For an iPhone Shortcut: Automation → a trigger (join home Wi-Fi, a Focus, an NFC tag) → Get Contents of URL with the webhook's URL from the editor, method POST and the header Authorization: Bearer <owner token>.",
+                "For an iPhone Shortcut: Automation → a trigger (join home Wi-Fi, a Focus, an NFC tag) → Get Contents of URL with the webhook's URL from the editor, method POST and the header Authorization: Bearer <owner token>. Add Get Dictionary Value 'message' → Show Result to see what the automation did: ran, nothing to do (and why) or skipped by its cooldown.",
             ],
             troubleshooting:
             [
