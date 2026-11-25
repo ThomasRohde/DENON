@@ -55,7 +55,8 @@ AI agents: nobody watches an automation when it runs.
 
 1. A trigger fires with an event: a room event, a webhook call (its JSON fields are the event data), a schedule or an
    app start. The graph runs only if it is enabled and out of its cooldown.
-2. The runner walks the edges from that trigger. An action runs, then its `out` edges run in the order they were made.
+2. Graphs that one event (or one tick) starts run side by side, each from that moment: a graph that waits holds up
+   neither the others nor the next event. The runner walks the edges from that trigger. An action runs, then its `out` edges run in the order they were made.
    A condition follows `yes` or `no`. A node with several outgoing edges runs each branch in turn.
 3. A run stops after 100 steps. Graphs must have no cycles (the editor and the server refuse them).
 4. Loop protection as for room event rules: events caused by an automation never start an event trigger, event

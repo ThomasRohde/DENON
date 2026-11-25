@@ -91,11 +91,14 @@ public sealed class AutomationEventTests : IDisposable
             return Task.FromResult($"Receiver {command}");
         }
 
+        /// <summary>When set, a wait lasts until the test completes this.</summary>
+        public TaskCompletionSource? DelayGate { get; set; }
+
         public Task DelayAsync(TimeSpan delay, CancellationToken ct)
         {
-            Calls.Add($"wait:{delay.TotalSeconds}");
+            lock (Calls) Calls.Add($"wait:{delay.TotalSeconds}");
             OnDelay?.Invoke();
-            return Task.CompletedTask;
+            return DelayGate?.Task ?? Task.CompletedTask;
         }
     }
 
@@ -521,6 +524,37 @@ public sealed class AutomationEventTests : IDisposable
         await rig.Engine.EvaluateTickAsync(webhookAt.AddSeconds(20), default); // 22:00:10, inside the 120 s cooldown
         await rig.Engine.EvaluateTickAsync(webhookAt.AddSeconds(60), default); // 22:00:50, still today's slot
         Assert.Equal(new[] { "scene:movie-night" }, rig.Effects.Calls);
+    }
+
+    [Fact]
+    public async Task Engine_AWaitingGraphDoesNotHoldBackTheNextGraph()
+    {
+        var slow = new AutomationGraph
+        {
+            Id = "slow", Name = "slow", Enabled = true,
+            Nodes =
+            [
+                Node("t", AutomationNodeTypes.TriggerEvent, ("event", "input.changed")),
+                Node("w", AutomationNodeTypes.ActionDelay, ("seconds", "120")),
+                Node("a", AutomationNodeTypes.ActionScene, ("sceneId", "movie-night")),
+            ],
+            Edges = [Edge("t", "w"), Edge("w", "a")],
+        };
+        var quick = SceneGraph("quick", Node("t", AutomationNodeTypes.TriggerEvent, ("event", "input.changed")), "late-night");
+        var rig = await CreateRigAsync(slow, quick);
+        using var _ = rig.Cleanup;
+
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        rig.Effects.DelayGate = gate;
+
+        var handling = rig.Engine.HandleRoomEventAsync(Event("input.changed", data: ("to", "TV")), DateTimeOffset.Now);
+        Assert.Contains("scene:late-night", rig.Effects.Calls);   // ran while "slow" still waits
+        Assert.False(handling.IsCompleted);
+
+        gate.SetResult();
+        var runs = await handling;
+        Assert.Equal(2, runs.Count);
+        Assert.Contains("scene:movie-night", rig.Effects.Calls);
     }
 
     [Fact]

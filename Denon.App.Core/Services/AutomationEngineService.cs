@@ -128,7 +128,8 @@ public sealed class AutomationEngineService : BackgroundService
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
-                await EvaluateTickAsync(DateTimeOffset.Now, stoppingToken);
+                // Runs go on in the background: a graph that waits must not stall the next tick.
+                Observe(EvaluateTickAsync(DateTimeOffset.Now, stoppingToken), "Schedule");
             }
         }
         catch (OperationCanceledException)
@@ -148,24 +149,28 @@ public sealed class AutomationEngineService : BackgroundService
     {
         await foreach (var roomEvent in _pendingEvents.Reader.ReadAllAsync(ct))
         {
-            try
-            {
-                await HandleRoomEventAsync(roomEvent, DateTimeOffset.Now, ct);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _logStore.Warning($"[Automation] Event trigger failed on {roomEvent.Event}: {ex.Message}");
-            }
+            // The graphs are chosen, checked and marked here, in order; their runs go on in the background, so a
+            // graph that waits neither holds up the next event nor starts later graphs with a stale clock.
+            Observe(HandleRoomEventAsync(roomEvent, DateTimeOffset.Now, ct), $"Event trigger on {roomEvent.Event}");
         }
     }
 
+    private void Observe(Task task, string what) =>
+        _ = task.ContinueWith(
+            t => _logStore.Warning($"[Automation] {what} failed: {t.Exception?.GetBaseException().Message}"),
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted,
+            TaskScheduler.Default);
+
     /// <summary>
     /// Starts every enabled graph with an event or webhook trigger that matches <paramref name="roomEvent"/> and is out
-    /// of its cooldown (one run per graph). Returns the runs. Public for tests.
+    /// of its cooldown (one run per graph). The choice, the cooldowns and the loop guard are settled before this
+    /// returns its task, all at <paramref name="now"/>; the runs then go side by side. The task completes with the
+    /// finished runs. Public for tests.
     /// </summary>
-    public async Task<IReadOnlyList<AutomationRun>> HandleRoomEventAsync(RoomEvent roomEvent, DateTimeOffset now, CancellationToken ct = default)
+    public Task<IReadOnlyList<AutomationRun>> HandleRoomEventAsync(RoomEvent roomEvent, DateTimeOffset now, CancellationToken ct = default)
     {
-        var runs = new List<AutomationRun>();
+        var runs = new List<Task<AutomationRun>>();
         foreach (var graph in EnabledGraphs())
         {
             var trigger = graph.Nodes.FirstOrDefault(n => AutomationTriggers.Matches(n, roomEvent));
@@ -181,24 +186,36 @@ public sealed class AutomationEngineService : BackgroundService
                 continue;
             }
 
-            MarkRun(graph, now);
+            if (!TryMarkRun(graph, now, isWebhook ? TimeSpan.Zero : MinEventCooldown))
+            {
+                continue; // A schedule or app start of this graph got there first.
+            }
+
             var detail = isWebhook
                 ? $"Webhook '{roomEvent.GetText("hook")}'"
                 : $"Event {AutomationTriggers.Describe(roomEvent)}";
-            runs.Add(await RunAsync(graph, trigger, roomEvent, detail, dryRun: false, ct, now));
+            runs.Add(RunAsync(graph, trigger, roomEvent, detail, dryRun: false, ct, now));
         }
 
-        return runs;
+        return WhenAllRuns(runs);
     }
 
-    /// <summary>Schedules and app starts. Public for tests.</summary>
-    public async Task EvaluateTickAsync(DateTimeOffset now, CancellationToken ct)
+    private static async Task<IReadOnlyList<AutomationRun>> WhenAllRuns(List<Task<AutomationRun>> runs) =>
+        runs.Count == 0 ? [] : await Task.WhenAll(runs);
+
+    /// <summary>
+    /// Schedules and app starts. As for events, the checks happen before the task is returned and the runs go side
+    /// by side; the task completes when they have finished. Public for tests.
+    /// </summary>
+    public Task EvaluateTickAsync(DateTimeOffset now, CancellationToken ct)
     {
         var graphs = EnabledGraphs();
         if (graphs.Count == 0)
         {
-            return;
+            return Task.CompletedTask;
         }
+
+        var runs = new List<Task<AutomationRun>>();
 
         var today = DateOnly.FromDateTime(now.LocalDateTime);
         var currentTime = TimeOnly.FromDateTime(now.LocalDateTime);
@@ -213,10 +230,9 @@ public sealed class AutomationEngineService : BackgroundService
                 {
                     var started = ParseProcessList(node.Get("processes"))
                         .FirstOrDefault(p => current.Contains(p) && !_previousProcessNames.Contains(p));
-                    if (started is not null && IsOutOfCooldown(graph, now, MinAppLaunchCooldown))
+                    if (started is not null && TryMarkRun(graph, now, MinAppLaunchCooldown))
                     {
-                        MarkRun(graph, now);
-                        _ = RunAsync(graph, node, null, $"'{started}.exe' started", dryRun: false, ct, now);
+                        runs.Add(RunAsync(graph, node, null, $"'{started}.exe' started", dryRun: false, ct, now));
                     }
                 }
             }
@@ -245,15 +261,16 @@ public sealed class AutomationEngineService : BackgroundService
                 // Today's slot is used up either way: a run the cooldown blocks is skipped, not retried later
                 // in the same minute.
                 _lastScheduleDayByNode[key] = today;
-                if (!IsOutOfCooldown(graph, now, TimeSpan.Zero))
+                if (!TryMarkRun(graph, now, TimeSpan.Zero))
                 {
                     continue;
                 }
 
-                MarkRun(graph, now);
-                await RunAsync(graph, node, null, $"Scheduled {at:HH\\:mm}", dryRun: false, ct, now);
+                runs.Add(RunAsync(graph, node, null, $"Scheduled {at:HH\\:mm}", dryRun: false, ct, now));
             }
         }
+
+        return WhenAllRuns(runs);
     }
 
     private List<AutomationGraph> EnabledGraphs() =>
@@ -261,24 +278,39 @@ public sealed class AutomationEngineService : BackgroundService
 
     private bool IsOutOfCooldown(AutomationGraph graph, DateTimeOffset now, TimeSpan minimum)
     {
+        lock (_gate)
+        {
+            return IsOutOfCooldownLocked(graph, now, minimum);
+        }
+    }
+
+    /// <summary>
+    /// Checks the cooldown and marks the run in one step: the event loop and the 3-second tick run on different
+    /// threads, and both may try to start the same graph.
+    /// </summary>
+    private bool TryMarkRun(AutomationGraph graph, DateTimeOffset now, TimeSpan minimum)
+    {
+        lock (_gate)
+        {
+            if (!IsOutOfCooldownLocked(graph, now, minimum))
+            {
+                return false;
+            }
+
+            _lastRunByGraph[graph.Id] = now;
+            return true;
+        }
+    }
+
+    private bool IsOutOfCooldownLocked(AutomationGraph graph, DateTimeOffset now, TimeSpan minimum)
+    {
         var cooldown = TimeSpan.FromSeconds(Math.Clamp(graph.CooldownSeconds, 0, 86400));
         if (cooldown < minimum)
         {
             cooldown = minimum;
         }
 
-        lock (_gate)
-        {
-            return !_lastRunByGraph.TryGetValue(graph.Id, out var last) || now - last >= cooldown;
-        }
-    }
-
-    private void MarkRun(AutomationGraph graph, DateTimeOffset now)
-    {
-        lock (_gate)
-        {
-            _lastRunByGraph[graph.Id] = now;
-        }
+        return !_lastRunByGraph.TryGetValue(graph.Id, out var last) || now - last >= cooldown;
     }
 
     /// <summary>
