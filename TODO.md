@@ -53,8 +53,8 @@ Phase 2 is done in 1.18.0: YouTube / YouTube Music and jukebox tracks are decode
 ## Automations
 
 Automation graphs (trigger → conditions → actions), the node editor (`Denon.App.Desktop/Automations`, served by the
-Insights server in a WebView2 window), webhooks and the live `RoomEventBus` are in [Unreleased] on the branch
-`automations-v2`. See `docs/automation-graphs.md`. Next: Claude writing graphs through the `architect_automation` MCP
+Insights server in a WebView2 window), webhooks and the live `RoomEventBus` are in 2.9.0. See
+`docs/automation-graphs.md`. Next: Claude writing graphs through the `architect_automation` MCP
 prompt is wired (`create_or_update_automation`) but not tried with a real agent.
 
 - [ ] **A real iPhone Shortcut over Wi-Fi is not tested.** Checked on 2026-11-25 in a debug build: `POST
