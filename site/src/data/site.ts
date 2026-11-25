@@ -66,8 +66,8 @@ export const tour = [
     icon: "IconNavScenes",
     shot: "03-scenes-acoustics",
     guide: "scenes-acoustics",
-    title: "Scenes and acoustics",
-    text: "One click sets input, sound mode, volume and lights for a movie night. Tune Audyssey, Dynamic EQ, dialog level and tone live.",
+    title: "Scenes, automations and acoustics",
+    text: "One click sets input, sound mode, volume and lights for a movie night. Automations do it for you: draw a trigger, checks and actions in the editor, and they run when the receiver turns on, at a set time, or when your iPhone calls a link. Tune Audyssey, Dynamic EQ, dialog level and tone live.",
   },
   {
     id: "plugins",
@@ -85,7 +85,7 @@ export const tour = [
     shot: "08-brain",
     guide: "mcp-room-brain",
     title: "AI assistants (MCP)",
-    text: "An optional MCP server lets an AI assistant such as Claude see the room and control it, with the access level you choose.",
+    text: "An optional MCP server lets an AI assistant such as Claude see the room, control it and build automations for you, with the access level you choose. An automation it builds stays off until you switch it on.",
   },
   {
     id: "settings",

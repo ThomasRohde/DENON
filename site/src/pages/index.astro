@@ -38,6 +38,7 @@ const devices = [
   { name: "Chromecast", text: "See what plays on your Cast devices. A separate plugin download." },
   { name: "Apple TV", text: "Pair once, then see what plays and pause it. A separate plugin download." },
   { name: "HomePod", text: "See what each HomePod plays, and play, pause or skip. No PIN. A separate plugin download." },
+  { name: "iPhone Shortcuts", text: "A Shortcut calls a link to start an automation: when you come home, when a Focus turns on, or from an NFC tag." },
 ];
 ---
 
@@ -133,7 +134,10 @@ const devices = [
     <div class="wrap works">
       <div class="section-intro">
         <h2 id="works">Works with the rest of the room</h2>
-        <p>Scenes can set the receiver, the lights and the TV in one click. Each device has its own page in the app.</p>
+        <p>
+          Scenes set the receiver, the lights and the TV in one click, and automations do it when something happens.
+          Each device has its own page in the app.
+        </p>
       </div>
       <dl class="devices">
         {devices.map((d) => (
@@ -157,7 +161,8 @@ const devices = [
         </p>
         <p>
           The phone remote is a web page the app serves on your Wi-Fi. Guests get their own QR code, and you can
-          revoke it at any time.
+          revoke it at any time. The links that start automations use the same server and need your owner key, and
+          automations run on your PC, not in a cloud.
         </p>
       </div>
       <div class="local-cta">
