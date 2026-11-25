@@ -510,6 +510,32 @@ public sealed class AutomationEventTests : IDisposable
     }
 
     [Fact]
+    public async Task Engine_ARunThatChangesNothing_LeavesTheOriginsAlone()
+    {
+        var graph = new AutomationGraph
+        {
+            Id = "never", Name = "never", Enabled = true,
+            Nodes =
+            [
+                Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "never")),
+                Node("c", AutomationNodeTypes.ConditionEvent, ("filter", "who=nobody")),
+                Node("a", AutomationNodeTypes.ActionScene, ("sceneId", "movie-night")),
+            ],
+            Edges = [Edge("t", "c"), Edge("c", "a", "yes")],
+        };
+        var rig = await CreateRigAsync(graph);
+        using var _ = rig.Cleanup;
+
+        Assert.Single(await rig.Engine.HandleRoomEventAsync(Hook("never"), DateTimeOffset.Now));
+        Assert.Empty(rig.Effects.Calls);
+
+        // The user's own power-on right after still counts as external, so a receiver-on automation can fire.
+        Assert.Equal("external", rig.Telemetry.ResolveOrigin("avr"));
+        Assert.Equal("external", rig.Telemetry.ResolveOrigin("tv"));
+        Assert.Equal("external", rig.Telemetry.ResolveOrigin("lighting"));
+    }
+
+    [Fact]
     public async Task Engine_ScheduleHonoursTheGraphCooldown()
     {
         var graph = SceneGraph("both", Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "home")), cooldown: 120);

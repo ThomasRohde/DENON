@@ -1621,7 +1621,8 @@ function pluginActionField(node, id, f, opts) {
   sel.value = index >= 0 ? String(index) : c.actionId ? "missing" : "";
   sel.addEventListener("change", () => {
     if (sel.value === "missing") return;
-    const a = actions[Number(sel.value)];
+    // "" is "Choose an action": clear the action (Number("") would be 0, the first action in the list).
+    const a = sel.value === "" ? null : actions[Number(sel.value)];
     const keep = new Set((a?.parameters ?? []).map((p) => `p:${p.name}`));
     for (const k of Object.keys(c)) if (k.startsWith("p:") && !keep.has(k)) delete c[k];
     if (a) {

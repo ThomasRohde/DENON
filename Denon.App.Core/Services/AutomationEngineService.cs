@@ -355,17 +355,16 @@ public sealed class AutomationEngineService : BackgroundService
     {
         if (!dryRun)
         {
-            // Changes made by this run are "automation" in the event log, so they never start an event trigger.
-            _telemetry.MarkOrigin("avr", AutomationTriggers.AutomationOrigin, "automation.triggered", new Dictionary<string, object?>
+            // Only the log entry here. The "automation" origin is stamped by each step right before it changes a domain
+            // (OriginStampingEffects): a run that waits or whose checks say no must not hide the user's own changes
+            // (a real power-on) from event triggers for the next seconds.
+            _telemetry.Record(EventTelemetryLog.StreamControl, "automation", "automation.triggered", AutomationTriggers.AutomationOrigin, new Dictionary<string, object?>
             {
                 ["automation"] = graph.Name,
                 ["trigger"] = detail,
             });
-            _telemetry.MarkOrigin("tv", AutomationTriggers.AutomationOrigin);
-            _telemetry.MarkOrigin("lighting", AutomationTriggers.AutomationOrigin);
         }
 
-        // The stamp above lasts 6 s; a Wait or a slow step would outlive it. Stamp again right before each change.
         var effects = dryRun ? EffectsOverride ?? _effects : new OriginStampingEffects(EffectsOverride ?? _effects, _telemetry);
 
         AutomationRun run;
