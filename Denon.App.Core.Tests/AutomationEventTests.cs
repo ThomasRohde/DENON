@@ -600,6 +600,40 @@ public sealed class AutomationEventTests : IDisposable
     }
 
     [Fact]
+    public async Task Engine_RunsThatChangeNothing_DoNotTripTheLoopGuard()
+    {
+        // A room-event automation whose check keeps saying no, and an unrelated one that acts.
+        var picky = new AutomationGraph
+        {
+            Id = "picky", Name = "picky", Enabled = true, CooldownSeconds = 0,
+            Nodes =
+            [
+                Node("t", AutomationNodeTypes.TriggerEvent, ("event", "volume.settled")),
+                Node("c", AutomationNodeTypes.ConditionEvent, ("filter", "to=never")),
+                Node("a", AutomationNodeTypes.ActionScene, ("sceneId", "movie-night")),
+            ],
+            Edges = [Edge("t", "c"), Edge("c", "a", "yes")],
+        };
+        var lights = SceneGraph("lights", Node("t", AutomationNodeTypes.TriggerEvent, ("event", "power.changed")), "late-night");
+        var rig = await CreateRigAsync(picky, lights);
+        using var _ = rig.Cleanup;
+
+        // 30 rejected runs within a minute (each gives back its cooldown, so each is tried).
+        var t0 = DateTimeOffset.Now;
+        for (var i = 0; i < 30; i++)
+        {
+            Assert.Single(await rig.Engine.HandleRoomEventAsync(Event("volume.settled", data: ("to", "40")), t0.AddSeconds(i)));
+        }
+
+        Assert.Empty(rig.Effects.Calls);
+        Assert.False(rig.Engine.EventTriggersPaused);
+
+        // The loop guard was not tripped: the other automation still runs.
+        Assert.Single(await rig.Engine.HandleRoomEventAsync(Event("power.changed", data: ("to", "on")), t0.AddSeconds(31)));
+        Assert.Equal(new[] { "scene:late-night" }, rig.Effects.Calls);
+    }
+
+    [Fact]
     public async Task Engine_ScheduleHonoursTheGraphCooldown()
     {
         var graph = SceneGraph("both", Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "home")), cooldown: 120);

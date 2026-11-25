@@ -63,7 +63,8 @@ AI agents: nobody watches an automation when it runs.
 3. A run stops after 100 steps. Graphs must have no cycles (the editor and the server refuse them).
 4. Loop protection as for room event rules: events caused by an automation never start an event trigger, event
    triggers wait at least 10 s per graph, and more than 20 event-started runs in a minute pause event triggers for a
-   minute. Webhooks are not paused.
+   minute. Webhooks are not paused. Only runs that acted count: a run whose checks said no gives back its cooldown
+   and its loop-guard count, since it cannot have caused a loop.
 
 ## Editor API (Insights server, `127.0.0.1`, cookie key)
 

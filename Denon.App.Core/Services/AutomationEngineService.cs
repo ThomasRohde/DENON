@@ -41,7 +41,8 @@ public sealed class AutomationEngineService : BackgroundService
     private readonly Dictionary<string, DateOnly> _lastScheduleDayByNode = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AutomationRun> _lastRunResult = new(StringComparer.Ordinal);
     private readonly Dictionary<string, DateTimeOffset> _lastSkipNoticeByGraph = new(StringComparer.Ordinal);
-    private readonly Queue<DateTimeOffset> _recentEventRuns = new();
+    /// <summary>One ticket per event-started run in the loop window; under <see cref="_gate"/> (runs finish on other threads).</summary>
+    private readonly List<LoopTicket> _recentEventRuns = [];
     private readonly Channel<RoomEvent> _pendingEvents = Channel.CreateBounded<RoomEvent>(new BoundedChannelOptions(256)
     {
         SingleReader = true,
@@ -81,7 +82,16 @@ public sealed class AutomationEngineService : BackgroundService
     public IAutomationEffects? EffectsOverride { get; set; }
 
     /// <summary>True while the loop guard pauses event triggers.</summary>
-    public bool EventTriggersPaused => DateTimeOffset.Now < _eventTriggersPausedUntil;
+    public bool EventTriggersPaused
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return DateTimeOffset.Now < _eventTriggersPausedUntil;
+            }
+        }
+    }
 
     /// <summary>The latest room events from the live bus, newest first.</summary>
     public IReadOnlyList<RoomEvent> GetRecentEvents(int max = 20) => _eventBus.GetRecent(max);
@@ -192,18 +202,20 @@ public sealed class AutomationEngineService : BackgroundService
                 continue;
             }
 
-            if (!isWebhook && !AllowEventRun(now, graph.Name))
+            LoopTicket? ticket = null;
+            if (!isWebhook && (ticket = AllowEventRun(now, graph.Name)) is null)
             {
                 continue;
             }
 
             if (!TryMarkRun(graph, now, minimum, out var mark))
             {
-                ReportCooldownSkip(graph, now, minimum, detail); // A schedule or app start of this graph got there first.
+                ReturnLoopTicket(ticket); // A schedule or app start of this graph got there first: no run, no count.
+                ReportCooldownSkip(graph, now, minimum, detail);
                 continue;
             }
 
-            runs.Add(RunAsync(graph, trigger, roomEvent, detail, dryRun: false, ct, now, mark));
+            runs.Add(RunAsync(graph, trigger, roomEvent, detail, dryRun: false, ct, now, mark, ticket));
         }
 
         return WhenAllRuns(runs);
@@ -398,32 +410,55 @@ public sealed class AutomationEngineService : BackgroundService
     /// <summary>
     /// Loop breaker: graphs that react to room events can set off each other (scene → power.changed → scene).
     /// After <see cref="LoopRunLimit"/> event-started runs within <see cref="LoopWindow"/>, event triggers pause for
-    /// one window. Webhooks are not counted: each one is a call from outside.
+    /// one window. Webhooks are not counted: each one is a call from outside. A run that changed nothing gives its
+    /// ticket back (<see cref="ReturnLoopTicket"/>): it cannot have caused a loop, and a check that keeps saying no must
+    /// not pause every other event automation. Returns the run's ticket, or null when event triggers are paused.
     /// </summary>
-    private bool AllowEventRun(DateTimeOffset now, string graphName)
+    private LoopTicket? AllowEventRun(DateTimeOffset now, string graphName)
     {
-        if (now < _eventTriggersPausedUntil)
+        string? pausedMessage = null;
+        lock (_gate)
         {
-            return false;
-        }
+            if (now < _eventTriggersPausedUntil)
+            {
+                return null;
+            }
 
-        while (_recentEventRuns.Count > 0 && now - _recentEventRuns.Peek() > LoopWindow)
-        {
-            _recentEventRuns.Dequeue();
-        }
+            _recentEventRuns.RemoveAll(t => now - t.At > LoopWindow);
+            if (_recentEventRuns.Count < LoopRunLimit)
+            {
+                var ticket = new LoopTicket(now);
+                _recentEventRuns.Add(ticket);
+                return ticket;
+            }
 
-        if (_recentEventRuns.Count >= LoopRunLimit)
-        {
             _eventTriggersPausedUntil = now + LoopWindow;
             _recentEventRuns.Clear();
-            var message = $"Paused event triggers for {LoopWindow.TotalSeconds:0} s: {LoopRunLimit} runs in {LoopWindow.TotalSeconds:0} s looks like a loop (last: '{graphName}').";
-            _logStore.Warning($"[Automation] {message}");
-            ActivityLogged?.Invoke(new AutomationActivityEntry(now, "Loop guard", message, false));
-            return false;
+            pausedMessage = $"Paused event triggers for {LoopWindow.TotalSeconds:0} s: {LoopRunLimit} runs in {LoopWindow.TotalSeconds:0} s looks like a loop (last: '{graphName}').";
         }
 
-        _recentEventRuns.Enqueue(now);
-        return true;
+        _logStore.Warning($"[Automation] {pausedMessage}");
+        ActivityLogged?.Invoke(new AutomationActivityEntry(now, "Loop guard", pausedMessage, false));
+        return null;
+    }
+
+    private void ReturnLoopTicket(LoopTicket? ticket)
+    {
+        if (ticket is null)
+        {
+            return;
+        }
+
+        lock (_gate)
+        {
+            _recentEventRuns.Remove(ticket);
+        }
+    }
+
+    /// <summary>One event-started run counted by the loop guard (a reference, so the same run's count can be returned).</summary>
+    private sealed class LoopTicket(DateTimeOffset at)
+    {
+        public DateTimeOffset At { get; } = at;
     }
 
     private async Task<AutomationRun> RunAsync(
@@ -434,7 +469,8 @@ public sealed class AutomationEngineService : BackgroundService
         bool dryRun,
         CancellationToken ct,
         DateTimeOffset? at = null,
-        CooldownMark? mark = null)
+        CooldownMark? mark = null,
+        LoopTicket? ticket = null)
     {
         if (!dryRun)
         {
@@ -465,9 +501,15 @@ public sealed class AutomationEngineService : BackgroundService
             _lastRunResult[graph.Id] = run;
         }
 
-        if (mark is { } own && !ActedOnTheRoom(graph, run))
+        // A run that changed nothing gives back its cooldown and its loop-guard count.
+        if (!dryRun && !ActedOnTheRoom(graph, run))
         {
-            ReleaseCooldownMark(graph.Id, own);
+            if (mark is { } own)
+            {
+                ReleaseCooldownMark(graph.Id, own);
+            }
+
+            ReturnLoopTicket(ticket);
         }
 
         if (!dryRun)
