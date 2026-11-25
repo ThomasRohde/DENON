@@ -40,6 +40,7 @@ public sealed class AutomationEngineService : BackgroundService
     private readonly Dictionary<string, DateTimeOffset> _lastRunByGraph = new(StringComparer.Ordinal);
     private readonly Dictionary<string, DateOnly> _lastScheduleDayByNode = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AutomationRun> _lastRunResult = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, DateTimeOffset> _lastSkipNoticeByGraph = new(StringComparer.Ordinal);
     private readonly Queue<DateTimeOffset> _recentEventRuns = new();
     private readonly Channel<RoomEvent> _pendingEvents = Channel.CreateBounded<RoomEvent>(new BoundedChannelOptions(256)
     {
@@ -181,21 +182,28 @@ public sealed class AutomationEngineService : BackgroundService
             }
 
             var isWebhook = trigger.Type == AutomationNodeTypes.TriggerWebhook;
-            if (!IsOutOfCooldown(graph, now, isWebhook ? TimeSpan.Zero : MinEventCooldown) ||
-                (!isWebhook && !AllowEventRun(now, graph.Name)))
+            var minimum = isWebhook ? TimeSpan.Zero : MinEventCooldown;
+            var detail = isWebhook
+                ? $"Webhook '{roomEvent.GetText("hook")}'"
+                : $"Event {AutomationTriggers.Describe(roomEvent)}";
+            if (!IsOutOfCooldown(graph, now, minimum))
+            {
+                ReportCooldownSkip(graph, now, minimum, detail);
+                continue;
+            }
+
+            if (!isWebhook && !AllowEventRun(now, graph.Name))
             {
                 continue;
             }
 
-            if (!TryMarkRun(graph, now, isWebhook ? TimeSpan.Zero : MinEventCooldown))
+            if (!TryMarkRun(graph, now, minimum, out var mark))
             {
-                continue; // A schedule or app start of this graph got there first.
+                ReportCooldownSkip(graph, now, minimum, detail); // A schedule or app start of this graph got there first.
+                continue;
             }
 
-            var detail = isWebhook
-                ? $"Webhook '{roomEvent.GetText("hook")}'"
-                : $"Event {AutomationTriggers.Describe(roomEvent)}";
-            runs.Add(RunAsync(graph, trigger, roomEvent, detail, dryRun: false, ct, now));
+            runs.Add(RunAsync(graph, trigger, roomEvent, detail, dryRun: false, ct, now, mark));
         }
 
         return WhenAllRuns(runs);
@@ -231,9 +239,19 @@ public sealed class AutomationEngineService : BackgroundService
                 {
                     var started = ParseProcessList(node.Get("processes"))
                         .FirstOrDefault(p => current.Contains(p) && !_previousProcessNames.Contains(p));
-                    if (started is not null && TryMarkRun(graph, now, MinAppLaunchCooldown))
+                    if (started is null)
                     {
-                        runs.Add(RunAsync(graph, node, null, $"'{started}.exe' started", dryRun: false, ct, now));
+                        continue;
+                    }
+
+                    var detail = $"'{started}.exe' started";
+                    if (TryMarkRun(graph, now, MinAppLaunchCooldown, out var mark))
+                    {
+                        runs.Add(RunAsync(graph, node, null, detail, dryRun: false, ct, now, mark));
+                    }
+                    else
+                    {
+                        ReportCooldownSkip(graph, now, MinAppLaunchCooldown, detail);
                     }
                 }
             }
@@ -262,12 +280,14 @@ public sealed class AutomationEngineService : BackgroundService
                 // Today's slot is used up either way: a run the cooldown blocks is skipped, not retried later
                 // in the same minute.
                 _lastScheduleDayByNode[key] = today;
-                if (!TryMarkRun(graph, now, TimeSpan.Zero))
+                var scheduled = $"Scheduled {at:HH\\:mm}";
+                if (!TryMarkRun(graph, now, TimeSpan.Zero, out var mark))
                 {
+                    ReportCooldownSkip(graph, now, TimeSpan.Zero, scheduled);
                     continue;
                 }
 
-                runs.Add(RunAsync(graph, node, null, $"Scheduled {at:HH\\:mm}", dryRun: false, ct, now));
+                runs.Add(RunAsync(graph, node, null, scheduled, dryRun: false, ct, now, mark));
             }
         }
 
@@ -289,10 +309,11 @@ public sealed class AutomationEngineService : BackgroundService
     /// Checks the cooldown and marks the run in one step: the event loop and the 3-second tick run on different
     /// threads, and both may try to start the same graph.
     /// </summary>
-    private bool TryMarkRun(AutomationGraph graph, DateTimeOffset now, TimeSpan minimum)
+    private bool TryMarkRun(AutomationGraph graph, DateTimeOffset now, TimeSpan minimum, out CooldownMark mark)
     {
         lock (_gate)
         {
+            mark = new CooldownMark(now, _lastRunByGraph.TryGetValue(graph.Id, out var previous) ? previous : null);
             if (!IsOutOfCooldownLocked(graph, now, minimum))
             {
                 return false;
@@ -301,6 +322,66 @@ public sealed class AutomationEngineService : BackgroundService
             _lastRunByGraph[graph.Id] = now;
             return true;
         }
+    }
+
+    /// <summary>The cooldown mark a run set, and the one before it, so a run that changed nothing can give it back.</summary>
+    private readonly record struct CooldownMark(DateTimeOffset At, DateTimeOffset? Previous);
+
+    /// <summary>
+    /// Gives the cooldown back after a run that changed nothing (its checks said no, or it only waited): the cooldown
+    /// is there to space out actions, so a test or a "no" must not block the next real run. Only undone while the
+    /// mark is still this run's own.
+    /// </summary>
+    private void ReleaseCooldownMark(string graphId, CooldownMark mark)
+    {
+        lock (_gate)
+        {
+            if (!_lastRunByGraph.TryGetValue(graphId, out var current) || current != mark.At)
+            {
+                return;
+            }
+
+            if (mark.Previous is { } previous)
+            {
+                _lastRunByGraph[graphId] = previous;
+            }
+            else
+            {
+                _lastRunByGraph.Remove(graphId);
+            }
+        }
+    }
+
+    /// <summary>True when a scene, plugin or receiver step ran (or failed trying). Waits and checks do not count.</summary>
+    private static bool ActedOnTheRoom(AutomationGraph graph, AutomationRun run) =>
+        run.Steps.Any(step => step.Outcome is "ran" or "failed" &&
+                              graph.FindNode(step.NodeId) is { } node &&
+                              AutomationNodeTypes.Find(node.Type)?.Group == AutomationNodeTypes.GroupAction &&
+                              node.Type != AutomationNodeTypes.ActionDelay);
+
+    /// <summary>
+    /// Says in the activity log that the cooldown blocked a trigger, so a webhook or event that seems to do nothing
+    /// can be explained. At most once a minute per automation, so a busy event trigger cannot flood the log.
+    /// </summary>
+    private void ReportCooldownSkip(AutomationGraph graph, DateTimeOffset now, TimeSpan minimum, string detail)
+    {
+        DateTimeOffset last, until;
+        lock (_gate)
+        {
+            if (!_lastRunByGraph.TryGetValue(graph.Id, out last) ||
+                (_lastSkipNoticeByGraph.TryGetValue(graph.Id, out var lastNotice) && now - lastNotice < TimeSpan.FromMinutes(1)))
+            {
+                return;
+            }
+
+            _lastSkipNoticeByGraph[graph.Id] = now;
+            var cooldown = TimeSpan.FromSeconds(Math.Clamp(graph.CooldownSeconds, 0, 86400));
+            until = last + (cooldown < minimum ? minimum : cooldown);
+        }
+
+        var message = $"{detail} → skipped: in its cooldown until {until.LocalDateTime:HH:mm:ss} (last run {last.LocalDateTime:HH:mm:ss}).";
+        _logStore.Info($"[Automation] {graph.Name}: {message}");
+        ActivityLogged?.Invoke(new AutomationActivityEntry(now, graph.Name, message, true));
     }
 
     private bool IsOutOfCooldownLocked(AutomationGraph graph, DateTimeOffset now, TimeSpan minimum)
@@ -352,7 +433,8 @@ public sealed class AutomationEngineService : BackgroundService
         string detail,
         bool dryRun,
         CancellationToken ct,
-        DateTimeOffset? at = null)
+        DateTimeOffset? at = null,
+        CooldownMark? mark = null)
     {
         if (!dryRun)
         {
@@ -381,6 +463,11 @@ public sealed class AutomationEngineService : BackgroundService
         lock (_gate)
         {
             _lastRunResult[graph.Id] = run;
+        }
+
+        if (mark is { } own && !ActedOnTheRoom(graph, run))
+        {
+            ReleaseCooldownMark(graph.Id, own);
         }
 
         if (!dryRun)

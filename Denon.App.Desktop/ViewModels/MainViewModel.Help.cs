@@ -612,7 +612,7 @@ public sealed partial class MainViewModel
             ],
             troubleshooting:
             [
-                new("An automation did not run a second time?", "After a run it waits for its cooldown (seconds, set in the editor). An automation started by a room event waits at least 10 seconds. Click Run now to check it at once."),
+                new("An automation did not run a second time?", "After a run that did something, it waits for its cooldown (seconds, set in the editor); a run whose checks said no does not count. A trigger that the cooldown blocks shows in AUTOMATION ACTIVITY LOG as 'skipped: in its cooldown until …'. An automation started by a room event waits at least 10 seconds. Click Run now to run it at once."),
                 new("A room event automation does not run?", "Changes made by an automation never start a room event trigger. If more than 20 event-started runs happen in one minute, the app pauses event triggers for a minute and says so in AUTOMATION ACTIVITY LOG. Use Dry run in the editor to see which check said no."),
                 new("The Shortcut gets 401 or no answer?", "Use the owner token (not the guest token) and the PC's address on your Wi-Fi. Phone Remote must be on, and the firewall must allow port 18925 (Cast & Remote → Allow Firewall). The answer names the automations that listen to the hook."),
                 new("A plugin step fails with 'Missing … parameter'?", "Fill in the required action parameters shown under PLUGIN ACTION CHAIN (for example entityId for Home Assistant or roomId for Philips Hue) and click Save Scenes."),

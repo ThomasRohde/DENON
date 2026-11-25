@@ -54,7 +54,9 @@ AI agents: nobody watches an automation when it runs.
 ## How a run works
 
 1. A trigger fires with an event: a room event, a webhook call (its JSON fields are the event data), a schedule or an
-   app start. The graph runs only if it is enabled and out of its cooldown.
+   app start. The graph runs only if it is enabled and out of its cooldown. Only a run that acts (a scene, plugin
+   or receiver step ran or failed) starts the cooldown; a run whose checks said no, or that only waited, gives it
+   back. A trigger that the cooldown blocks is written to the activity log (at most once a minute per graph).
 2. Graphs that one event (or one tick) starts run side by side, each from that moment: a graph that waits holds up
    neither the others nor the next event. The runner walks the edges from that trigger. An action runs, then its `out` edges run in the order they were made.
    A condition follows `yes` or `no`. A node with several outgoing edges runs each branch in turn.
