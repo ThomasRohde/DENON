@@ -1813,18 +1813,19 @@ async function deleteGraph() {
   toast(`Deleted “${name}”.`);
 }
 
-// The enabled switch saves at once (the saved version with only `enabled` changed); other edits wait for Save.
+// The enabled switch saves at once with a targeted request that changes only `enabled`; other edits wait for Save.
+// It waits for a Save in flight, and sets the draft's `enabled` first, so neither request undoes the other.
 async function toggleEnabled(id, on, control) {
   const saved = state.graphs.find((g) => g.id === id);
+  const before = state.draft?.id === id ? state.draft.enabled : null;
+  if (state.draft?.id === id) state.draft.enabled = on;
   if (!saved) {
-    if (state.draft?.id === id) {
-      state.draft.enabled = on;
-      changed();
-    }
+    if (state.draft?.id === id) changed();
     return;
   }
   try {
-    const res = await api("PUT", `/api/automations/${encodeURIComponent(id)}`, { ...clone(saved), enabled: on });
+    if (state.saving) await state.saving;
+    const res = await api("POST", `/api/automations/${encodeURIComponent(id)}/enabled`, { enabled: on });
     const g = normalize(res?.graph ?? { ...saved, enabled: on });
     state.graphs = state.graphs.map((x) => (x.id === id ? g : x));
     if (state.draft?.id === id) {
@@ -1834,6 +1835,7 @@ async function toggleEnabled(id, on, control) {
     toast(g.enabled ? `“${g.name}” is on.` : `“${g.name}” is off.`, "ok");
   } catch (error) {
     if (control) control.checked = !on;
+    if (before !== null && state.draft?.id === id) state.draft.enabled = before;
     if (error.status === 400 && state.draft?.id === id) {
       state.problems = problemsFrom(error.data);
       renderCanvas();
@@ -1858,6 +1860,9 @@ async function save() {
   const body = normalize(state.draft);
   const sent = stable(body);
   state.busy = true;
+  // A switch flipped meanwhile waits for this save (toggleEnabled), so its change lands after it.
+  let saveDone;
+  state.saving = new Promise((resolve) => (saveDone = resolve));
   updateToolbar();
   $("btn-save").textContent = "Saving…";
   try {
@@ -1887,6 +1892,8 @@ async function save() {
     return false;
   } finally {
     state.busy = false;
+    state.saving = null;
+    saveDone();
     $("btn-save").textContent = "Save";
     changed();
   }
@@ -1910,9 +1917,12 @@ async function runTest(dryRun) {
     });
     if (choice !== "run") return;
   }
-  if (dirty && !(await save())) return;
+  // Run now saves first (its dialog says so). A dry run tests the draft as it is and publishes nothing: saving an
+  // enabled automation would let a real event run the unsaved actions while you think you are only testing.
+  if (!dryRun && dirty && !(await save())) return;
   const sel = state.selection?.kind === "node" ? nodeById(state.selection.id) : null;
   const body = { dryRun };
+  if (dryRun && (dirty || state.isNew)) body.graph = normalize(state.draft);
   if (sel && isTrigger(sel)) body.triggerNodeId = sel.id;
   const btn = dryRun ? $("btn-dry") : $("btn-run");
   const label = btn.textContent;
@@ -1927,7 +1937,14 @@ async function runTest(dryRun) {
     toast(run?.summary || (run?.success ? "Done." : "The run failed."), run?.success ? "ok" : "error", 4000);
     scheduleList();
   } catch (error) {
-    toast(`${dryRun ? "Dry run" : "Run"} failed: ${error.message}`, "error", 6000);
+    if (error.status === 400 && error.data?.problems) {
+      state.problems = problemsFrom(error.data);
+      renderCanvas();
+      renderInspector({ keepFocus: true });
+      toast(`${dryRun ? "Dry run" : "Run"} not started: ${plural(state.problems.length, "problem")} to fix.`, "error", 5000);
+    } else {
+      toast(`${dryRun ? "Dry run" : "Run"} failed: ${error.message}`, "error", 6000);
+    }
   } finally {
     state.busy = false;
     btn.textContent = label;

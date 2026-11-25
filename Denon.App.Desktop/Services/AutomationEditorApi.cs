@@ -133,6 +133,9 @@ public sealed class AutomationEditorApi
             case ("POST", "test"):
                 return await TestAsync(id, await ReadBodyAsync(request, ct), ct);
 
+            case ("POST", "enabled"):
+                return await SetEnabledAsync(id, await ReadBodyAsync(request, ct), ct);
+
             default:
                 return (404, new { error = "Not found" });
         }
@@ -166,6 +169,41 @@ public sealed class AutomationEditorApi
         // the app) both keep their change.
         await _settingsStore.UpdateAsync(s => AutomationGraph.Upsert(s.AutomationGraphs, graph), ct);
         return (200, new { graph });
+    }
+
+    /// <summary>
+    /// The on/off switch: changes only <c>enabled</c> of the saved graph, inside the store's lock, so it never
+    /// resends (and so undoes) nodes that a Save just stored.
+    /// </summary>
+    private async Task<(int, object)> SetEnabledAsync(string id, string body, CancellationToken ct)
+    {
+        bool enabled;
+        try
+        {
+            using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(body) ? "{}" : body);
+            if (!doc.RootElement.TryGetProperty("enabled", out var value) || value.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+            {
+                return (400, new { error = "Send { \"enabled\": true } or { \"enabled\": false }." });
+            }
+
+            enabled = value.GetBoolean();
+        }
+        catch (JsonException ex)
+        {
+            return (400, new { error = $"Not valid JSON: {ex.Message}" });
+        }
+
+        AutomationGraph? updated = null;
+        await _settingsStore.UpdateAsync(s =>
+        {
+            if (s.AutomationGraphs.FirstOrDefault(g => g.Id == id) is { } graph)
+            {
+                graph.Enabled = enabled;
+                updated = graph.Clone();
+            }
+        }, ct);
+
+        return updated is null ? (404, new { error = $"No automation '{id}'. Save it first." }) : (200, new { graph = updated });
     }
 
     /// <summary>

@@ -76,7 +76,8 @@ A body over 512 KB gets `413`. All answers are JSON.
 | `GET /api/automations/events?limit=30` | `{ events: [{ ts, stream, device, event, origin, data }] }`, newest first |
 | `PUT /api/automations/{id}` body `Graph` | `200 { graph }` or `400 { error, problems: [{ nodeId?, message }] }` |
 | `DELETE /api/automations/{id}` | `200 { deleted: id }` |
-| `POST /api/automations/{id}/test` body `{ dryRun: bool, triggerNodeId?: string, data?: { key: value }, graph?: Graph }` | `200 Run`; with `graph`, that unsaved graph runs instead of the saved one |
+| `POST /api/automations/{id}/enabled` body `{ enabled: bool }` | `200 { graph }`: changes only `enabled` of the saved graph (the on/off switch) |
+| `POST /api/automations/{id}/test` body `{ dryRun: bool, triggerNodeId?: string, data?: { key: value }, graph?: Graph }` | `200 Run`; with `graph`, that unsaved graph runs instead of the saved one (the editor's Dry run sends its draft this way and saves nothing) |
 
 `Run`: `{ at, graphId, trigger, dryRun, success, summary, steps: [{ nodeId, outcome, message }] }` where `outcome` is
 `ran`, `yes`, `no`, `failed`, `skipped` or `would-run` (dry run). `runs` in the list holds the last run per graph.
