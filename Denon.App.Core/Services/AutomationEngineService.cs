@@ -242,7 +242,14 @@ public sealed class AutomationEngineService : BackgroundService
                     continue;
                 }
 
+                // Today's slot is used up either way: a run the cooldown blocks is skipped, not retried later
+                // in the same minute.
                 _lastScheduleDayByNode[key] = today;
+                if (!IsOutOfCooldown(graph, now, TimeSpan.Zero))
+                {
+                    continue;
+                }
+
                 MarkRun(graph, now);
                 await RunAsync(graph, node, null, $"Scheduled {at:HH\\:mm}", dryRun: false, ct, now);
             }
@@ -326,10 +333,13 @@ public sealed class AutomationEngineService : BackgroundService
             _telemetry.MarkOrigin("lighting", AutomationTriggers.AutomationOrigin);
         }
 
+        // The stamp above lasts 6 s; a Wait or a slow step would outlive it. Stamp again right before each change.
+        var effects = dryRun ? EffectsOverride ?? _effects : new OriginStampingEffects(EffectsOverride ?? _effects, _telemetry);
+
         AutomationRun run;
         try
         {
-            run = await AutomationGraphRunner.RunAsync(graph, trigger, roomEvent, detail, EffectsOverride ?? _effects, dryRun, at ?? DateTimeOffset.Now, ct);
+            run = await AutomationGraphRunner.RunAsync(graph, trigger, roomEvent, detail, effects, dryRun, at ?? DateTimeOffset.Now, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -397,6 +407,48 @@ public sealed class AutomationEngineService : BackgroundService
                 .Where(static s => !string.IsNullOrWhiteSpace(s))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+
+    /// <summary>
+    /// Stamps the "automation" origin on the domains a step changes right before it runs, so the room events it
+    /// causes never start an event trigger, however long the run has waited before the step.
+    /// </summary>
+    private sealed class OriginStampingEffects(IAutomationEffects inner, EventTelemetryLog telemetry) : IAutomationEffects
+    {
+        public ReceiverFacts GetReceiverFacts() => inner.GetReceiverFacts();
+
+        public string DescribeScene(string sceneId) => inner.DescribeScene(sceneId);
+
+        public string DescribePluginAction(string pluginId, string actionId) => inner.DescribePluginAction(pluginId, actionId);
+
+        public Task RunSceneAsync(string sceneId, CancellationToken ct)
+        {
+            Stamp(EventTelemetryLog.StreamAvr, EventTelemetryLog.StreamTv, EventTelemetryLog.StreamLighting);
+            return inner.RunSceneAsync(sceneId, ct);
+        }
+
+        public Task<(bool Success, string Message)> RunPluginActionAsync(
+            string pluginId, string actionId, IReadOnlyDictionary<string, string>? parameters, CancellationToken ct)
+        {
+            Stamp(EventTelemetryLog.StreamAvr, EventTelemetryLog.StreamTv, EventTelemetryLog.StreamLighting, $"plugin:{pluginId.Trim().ToLowerInvariant()}");
+            return inner.RunPluginActionAsync(pluginId, actionId, parameters, ct);
+        }
+
+        public Task<string> RunReceiverCommandAsync(string command, string value, CancellationToken ct)
+        {
+            Stamp(EventTelemetryLog.StreamAvr);
+            return inner.RunReceiverCommandAsync(command, value, ct);
+        }
+
+        public Task DelayAsync(TimeSpan delay, CancellationToken ct) => inner.DelayAsync(delay, ct);
+
+        private void Stamp(params string[] domains)
+        {
+            foreach (var domain in domains)
+            {
+                telemetry.MarkOrigin(domain, AutomationTriggers.AutomationOrigin);
+            }
+        }
+    }
 
     /// <summary>The real room: the receiver, the Smart Scenes and the plugins.</summary>
     private sealed class RoomEffects(AutomationEngineService engine) : IAutomationEffects

@@ -57,6 +57,14 @@ public sealed class AutomationEventTests : IDisposable
 
         public string? FailPluginAction { get; set; }
 
+        /// <summary>Runs during a wait (to simulate time passing), e.g. to let another origin take over.</summary>
+        public Action? OnDelay { get; set; }
+
+        /// <summary>Read when a scene or plugin action runs; the answers go to <see cref="Probed"/>.</summary>
+        public Func<string>? Probe { get; set; }
+
+        public List<string> Probed { get; } = [];
+
         public ReceiverFacts GetReceiverFacts() => Facts;
 
         public string DescribeScene(string sceneId) => sceneId;
@@ -66,11 +74,13 @@ public sealed class AutomationEventTests : IDisposable
         public Task RunSceneAsync(string sceneId, CancellationToken ct)
         {
             Calls.Add($"scene:{sceneId}");
+            if (Probe is not null) Probed.Add(Probe());
             return Task.CompletedTask;
         }
 
         public Task<(bool Success, string Message)> RunPluginActionAsync(string pluginId, string actionId, IReadOnlyDictionary<string, string>? parameters, CancellationToken ct)
         {
+            if (Probe is not null) Probed.Add(Probe());
             Calls.Add($"plugin:{pluginId}:{actionId}" + (parameters is null ? "" : "?" + string.Join("&", parameters.Select(p => $"{p.Key}={p.Value}"))));
             return Task.FromResult(actionId == FailPluginAction ? (false, "bridge offline") : (true, "ok"));
         }
@@ -84,6 +94,7 @@ public sealed class AutomationEventTests : IDisposable
         public Task DelayAsync(TimeSpan delay, CancellationToken ct)
         {
             Calls.Add($"wait:{delay.TotalSeconds}");
+            OnDelay?.Invoke();
             return Task.CompletedTask;
         }
     }
@@ -313,7 +324,7 @@ public sealed class AutomationEventTests : IDisposable
 
     // ---- Endpoint and engine -------------------------------------------------------------------------------
 
-    private sealed record Rig(AppSettingsStore Store, RoomEventBus Bus, RemoteWebApiHandler Handler, AutomationEngineService Engine, FakeEffects Effects, IDisposable Cleanup);
+    private sealed record Rig(AppSettingsStore Store, RoomEventBus Bus, EventTelemetryLog Telemetry, RemoteWebApiHandler Handler, AutomationEngineService Engine, FakeEffects Effects, IDisposable Cleanup);
 
     private async Task<Rig> CreateRigAsync(params AutomationGraph[] graphs)
     {
@@ -344,7 +355,7 @@ public sealed class AutomationEventTests : IDisposable
             telemetry.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(3));
             bus.Dispose();
         });
-        return new Rig(store, bus, handler, engine, effects, cleanup);
+        return new Rig(store, bus, telemetry, handler, engine, effects, cleanup);
     }
 
     private sealed class Cleanup(Action action) : IDisposable
@@ -407,6 +418,53 @@ public sealed class AutomationEventTests : IDisposable
 
         Assert.Equal(new[] { "scene:pure-audiophile", "scene:pure-audiophile", "scene:movie-night", "scene:movie-night" }, rig.Effects.Calls);
         Assert.Equal("on", rig.Engine.GetLastRuns()["on"].GraphId);
+    }
+
+    [Fact]
+    public async Task Engine_StampsTheAutomationOrigin_RightBeforeEachStep()
+    {
+        var graph = new AutomationGraph
+        {
+            Id = "slow", Name = "slow", Enabled = true,
+            Nodes =
+            [
+                Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "slow")),
+                Node("w", AutomationNodeTypes.ActionDelay, ("seconds", "10")),
+                Node("a", AutomationNodeTypes.ActionScene, ("sceneId", "movie-night")),
+                Node("p", AutomationNodeTypes.ActionPlugin, ("pluginId", "chromecast"), ("actionId", "cast.pause")),
+            ],
+            Edges = [Edge("t", "w"), Edge("w", "a"), Edge("a", "p")],
+        };
+        var rig = await CreateRigAsync(graph);
+        using var _ = rig.Cleanup;
+
+        // During the wait the run's first stamp is overwritten (as an expired or newer one would be).
+        rig.Effects.OnDelay = () =>
+        {
+            rig.Telemetry.MarkOrigin("avr", "desktop_ui");
+            rig.Telemetry.MarkOrigin("plugin:chromecast", "desktop_ui");
+        };
+        rig.Effects.Probe = () => $"{rig.Telemetry.ResolveOrigin("avr")}/{rig.Telemetry.ResolveOrigin("plugin:chromecast")}";
+
+        Assert.Single(await rig.Engine.HandleRoomEventAsync(Hook("slow"), DateTimeOffset.Now));
+        Assert.Equal(new[] { "automation/desktop_ui", "automation/automation" }, rig.Effects.Probed);
+    }
+
+    [Fact]
+    public async Task Engine_ScheduleHonoursTheGraphCooldown()
+    {
+        var graph = SceneGraph("both", Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "home")), cooldown: 120);
+        graph.Nodes.Add(Node("s", AutomationNodeTypes.TriggerSchedule, ("time", "22:00"), ("days", "Daily")));
+        graph.Edges.Add(Edge("s", "a"));
+        var rig = await CreateRigAsync(graph);
+        using var _ = rig.Cleanup;
+
+        var offset = TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 11, 25));
+        var webhookAt = new DateTimeOffset(2026, 11, 25, 21, 59, 50, offset);
+        Assert.Single(await rig.Engine.HandleRoomEventAsync(Hook("home"), webhookAt));
+        await rig.Engine.EvaluateTickAsync(webhookAt.AddSeconds(20), default); // 22:00:10, inside the 120 s cooldown
+        await rig.Engine.EvaluateTickAsync(webhookAt.AddSeconds(60), default); // 22:00:50, still today's slot
+        Assert.Equal(new[] { "scene:movie-night" }, rig.Effects.Calls);
     }
 
     [Fact]
