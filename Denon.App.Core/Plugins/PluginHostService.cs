@@ -1081,7 +1081,8 @@ public sealed class PluginHostService : IAsyncDisposable
         }
     }
 
-    private static string MapPluginToDomain(string pluginId) => pluginId.Trim().ToLowerInvariant() switch
+    /// <summary>The origin domain a plugin's actions change: tv for the LG TV, lighting for Hue, else plugin:<id>.</summary>
+    public static string MapPluginToDomain(string pluginId) => pluginId.Trim().ToLowerInvariant() switch
     {
         "smart-tv" => EventTelemetryLog.StreamTv,
         "philips-hue" => EventTelemetryLog.StreamLighting,

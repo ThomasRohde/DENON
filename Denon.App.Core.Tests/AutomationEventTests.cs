@@ -536,6 +536,28 @@ public sealed class AutomationEventTests : IDisposable
     }
 
     [Fact]
+    public async Task Engine_AHueActionMarksOnlyTheLights()
+    {
+        var graph = new AutomationGraph
+        {
+            Id = "lights", Name = "lights", Enabled = true,
+            Nodes =
+            [
+                Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "lights")),
+                Node("a", AutomationNodeTypes.ActionPlugin, ("pluginId", "philips-hue"), ("actionId", "hue.all_on")),
+            ],
+            Edges = [Edge("t", "a")],
+        };
+        var rig = await CreateRigAsync(graph);
+        using var _ = rig.Cleanup;
+
+        Assert.Single(await rig.Engine.HandleRoomEventAsync(Hook("lights"), DateTimeOffset.Now));
+        Assert.Equal("automation", rig.Telemetry.ResolveOrigin("lighting"));
+        Assert.Equal("external", rig.Telemetry.ResolveOrigin("avr")); // the user's receiver power-on still counts
+        Assert.Equal("external", rig.Telemetry.ResolveOrigin("tv"));
+    }
+
+    [Fact]
     public async Task Engine_ScheduleHonoursTheGraphCooldown()
     {
         var graph = SceneGraph("both", Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "home")), cooldown: 120);

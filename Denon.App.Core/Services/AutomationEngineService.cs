@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Threading.Channels;
 using Denon.App.Core.Models;
 using Denon.App.Core.Plugins;
+using Denon.App.PluginSdk;
 using Microsoft.Extensions.Hosting;
 
 namespace Denon.App.Core.Services;
@@ -365,7 +366,7 @@ public sealed class AutomationEngineService : BackgroundService
             });
         }
 
-        var effects = dryRun ? EffectsOverride ?? _effects : new OriginStampingEffects(EffectsOverride ?? _effects, _telemetry);
+        var effects = dryRun ? EffectsOverride ?? _effects : new OriginStampingEffects(EffectsOverride ?? _effects, _telemetry, PluginDomains);
 
         AutomationRun run;
         try
@@ -443,7 +444,24 @@ public sealed class AutomationEngineService : BackgroundService
     /// Stamps the "automation" origin on the domains a step changes right before it runs, so the room events it
     /// causes never start an event trigger, however long the run has waited before the step.
     /// </summary>
-    private sealed class OriginStampingEffects(IAutomationEffects inner, EventTelemetryLog telemetry) : IAutomationEffects
+    /// <summary>
+    /// The origin domains a plugin action can change: the plugin's own (tv for the LG TV, lighting for Hue, else
+    /// plugin:&lt;id&gt;), plus the receiver only for a plugin that may control it (<see cref="PluginCapabilities.ReceiverControl"/>).
+    /// A Hue-only action must not hide the user's own receiver power-on from event triggers.
+    /// </summary>
+    private IReadOnlyList<string> PluginDomains(string pluginId)
+    {
+        var domain = PluginHostService.MapPluginToDomain(pluginId);
+        var record = _pluginHost.GetPlugins().FirstOrDefault(p => string.Equals(p.Id, pluginId, StringComparison.OrdinalIgnoreCase));
+        return record?.Capabilities.HasFlag(PluginCapabilities.ReceiverControl) == true
+            ? [domain, EventTelemetryLog.StreamAvr]
+            : [domain];
+    }
+
+    private sealed class OriginStampingEffects(
+        IAutomationEffects inner,
+        EventTelemetryLog telemetry,
+        Func<string, IReadOnlyList<string>> pluginDomains) : IAutomationEffects
     {
         public ReceiverFacts GetReceiverFacts() => inner.GetReceiverFacts();
 
@@ -460,7 +478,7 @@ public sealed class AutomationEngineService : BackgroundService
         public Task<(bool Success, string Message)> RunPluginActionAsync(
             string pluginId, string actionId, IReadOnlyDictionary<string, string>? parameters, CancellationToken ct)
         {
-            Stamp(EventTelemetryLog.StreamAvr, EventTelemetryLog.StreamTv, EventTelemetryLog.StreamLighting, $"plugin:{pluginId.Trim().ToLowerInvariant()}");
+            Stamp([.. pluginDomains(pluginId)]);
             return inner.RunPluginActionAsync(pluginId, actionId, parameters, ct);
         }
 
