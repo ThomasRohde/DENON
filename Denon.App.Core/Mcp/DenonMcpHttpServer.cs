@@ -2161,19 +2161,10 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
             return BuildToolError("The automation was not saved:\n" + string.Join("\n", problems.Select(p => p.NodeId is null ? $"- {p.Message}" : $"- node {p.NodeId}: {p.Message}")));
         }
 
-        var updated = _settingsStore.Current.Clone();
-        var index = updated.AutomationGraphs.FindIndex(g => string.Equals(g.Id, graph.Id, StringComparison.Ordinal));
-        if (index >= 0)
-        {
-            updated.AutomationGraphs[index] = graph;
-        }
-        else
-        {
-            updated.AutomationGraphs.Add(graph);
-        }
-
-        await _settingsStore.SaveAsync(updated, ct);
-        return BuildToolJson(new { saved = true, replaced = index >= 0, automation = graph });
+        // Inside the store's lock, so an editor save at the same moment is not undone.
+        var replaced = false;
+        await _settingsStore.UpdateAsync(s => replaced = AutomationGraph.Upsert(s.AutomationGraphs, graph), ct);
+        return BuildToolJson(new { saved = true, replaced, automation = graph });
     }
 
     /// <summary>Agents rarely send positions: put unplaced nodes in columns by their distance from a trigger.</summary>

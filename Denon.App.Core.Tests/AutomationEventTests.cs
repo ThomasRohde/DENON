@@ -239,6 +239,28 @@ public sealed class AutomationEventTests : IDisposable
         Assert.Equal("arrive-home", hookGraph.Nodes[0].Get("hook"));
     }
 
+    [Fact]
+    public async Task OverlappingUpserts_AllSurvive()
+    {
+        var log = new AppLogStore(Path.Combine(_tempDir, "upsert.log"));
+        var store = new AppSettingsStore(log, Path.Combine(_tempDir, "upsert-settings.json"));
+        await store.InitializeAsync();
+        await store.UpdateAsync(s => s.AutomationGraphs = []);
+
+        var graphs = Enumerable.Range(1, 10)
+            .Select(i => SceneGraph($"g{i}", Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", $"h{i}"))))
+            .ToList();
+        await Task.WhenAll(graphs.Select(g => Task.Run(() => store.UpdateAsync(s => AutomationGraph.Upsert(s.AutomationGraphs, g)))));
+
+        Assert.Equal(10, store.Current.AutomationGraphs.Count);
+        var renamed = graphs[0].Clone();
+        renamed.Name = "renamed";
+        var replaced = false;
+        await store.UpdateAsync(s => replaced = AutomationGraph.Upsert(s.AutomationGraphs, renamed));
+        Assert.True(replaced);
+        Assert.Equal("renamed", store.Current.AutomationGraphs.Single(g => g.Id == "g1").Name);
+    }
+
     // ---- Runner --------------------------------------------------------------------------------------------
 
     [Fact]

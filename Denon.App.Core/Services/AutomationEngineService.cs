@@ -476,6 +476,10 @@ public sealed class AutomationEngineService : BackgroundService
         {
             var scene = FindScene(sceneId) ?? throw new InvalidOperationException($"No Smart Scene '{sceneId}'.");
             await engine._receiverController.ApplySceneAsync(scene, ct);
+
+            // ApplySceneAsync returns after the receiver part; the scene's plugin chain runs in the background.
+            // Wait for it, so the next node runs after the whole scene (e.g. a Hue step after the scene's own dim).
+            await engine._pluginHost.WhenSceneActionsDoneAsync(scene.Id, ct);
         }
 
         public async Task<(bool Success, string Message)> RunPluginActionAsync(

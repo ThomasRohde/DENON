@@ -120,13 +120,13 @@ public sealed class AutomationEditorApi
 
             case ("DELETE", ""):
             {
-                var updated = _settingsStore.Current.Clone();
-                if (updated.AutomationGraphs.RemoveAll(g => g.Id == id) == 0)
+                if (_settingsStore.Current.AutomationGraphs.All(g => g.Id != id))
                 {
                     return (404, new { error = $"No automation '{id}'." });
                 }
 
-                await _settingsStore.SaveAsync(updated, ct);
+                // Inside the store's lock, against the latest settings: an overlapping save is not undone.
+                await _settingsStore.UpdateAsync(s => s.AutomationGraphs.RemoveAll(g => g.Id == id), ct);
                 return (200, new { deleted = id });
             }
 
@@ -162,18 +162,9 @@ public sealed class AutomationEditorApi
             return (400, new { error = "The automation was not saved.", problems });
         }
 
-        var updated = _settingsStore.Current.Clone();
-        var index = updated.AutomationGraphs.FindIndex(g => g.Id == id);
-        if (index >= 0)
-        {
-            updated.AutomationGraphs[index] = graph;
-        }
-        else
-        {
-            updated.AutomationGraphs.Add(graph);
-        }
-
-        await _settingsStore.SaveAsync(updated, ct);
+        // Inside the store's lock, against the latest settings: two overlapping saves (two graphs, or a switch in
+        // the app) both keep their change.
+        await _settingsStore.UpdateAsync(s => AutomationGraph.Upsert(s.AutomationGraphs, graph), ct);
         return (200, new { graph });
     }
 

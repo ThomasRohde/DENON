@@ -74,6 +74,7 @@ public sealed class PluginHostService : IAsyncDisposable
     private volatile IAudioReactivePlugin[] _activeAudioPlugins = [];
 
     private PluginReceiverSnapshot? _lastBroadcastReceiver;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Task> _sceneActionRuns = new(StringComparer.OrdinalIgnoreCase);
     private bool _isInitialized;
     private bool _disposed;
 
@@ -672,7 +673,29 @@ public sealed class PluginHostService : IAsyncDisposable
 
     private void OnReceiverSceneActivated(ScenePreset scene)
     {
-        _ = Task.Run(() => NotifySceneActivatedAsync(scene, CancellationToken.None));
+        // The receiver part of a scene is done here; its plugin chain runs in the background. Keep the task so an
+        // automation can wait for the whole scene before its next step (WhenSceneActionsDoneAsync).
+        var run = Task.Run(() => NotifySceneActivatedAsync(scene, CancellationToken.None));
+        _sceneActionRuns[scene.Id] = run;
+    }
+
+    /// <summary>
+    /// Completes when the plugin chain of the latest activation of <paramref name="sceneId"/> has run (at once when
+    /// there is none). Activation errors are logged by the chain, not thrown here.
+    /// </summary>
+    public async Task WhenSceneActionsDoneAsync(string sceneId, CancellationToken cancellationToken = default)
+    {
+        if (_sceneActionRuns.TryGetValue(sceneId, out var run))
+        {
+            try
+            {
+                await run.WaitAsync(cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // The chain reports its own failures.
+            }
+        }
     }
 
     private void OnReceiverStateChanged(ReceiverStateSnapshot rawSnapshot)

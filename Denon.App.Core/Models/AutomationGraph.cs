@@ -35,6 +35,20 @@ public sealed class AutomationGraph
 
     public static string NewId(string prefix) => $"{prefix}-{Guid.NewGuid().ToString("N")[..6]}";
 
+    /// <summary>Replaces the graph with the same id in <paramref name="graphs"/>, or adds it. True when it replaced one.</summary>
+    public static bool Upsert(List<AutomationGraph> graphs, AutomationGraph graph)
+    {
+        var index = graphs.FindIndex(g => string.Equals(g.Id, graph.Id, StringComparison.Ordinal));
+        if (index >= 0)
+        {
+            graphs[index] = graph;
+            return true;
+        }
+
+        graphs.Add(graph);
+        return false;
+    }
+
     /// <summary>The example automations of a new install, all off.</summary>
     public static List<AutomationGraph> CreateDefaults() =>
     [
