@@ -76,7 +76,17 @@ public partial class AutomationEditorWindow : Window
             {
                 case MessageBoxResult.Yes:
                     // The page saves and answers with a "saved" web message (OnWebMessageReceived closes on success).
-                    await EditorWebView.CoreWebView2.ExecuteScriptAsync("window.denonEditor?.saveForClose()");
+                    try
+                    {
+                        await EditorWebView.CoreWebView2.ExecuteScriptAsync("window.denonEditor?.saveForClose()");
+                    }
+                    catch (Exception ex)
+                    {
+                        // Keep the window open: the changes are still in the page.
+                        MessageBox.Show(this, $"The automation could not be saved: {ex.Message}", "Not saved",
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+
                     break;
                 case MessageBoxResult.No:
                     CloseConfirmed();

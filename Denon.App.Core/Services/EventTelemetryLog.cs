@@ -167,7 +167,7 @@ public sealed class EventTelemetryLog : IAsyncDisposable
     /// Publishes the event on the live <see cref="RoomEventBus"/> (always), and when event logging is on, also
     /// enqueues it to the daily JSONL file of its stream without blocking the caller.
     /// </summary>
-    /// <summary>Publishes the event on the bus (and writes it when telemetry is on). Returns the published event, or null after dispose.</summary>
+    /// <returns>The published event, or null after dispose.</returns>
     public RoomEvent? Record(
         string stream,
         string device,
