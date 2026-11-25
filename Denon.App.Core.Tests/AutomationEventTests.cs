@@ -401,9 +401,9 @@ public sealed class AutomationEventTests : IDisposable
         var ytQueue = new YouTubeQueueService(relay, controller, stateStore, log);
         var jukebox = new LocalMediaJukeboxService(relay, controller, stateStore, log);
         var plugins = new PluginHostService([], store, stateStore, controller, telemetry, log);
-        var handler = new RemoteWebApiHandler(controller, stateStore, store, ytMedia, ytQueue, jukebox, plugins, telemetry, log);
         var effects = new FakeEffects();
         var engine = new AutomationEngineService(store, controller, stateStore, plugins, telemetry, bus, log) { EffectsOverride = effects };
+        var handler = new RemoteWebApiHandler(controller, stateStore, store, ytMedia, ytQueue, jukebox, plugins, telemetry, engine, log);
 
         var cleanup = new Cleanup(() =>
         {
@@ -698,7 +698,7 @@ public sealed class AutomationEventTests : IDisposable
     }
 
     [Fact]
-    public async Task RunningEngine_RunsAWebhookAutomation_FromTheHttpCallThroughTheBus()
+    public async Task RunningEngine_RunsAWebhookAutomation_OnceFromTheHttpCall()
     {
         var graph = SceneGraph("home", Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "arrive-home"), ("filter", "who=owner")));
         var rig = await CreateRigAsync(graph);
@@ -712,17 +712,88 @@ public sealed class AutomationEventTests : IDisposable
             await Task.Delay(200); // the engine subscribes when ExecuteAsync starts
             var reply = await rig.Handler.HandleAsync("POST", "/api/hooks/arrive-home", null, "{\"who\":\"owner\"}", rig.Store.Current.Remote.OwnerToken, CancellationToken.None);
             Assert.Equal(200, reply.StatusCode);
+            Assert.Contains("\"outcome\":\"ran\"", reply.Body);
 
             var done = await Task.WhenAny(ran.Task, Task.Delay(TimeSpan.FromSeconds(5)));
             Assert.True(done == ran.Task, "The webhook automation did not run within 5 s.");
             var entry = await ran.Task;
             Assert.Equal("home", entry.RuleName);
             Assert.Contains("Webhook 'arrive-home'", entry.TriggerDetail);
+            await Task.Delay(300); // the bus copy of the event must not start it a second time
             Assert.Equal(new[] { "scene:movie-night" }, rig.Effects.Calls);
         }
         finally
         {
             await rig.Engine.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task Webhook_Reply_SaysWhatEachAutomationDid()
+    {
+        // ran: no conditions. nothing: needs the receiver in standby, but it is on. skipped: a run 5 minutes ago, 1 h cooldown.
+        var ran = SceneGraph("ran", Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "home")));
+        var nothing = new AutomationGraph
+        {
+            Id = "nothing", Name = "nothing", Enabled = true, CooldownSeconds = 3600,
+            Nodes =
+            [
+                Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "home")),
+                Node("c", AutomationNodeTypes.ConditionReceiver, ("power", "standby"), ("input", ""), ("muted", "any")),
+                Node("a", AutomationNodeTypes.ActionScene, ("sceneId", "jazz")),
+            ],
+            Edges = [Edge("t", "c"), Edge("c", "a", AutomationNodeTypes.PortYes)],
+        };
+        var skipped = SceneGraph("skipped", Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "home")), cooldown: 3600);
+        var rig = await CreateRigAsync(ran, nothing, skipped);
+        using var _ = rig.Cleanup;
+        rig.Effects.Facts = new ReceiverFacts(true, "TV", false);
+        // All three ran 5 minutes ago. Only "skipped" acted with a cooldown; "nothing" changed nothing and keeps no cooldown.
+        Assert.Equal(3, (await rig.Engine.HandleRoomEventAsync(Hook("home"), DateTimeOffset.Now.AddMinutes(-5))).Count);
+        rig.Effects.Calls.Clear();
+
+        var reply = await rig.Handler.HandleAsync("POST", "/api/hooks/home", null, "", rig.Store.Current.Remote.OwnerToken, CancellationToken.None);
+
+        Assert.Equal(200, reply.StatusCode);
+        using var doc = System.Text.Json.JsonDocument.Parse(reply.Body);
+        var root = doc.RootElement.TryGetProperty("data", out var data) ? data : doc.RootElement;
+        var outcomes = root.GetProperty("results").EnumerateArray()
+            .ToDictionary(static r => r.GetProperty("automation").GetString()!, static r => r.GetProperty("outcome").GetString());
+        Assert.Equal("ran", outcomes["ran"]);
+        Assert.Equal("nothing", outcomes["nothing"]);
+        Assert.Equal("skipped", outcomes["skipped"]);
+        var message = root.GetProperty("message").GetString()!;
+        Assert.Contains("ran: ran Scene 'movie-night'", message);
+        Assert.Contains("nothing: nothing to do", message);
+        Assert.Contains("skipped: skipped, in its cooldown until", message);
+        Assert.Equal(new[] { "scene:movie-night" }, rig.Effects.Calls);
+    }
+
+    [Fact]
+    public async Task Webhook_Reply_SaysStillRunning_WhenARunTakesLonger()
+    {
+        var slow = new AutomationGraph
+        {
+            Id = "slow", Name = "slow", Enabled = true, CooldownSeconds = 0,
+            Nodes = [Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "slow")), Node("w", AutomationNodeTypes.ActionDelay, ("seconds", "5"))],
+            Edges = [Edge("t", "w")],
+        };
+        var rig = await CreateRigAsync(slow);
+        using var _ = rig.Cleanup;
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        rig.Effects.DelayGate = gate;
+        var wait = RemoteWebApiHandler.WebhookReplyWait;
+        RemoteWebApiHandler.WebhookReplyWait = TimeSpan.FromMilliseconds(200);
+        try
+        {
+            var reply = await rig.Handler.HandleAsync("POST", "/api/hooks/slow", null, "", rig.Store.Current.Remote.OwnerToken, CancellationToken.None);
+            Assert.Contains("\"outcome\":\"running\"", reply.Body);
+            Assert.Contains("slow: still running.", reply.Body);
+        }
+        finally
+        {
+            RemoteWebApiHandler.WebhookReplyWait = wait;
+            gate.TrySetResult();
         }
     }
 

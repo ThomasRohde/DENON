@@ -477,7 +477,8 @@ public sealed class ReviewVerificationTests : IDisposable
         using var ytQueue = new YouTubeQueueService(relay, controller, stateStore, log);
         using var localJukebox = new LocalMediaJukeboxService(relay, controller, stateStore, log);
         var plugins = new PluginHostService([], store, stateStore, controller, telemetry, log);
-        var handler = new RemoteWebApiHandler(controller, stateStore, store, ytMedia, ytQueue, localJukebox, plugins, telemetry, log);
+        using var automations = new AutomationEngineService(store, controller, stateStore, plugins, telemetry, new RoomEventBus(log), log);
+        var handler = new RemoteWebApiHandler(controller, stateStore, store, ytMedia, ytQueue, localJukebox, plugins, telemetry, automations, log);
 
         // 1. Fresh phone without token -> 401 pairing required
         var unauth = await handler.HandleAsync("GET", "/api/status", null, "", null, CancellationToken.None);

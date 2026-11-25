@@ -167,7 +167,8 @@ public sealed class EventTelemetryLog : IAsyncDisposable
     /// Publishes the event on the live <see cref="RoomEventBus"/> (always), and when event logging is on, also
     /// enqueues it to the daily JSONL file of its stream without blocking the caller.
     /// </summary>
-    public void Record(
+    /// <summary>Publishes the event on the bus (and writes it when telemetry is on). Returns the published event, or null after dispose.</summary>
+    public RoomEvent? Record(
         string stream,
         string device,
         string eventName,
@@ -176,7 +177,7 @@ public sealed class EventTelemetryLog : IAsyncDisposable
     {
         if (_disposed)
         {
-            return;
+            return null;
         }
 
         var cleanStream = NormalizeStreamName(stream);
@@ -193,11 +194,12 @@ public sealed class EventTelemetryLog : IAsyncDisposable
         var cleanOrigin = string.IsNullOrWhiteSpace(origin) ? "app" : origin.Trim();
         var cleanData = data is { Count: > 0 } ? data : null;
 
-        _eventBus.Publish(new RoomEvent(now, cleanStream, cleanDevice, cleanEvent, cleanOrigin, cleanData));
+        var published = new RoomEvent(now, cleanStream, cleanDevice, cleanEvent, cleanOrigin, cleanData);
+        _eventBus.Publish(published);
 
         if (!IsEnabled)
         {
-            return;
+            return published;
         }
 
         var envelope = new TelemetryEventEnvelope(
@@ -214,6 +216,8 @@ public sealed class EventTelemetryLog : IAsyncDisposable
         {
             Interlocked.Increment(ref _sessionEventCount);
         }
+
+        return published;
     }
 
     public IReadOnlyList<string> ListAvailableStreams()

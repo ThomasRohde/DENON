@@ -33,6 +33,9 @@ public partial class App : System.Windows.Application
     private TrayIconController? _trayIconController;
     private bool _isExiting;
 
+    /// <summary>True once the app exits (tray Exit, sign-out or shutdown): windows then close without asking.</summary>
+    internal static bool IsExiting => (Current as App)?._isExiting == true;
+
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);

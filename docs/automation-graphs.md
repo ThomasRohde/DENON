@@ -65,6 +65,12 @@ AI agents: nobody watches an automation when it runs.
    triggers wait at least 10 s per graph, and more than 20 event-started runs in a minute pause event triggers for a
    minute. Webhooks are not paused. Only runs that acted count: a run whose checks said no gives back its cooldown
    and its loop-guard count, since it cannot have caused a loop.
+5. A webhook call starts its automations itself and waits up to 4 s for them, then answers
+   `200 { hook, automations: [name], results: [{ automation, outcome, message }], message }`. `outcome` is `ran`,
+   `nothing` (its checks said no; the message says why), `skipped` (in its cooldown; the message says until when),
+   `paused`, `failed` or `running` (still busy after 4 s). `message` has one line per automation, for example
+   `iPhone: arrive home → Morning Jazz: nothing to do: the receiver is on`. An iPhone Shortcut shows it with
+   Get Dictionary Value `message` → Show Result.
 
 ## Editor API (Insights server, `127.0.0.1`, cookie key)
 

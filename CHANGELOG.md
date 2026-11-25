@@ -4,6 +4,18 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **A webhook call answers with what each automation did.** The reply waits up to 4 seconds and says, per
+  automation, "ran Scene 'Morning Jazz'", "nothing to do: the receiver is on", "skipped, in its cooldown until 11:37:05"
+  or "still running" (`results` and `message` in the JSON). Add Get Dictionary Value `message` → Show Result to the
+  iPhone Shortcut to see it. Before, the reply only listed the automations that listen.
+
+### Fixed
+- **The automation editor window asks before it closes with unsaved changes**: Save, Discard or Cancel. Before, closing
+  the window dropped the changes without a word.
+
 ## [2.9.1] - 2026-11-25
 
 ### Fixed
