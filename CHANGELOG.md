@@ -4,7 +4,7 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.9.4] - 2026-11-26
 
 ### Fixed
 - **A light change reads "Lights: 3 of 4 on" in the activity feed** (or "Lights off"). In 2.9.3 the new events showed
