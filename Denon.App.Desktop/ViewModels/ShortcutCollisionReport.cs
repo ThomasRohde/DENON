@@ -19,7 +19,7 @@ public static class ShortcutCollisionReport
             .ToList();
 
         return blocking.Count == 0
-            ? "Settings not saved: the shortcuts in Settings have a collision."
+            ? "Settings not saved: the shortcut check in Settings did not pass. Check the shortcuts there."
             : $"Settings not saved: resolve the shortcut collision(s) in Settings first. {string.Join(" ", blocking)}";
     }
 }

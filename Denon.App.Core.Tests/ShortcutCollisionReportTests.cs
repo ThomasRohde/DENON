@@ -37,4 +37,16 @@ public sealed class ShortcutCollisionReportTests
         Assert.DoesNotContain("Next", text);
         Assert.Contains("\"Volume up\" (Ctrl+Alt+Up): OS TAKEN", text);
     }
+
+    [Fact]
+    public void Without_a_blocking_shortcut_it_does_not_claim_a_collision()
+    {
+        var ok = new ShortcutItemEditor("global.play", "Play / Pause", isGlobal: true, "Ctrl+Alt+P");
+        ok.SetValidationResult(false, false, null, "OK");
+
+        var text = ShortcutCollisionReport.Describe([ok]);
+
+        Assert.StartsWith("Settings not saved:", text);
+        Assert.DoesNotContain("collision", text, StringComparison.OrdinalIgnoreCase);
+    }
 }
