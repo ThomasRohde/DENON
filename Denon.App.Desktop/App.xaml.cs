@@ -631,9 +631,15 @@ public partial class App : System.Windows.Application
         const int wmQueryEndSession = 0x0011;
         const int wmEndSession = 0x0016;
         const long endSessionCloseApp = 0x1;
-        if (msg is wmQueryEndSession or wmEndSession && (lParam.ToInt64() & endSessionCloseApp) != 0)
+        var closeApp = (lParam.ToInt64() & endSessionCloseApp) != 0;
+        if (msg == wmQueryEndSession && closeApp)
         {
             _closedByInstaller = true;
+        }
+        else if (msg == wmEndSession)
+        {
+            // wParam FALSE: the close was cancelled, so a later exit is not the installer's.
+            _closedByInstaller = wParam != IntPtr.Zero && closeApp;
         }
 
         return IntPtr.Zero;

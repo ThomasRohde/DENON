@@ -376,6 +376,13 @@ public static class NowPlayingResolver
         return new SmartTvNowShowing(model, showing, isScreenOff, TryReadLiveTv(tv.StatusDetails));
     }
 
+    /// <summary>How long a paused HomePod stays in the hero after it was last seen playing.</summary>
+    public static readonly TimeSpan PausedHomePodShownFor = TimeSpan.FromMinutes(10);
+
+    // When each HomePod stream (speaker, app, title) was last seen playing. Shared by the hero, the phone remote and MCP.
+    // Entries older than PausedHomePodShownFor are dropped, so it holds only the last few streams.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTimeOffset> HomePodLastPlaying = new(StringComparer.Ordinal);
+
     /// <summary>
     /// What a HomePod plays, from the HomePod plugin's status details (kind "homepod"), as a hero entry: the title,
     /// "artist • app • speaker", its artwork (a file in the plugin data folder) and a <see cref="CastNowPlaying"/>
@@ -383,12 +390,6 @@ public static class NowPlayingResolver
     /// A paused HomePod shows for <see cref="PausedHomePodShownFor"/> after it was last seen playing: a HomePod keeps its
     /// last stream "paused" for hours, and that is not what plays now. One never seen playing in this run is not shown.
     /// </summary>
-    /// <summary>How long a paused HomePod stays in the hero after it was last seen playing.</summary>
-    public static readonly TimeSpan PausedHomePodShownFor = TimeSpan.FromMinutes(10);
-
-    // When each HomePod stream (speaker, app, title) was last seen playing. Shared by the hero, the phone remote and MCP.
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTimeOffset> HomePodLastPlaying = new(StringComparer.Ordinal);
-
     public static ResolvedNowPlaying? TryResolveHomePod(IReadOnlyList<PluginRecordSnapshot>? plugins, string? homePodDataDirectory = null, DateTimeOffset? now = null)
     {
         var plugin = plugins?.FirstOrDefault(p =>
@@ -404,12 +405,18 @@ public static class NowPlayingResolver
         var title = Get("title");
         var key = $"{speaker}|{app}|{title}";
         var at = now ?? DateTimeOffset.UtcNow;
+        foreach (var old in HomePodLastPlaying.Where(e => e.Key != key && at - e.Value > PausedHomePodShownFor).ToList())
+        {
+            HomePodLastPlaying.TryRemove(old);
+        }
+
         if (playing)
         {
             HomePodLastPlaying[key] = at;
         }
         else if (!HomePodLastPlaying.TryGetValue(key, out var lastPlaying) || at - lastPlaying > PausedHomePodShownFor)
         {
+            HomePodLastPlaying.TryRemove(key, out _);
             return null;
         }
 
