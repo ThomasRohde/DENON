@@ -636,11 +636,12 @@ public sealed class ReceiverController
 
                 if (!string.IsNullOrWhiteSpace(scene.StreamUrl))
                 {
+                    var streamUrl = scene.StreamUrl.Trim();
                     await _avrClient.EnsureMainZoneNetAsync(settings, token);
-                    await _heosClient.PlayUrlAsync(settings, scene.StreamUrl.Trim(), volume: null, unmute: scene.Unmute, token);
+                    await _heosClient.PlayUrlAsync(settings, streamUrl, volume: null, unmute: scene.Unmute, token);
                     // A scene that starts a saved station's stream plays that station: name it in Now playing.
                     _lastPlayedStationAlias = settings.Stations
-                        .FirstOrDefault(s => string.Equals(s.Url.Trim(), scene.StreamUrl.Trim(), StringComparison.OrdinalIgnoreCase))?.Alias;
+                        .FirstOrDefault(s => string.Equals(s.Url.Trim(), streamUrl, StringComparison.OrdinalIgnoreCase))?.Alias;
                     NonRelaySourceActivated?.Invoke();
                 }
 
