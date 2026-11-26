@@ -90,6 +90,7 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
@@ -112,7 +113,16 @@
                         </StackPanel>
                     </DockPanel>
 
-                    <ScrollViewer Grid.Row="1"
+                    <!-- Why the last save did not save (shortcut collision, error); also in the log and the status line. -->
+                    <TextBlock Grid.Row="1"
+                               Text="{Binding SettingsSaveProblem}"
+                               Foreground="{DynamicResource AccentCrimsonBrush}"
+                               FontSize="{DynamicResource FontSize05}"
+                               TextWrapping="Wrap"
+                               Margin="{skin:Space 0,0,0,10}"
+                               Visibility="{Binding SettingsSaveProblem, Converter={StaticResource StringToVis}}" />
+
+                    <ScrollViewer Grid.Row="2"
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled"
                                   Padding="{skin:Space 0,0,6,0}">

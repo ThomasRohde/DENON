@@ -60,6 +60,7 @@ public sealed partial class MainViewModel : ObservableObject
     private string _connectionBadgeText = "OFFLINE";
     private string _connectionBadgeTone = OfflineTone;
     private string _statusMessage = "Discovering receiver on local network...";
+    private string _settingsSaveProblem = string.Empty;
     private string _receiverTitle = "Denon / Marantz AVR";
     private string _detectedModelName = string.Empty;
     private string _receiverDetails = "Waiting for telemetry...";
@@ -506,6 +507,13 @@ public sealed partial class MainViewModel : ObservableObject
     {
         get => _statusMessage;
         private set => SetProperty(ref _statusMessage, value);
+    }
+
+    /// <summary>Why the last Save &amp; Sync did not save (or did not sync); empty after a clean save.</summary>
+    public string SettingsSaveProblem
+    {
+        get => _settingsSaveProblem;
+        private set => SetProperty(ref _settingsSaveProblem, value);
     }
 
     public string ReceiverTitle
@@ -1852,11 +1860,12 @@ public sealed partial class MainViewModel : ObservableObject
 
     private async Task SaveSettingsAsync()
     {
+        var saved = false;
         try
         {
             if (!ValidateShortcutCollisions(reportClean: false))
             {
-                StatusMessage = "Cannot save: resolve highlighted shortcut collisions in Settings first.";
+                ReportSettingsSaveProblem(ShortcutCollisionReport.Describe(ShortcutEditors));
                 return;
             }
 
@@ -1910,6 +1919,8 @@ public sealed partial class MainViewModel : ObservableObject
                 s.Shortcuts = settings.Shortcuts;
                 s.Telemetry = settings.Telemetry;
             });
+            saved = true;
+            SettingsSaveProblem = string.Empty;
             RefreshTelemetryStats();
             StatusMessage = "Settings saved. Syncing with receiver...";
             await _receiverController.RefreshAsync();
@@ -1917,8 +1928,18 @@ public sealed partial class MainViewModel : ObservableObject
         catch (Exception exception)
         {
             LastError = exception.Message;
-            StatusMessage = exception.Message;
+            ReportSettingsSaveProblem(saved
+                ? $"Settings saved, but the receiver sync failed: {exception.Message}"
+                : $"Settings not saved: {exception.Message}");
         }
+    }
+
+    // A refused or failed save is never silent: the reason goes to the log, the status line and the Stations page.
+    private void ReportSettingsSaveProblem(string reason)
+    {
+        _logStore.Warning(reason);
+        SettingsSaveProblem = reason;
+        StatusMessage = reason;
     }
 
     private async Task SaveVolumeDisplayModeAsync(bool displayVolumeInDb)
