@@ -250,6 +250,30 @@ public sealed class McpServerIntegrationTests : IAsyncLifetime
         Assert.True(bad.StructuredContent!.Value.GetProperty("problems").GetArrayLength() > 0);
         Assert.Equal(before, _settings.Current.AutomationGraphs.Count); // a preview saves nothing
 
+        // Both branches lead to one action: the second path shows it as a repeat. A null config gives problems, not a failure.
+        var converge = (await client.CallToolAsync("preview_automation", new Dictionary<string, object?>
+        {
+            ["automation"] = new Dictionary<string, object?>
+            {
+                ["name"] = "Both ways",
+                ["nodes"] = new object?[]
+                {
+                    new { id = "t", type = "trigger.webhook", config = new Dictionary<string, string> { ["hook"] = "x" } },
+                    new { id = "c", type = "condition.receiver", config = new Dictionary<string, string> { ["power"] = "on" } },
+                    new { id = "a", type = "action.receiver", config = (Dictionary<string, string>?)null },
+                },
+                ["edges"] = new object[]
+                {
+                    new { from = "t", port = "out", to = "c" }, new { from = "c", port = "yes", to = "a" }, new { from = "c", port = "no", to = "a" },
+                },
+            },
+        })).StructuredContent!.Value;
+        var paths = converge.GetProperty("steps").EnumerateArray().Where(s => s.GetProperty("id").GetString() == "a").ToList();
+        Assert.Equal(2, paths.Count);
+        Assert.Equal(["yes", "no"], paths.Select(s => s.GetProperty("port").GetString()));
+        Assert.True(paths[1].GetProperty("repeat").GetBoolean());
+        Assert.True(converge.GetProperty("problems").GetArrayLength() > 0); // the receiver action has no command
+
         var saved = _settings.Current.AutomationGraphs[0];
         var shown = (await client.CallToolAsync("preview_automation", new Dictionary<string, object?> { ["automation_id"] = saved.Id })).StructuredContent!.Value;
         Assert.Equal("saved", shown.GetProperty("mode").GetString());

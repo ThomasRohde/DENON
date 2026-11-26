@@ -16,6 +16,8 @@
 .kind { font-size: 10px; font-weight: 700; letter-spacing: .04em; color: var(--color-text-secondary); padding-top: 2px; min-width: 4.6em; }
 .step .title { font-size: 13px; font-weight: 600; }
 .step .text { font-size: 12px; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.step.repeat { background: transparent; border: 1px dashed var(--color-border-primary); border-left-width: 3px; }
+.step.repeat .title::before { content: "↪ "; }
 .branch { font-size: 11px; font-weight: 700; margin-right: 6px; }
 .branch.yes { color: var(--good); }
 .branch.no, .branch.unreached { color: var(--warn); }
@@ -50,7 +52,7 @@ function pill(text, cls) { return el("span", { className: `pill ${cls || ""}` },
 
 function stepItem(step, problemIds) {
   const group = step.group in KIND ? step.group : "unknown";
-  return el("li", { className: `step ${group}${problemIds.has(step.id) ? " problem" : ""}`, style: { marginLeft: `${Math.min(step.depth, 6) * 14}px` } },
+  return el("li", { className: `step ${group}${step.repeat ? " repeat" : ""}${problemIds.has(step.id) ? " problem" : ""}`, style: { marginLeft: `${Math.min(step.depth, 6) * 14}px` } },
     el("span", { className: "kind" }, KIND[group] || "?"),
     el("div", {},
       el("div", { className: "title" },

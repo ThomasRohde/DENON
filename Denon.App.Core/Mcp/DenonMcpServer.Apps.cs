@@ -435,8 +435,8 @@ public sealed partial class DenonMcpServer
             {
                 mode = "preview",
                 automation = graph,
+                problems = ValidateForPreview(graph),
                 steps = DescribeSteps(graph),
-                problems = AutomationGraphValidator.Validate(graph).Select(p => new { nodeId = p.NodeId, message = p.Message }),
                 replaces = existing is null ? null : new { name = existing.Name, enabled = existing.Enabled },
                 canSave,
             };
@@ -456,8 +456,8 @@ public sealed partial class DenonMcpServer
             {
                 mode = "saved",
                 automation = graph,
+                problems = ValidateForPreview(graph),
                 steps = DescribeSteps(graph),
-                problems = AutomationGraphValidator.Validate(graph).Select(p => new { nodeId = p.NodeId, message = p.Message }),
                 canSave,
             };
         }
@@ -476,7 +476,15 @@ public sealed partial class DenonMcpServer
         };
     }
 
-    internal sealed record AutomationStep(string Id, string Group, string Title, string Text, int Depth, string? Port);
+    /// <summary>
+    /// A step of the outline. <paramref name="Repeat"/>: a path that leads to a step shown above already (two branches
+    /// or triggers that meet, or a loop), so it is not shown twice.
+    /// </summary>
+    internal sealed record AutomationStep(string Id, string Group, string Title, string Text, int Depth, string? Port, bool Repeat = false);
+
+    /// <summary>Validates first: the validator also fills in a missing config, which the outline reads.</summary>
+    private static List<object> ValidateForPreview(AutomationGraph graph) =>
+        [.. AutomationGraphValidator.Validate(graph).Select(p => (object)new { nodeId = p.NodeId, message = p.Message })];
 
     /// <summary>The graph as a readable outline: from each trigger, every node once, with the branch it is on.</summary>
     internal List<AutomationStep> DescribeSteps(AutomationGraph graph)
@@ -486,12 +494,15 @@ public sealed partial class DenonMcpServer
 
         void Walk(AutomationNode node, int depth, string? port)
         {
+            var info = AutomationNodeTypes.Find(node.Type);
+            node.Config ??= [];
             if (!seen.Add(node.Id))
             {
+                // Shown above already: say that this path goes there too, so no path looks as if it does nothing.
+                steps.Add(new AutomationStep(node.Id, info?.Group ?? "unknown", info?.Title ?? node.Type, "The same step as above.", depth, port, Repeat: true));
                 return;
             }
 
-            var info = AutomationNodeTypes.Find(node.Type);
             steps.Add(new AutomationStep(node.Id, info?.Group ?? "unknown", info?.Title ?? node.Type, DescribeNode(node, info), depth, port));
             foreach (var edge in graph.Edges.Where(e => e.From == node.Id).OrderBy(e => e.Port == AutomationNodeTypes.PortNo ? 1 : 0))
             {
