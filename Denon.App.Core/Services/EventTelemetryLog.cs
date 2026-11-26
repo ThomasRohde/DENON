@@ -163,6 +163,14 @@ public sealed class EventTelemetryLog : IAsyncDisposable
         return fallback;
     }
 
+    /// <summary>Ended sessions the overlap tracker knows, ending after <paramref name="since"/>.</summary>
+    internal IReadOnlyList<MediaSessionOverlapTracker.SessionInterval> ClosedSessionsSince(DateTimeOffset since) =>
+        _sessionOverlap.ClosedSince(since);
+
+    /// <summary>Gives the overlap tracker the ended sessions of an earlier run (crash recovery).</summary>
+    internal void RestoreClosedSessions(IEnumerable<MediaSessionOverlapTracker.SessionInterval> intervals) =>
+        _sessionOverlap.RestoreClosed(intervals);
+
     /// <summary>Where the monitor keeps the sessions that are open now, to close them after a crash.</summary>
     public string OpenSessionsPath => Path.Combine(_eventsDir, "open-sessions.json");
 

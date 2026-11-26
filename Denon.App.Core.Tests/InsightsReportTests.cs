@@ -290,6 +290,25 @@ public sealed class InsightsReportTests
     }
 
     [Fact]
+    public void Something_else_on_the_device_after_the_restart_keeps_the_sessions_apart()
+    {
+        // Netflix until the restart, one minute of Live TV, then Netflix again: two Netflix sessions, not one with the
+        // Live TV minute counted in it.
+        var day = Now.Date.AddHours(20);
+        var events = new[]
+        {
+            Session(day.AddMinutes(30), "lg-tv", "tv_app", "Netflix", 30 * 60, reason: "app_shutdown"),
+            Session(day.AddMinutes(32), "lg-tv", "tv_channel", "DR1", 60, reason: "switched"),
+            Session(day.AddMinutes(63), "lg-tv", "tv_app", "Netflix", 30 * 60, reason: "standby"),
+        };
+
+        var report = InsightsReport.Build(events, At(Now), 1);
+
+        Assert.Equal(3, report.Watch.Sessions);
+        Assert.Equal(61 * 60, report.Watch.TotalSeconds);
+    }
+
+    [Fact]
     public void A_joined_session_keeps_the_volume_of_both_parts()
     {
         // Two equal parts at 30 and 60: the joined session plays at 45, not 30.

@@ -848,6 +848,14 @@ public static partial class InsightsReport
         foreach (var session in ordered)
         {
             var key = $"{session.Device}|{session.Kind}|{session.App}|{session.Title}";
+
+            // Something else on the same device after the restart (a minute of Live TV) means the first session did
+            // not go on: the gap was not continued viewing.
+            foreach (var other in openSplits.Where(o => o.Key != key && joined[o.Value].Device == session.Device).Select(static o => o.Key).ToList())
+            {
+                openSplits.Remove(other);
+            }
+
             if (openSplits.TryGetValue(key, out var index))
             {
                 var before = joined[index];

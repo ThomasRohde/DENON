@@ -102,6 +102,33 @@ public sealed class MediaSessionOverlapTracker
         }
     }
 
+    /// <summary>The ended sessions that end after <paramref name="since"/>: kept with the open-sessions checkpoint.</summary>
+    internal IReadOnlyList<SessionInterval> ClosedSince(DateTimeOffset since)
+    {
+        lock (_sync)
+        {
+            return _closed.Where(c => c.End > since).ToList();
+        }
+    }
+
+    /// <summary>
+    /// Puts ended sessions of an earlier run back, so a session closed after a crash is not given time that those
+    /// sessions already counted.
+    /// </summary>
+    internal void RestoreClosed(IEnumerable<SessionInterval> intervals)
+    {
+        lock (_sync)
+        {
+            foreach (var interval in intervals)
+            {
+                if (interval.End is not null && !_closed.Contains(interval))
+                {
+                    _closed.Add(interval);
+                }
+            }
+        }
+    }
+
     /// <summary>True when <paramref name="coverer"/> is a more specific view of the same watching as <paramref name="target"/>.</summary>
     internal static bool Covers(SessionInterval coverer, SessionInterval target)
     {

@@ -901,7 +901,14 @@ public sealed partial class EventTelemetryMonitorService : BackgroundService
 
     private sealed record OpenSessionRecord(string Device, string Origin, DateTimeOffset StartedUtc, Dictionary<string, object?> Data);
 
-    private sealed record OpenSessionsFile(DateTimeOffset LastSeenUtc, List<OpenSessionRecord> Sessions);
+    /// <summary>
+    /// <paramref name="Closed"/>: the sessions that ended while these were open (a programme that ended while the
+    /// receiver stayed on TV Audio), so recovery does not count their time again.
+    /// </summary>
+    private sealed record OpenSessionsFile(
+        DateTimeOffset LastSeenUtc,
+        List<OpenSessionRecord> Sessions,
+        List<MediaSessionOverlapTracker.SessionInterval>? Closed = null);
 
     private static readonly System.Text.Json.JsonSerializerOptions OpenSessionsJson = new(System.Text.Json.JsonSerializerDefaults.Web);
 
@@ -934,7 +941,8 @@ public sealed partial class EventTelemetryMonitorService : BackgroundService
         {
             var path = _telemetry.OpenSessionsPath;
             var temp = path + ".tmp";
-            File.WriteAllText(temp, System.Text.Json.JsonSerializer.Serialize(new OpenSessionsFile(nowUtc, open), OpenSessionsJson));
+            var closed = open.Count == 0 ? [] : _telemetry.ClosedSessionsSince(open.Min(static o => o.StartedUtc)).ToList();
+            File.WriteAllText(temp, System.Text.Json.JsonSerializer.Serialize(new OpenSessionsFile(nowUtc, open, closed), OpenSessionsJson));
             File.Move(temp, path, overwrite: true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -974,8 +982,9 @@ public sealed partial class EventTelemetryMonitorService : BackgroundService
         var lastSeen = left.LastSeenUtc.ToLocalTime();
         _logStore.Warning($"[Telemetry] The app did not stop cleanly last time (last seen {lastSeen:yyyy-MM-dd HH:mm}). " +
                           $"Closed {left.Sessions.Count} open session(s) at that time.");
-        // The receiver's input last: the overlap tracker then knows the TV session that covered it, so its time is not
-        // counted twice.
+        // The sessions that ended during these first, then the receiver's input last: the overlap tracker then knows
+        // every TV session that covered it, so its time is not counted twice.
+        _telemetry.RestoreClosedSessions(left.Closed ?? []);
         foreach (var session in left.Sessions.OrderBy(static s => s.Device == "avr" ? 1 : 0))
         {
             var seconds = (int)Math.Round((left.LastSeenUtc - session.StartedUtc).TotalSeconds);

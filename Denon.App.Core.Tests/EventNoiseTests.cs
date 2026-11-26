@@ -180,6 +180,49 @@ public sealed class EventNoiseTests : IDisposable
     }
 
     [Fact]
+    public async Task A_recovered_receiver_input_does_not_count_programmes_that_already_ended()
+    {
+        var rig = await CreateRigAsync();
+        using var _ = rig.Cleanup;
+        var lastSeen = DateTimeOffset.UtcNow.AddHours(-1);
+
+        // TV Audio for 80 min: a 60 min programme that ended, then 20 min of the next one when the app crashed.
+        File.WriteAllText(rig.Telemetry.OpenSessionsPath, JsonSerializer.Serialize(new
+        {
+            lastSeenUtc = lastSeen,
+            sessions = new object[]
+            {
+                new
+                {
+                    device = "avr", origin = "external", startedUtc = lastSeen.AddMinutes(-80),
+                    data = new Dictionary<string, object?> { ["kind"] = "avr_input", ["title"] = "TV Audio", ["input"] = "TV" },
+                },
+                new
+                {
+                    device = "lg-tv", origin = "external", startedUtc = lastSeen.AddMinutes(-20),
+                    data = new Dictionary<string, object?> { ["kind"] = "tv_channel", ["title"] = "DR1" },
+                },
+            },
+            closed = new[]
+            {
+                new { label = "tv_channel:lg-tv", kind = "tv_channel", title = "TV 2", input = "", start = lastSeen.AddMinutes(-80), end = (DateTimeOffset?)lastSeen.AddMinutes(-20) },
+            },
+        }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+
+        rig.Monitor.CloseSessionsLeftOpen();
+        await DeliveredAsync(rig);
+
+        RoomEvent receiver;
+        lock (rig.Seen)
+        {
+            receiver = Assert.Single(rig.Seen, static e => e.Event == "session.ended" && e.Device == "avr");
+        }
+
+        Assert.Equal("4800", receiver.GetText("durationSec"));
+        Assert.Equal("0", receiver.GetText("exclusiveSec")); // both programmes covered it
+    }
+
+    [Fact]
     public async Task A_recovered_receiver_input_under_the_tv_is_not_counted_twice()
     {
         var rig = await CreateRigAsync();
