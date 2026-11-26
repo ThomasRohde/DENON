@@ -7,7 +7,7 @@ namespace Denon.App.Core.Tests;
 
 public sealed class McpPluginToolBridgeTests
 {
-    private static JsonElement ToJson(object value) => JsonSerializer.SerializeToElement(value);
+    private static JsonElement ToJson(object value) => JsonSerializer.SerializeToElement(value, value.GetType(), ModelContextProtocol.McpJsonUtilities.DefaultOptions);
 
     [Fact]
     public void Declared_parameters_become_the_input_schema()
@@ -96,6 +96,7 @@ public sealed class McpPluginToolBridgeTests
         Assert.False(json.GetProperty("isError").GetBoolean());
         Assert.Equal("image", content[0].GetProperty("type").GetString());
         Assert.Equal("image/png", content[0].GetProperty("mimeType").GetString());
+        Assert.Equal("aGVsbG8=", content[0].GetProperty("data").GetString()); // the plugin's base64, not encoded twice
         Assert.Equal("text", content[1].GetProperty("type").GetString());
         Assert.Contains("Stuen 2: Netflix (playing)", content[1].GetProperty("text").GetString());
         Assert.Contains("\"app\": \"Netflix\"", content[1].GetProperty("text").GetString());

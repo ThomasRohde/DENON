@@ -8,7 +8,7 @@ namespace Denon.App.Desktop.ViewModels;
 public sealed partial class MainViewModel
 {
     private RoomIntelligenceService _roomIntelligence = null!;
-    private DenonMcpHttpServer _mcpServer = null!;
+    private DenonMcpServer _mcpServer = null!;
 
     private bool _mcpEnabled = true;
     private string _mcpPortText = "18926";
@@ -191,7 +191,7 @@ public sealed partial class MainViewModel
 
     public bool HasMcpActivity => McpActivityFeed.Count > 0;
 
-    private void InitializeMcpAndIntelligence(RoomIntelligenceService roomIntelligence, DenonMcpHttpServer mcpServer)
+    private void InitializeMcpAndIntelligence(RoomIntelligenceService roomIntelligence, DenonMcpServer mcpServer)
     {
         _roomIntelligence = roomIntelligence;
         _mcpServer = mcpServer;

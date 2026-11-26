@@ -53,6 +53,20 @@ Phase 2 is done in 1.18.0: YouTube / YouTube Music and jukebox tracks are decode
       `session.ended` quiet once a receiver-input session ends covered by a Chromecast or Apple TV session (uncovered
       and still-running sessions stay visible).
 
+## MCP server (C# SDK)
+
+On the official MCP C# SDK since 2.10.1 (`DenonMcpServer`, `ModelContextProtocol.AspNetCore` 2.4, session mode
+`StatefulForInitializeClients`).
+
+- [ ] Ask instead of refusing: use input-required results (`InputRequiredException` with an elicitation) to confirm a
+      volume above the safe ceiling, power off, or which Chromecast. Needs a client that supports it (`IsMrtrSupported`
+      or a session with elicitation).
+- [ ] MCP Apps (`ModelContextProtocol.Extensions.Apps`, experimental): a now-playing card or the Insights charts in the
+      chat.
+- [ ] Room-state updates reach only session clients (initialize, 2025-11-25). 2026-07-28 clients get none: the SDK does
+      not yet fan out resource updates over `subscriptions/listen` (csharp-sdk #1662).
+- [ ] Verify live with Claude Code / Claude Desktop after the release (which protocol version they choose).
+
 ## Volume memory
 
 Learns the listening volume per source and sets it on a source change (2.10.0, `VolumeMemoryService`,

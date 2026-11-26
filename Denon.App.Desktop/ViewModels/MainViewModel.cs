@@ -151,7 +151,7 @@ public sealed partial class MainViewModel : ObservableObject
         LyricsService lyricsService,
         AcousticSyncCalibrationService calibrationService,
         RoomIntelligenceService roomIntelligenceService,
-        DenonMcpHttpServer mcpServer,
+        DenonMcpServer mcpServer,
         EventTelemetryLog telemetryLog)
     {
         _receiverController = receiverController;

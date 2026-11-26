@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ModelContextProtocol.Protocol;
 using Denon.App.PluginSdk;
 
 namespace Denon.App.Core.Mcp;
@@ -57,19 +58,14 @@ public static class McpPluginToolBridge
     /// MCP tool result for a plugin action: an image block when the plugin returns one, the JSON data
     /// (pretty text + <c>structuredContent</c> for objects) or else the message, and <c>isError</c> on failure.
     /// </summary>
-    public static object BuildResult(PluginActionResult result)
+    public static CallToolResult BuildResult(PluginActionResult result)
     {
         if (!result.Success)
         {
-            return new
-            {
-                content = new object[] { new { type = "text", text = result.Message } },
-                isError = true,
-            };
+            return new CallToolResult { Content = [new TextContentBlock { Text = result.Message }], IsError = true };
         }
 
-        JsonElement structured = default;
-        var hasStructured = false;
+        JsonElement? structured = null;
         var text = result.Message;
 
         if (!string.IsNullOrWhiteSpace(result.DataJson))
@@ -77,9 +73,9 @@ public static class McpPluginToolBridge
             try
             {
                 using var doc = JsonDocument.Parse(result.DataJson);
-                structured = doc.RootElement.Clone();
-                hasStructured = structured.ValueKind == JsonValueKind.Object;
-                var json = JsonSerializer.Serialize(structured, PrettyJson);
+                var data = doc.RootElement.Clone();
+                structured = data.ValueKind == JsonValueKind.Object ? data : null; // an object for every client version
+                var json = JsonSerializer.Serialize(data, PrettyJson);
                 text = string.IsNullOrWhiteSpace(result.Message) ? json : $"{result.Message}\n\n{json}";
             }
             catch (JsonException)
@@ -88,21 +84,18 @@ public static class McpPluginToolBridge
             }
         }
 
-        var content = new List<object>();
+        var content = new List<ContentBlock>();
         if (!string.IsNullOrWhiteSpace(result.ImageBase64))
         {
-            content.Add(new
+            // The SDK's Data is the base64 text as UTF-8 bytes (it writes them as is); FromBytes is for raw image bytes.
+            content.Add(new ImageContentBlock
             {
-                type = "image",
-                data = result.ImageBase64,
-                mimeType = string.IsNullOrWhiteSpace(result.ImageMimeType) ? "image/jpeg" : result.ImageMimeType,
+                Data = System.Text.Encoding.UTF8.GetBytes(result.ImageBase64),
+                MimeType = string.IsNullOrWhiteSpace(result.ImageMimeType) ? "image/jpeg" : result.ImageMimeType,
             });
         }
 
-        content.Add(new { type = "text", text });
-
-        return hasStructured
-            ? new { content, structuredContent = structured, isError = false }
-            : new { content, isError = false };
+        content.Add(new TextContentBlock { Text = text });
+        return new CallToolResult { Content = content, StructuredContent = structured, IsError = false };
     }
 }

@@ -4,6 +4,19 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **The MCP server runs on the official MCP C# SDK** (`ModelContextProtocol.AspNetCore` 2.4, ASP.NET Core Kestrel)
+  instead of the hand-written HTTP and JSON-RPC layer. It speaks the MCP revision **2026-07-28** (no start handshake
+  or session, version and client info on every request); clients that still start with `initialize` (2025-11-25 and
+  older) get a session as before. The tools, resources, prompts, permission tiers, safe-volume ceiling and plugin
+  tools are unchanged. The tool list is the SDK's tool collection: a plugin change tells sessions the list changed.
+- **LAN connections need no administrator rights** any more (Kestrel instead of HttpListener's URL reservation).
+- **A browser page on another site can no longer call the server**: requests with a foreign `Origin` get 403 (only
+  native clients and pages on this PC). The token is compared in fixed time.
+- **A missing resource is an invalid-params error (-32602)**, as 2026-07-28 asks.
+
 ## [2.10.0] - 2026-11-26
 
 ### Added

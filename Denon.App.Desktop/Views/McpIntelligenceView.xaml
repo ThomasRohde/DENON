@@ -52,7 +52,7 @@
 
                         <Border Grid.Column="0" Background="{DynamicResource SidebarBgBrush}" BorderBrush="{DynamicResource Ink11Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius03}" Padding="{skin:Space 10,7}">
                             <StackPanel>
-                                <TextBlock Text="STREAMABLE HTTP ENDPOINT (POST + SSE)" FontSize="{DynamicResource FontSize01}" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" />
+                                <TextBlock Text="STREAMABLE HTTP ENDPOINT (MCP 2026-07-28)" FontSize="{DynamicResource FontSize01}" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" />
                                 <TextBlock Text="{Binding McpEndpointText}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize06}" Foreground="{DynamicResource AccentCyanBrightBrush}" Margin="{skin:Space 0,2,0,0}" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                         </Border>

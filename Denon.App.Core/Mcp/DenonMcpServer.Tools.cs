@@ -1,955 +1,18 @@
-using System.Collections.Concurrent;
-using System.Diagnostics;
-using System.Net;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Denon.App.Core.Models;
 using Denon.App.Core.Plugins;
 using Denon.App.Core.Services;
+using ModelContextProtocol.Protocol;
 
 namespace Denon.App.Core.Mcp;
 
-/// <summary>
-/// Spec-compliant Streamable HTTP Model Context Protocol (MCP) server hosted natively inside Denon Desktop.
-/// - Single endpoint: POST /mcp (JSON-RPC 2.0), GET /mcp (SSE live notifications), DELETE /mcp (session close), GET /health
-/// - Exposes live Room Graph Resources, Expert Prompts, Curated Intelligence Tools, and auto-bridged IDenonPlugin Tools
-/// - Enforces Bearer authentication, Permission Tiers (Observer / SafeControl / FullOrchestration), and MaxSafeVolume ceiling
-/// </summary>
-public sealed partial class DenonMcpHttpServer : IAsyncDisposable
+/// <summary>The tools of the Denon Desktop MCP server: their definitions, and what each call does.</summary>
+public sealed partial class DenonMcpServer
 {
-    private const string ServerName = "denon-desktop-mcp";
-    private const string ServerVersion = "1.13.1";
-    private const string DefaultProtocolVersion = "2025-11-25";
-
-    private static readonly JsonSerializerOptions JsonOutOptions = new()
+    private List<Tool> BuildToolDefinitions()
     {
-        WriteIndented = false,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-    };
-
-    private static readonly JsonSerializerOptions JsonPrettyOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-    };
-
-    private readonly AppSettingsStore _settingsStore;
-    private readonly ReceiverController _receiverController;
-    private readonly ReceiverStateStore _stateStore;
-    private readonly PluginHostService _pluginHost;
-    private readonly RoomIntelligenceService _intelligence;
-    private readonly RadioBrowserService _radioBrowser;
-    private readonly YouTubeMediaService _youtubeService;
-    private readonly LocalAudioRelayServer _relayServer;
-    private readonly YouTubeQueueService _queueService;
-    private readonly LyricsService _lyricsService;
-    private readonly EventTelemetryLog _telemetry;
-    private readonly AppLogStore _logStore;
-
-    private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
-    private readonly object _activityLock = new();
-    private readonly List<McpActivityEntry> _activityLog = [];
-    private readonly ConcurrentDictionary<string, DateTimeOffset> _sessions = new();
-    private readonly ConcurrentDictionary<Guid, StreamWriter> _sseClients = new();
-
-    private HttpListener? _listener;
-    private CancellationTokenSource? _cts;
-    private Task? _acceptLoop;
-    private bool _disposed;
-
-    public DenonMcpHttpServer(
-        AppSettingsStore settingsStore,
-        ReceiverController receiverController,
-        ReceiverStateStore stateStore,
-        PluginHostService pluginHost,
-        RoomIntelligenceService intelligence,
-        RadioBrowserService radioBrowser,
-        YouTubeMediaService youtubeService,
-        LocalAudioRelayServer relayServer,
-        YouTubeQueueService queueService,
-        LyricsService lyricsService,
-        EventTelemetryLog telemetry,
-        AppLogStore logStore)
-    {
-        _settingsStore = settingsStore;
-        _receiverController = receiverController;
-        _stateStore = stateStore;
-        _pluginHost = pluginHost;
-        _intelligence = intelligence;
-        _radioBrowser = radioBrowser;
-        _youtubeService = youtubeService;
-        _relayServer = relayServer;
-        _queueService = queueService;
-        _lyricsService = lyricsService;
-        _telemetry = telemetry;
-        _logStore = logStore;
-
-        _intelligence.RoomGraphChanged += BroadcastRoomUpdatedNotification;
-    }
-
-    public event Action? StatusChanged;
-
-    public event Action<McpActivityEntry>? ActivityAdded;
-
-    public bool IsRunning => _listener?.IsListening == true;
-
-    public string ListeningEndpoint { get; private set; } = string.Empty;
-
-    public string? LastError { get; private set; }
-
-    public int RegisteredToolCount => BuildToolDefinitions().Count;
-
-    public IReadOnlyList<McpActivityEntry> GetRecentActivity()
-    {
-        lock (_activityLock)
-        {
-            return [.. _activityLog];
-        }
-    }
-
-    public void ClearActivity()
-    {
-        lock (_activityLock)
-        {
-            _activityLog.Clear();
-        }
-    }
-
-    public string BuildClientConfigJson()
-    {
-        var cfg = _settingsStore.Current.Mcp;
-        var url = string.IsNullOrWhiteSpace(ListeningEndpoint)
-            ? $"http://127.0.0.1:{cfg.Port}/mcp"
-            : ListeningEndpoint;
-
-        object serverEntry = cfg.RequireBearerAuth && !string.IsNullOrWhiteSpace(cfg.BearerToken)
-            ? new
-            {
-                type = "http",
-                url,
-                headers = new Dictionary<string, string>
-                {
-                    ["Authorization"] = $"Bearer {cfg.BearerToken}",
-                },
-            }
-            : new
-            {
-                type = "http",
-                url,
-            };
-
-        var root = new Dictionary<string, object>
-        {
-            ["mcpServers"] = new Dictionary<string, object>
-            {
-                ["denon-desktop"] = serverEntry,
-            },
-        };
-
-        return JsonSerializer.Serialize(root, JsonPrettyOptions);
-    }
-
-    public async Task ApplySettingsAsync(CancellationToken ct = default)
-    {
-        var cfg = _settingsStore.Current.Mcp;
-        if (!cfg.Enabled)
-        {
-            await StopAsync();
-            return;
-        }
-
-        await RestartAsync(ct);
-    }
-
-    public async Task RestartAsync(CancellationToken ct = default)
-    {
-        await _lifecycleGate.WaitAsync(ct);
-        try
-        {
-            await StopCoreLockedAsync();
-            StartCoreLocked();
-        }
-        finally
-        {
-            _lifecycleGate.Release();
-        }
-
-        StatusChanged?.Invoke();
-    }
-
-    public async Task StopAsync()
-    {
-        await _lifecycleGate.WaitAsync();
-        try
-        {
-            await StopCoreLockedAsync();
-        }
-        finally
-        {
-            _lifecycleGate.Release();
-        }
-
-        StatusChanged?.Invoke();
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        _intelligence.RoomGraphChanged -= BroadcastRoomUpdatedNotification;
-        await StopAsync();
-        _lifecycleGate.Dispose();
-    }
-
-    private void StartCoreLocked()
-    {
-        var cfg = _settingsStore.Current.Mcp;
-        if (!cfg.Enabled)
-        {
-            return;
-        }
-
-        var port = Math.Clamp(cfg.Port, 1024, 65535);
-        var listener = new HttpListener();
-        var boundHost = "127.0.0.1";
-
-        try
-        {
-            if (cfg.AllowLanConnections)
-            {
-                try
-                {
-                    listener.Prefixes.Add($"http://+:{port}/");
-                    listener.Start();
-                    boundHost = LocalAudioRelayServer.ResolveLocalLanIpForReceiver(_settingsStore.Current.Receiver.Host);
-                }
-                catch
-                {
-                    // Fallback cleanly to localhost if URLACL isn't registered for '+'
-                    listener.Close();
-                    listener = new HttpListener();
-                    listener.Prefixes.Add($"http://127.0.0.1:{port}/");
-                    listener.Prefixes.Add($"http://localhost:{port}/");
-                    listener.Start();
-                    boundHost = "127.0.0.1";
-                    _logStore.Warning($"MCP LAN bind (+:{port}) needs admin URLACL; fell back to localhost (127.0.0.1:{port}).");
-                }
-            }
-            else
-            {
-                listener.Prefixes.Add($"http://127.0.0.1:{port}/");
-                listener.Prefixes.Add($"http://localhost:{port}/");
-                listener.Start();
-            }
-
-            _listener = listener;
-            _cts = new CancellationTokenSource();
-            ListeningEndpoint = $"http://{boundHost}:{port}/mcp";
-            LastError = null;
-
-            var token = _cts.Token;
-            _acceptLoop = Task.Run(() => AcceptLoopAsync(listener, token), token);
-            _logStore.Info($"Streamable HTTP MCP server listening on {ListeningEndpoint} ({RegisteredToolCount} tools, tier: {cfg.PermissionTier}).");
-        }
-        catch (Exception ex)
-        {
-            LastError = ex.Message;
-            ListeningEndpoint = string.Empty;
-            try { listener.Close(); } catch { }
-            _logStore.Warning($"Failed to start MCP HTTP server on port {port}: {ex.Message}");
-        }
-    }
-
-    private async Task StopCoreLockedAsync()
-    {
-        if (_cts is not null)
-        {
-            _cts.Cancel();
-            _cts.Dispose();
-            _cts = null;
-        }
-
-        foreach (var kv in _sseClients)
-        {
-            if (_sseClients.TryRemove(kv.Key, out var writer))
-            {
-                try { writer.Dispose(); } catch { }
-            }
-        }
-
-        if (_listener is not null)
-        {
-            try { _listener.Stop(); } catch { }
-            try { _listener.Close(); } catch { }
-            _listener = null;
-        }
-
-        if (_acceptLoop is not null)
-        {
-            try { await _acceptLoop.WaitAsync(TimeSpan.FromSeconds(2)); } catch { }
-            _acceptLoop = null;
-        }
-
-        ListeningEndpoint = string.Empty;
-    }
-
-    private async Task AcceptLoopAsync(HttpListener listener, CancellationToken ct)
-    {
-        while (!ct.IsCancellationRequested && listener.IsListening)
-        {
-            HttpListenerContext ctx;
-            try
-            {
-                ctx = await listener.GetContextAsync().WaitAsync(ct);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-            catch (HttpListenerException)
-            {
-                break;
-            }
-            catch (ObjectDisposedException)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                _logStore.Warning($"MCP listener warning: {ex.Message}");
-                continue;
-            }
-
-            _ = Task.Run(() => HandleHttpContextAsync(ctx, ct), ct);
-        }
-    }
-
-    private async Task HandleHttpContextAsync(HttpListenerContext ctx, CancellationToken ct)
-    {
-        var req = ctx.Request;
-        var resp = ctx.Response;
-        var path = (req.Url?.AbsolutePath ?? "/").TrimEnd('/');
-        if (string.IsNullOrEmpty(path))
-        {
-            path = "/";
-        }
-
-        AddCorsHeaders(resp);
-
-        try
-        {
-            if (req.HttpMethod.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
-            {
-                resp.StatusCode = 204;
-                resp.Close();
-                return;
-            }
-
-            // Public lightweight health check
-            if (req.HttpMethod.Equals("GET", StringComparison.OrdinalIgnoreCase) &&
-                (path.Equals("/health", StringComparison.OrdinalIgnoreCase) || path == "/"))
-            {
-                await WriteJsonResponseAsync(resp, 200, new
-                {
-                    status = "ok",
-                    server = ServerName,
-                    version = ServerVersion,
-                    protocolVersion = DefaultProtocolVersion,
-                    endpoint = ListeningEndpoint,
-                    permissionTier = _settingsStore.Current.Mcp.PermissionTier.ToString(),
-                    maxSafeVolume = _settingsStore.Current.Mcp.MaxSafeVolume,
-                    toolsCount = RegisteredToolCount,
-                    resourcesCount = 4,
-                    resourceTemplatesCount = 3,
-                    promptsCount = 4,
-                });
-                return;
-            }
-
-            if (!path.Equals("/mcp", StringComparison.OrdinalIgnoreCase))
-            {
-                await WriteJsonResponseAsync(resp, 404, new { error = "Not Found. Use /mcp (Streamable HTTP MCP) or /health." });
-                return;
-            }
-
-            if (!IsAuthorized(req))
-            {
-                LogActivity("auth", $"{req.HttpMethod} /mcp from {req.RemoteEndPoint?.Address}", "Blocked (401)", 0);
-                resp.Headers["WWW-Authenticate"] = "Bearer realm=\"DenonDesktopMCP\"";
-                await WriteJsonResponseAsync(resp, 401, new { error = "Unauthorized. Provide header: Authorization: Bearer <token>" });
-                return;
-            }
-
-            if (req.HttpMethod.Equals("DELETE", StringComparison.OrdinalIgnoreCase))
-            {
-                var sid = req.Headers["Mcp-Session-Id"];
-                if (!string.IsNullOrWhiteSpace(sid))
-                {
-                    _sessions.TryRemove(sid, out _);
-                }
-
-                resp.StatusCode = 204;
-                resp.Close();
-                return;
-            }
-
-            if (req.HttpMethod.Equals("GET", StringComparison.OrdinalIgnoreCase))
-            {
-                await HandleSseStreamAsync(resp, ct);
-                return;
-            }
-
-            if (!req.HttpMethod.Equals("POST", StringComparison.OrdinalIgnoreCase))
-            {
-                await WriteJsonResponseAsync(resp, 405, new { error = "Method Not Allowed. Use POST /mcp or GET /mcp." });
-                return;
-            }
-
-            string body;
-            using (var reader = new StreamReader(req.InputStream, Encoding.UTF8))
-            {
-                body = await reader.ReadToEndAsync(ct);
-            }
-
-            if (string.IsNullOrWhiteSpace(body))
-            {
-                await WriteJsonResponseAsync(resp, 400, BuildJsonRpcError(null, -32700, "Empty JSON-RPC request body."));
-                return;
-            }
-
-            JsonDocument doc;
-            try
-            {
-                doc = JsonDocument.Parse(body);
-            }
-            catch (JsonException ex)
-            {
-                await WriteJsonResponseAsync(resp, 400, BuildJsonRpcError(null, -32700, $"Parse error: {ex.Message}"));
-                return;
-            }
-
-            using (doc)
-            {
-                var sessionId = req.Headers["Mcp-Session-Id"];
-                if (string.IsNullOrWhiteSpace(sessionId))
-                {
-                    sessionId = Guid.NewGuid().ToString("N");
-                }
-
-                _sessions[sessionId] = DateTimeOffset.UtcNow;
-                resp.Headers["Mcp-Session-Id"] = sessionId;
-
-                var root = doc.RootElement;
-                if (root.ValueKind == JsonValueKind.Array)
-                {
-                    var batchResults = new List<object>();
-                    foreach (var item in root.EnumerateArray())
-                    {
-                        var single = await DispatchJsonRpcAsync(item, ct);
-                        if (single is not null)
-                        {
-                            batchResults.Add(single);
-                        }
-                    }
-
-                    if (batchResults.Count == 0)
-                    {
-                        resp.StatusCode = 202;
-                        resp.Close();
-                    }
-                    else
-                    {
-                        await WriteJsonResponseAsync(resp, 200, batchResults);
-                    }
-                }
-                else
-                {
-                    var result = await DispatchJsonRpcAsync(root, ct);
-                    if (result is null)
-                    {
-                        // JSON-RPC notification (no id) -> 202 Accepted per MCP Streamable HTTP spec
-                        resp.StatusCode = 202;
-                        resp.Close();
-                    }
-                    else
-                    {
-                        await WriteJsonResponseAsync(resp, 200, result);
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            try
-            {
-                await WriteJsonResponseAsync(resp, 500, BuildJsonRpcError(null, -32603, $"Internal server error: {ex.Message}"));
-            }
-            catch
-            {
-                try { resp.Abort(); } catch { }
-            }
-        }
-    }
-
-    private async Task HandleSseStreamAsync(HttpListenerResponse resp, CancellationToken ct)
-    {
-        var clientId = Guid.NewGuid();
-        resp.StatusCode = 200;
-        resp.ContentType = "text/event-stream; charset=utf-8";
-        resp.Headers["Cache-Control"] = "no-cache";
-        resp.Headers["Connection"] = "keep-alive";
-        resp.SendChunked = true;
-
-        using var writer = new StreamWriter(resp.OutputStream, new UTF8Encoding(false), leaveOpen: false) { AutoFlush = true };
-        _sseClients[clientId] = writer;
-        LogActivity("sse", "Connected live room-event SSE stream", "OK", 0);
-
-        try
-        {
-            await writer.WriteAsync(": connected to denon-desktop-mcp\n\n");
-            while (!ct.IsCancellationRequested)
-            {
-                await Task.Delay(TimeSpan.FromSeconds(25), ct);
-                await writer.WriteAsync(": keepalive\n\n");
-            }
-        }
-        catch
-        {
-            // Client disconnected.
-        }
-        finally
-        {
-            _sseClients.TryRemove(clientId, out _);
-            try { resp.Close(); } catch { }
-        }
-    }
-
-    private void BroadcastRoomUpdatedNotification()
-    {
-        if (_sseClients.IsEmpty)
-        {
-            return;
-        }
-
-        var payload = JsonSerializer.Serialize(new
-        {
-            jsonrpc = "2.0",
-            method = "notifications/resources/updated",
-            @params = new { uri = "denon://room/state" },
-        }, JsonOutOptions);
-
-        var frame = $"event: message\ndata: {payload}\n\n";
-        foreach (var kv in _sseClients)
-        {
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await kv.Value.WriteAsync(frame);
-                }
-                catch
-                {
-                    _sseClients.TryRemove(kv.Key, out _);
-                }
-            });
-        }
-    }
-
-    private async Task<object?> DispatchJsonRpcAsync(JsonElement msg, CancellationToken ct)
-    {
-        var hasId = msg.TryGetProperty("id", out var idEl) && idEl.ValueKind != JsonValueKind.Null;
-        object? idObj = hasId ? CloneJsonId(idEl) : null;
-        var method = msg.TryGetProperty("method", out var mEl) ? mEl.GetString() ?? string.Empty : string.Empty;
-        var hasParams = msg.TryGetProperty("params", out var paramsEl) && paramsEl.ValueKind == JsonValueKind.Object;
-
-        // Notifications (no id) require no JSON-RPC response body
-        if (!hasId || method.StartsWith("notifications/", StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
-        var sw = Stopwatch.StartNew();
-        try
-        {
-            object result = method switch
-            {
-                "initialize" => HandleInitialize(hasParams ? paramsEl : default),
-                "ping" => new { },
-                "tools/list" => new { tools = BuildToolDefinitions() },
-                "tools/call" => await HandleToolCallAsync(hasParams ? paramsEl : default, ct),
-                "resources/list" => HandleResourcesList(),
-                "resources/templates/list" => HandleResourceTemplatesList(),
-                "resources/read" => HandleResourceRead(hasParams ? paramsEl : default),
-                "resources/subscribe" => new { },
-                "resources/unsubscribe" => new { },
-                "prompts/list" => HandlePromptsList(),
-                "prompts/get" => HandlePromptGet(hasParams ? paramsEl : default),
-                "completion/complete" => HandleCompletionComplete(hasParams ? paramsEl : default),
-                "logging/setLevel" => new { },
-                _ => throw new McpMethodNotFoundException($"Method '{method}' not found."),
-            };
-
-            sw.Stop();
-            if (method is not ("ping" or "tools/list" or "resources/list" or "resources/templates/list" or "prompts/list" or "completion/complete" or "logging/setLevel"))
-            {
-                var detail = method == "tools/call" && hasParams && paramsEl.TryGetProperty("name", out var nEl)
-                    ? nEl.GetString() ?? method
-                    : (method == "resources/read" && hasParams && paramsEl.TryGetProperty("uri", out var uEl) ? uEl.GetString() ?? method : method);
-                LogActivity(method, detail, "OK", sw.ElapsedMilliseconds);
-            }
-
-            return new
-            {
-                jsonrpc = "2.0",
-                id = idObj,
-                result,
-            };
-        }
-        catch (McpMethodNotFoundException ex)
-        {
-            sw.Stop();
-            LogActivity(method, ex.Message, "Error", sw.ElapsedMilliseconds);
-            return BuildJsonRpcError(idObj, -32601, ex.Message);
-        }
-        catch (McpInvalidParamsException ex)
-        {
-            sw.Stop();
-            LogActivity(method, ex.Message, "Invalid Params", sw.ElapsedMilliseconds);
-            return BuildJsonRpcError(idObj, -32602, ex.Message);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            sw.Stop();
-            LogActivity(method, ex.Message, "Blocked (Tier)", sw.ElapsedMilliseconds);
-            return new
-            {
-                jsonrpc = "2.0",
-                id = idObj,
-                result = BuildToolError(ex.Message),
-            };
-        }
-        catch (Exception ex)
-        {
-            sw.Stop();
-            LogActivity(method, ex.Message, "Error", sw.ElapsedMilliseconds);
-            return new
-            {
-                jsonrpc = "2.0",
-                id = idObj,
-                result = BuildToolError(ex.Message),
-            };
-        }
-    }
-
-    private object HandleInitialize(JsonElement paramsEl)
-    {
-        var negotiatedVersion = DefaultProtocolVersion;
-        if (paramsEl.ValueKind == JsonValueKind.Object &&
-            paramsEl.TryGetProperty("protocolVersion", out var pvEl) &&
-            pvEl.GetString() is { Length: > 0 } requested)
-        {
-            negotiatedVersion = requested;
-        }
-
-        return new
-        {
-            protocolVersion = negotiatedVersion,
-            capabilities = new
-            {
-                tools = new { listChanged = true },
-                resources = new { subscribe = true, listChanged = true },
-                prompts = new { listChanged = false },
-                completions = new { },
-                logging = new { },
-            },
-            serverInfo = new
-            {
-                name = ServerName,
-                version = ServerVersion,
-            },
-            instructions =
-                "Denon Desktop Living-Room Intelligence MCP Server. Read denon://room/state and denon://memory/habits first to understand the user's Denon AVR, Philips Hue lights, LG webOS Smart TV, Home Assistant entities, active Room Doctor insights, and preferred listening volumes. Use apply_atmosphere for cohesive multi-device moods (it automatically captures an Undo snapshot and enforces MaxSafeVolume). Use tv_computer to visually see (screenshot) and operate the LG webOS TV OS, Web Browser, Magic Remote pointer, and apps in a single unified tool.",
-        };
-    }
-
-    private static object HandleResourcesList() => new
-    {
-        resources = new object[]
-        {
-            new
-            {
-                uri = "denon://room/state",
-                name = "Live Living-Room State Graph",
-                description = "Unified real-time state of Denon/Marantz AVR, Now Playing, Up-Next Queue, Philips Hue, LG webOS TV, Home Assistant, Room Doctor Insights, Undo snapshot, and safety limits.",
-                mimeType = "application/json",
-            },
-            new
-            {
-                uri = "denon://diagnostics/health",
-                name = "Home Theater Diagnostics & Health",
-                description = "Cross-device Room Doctor insights, LIVE PUSH status, and recent warning/error log entries.",
-                mimeType = "application/json",
-            },
-            new
-            {
-                uri = "denon://catalog/capabilities",
-                name = "Inputs, Sound Modes, Smart Scenes, Rules & Plugins Catalog",
-                description = "Complete reference of valid AVR input codes, sound mode codes, configured Smart Scenes, automations and their node types, and all installed Plugin Actions.",
-                mimeType = "application/json",
-            },
-            new
-            {
-                uri = "denon://memory/habits",
-                name = "Local Listening Habits & Preferences Memory",
-                description = "Locally learned preferred volume per time of day (Morning/Afternoon/Evening/LateNight), top inputs, sound modes, scenes, and plugin actions.",
-                mimeType = "application/json",
-            },
-        },
-    };
-
-    private static object HandleResourceTemplatesList() => new
-    {
-        resourceTemplates = new object[]
-        {
-            new
-            {
-                uriTemplate = "denon://plugins/{pluginId}",
-                name = "Plugin Details & Actions",
-                description = "Inspect live health, status, capabilities, and actions for a specific plugin (e.g. philips-hue, smart-tv, home-assistant).",
-                mimeType = "application/json",
-            },
-            new
-            {
-                uriTemplate = "denon://scenes/{sceneId}",
-                name = "Smart Scene Configuration",
-                description = "Read the complete AVR, acoustic, and chained plugin action configuration for a specific Smart Scene (e.g. movie-night, late-night).",
-                mimeType = "application/json",
-            },
-            new
-            {
-                uriTemplate = "denon://logs/events/{stream}",
-                name = "Smart Event & Habit Telemetry Stream",
-                description = "Read recent habit-ready structured events from a telemetry stream (media, avr, tv, lighting, control, all, or plugin:<id>).",
-                mimeType = "application/json",
-            },
-        },
-    };
-
-    private object HandleResourceRead(JsonElement paramsEl)
-    {
-        var uri = GetString(paramsEl, "uri");
-        var lower = uri.ToLowerInvariant();
-        object payload;
-
-        if (lower == "denon://room/state")
-        {
-            payload = _intelligence.BuildRoomStatePayload();
-        }
-        else if (lower == "denon://diagnostics/health")
-        {
-            payload = _intelligence.BuildDiagnosticsPayload();
-        }
-        else if (lower == "denon://catalog/capabilities")
-        {
-            payload = _intelligence.BuildCapabilitiesPayload();
-        }
-        else if (lower == "denon://memory/habits")
-        {
-            payload = _intelligence.BuildHabitsPayload();
-        }
-        else if (lower.StartsWith("denon://plugins/", StringComparison.Ordinal))
-        {
-            var pluginId = Uri.UnescapeDataString(uri["denon://plugins/".Length..].Trim('/'));
-            var plugin = _pluginHost.GetPlugins().FirstOrDefault(p => p.Id.Equals(pluginId, StringComparison.OrdinalIgnoreCase))
-                ?? throw new McpInvalidParamsException($"Plugin '{pluginId}' not found.");
-            payload = new
-            {
-                id = plugin.Id,
-                name = plugin.Name,
-                version = plugin.Version,
-                category = plugin.Category,
-                enabled = plugin.IsEnabled,
-                health = plugin.Health.ToString(),
-                status = plugin.StatusText,
-                lastError = plugin.LastError,
-                actions = plugin.Actions.Select(a => new
-                {
-                    id = a.ActionId,
-                    mcpToolName = BuildPluginToolName(plugin.Id, a.ActionId),
-                    name = a.DisplayName,
-                    description = a.Description,
-                    category = a.Category,
-                }).ToArray(),
-            };
-        }
-        else if (lower.StartsWith("denon://scenes/", StringComparison.Ordinal))
-        {
-            var sceneId = Uri.UnescapeDataString(uri["denon://scenes/".Length..].Trim('/'));
-            var scene = _settingsStore.Current.Receiver.Scenes.FirstOrDefault(s =>
-                s.Id.Equals(sceneId, StringComparison.OrdinalIgnoreCase) ||
-                s.Name.Equals(sceneId, StringComparison.OrdinalIgnoreCase))
-                ?? throw new McpInvalidParamsException($"Smart Scene '{sceneId}' not found.");
-            payload = scene;
-        }
-        else if (lower.StartsWith("denon://logs/events/", StringComparison.Ordinal))
-        {
-            var streamName = Uri.UnescapeDataString(uri["denon://logs/events/".Length..].Trim('/'));
-            var events = _telemetry.QueryRecentEvents(streamName, hours: 72, limit: 120);
-            payload = new
-            {
-                stream = string.IsNullOrWhiteSpace(streamName) ? "all" : streamName,
-                hours = 72,
-                count = events.Count,
-                availableStreams = _telemetry.ListAvailableStreams(),
-                stats = _telemetry.GetStats(),
-                events,
-            };
-        }
-        else
-        {
-            throw new McpInvalidParamsException($"Unknown resource URI '{uri}'.");
-        }
-
-        return new
-        {
-            contents = new[]
-            {
-                new
-                {
-                    uri,
-                    mimeType = "application/json",
-                    text = JsonSerializer.Serialize(payload, JsonPrettyOptions),
-                },
-            },
-        };
-    }
-
-    private object HandleCompletionComplete(JsonElement paramsEl)
-    {
-        var argName = string.Empty;
-        var argVal = string.Empty;
-        if (paramsEl.ValueKind == JsonValueKind.Object &&
-            paramsEl.TryGetProperty("argument", out var argEl) &&
-            argEl.ValueKind == JsonValueKind.Object)
-        {
-            argName = GetString(argEl, "name");
-            argVal = GetString(argEl, "value");
-        }
-
-        IEnumerable<string> candidates = argName.ToLowerInvariant() switch
-        {
-            "pluginid" => _pluginHost.GetPlugins().Select(p => p.Id),
-            "sceneid" => _settingsStore.Current.Receiver.Scenes.Select(s => s.Id),
-            "stream" => new[] { "all" }.Concat(_telemetry.ListAvailableStreams()),
-            "vibe" => ["cozy rainy jazz night", "sci-fi cinema night", "late night reading", "upbeat party sync"],
-            "goal" => ["clearer movie dialogue at night", "pure audiophile stereo", "punchier subwoofer bass"],
-            _ => [],
-        };
-
-        var values = candidates
-            .Where(c => string.IsNullOrWhiteSpace(argVal) || c.Contains(argVal, StringComparison.OrdinalIgnoreCase))
-            .Take(20)
-            .ToArray();
-
-        return new
-        {
-            completion = new
-            {
-                values,
-                total = values.Length,
-                hasMore = false,
-            },
-        };
-    }
-
-    private static object HandlePromptsList() => new
-    {
-        prompts = new object[]
-        {
-            new
-            {
-                name = "design_atmosphere",
-                description = "Design and apply a cohesive living-room atmosphere across Denon AVR, Philips Hue, LG webOS TV, and music.",
-                arguments = new[]
-                {
-                    new { name = "vibe", description = "Desired mood or activity (e.g. 'cozy rainy jazz night', 'sci-fi cinema', 'late night reading')", required = true },
-                },
-            },
-            new
-            {
-                name = "diagnose_home_theater",
-                description = "Inspect cross-device state and logs to diagnose & fix audio/video/TV/lighting issues.",
-                arguments = new[]
-                {
-                    new { name = "symptom", description = "What feels wrong (e.g. 'no sound from TV', 'too quiet', 'lights not syncing')", required = false },
-                },
-            },
-            new
-            {
-                name = "acoustic_advisor",
-                description = "Recommend and apply Audyssey, Dynamic EQ/Volume, Dialog/Subwoofer trims safely for the user's goal.",
-                arguments = new[]
-                {
-                    new { name = "goal", description = "Acoustic objective (e.g. 'clearer movie dialogue at night', 'punchier bass for music')", required = true },
-                },
-            },
-            new
-            {
-                name = "architect_automation",
-                description = "Build a validated Smart Scene and/or automation graph from a plain-English habit description.",
-                arguments = new[]
-                {
-                    new { name = "habit", description = "Natural language trigger & actions (e.g. 'When I open Plex after 8pm, dim Hue and switch TV to HDMI 2')", required = true },
-                },
-            },
-        },
-    };
-
-    private static object HandlePromptGet(JsonElement paramsEl)
-    {
-        var name = GetString(paramsEl, "name");
-        var args = paramsEl.TryGetProperty("arguments", out var aEl) && aEl.ValueKind == JsonValueKind.Object ? aEl : default;
-
-        var promptText = name.ToLowerInvariant() switch
-        {
-            "design_atmosphere" =>
-                $"Design and apply a cohesive living-room atmosphere for: \"{GetString(args, "vibe", "evening relax")}\". " +
-                "First read denon://room/state and denon://memory/habits to respect the user's preferred time-of-day volume and available plugins. " +
-                "Then use apply_atmosphere (plus media_search_radio or media_play_youtube if music fits) to orchestrate Denon AVR, Philips Hue, and LG webOS TV smoothly.",
-            "diagnose_home_theater" =>
-                $"Diagnose this home theater symptom: \"{GetString(args, "symptom", "general health check")}\". " +
-                "Call diagnose_room and read denon://diagnostics/health + denon://room/state. Identify any cross-device mismatches (e.g. LG TV speaker output vs HDMI eARC, muted AVR, low volume, plugin warning) and either fix them with fix_room_issue or explain the exact cause clearly.",
-            "acoustic_advisor" =>
-                $"Optimize Denon AVR acoustics for: \"{GetString(args, "goal", "clear dialogue at moderate volume")}\". " +
-                "Read denon://room/state first, then use avr_tune_acoustics safely and explain what each adjustment does.",
-            "architect_automation" =>
-                $"Create a Denon Desktop Smart Scene and/or automation for this habit: \"{GetString(args, "habit", "movie night automation")}\". " +
-                "Read denon://catalog/capabilities to use valid input codes, sound modes, and plugin action IDs and automation node types, then call create_or_update_scene and/or create_or_update_automation (a trigger, optional conditions, then actions).",
-            _ => throw new McpInvalidParamsException($"Unknown prompt '{name}'."),
-        };
-
-        return new
-        {
-            description = $"Denon Desktop guided workflow: {name}",
-            messages = new[]
-            {
-                new
-                {
-                    role = "user",
-                    content = new { type = "text", text = promptText },
-                },
-            },
-        };
-    }
-
-    private List<object> BuildToolDefinitions()
-    {
-        var tools = new List<object>
+        var tools = new List<Tool>
         {
             // Room Intelligence & Diagnostics
             Tool("get_room_state",
@@ -1283,10 +346,8 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         return tools;
     }
 
-    private async Task<object> HandleToolCallAsync(JsonElement paramsEl, CancellationToken ct)
+    private async Task<CallToolResult> HandleToolCallAsync(string toolName, JsonElement args, CancellationToken ct)
     {
-        var toolName = GetString(paramsEl, "name");
-        var args = paramsEl.TryGetProperty("arguments", out var aEl) && aEl.ValueKind == JsonValueKind.Object ? aEl : default;
         var cfg = _settingsStore.Current.Mcp;
 
         // Read-only tools (allowed in all permission tiers including Observer)
@@ -1783,7 +844,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         throw new McpInvalidParamsException($"Unknown MCP tool '{toolName}'.");
     }
 
-    private async Task<object> ExecuteTvComputerToolAsync(JsonElement args, McpServerSettings cfg, CancellationToken ct)
+    private async Task<CallToolResult> ExecuteTvComputerToolAsync(JsonElement args, McpServerSettings cfg, CancellationToken ct)
     {
         var action = GetString(args, "action", "screenshot").Trim().ToLowerInvariant();
         var isReadOnlyAction = action is "screenshot" or "get_state" or "get_settings";
@@ -1837,57 +898,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
             _intelligence.RecordPluginActionUsed("smart-tv", $"tv.computer:{action}");
         }
 
-        JsonElement structured = default;
-        var hasStructured = false;
-        var textPayload = res.Message;
-
-        if (!string.IsNullOrWhiteSpace(res.DataJson))
-        {
-            try
-            {
-                using var parsedDoc = JsonDocument.Parse(res.DataJson);
-                structured = parsedDoc.RootElement.Clone();
-                hasStructured = structured.ValueKind == JsonValueKind.Object;
-                textPayload = JsonSerializer.Serialize(structured, JsonPrettyOptions);
-            }
-            catch
-            {
-                textPayload = res.DataJson;
-            }
-        }
-
-        var contentBlocks = new List<object>();
-        if (!string.IsNullOrWhiteSpace(res.ImageBase64))
-        {
-            contentBlocks.Add(new
-            {
-                type = "image",
-                data = res.ImageBase64,
-                mimeType = string.IsNullOrWhiteSpace(res.ImageMimeType) ? "image/jpeg" : res.ImageMimeType,
-            });
-        }
-
-        contentBlocks.Add(new
-        {
-            type = "text",
-            text = textPayload,
-        });
-
-        if (hasStructured)
-        {
-            return new
-            {
-                content = contentBlocks,
-                structuredContent = structured,
-                isError = false,
-            };
-        }
-
-        return new
-        {
-            content = contentBlocks,
-            isError = false,
-        };
+        return McpPluginToolBridge.BuildResult(res);
     }
 
     private static object BuildTvComputerSchema() => new
@@ -1944,7 +955,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         required = new[] { "action" },
     };
 
-    private async Task<object> ExecuteApplyAtmosphereAsync(JsonElement args, McpServerSettings cfg, CancellationToken ct)
+    private async Task<CallToolResult> ExecuteApplyAtmosphereAsync(JsonElement args, McpServerSettings cfg, CancellationToken ct)
     {
         var reason = GetString(args, "reason", "AI Atmosphere");
         var captured = _intelligence.CaptureSnapshot($"MCP Atmosphere: {reason}");
@@ -2015,7 +1026,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         });
     }
 
-    private async Task<object> ExecuteTuneAcousticsAsync(JsonElement args, CancellationToken ct)
+    private async Task<CallToolResult> ExecuteTuneAcousticsAsync(JsonElement args, CancellationToken ct)
     {
         var applied = new List<string>();
         if (GetString(args, "multeq") is { Length: > 0 } multeq)
@@ -2073,7 +1084,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
             : BuildToolText("No acoustic parameters were specified.");
     }
 
-    private async Task<object> ExecuteCreateOrUpdateSceneAsync(JsonElement args, McpServerSettings cfg, CancellationToken ct)
+    private async Task<CallToolResult> ExecuteCreateOrUpdateSceneAsync(JsonElement args, McpServerSettings cfg, CancellationToken ct)
     {
         var id = Slugify(RequireString(args, "id"));
         var name = RequireString(args, "name");
@@ -2124,7 +1135,7 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         return BuildToolJson(new { saved = true, scene });
     }
 
-    private async Task<object> ExecuteCreateOrUpdateAutomationAsync(JsonElement args, CancellationToken ct)
+    private async Task<CallToolResult> ExecuteCreateOrUpdateAutomationAsync(JsonElement args, CancellationToken ct)
     {
         if (!args.TryGetProperty("automation", out var element) || element.ValueKind != JsonValueKind.Object)
         {
@@ -2198,24 +1209,6 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         }
     }
 
-    private bool IsAuthorized(HttpListenerRequest req)
-    {
-        var cfg = _settingsStore.Current.Mcp;
-        if (!cfg.RequireBearerAuth || string.IsNullOrWhiteSpace(cfg.BearerToken))
-        {
-            return true;
-        }
-
-        var auth = req.Headers["Authorization"] ?? string.Empty;
-        if (auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-        {
-            var supplied = auth[7..].Trim();
-            return string.Equals(supplied, cfg.BearerToken.Trim(), StringComparison.Ordinal);
-        }
-
-        return false;
-    }
-
     private static void EnsureFullOrchestration(McpServerSettings cfg, string toolName)
     {
         if (cfg.PermissionTier < McpPermissionTier.FullOrchestration)
@@ -2232,28 +1225,13 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         return Math.Min(clampedRequested, ceiling);
     }
 
-    private void LogActivity(string method, string detail, string outcome, long durationMs)
-    {
-        var entry = new McpActivityEntry(DateTimeOffset.UtcNow, method, detail, outcome, durationMs);
-        lock (_activityLock)
-        {
-            _activityLog.Insert(0, entry);
-            if (_activityLog.Count > 50)
-            {
-                _activityLog.RemoveAt(_activityLog.Count - 1);
-            }
-        }
-
-        ActivityAdded?.Invoke(entry);
-    }
-
     private static string BuildPluginToolName(string pluginId, string actionId) =>
         $"plugin_{Slugify(pluginId)}_{Slugify(actionId)}";
 
     private static string Slugify(string raw) =>
         NonAlnumRegex().Replace((raw ?? string.Empty).Trim().ToLowerInvariant(), "_").Trim('_');
 
-    private static object Tool(
+    private static Tool Tool(
         string name,
         string description,
         object inputSchema,
@@ -2264,27 +1242,23 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         bool openWorld = false,
         object? outputSchema = null)
     {
-        var def = new Dictionary<string, object>
+        var shownTitle = string.IsNullOrWhiteSpace(title) ? name : title;
+        return new Tool
         {
-            ["name"] = name,
-            ["description"] = description,
-            ["inputSchema"] = inputSchema,
-            ["annotations"] = new
+            Name = name,
+            Title = shownTitle,
+            Description = description,
+            InputSchema = JsonSerializer.SerializeToElement(inputSchema),
+            OutputSchema = outputSchema is null ? null : JsonSerializer.SerializeToElement(outputSchema),
+            Annotations = new ToolAnnotations
             {
-                title = string.IsNullOrWhiteSpace(title) ? name : title,
-                readOnlyHint = readOnly,
-                destructiveHint = destructive,
-                idempotentHint = idempotent,
-                openWorldHint = openWorld,
+                Title = shownTitle,
+                ReadOnlyHint = readOnly,
+                DestructiveHint = destructive,
+                IdempotentHint = idempotent,
+                OpenWorldHint = openWorld,
             },
         };
-
-        if (outputSchema is not null)
-        {
-            def["outputSchema"] = outputSchema;
-        }
-
-        return def;
     }
 
     private static object OutputObjSchema(params (string Name, string Type)[] fields)
@@ -2327,37 +1301,28 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
             : new { type = "object", properties = props };
     }
 
-    private static object BuildToolText(string text) => new
+    private static CallToolResult BuildToolText(string text) => new()
     {
-        content = new[] { new { type = "text", text } },
-        isError = false,
+        Content = [new TextContentBlock { Text = text }],
+        IsError = false,
     };
 
-    private static object BuildToolJson(object data) => new
+    private static CallToolResult BuildToolJson(object data)
     {
-        content = new[] { new { type = "text", text = JsonSerializer.Serialize(data, JsonPrettyOptions) } },
-        structuredContent = data,
-        isError = false,
-    };
+        var structured = JsonSerializer.SerializeToElement(data, JsonPrettyOptions);
+        return new CallToolResult
+        {
+            Content = [new TextContentBlock { Text = JsonSerializer.Serialize(structured, JsonPrettyOptions) }],
+            // Structured content is an object for every client version; other values stay in the text.
+            StructuredContent = structured.ValueKind == JsonValueKind.Object ? structured : null,
+            IsError = false,
+        };
+    }
 
-    private static object BuildToolError(string message) => new
+    private static CallToolResult BuildToolError(string message) => new()
     {
-        content = new[] { new { type = "text", text = message } },
-        isError = true,
-    };
-
-    private static object BuildJsonRpcError(object? id, int code, string message) => new
-    {
-        jsonrpc = "2.0",
-        id,
-        error = new { code, message },
-    };
-
-    private static object? CloneJsonId(JsonElement idEl) => idEl.ValueKind switch
-    {
-        JsonValueKind.Number => idEl.TryGetInt64(out var l) ? l : idEl.GetDouble(),
-        JsonValueKind.String => idEl.GetString(),
-        _ => idEl.ToString(),
+        Content = [new TextContentBlock { Text = message }],
+        IsError = true,
     };
 
     private static string GetString(JsonElement obj, string name, string fallback = "")
@@ -2424,29 +1389,8 @@ public sealed partial class DenonMcpHttpServer : IAsyncDisposable
         return dict;
     }
 
-    private static void AddCorsHeaders(HttpListenerResponse resp)
-    {
-        resp.Headers["Access-Control-Allow-Origin"] = "*";
-        resp.Headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS";
-        resp.Headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept, Mcp-Session-Id, MCP-Protocol-Version";
-        resp.Headers["Access-Control-Expose-Headers"] = "Mcp-Session-Id";
-    }
-
-    private static async Task WriteJsonResponseAsync(HttpListenerResponse resp, int statusCode, object payload)
-    {
-        var json = JsonSerializer.Serialize(payload, JsonOutOptions);
-        var bytes = Encoding.UTF8.GetBytes(json);
-        resp.StatusCode = statusCode;
-        resp.ContentType = "application/json; charset=utf-8";
-        resp.ContentLength64 = bytes.Length;
-        await resp.OutputStream.WriteAsync(bytes);
-        resp.Close();
-    }
-
     [GeneratedRegex("[^a-z0-9]+")]
     private static partial Regex NonAlnumRegex();
-
-    private sealed class McpMethodNotFoundException(string message) : Exception(message);
 
     private sealed class McpInvalidParamsException(string message) : Exception(message);
 }
