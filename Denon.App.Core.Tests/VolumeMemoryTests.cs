@@ -85,6 +85,19 @@ public sealed class VolumeMemoryTests : IDisposable
         Assert.Equal(56, again.Find("cast:netflix")!.Level);
     }
 
+    [Fact]
+    public void A_broken_file_is_kept_aside_and_learning_starts_again()
+    {
+        var path = Path.Combine(_tempDir, "vm.json");
+        File.WriteAllText(path, "{ not json");
+        var store = new VolumeMemoryStore(new AppLogStore(Path.Combine(_tempDir, "a.log")), path);
+        store.Load();
+
+        Assert.True(store.IsNew); // so the service seeds from the logs
+        Assert.True(File.Exists(path + ".bad"));
+        Assert.Empty(store.Snapshot());
+    }
+
     // ---- what counts as a source ---------------------------------------------------------------------------------
 
     [Fact]
@@ -132,7 +145,11 @@ public sealed class VolumeMemoryTests : IDisposable
 
     // ---- the service -------------------------------------------------------------------------------------------
 
-    private sealed record Rig(VolumeMemoryService Service, VolumeMemoryStore Store, List<(int Level, bool Log)> Set, List<RoomEvent> Seen, IDisposable Cleanup);
+    private sealed record Rig(VolumeMemoryService Service, VolumeMemoryStore Store, List<(int Level, bool Log)> Set, List<RoomEvent> Seen, ReceiverStateStore State, IDisposable Cleanup)
+    {
+        /// <summary>Runs during a fade step, after the volume is set (to act as the user would).</summary>
+        public Action<int>? OnSet { get; set; }
+    }
 
     private async Task<Rig> CreateRigAsync()
     {
@@ -147,10 +164,16 @@ public sealed class VolumeMemoryTests : IDisposable
         var store = new VolumeMemoryStore(log, Path.Combine(_tempDir, "vm.json"));
         var service = new VolumeMemoryService(settings, state, controller, plugins, telemetry, store, log) { FadeStepDelay = TimeSpan.Zero };
         var set = new List<(int, bool)>();
-        service.SetVolumeOverride = (level, logIt, _) => { lock (set) set.Add((level, logIt)); return Task.CompletedTask; };
+        Rig? rig = null;
+        service.SetVolumeOverride = (level, logIt, _) =>
+        {
+            lock (set) set.Add((level, logIt));
+            rig?.OnSet?.Invoke(level);
+            return Task.CompletedTask;
+        };
         var seen = new List<RoomEvent>();
         var sub = bus.Subscribe(e => { lock (seen) seen.Add(e); });
-        return new Rig(service, store, set, seen, new Cleanup(() =>
+        return rig = new Rig(service, store, set, seen, state, new Cleanup(() =>
         {
             sub.Dispose();
             service.Dispose();
@@ -191,6 +214,24 @@ public sealed class VolumeMemoryTests : IDisposable
         await Tick(rig, T0.AddSeconds(60), Status("MPLAY", 40)); // back to Media Player at 40
         await Tick(rig, T0.AddSeconds(66), Status("MPLAY", 40));
         Assert.Equal([(42, false), (44, false), (46, false), (48, false), (50, false), (52, false), (54, false), (55, true)], rig.Set); // up in a fade
+    }
+
+    [Fact]
+    public async Task A_fade_stops_when_the_user_turns_the_volume()
+    {
+        var rig = await CreateRigAsync();
+        using var _ = rig.Cleanup;
+        rig.Store.Learn(ListeningSource.Create("input", "Media Player"), 55, 60, T0);
+
+        await Tick(rig, T0, Status("MPLAY", 40, on: false));
+        await Tick(rig, T0.AddSeconds(6), Status("MPLAY", 40, on: false));
+        await Tick(rig, T0.AddSeconds(10), Status("MPLAY", 40));
+
+        // The receiver follows each step, until the user turns it down to 30 at 44.
+        rig.OnSet = level => rig.State.UpdateStatus(Status("MPLAY", level >= 44 ? 30 : level));
+        await Tick(rig, T0.AddSeconds(16), Status("MPLAY", 40));
+
+        Assert.Equal([(42, false), (44, false)], rig.Set); // stopped: nothing after the user's change
     }
 
     [Fact]

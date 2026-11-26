@@ -110,7 +110,7 @@ public static partial class AutomationTriggers
 
             case AutomationNodeTypes.TriggerSource:
             {
-                if (!string.Equals(roomEvent.Event, VolumeMemoryService.SourceChangedEvent, StringComparison.Ordinal) ||
+                if (!string.Equals(roomEvent.Event, VolumeMemoryService.SourceChangedEvent, StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(roomEvent.Origin, AutomationOrigin, StringComparison.OrdinalIgnoreCase))
                 {
                     return false;

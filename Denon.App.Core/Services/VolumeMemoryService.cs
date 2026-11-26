@@ -269,14 +269,23 @@ public sealed class VolumeMemoryService : BackgroundService
             return;
         }
 
-        await SetLevelAsync(target, volume, Origin, ct);
+        if (!await SetLevelAsync(target, volume, Origin, source, ct))
+        {
+            _log.Info($"[Volume memory] {source.Label}: stopped the fade to {target}, the volume or the source changed.");
+            return;
+        }
+
         var message = $"Volume {target} for {source.Label} (learned)";
         _log.Info($"[Volume memory] {source.Label}: {Math.Round(volume)} → {target}.");
         Applied?.Invoke(message);
     }
 
     /// <summary>Down at once (no shock); up in steps of 2 over a moment.</summary>
-    private async Task SetLevelAsync(int target, double from, string origin, CancellationToken ct)
+    /// <summary>
+    /// Sets <paramref name="target"/>. Returns false when an upward fade stopped because the user changed the volume or
+    /// the source changed between its steps: their change wins.
+    /// </summary>
+    private async Task<bool> SetLevelAsync(int target, double from, string origin, ListeningSource source, CancellationToken ct)
     {
         await _applyGate.WaitAsync(ct);
         try
@@ -285,20 +294,44 @@ public sealed class VolumeMemoryService : BackgroundService
             var current = (int)Math.Round(from);
             if (target > current)
             {
+                var sent = current;
                 for (var step = current + 2; step < target; step += 2)
                 {
                     await SetVolumeAsync(step, log: false, ct);
+                    sent = step;
                     _telemetry.MarkOrigin("avr", origin);
                     await Task.Delay(FadeStepDelay, ct);
+                    if (Superseded(source, sent))
+                    {
+                        return false;
+                    }
                 }
             }
 
             await SetVolumeAsync(target, log: true, ct);
+            return true;
         }
         finally
         {
             _applyGate.Release();
         }
+    }
+
+    /// <summary>
+    /// True when, during a fade, the receiver's volume is no longer where the fade put it (the user turned it), or what
+    /// plays is no longer <paramref name="source"/>. The reading may lag one step behind, so 2 steps of slack.
+    /// </summary>
+    private bool Superseded(ListeningSource source, int sent)
+    {
+        var snapshot = _state.Snapshot;
+        if (!snapshot.IsConnected || snapshot.Status is not { } status)
+        {
+            return false;
+        }
+
+        var volume = Volume(status);
+        return volume < sent - 2.5 || volume > sent + 2.5 ||
+               !SameSource(ListeningSource.From(status, _plugins.GetPlugins()), source);
     }
 
     private Task SetVolumeAsync(int level, bool log, CancellationToken ct) =>
@@ -321,8 +354,9 @@ public sealed class VolumeMemoryService : BackgroundService
         }
 
         var target = (int)Math.Clamp(Math.Round(learned.Level), 0, SafeVolume(_settings.Current));
-        await SetLevelAsync(target, Volume(status!), origin, ct);
-        return $"Volume {target} for {source.Label} (learned)";
+        return await SetLevelAsync(target, Volume(status!), origin, source, ct)
+            ? $"Volume {target} for {source.Label} (learned)"
+            : $"Stopped the fade to {target} for {source.Label}: the volume or the source changed";
     }
 
     private static int SafeVolume(AppSettings settings) => Math.Clamp(settings.Mcp.MaxSafeVolume, 15, 98);

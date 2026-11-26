@@ -137,10 +137,28 @@ public sealed class VolumeMemoryStore
                     .GroupBy(static l => l.Key, StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(static g => g.Key, static g => g.Last(), StringComparer.OrdinalIgnoreCase);
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+            catch (JsonException ex)
+            {
+                // A broken file: keep it aside and start again from the logs, as on the first start.
+                IsNew = true;
+                TryMoveAside();
+                _log.Warning($"[Volume memory] {Path.GetFileName(_path)} could not be read ({ex.Message}); kept as .bad and learning again from the logs.");
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 _log.Warning($"[Volume memory] Could not read {Path.GetFileName(_path)}: {ex.Message}. Starting empty.");
             }
+        }
+    }
+
+    private void TryMoveAside()
+    {
+        try
+        {
+            File.Move(_path, _path + ".bad", overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
         }
     }
 
