@@ -290,8 +290,26 @@ public sealed class VolumeMemoryService : BackgroundService
         await _applyGate.WaitAsync(ct);
         try
         {
-            _telemetry.MarkOrigin("avr", origin);
+            // Read the receiver again: another adjustment (the automation action and the switch at the same time)
+            // may have run while this one waited, or the source may have changed.
+            var snapshot = _state.Snapshot;
+            if (snapshot.IsConnected && snapshot.Status is { } now)
+            {
+                if (!SameSource(ListeningSource.From(now, _plugins.GetPlugins()), source))
+                {
+                    return false;
+                }
+
+                from = Volume(now);
+            }
+
             var current = (int)Math.Round(from);
+            if (current == target)
+            {
+                return true; // Already there.
+            }
+
+            _telemetry.MarkOrigin("avr", origin);
             if (target > current)
             {
                 var sent = current;

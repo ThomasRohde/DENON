@@ -81,6 +81,8 @@ public sealed class LearnedVolumeItem : ObservableObject
 public sealed partial class MainViewModel
 {
     private VolumeMemoryService? _volumeMemory;
+    private bool _volumeMemoryEnabled = true;
+    private bool _volumeMemoryOnlyLower;
     private string _volumeMemoryNowText = "Nothing plays through the receiver.";
 
     public ObservableCollection<LearnedVolumeItem> LearnedVolumes { get; } = [];
@@ -89,30 +91,37 @@ public sealed partial class MainViewModel
 
     public RelayCommand ForgetLearnedVolumeCommand { get; private set; } = new(_ => { });
 
+    // The switches keep their own value (the settings store publishes a save only after it is on disk) and save it;
+    // SettingsChanged brings them back in line if a save fails or something else changes the settings.
     public bool VolumeMemoryEnabled
     {
-        get => _settingsStore.Current.VolumeMemory.Enabled;
+        get => _volumeMemoryEnabled;
         set
         {
-            if (value != VolumeMemoryEnabled)
+            if (SetProperty(ref _volumeMemoryEnabled, value))
             {
                 _ = _settingsStore.UpdateAsync(s => s.VolumeMemory.Enabled = value);
-                OnPropertyChanged();
             }
         }
     }
 
     public bool VolumeMemoryOnlyLower
     {
-        get => _settingsStore.Current.VolumeMemory.OnlyLower;
+        get => _volumeMemoryOnlyLower;
         set
         {
-            if (value != VolumeMemoryOnlyLower)
+            if (SetProperty(ref _volumeMemoryOnlyLower, value))
             {
                 _ = _settingsStore.UpdateAsync(s => s.VolumeMemory.OnlyLower = value);
-                OnPropertyChanged();
             }
         }
+    }
+
+    /// <summary>The switches follow the saved settings (a failed save reverts, or another settings change).</summary>
+    private void SyncVolumeMemorySwitches(AppSettings settings)
+    {
+        SetProperty(ref _volumeMemoryEnabled, settings.VolumeMemory.Enabled, nameof(VolumeMemoryEnabled));
+        SetProperty(ref _volumeMemoryOnlyLower, settings.VolumeMemory.OnlyLower, nameof(VolumeMemoryOnlyLower));
     }
 
     /// <summary>"Now: DR1 · learned 42" or why nothing is set.</summary>
@@ -133,6 +142,8 @@ public sealed partial class MainViewModel
         OnPropertyChanged(nameof(StepLearnedVolumeCommand));
         OnPropertyChanged(nameof(ForgetLearnedVolumeCommand));
 
+        SyncVolumeMemorySwitches(_settingsStore.Current);
+        _settingsStore.SettingsChanged += settings => _dispatcher.BeginInvoke(() => SyncVolumeMemorySwitches(settings));
         service.Applied += message => _dispatcher.BeginInvoke(() => StatusMessage = message);
         service.Store.Changed += () => _dispatcher.BeginInvoke(RefreshLearnedVolumes);
         service.SourceChanged += () => _dispatcher.BeginInvoke(RefreshLearnedVolumes);

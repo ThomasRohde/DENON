@@ -235,6 +235,24 @@ public sealed class VolumeMemoryTests : IDisposable
     }
 
     [Fact]
+    public async Task The_action_reads_the_receiver_again_and_sends_nothing_when_it_is_there()
+    {
+        var rig = await CreateRigAsync();
+        using var _ = rig.Cleanup;
+        rig.Store.Learn(ListeningSource.Create("input", "Media Player"), 55, 60, T0);
+
+        // The switch already raised it to 55 (an automation on the same source change runs after it).
+        rig.State.UpdateStatus(Status("MPLAY", 55));
+        Assert.Equal("Volume 55 for Media Player (learned)", await rig.Service.ApplyLearnedNowAsync("automation", CancellationToken.None));
+        Assert.Empty(rig.Set);
+
+        rig.State.UpdateStatus(Status("MPLAY", 40));
+        rig.OnSet = level => rig.State.UpdateStatus(Status("MPLAY", level)); // the receiver follows each step
+        await rig.Service.ApplyLearnedNowAsync("automation", CancellationToken.None);
+        Assert.Equal((55, true), rig.Set[^1]);
+    }
+
+    [Fact]
     public async Task Flipping_through_sources_or_the_app_starting_sets_nothing()
     {
         var rig = await CreateRigAsync();
