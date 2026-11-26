@@ -263,6 +263,19 @@ public sealed class VolumeMemoryService : BackgroundService
         return settings.OnlyLower && difference > 0 ? "only turning down" : null;
     }
 
+    /// <summary>The log line for a source change that kept its volume, or null when Volume memory is off.</summary>
+    internal static string? LeftAloneMessage(string why, double volume, int target, int minDifference)
+    {
+        var now = volume.ToString("0.#", CultureInfo.InvariantCulture); // as the receiver shows it, half steps too
+        return why switch
+        {
+            "off" => null,
+            "already close" => $"left at {now}, the learned {target} is within {Math.Max(1, minDifference)}.",
+            "only turning down" => $"left at {now}, the learned {target} is higher and Volume memory only turns down.",
+            _ => $"left at {now}: {why}.",
+        };
+    }
+
     private async Task MaybeApplyAsync(ListeningSource source, ReceiverStatus status, double volume, CancellationToken ct)
     {
         var settings = _settings.Current;
@@ -270,6 +283,12 @@ public sealed class VolumeMemoryService : BackgroundService
             _candidateOrigin, SafeVolume(settings), out var target);
         if (why is not null)
         {
+            // Say why the volume stays, in the receiver's numbers, so a level that was not set is never a mystery.
+            if (LeftAloneMessage(why, volume, target, settings.VolumeMemory.MinDifference) is { } kept)
+            {
+                _log.Info($"[Volume memory] {source.Label}: {kept}");
+            }
+
             return;
         }
 

@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   Insights), the Volume memory page, the Insights page and the Insights notes show the 0–98 volume only, for example
   "Streaming apps play at volume 56 and live TV at 41: about 15 louder". The logs keep dB.
 
+### Added
+- **Volume memory says why it kept the volume.** When the source changes and the volume stays, the log says why, in the
+  receiver's numbers: for example "DR2: left at 39, the learned 41 is within 3."
+
 ## [2.10.7] - 2026-11-26
 
 ### Changed

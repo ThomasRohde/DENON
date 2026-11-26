@@ -113,6 +113,15 @@ public sealed class VolumeMemoryTests : IDisposable
     // ---- when to set it ------------------------------------------------------------------------------------------
 
     [Theory]
+    [InlineData("already close", 39, 41, 3, "left at 39, the learned 41 is within 3.")]
+    [InlineData("only turning down", 30, 42, 3, "left at 30, the learned 42 is higher and Volume memory only turns down.")]
+    [InlineData("muted", 38.5, 0, 3, "left at 38.5: muted.")]
+    [InlineData("the volume was changed after the switch", 50, 0, 3, "left at 50: the volume was changed after the switch.")]
+    [InlineData("off", 50, 0, 3, null)]
+    public void A_kept_volume_is_logged_in_the_receivers_numbers(string why, double volume, int target, int minDifference, string? expected) =>
+        Assert.Equal(expected, VolumeMemoryService.LeftAloneMessage(why, volume, target, minDifference));
+
+    [Theory]
     [InlineData(true, false, 55, 55, false, "external", 42, null)]                        // set to 42
     [InlineData(false, false, 55, 55, false, "external", 0, "off")]
     [InlineData(true, false, 55, 55, true, "external", 0, "muted")]
