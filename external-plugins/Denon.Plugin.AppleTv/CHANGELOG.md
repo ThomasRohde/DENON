@@ -2,6 +2,12 @@
 
 Released separately from Denon Desktop with tags `appletv-vX.Y.Z`.
 
+## [0.5.1] - 2026-11-26
+
+### Fixed
+- **Discovery is logged only when something changed** (a new Apple TV, a moved one, or a different count). Before,
+  every run wrote "Apple TV discovery: 1 answered, 0 new."
+
 ## [0.5.0] - 2026-11-24
 
 Needs Denon Desktop **2.5.0** or later. Older versions do not read the `APPLE TV LIVE` status and drop a live program from the now-playing hero.

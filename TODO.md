@@ -39,8 +39,8 @@ Phase 2 is done in 1.18.0: YouTube / YouTube Music and jukebox tracks are decode
       plugins' watch logs. Same idea, in each plugin.
 - [ ] `WatchTimeReport` (the MCP `get_watch_time` tool) does not join restart splits yet; Insights does
       (`InsightsReport.JoinRestartSplits`). Share one helper.
-- [ ] The Chromecast, Apple TV and HomePod plugin changes in 2.9.3 (discovery log lines, cast playback hold) need a
-      plugin release each to reach the installed app.
+- [x] The plugin changes from 2.9.3 (discovery log lines, cast playback hold) are released: Chromecast 0.5.1, Apple TV
+      0.5.1 and HomePod 0.2.1 (2026-11-26).
 
 ## Insights page
 
