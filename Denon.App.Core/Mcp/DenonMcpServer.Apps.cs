@@ -87,7 +87,16 @@ public sealed partial class DenonMcpServer
             };
         }
 
-        var resolved = NowPlayingResolver.Resolve(status, null, _pluginHost.GetPlugins());
+        // The same inputs as the room-state payload: the station's name and the YouTube track the relay plays.
+        var stationName = string.IsNullOrWhiteSpace(status.ActiveStationAlias)
+            ? null
+            : _settingsStore.Current.Receiver.Stations
+                .FirstOrDefault(s => string.Equals(s.Alias, status.ActiveStationAlias, StringComparison.OrdinalIgnoreCase))?.DisplayName;
+        var resolved = NowPlayingResolver.Resolve(
+            status,
+            activeStationName: stationName,
+            plugins: _pluginHost.GetPlugins(),
+            activeYouTubeTrack: _queueService.IsYouTubePlaybackActive ? _queueService.Snapshot.CurrentTrack : null);
         var on = status.IsPoweredOn && status.IsMainZoneOn;
         var volume = status.VolumeExact > 0.01 ? status.VolumeExact : status.Volume;
         var isHeos = DenonCatalog.InputMatches(status.InputSource, "NET");

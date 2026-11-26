@@ -130,7 +130,10 @@ function render(data) {
 
   const live = !!(data.connected && data.on);
   $("volumeRow").hidden = !live;
-  $("buttonRow").hidden = !live;
+  // Refresh stays: the card has no live updates, so it is the way back after the receiver wakes or reconnects.
+  $("buttonRow").hidden = false;
+  $("mute").hidden = !live;
+  $("playPause").hidden = !live || !data.canPlayPause;
   if (live) {
     const max = data.maxVolume || 98;
     $("fill").style.width = `${Math.max(0, Math.min(100, (data.volume / max) * 100))}%`;
@@ -141,7 +144,6 @@ function render(data) {
     readout.classList.toggle("muted", !!data.muted);
     $("mute").textContent = data.muted ? "Unmute" : "Mute";
     $("up").disabled = busy || data.volume >= data.safeVolume;
-    $("playPause").hidden = !data.canPlayPause;
     $("playPause").textContent = data.playing ? "Pause" : "Play";
   }
   for (const id of ["down", "mute", "playPause", "refresh"]) $(id).disabled = busy;
