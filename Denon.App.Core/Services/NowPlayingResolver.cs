@@ -296,7 +296,9 @@ public static class NowPlayingResolver
                 IsExternalLiveInput: false);
         }
 
-        var sourceName = DenonCatalog.GetHeosSourceName(status.NowPlaying.SourceId);
+        // A placeholder "Url Stream" is this app's own stream (a station, a scene's stream): HEOS may call
+        // it "Local Music" (sid 1024), which is not what plays.
+        var sourceName = status.NowPlaying.IsPlaceholderUrlStream ? null : DenonCatalog.GetHeosSourceName(status.NowPlaying.SourceId);
         if (string.Equals(sourceName, "Network Stream", StringComparison.OrdinalIgnoreCase))
         {
             sourceName = null;
@@ -670,7 +672,7 @@ public static class NowPlayingResolver
         AddIfDistinct(activeStationName);
         AddIfDistinct(serviceLabel);
 
-        if (pieces.Count == 0 && !string.IsNullOrWhiteSpace(nowPlaying.Type))
+        if (pieces.Count == 0 && !nowPlaying.IsPlaceholderUrlStream && !string.IsNullOrWhiteSpace(nowPlaying.Type))
         {
             pieces.Add(ToTitleCase(nowPlaying.Type));
         }

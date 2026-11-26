@@ -4,6 +4,14 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Now playing names the station a scene starts.** When a scene (for example Morning Jazz from the arrive-home
+  automation) plays a saved station's stream, the app and the MCP card show the station (DR P8 Jazz), not
+  "Local Music · Song". HEOS reports the app's own URL streams as source 1024 "Local Music" with placeholder
+  metadata; that no longer clears the station or shows as Local Music.
+
 ## [2.10.3] - 2026-11-26
 
 ### Added
