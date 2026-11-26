@@ -142,6 +142,25 @@ public sealed class CastNowPlayingTests
         Assert.Equal("Metronome", NowPlayingResolver.Resolve(status, null, [], activeLocalTrack: track).Title);
     }
 
+    [Fact]
+    public void A_station_stream_reported_as_local_music_shows_the_station_not_local_music()
+    {
+        // A scene or station button plays a radio URL; HEOS reports it as sid 1024 "Local Music" with placeholders.
+        var radio = new NowPlayingMedia("song", "Url Stream", "", "Url Stream", "", "", "", null, 1024);
+        var status = new ReceiverStatus(
+            Player, "play", 55, false, radio, DateTimeOffset.Now,
+            IsPoweredOn: true, IsMainZoneOn: true, InputSource: "NET", SoundMode: "STEREO");
+
+        var named = NowPlayingResolver.Resolve(status, "DR P8 Jazz", []);
+        Assert.Equal("DR P8 Jazz", named.Title);
+        Assert.DoesNotContain("Local Music", named.Detail);
+        Assert.DoesNotContain("Song", named.Detail);
+
+        var unnamed = NowPlayingResolver.Resolve(status, null, []);
+        Assert.Equal("HEOS Stream", unnamed.Title);
+        Assert.DoesNotContain("Local Music", unnamed.Detail);
+    }
+
     [Theory]
     [InlineData("1 Cast device(s) connected.")]
     [InlineData("Cannot reach 1 Cast device(s).")]

@@ -638,7 +638,9 @@ public sealed class ReceiverController
                 {
                     await _avrClient.EnsureMainZoneNetAsync(settings, token);
                     await _heosClient.PlayUrlAsync(settings, scene.StreamUrl.Trim(), volume: null, unmute: scene.Unmute, token);
-                    _lastPlayedStationAlias = null;
+                    // A scene that starts a saved station's stream plays that station: name it in Now playing.
+                    _lastPlayedStationAlias = settings.Stations
+                        .FirstOrDefault(s => string.Equals(s.Url.Trim(), scene.StreamUrl.Trim(), StringComparison.OrdinalIgnoreCase))?.Alias;
                     NonRelaySourceActivated?.Invoke();
                 }
 
@@ -932,9 +934,9 @@ public sealed class ReceiverController
         }
 
         // If an external streaming service (Spotify, Tidal, TuneIn, Deezer, Amazon, AirPlay, etc.)
-        // is playing via phone/HEOS app, clear the stale Denon Desktop preset highlight!
-        var sid = heosStatus.NowPlaying.SourceId;
-        if (sid is int sourceId && sourceId != 1029 && sourceId != 0)
+        // is playing via phone/HEOS app, clear the stale Denon Desktop preset highlight. HEOS reports
+        // this app's own URL streams as sid 1024 "Local Music" with placeholder metadata: those keep it.
+        if (heosStatus.NowPlaying.IsNamedServiceSource)
         {
             _lastPlayedStationAlias = null;
             return null;
