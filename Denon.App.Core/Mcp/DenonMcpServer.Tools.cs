@@ -318,6 +318,9 @@ public sealed partial class DenonMcpServer
                 idempotent: true),
         };
 
+        // MCP App: the now-playing card (hosts without MCP Apps get its data as text).
+        tools.Add(NowPlayingTool());
+
         // Zero-config auto-bridge: expose enabled plugin actions as annotated MCP tools
         // (Skip hue.set_color since curated hue_set_color already exposes its full typed schema)
         foreach (var plugin in _pluginHost.GetPlugins().Where(p => p.IsEnabled))
@@ -353,6 +356,9 @@ public sealed partial class DenonMcpServer
         // Read-only tools (allowed in all permission tiers including Observer)
         switch (toolName)
         {
+            case NowPlayingToolName:
+                return ShowNowPlaying();
+
             case "get_room_state":
                 return BuildToolJson(_intelligence.BuildRoomStatePayload());
 

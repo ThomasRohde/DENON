@@ -61,8 +61,10 @@ On the official MCP C# SDK since 2.10.1 (`DenonMcpServer`, `ModelContextProtocol
 - [ ] Ask instead of refusing: use input-required results (`InputRequiredException` with an elicitation) to confirm a
       volume above the safe ceiling, power off, or which Chromecast. Needs a client that supports it (`IsMrtrSupported`
       or a session with elicitation).
-- [ ] MCP Apps (`ModelContextProtocol.Extensions.Apps`, experimental): a now-playing card or the Insights charts in the
-      chat.
+- [x] MCP Apps: the now-playing card (`show_now_playing`, `ui://denon/now-playing.html`, 2.10.3).
+- [ ] Check the card in a real host (ChatGPT/Codex, Claude Desktop) after the release: the view protocol was written
+      from the 2026-01-26 spec and tried in a stand-in host only.
+- [ ] More MCP Apps: a room remote (inputs, scenes, Volume memory levels) and the Insights charts.
 - [ ] Room-state updates reach only session clients (initialize, 2025-11-25). 2026-07-28 clients get none: the SDK does
       not yet fan out resource updates over `subscriptions/listen` (csharp-sdk #1662).
 - [ ] Verify live with Claude Code / Claude Desktop after the release (which protocol version they choose).

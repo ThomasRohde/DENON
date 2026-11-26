@@ -14,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol;
 using ModelContextProtocol.AspNetCore;
+using ModelContextProtocol.Extensions.Apps;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
@@ -296,6 +297,9 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
                     options.ToolCollection = _tools;
                 })
                 .WithHttpTransport(transport => transport.SessionMode = HttpServerSessionMode.StatefulForInitializeClients)
+#pragma warning disable MCPEXP003 // MCP Apps is experimental in the C# SDK: announces io.modelcontextprotocol/ui.
+                .WithMcpApps()
+#pragma warning restore MCPEXP003
                 .WithListResourcesHandler((_, _) => ValueTask.FromResult(ListResources()))
                 .WithListResourceTemplatesHandler((_, _) => ValueTask.FromResult(ListResourceTemplates()))
                 .WithReadResourceHandler((request, _) => ValueTask.FromResult(ReadResource(request.Params?.Uri ?? string.Empty)))
