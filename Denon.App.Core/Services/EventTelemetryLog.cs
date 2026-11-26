@@ -163,17 +163,30 @@ public sealed class EventTelemetryLog : IAsyncDisposable
         return fallback;
     }
 
+    /// <summary>Ended sessions the overlap tracker knows, ending after <paramref name="since"/>.</summary>
+    internal IReadOnlyList<MediaSessionOverlapTracker.SessionInterval> ClosedSessionsSince(DateTimeOffset since) =>
+        _sessionOverlap.ClosedSince(since);
+
+    /// <summary>Gives the overlap tracker the ended sessions of an earlier run (crash recovery).</summary>
+    internal void RestoreClosedSessions(IEnumerable<MediaSessionOverlapTracker.SessionInterval> intervals) =>
+        _sessionOverlap.RestoreClosed(intervals);
+
+    /// <summary>Where the monitor keeps the sessions that are open now, to close them after a crash.</summary>
+    public string OpenSessionsPath => Path.Combine(_eventsDir, "open-sessions.json");
+
     /// <summary>
     /// Publishes the event on the live <see cref="RoomEventBus"/> (always), and when event logging is on, also
     /// enqueues it to the daily JSONL file of its stream without blocking the caller.
     /// </summary>
+    /// <param name="at">When it happened, for an event written later (a session closed after a crash); else now.</param>
     /// <returns>The published event, or null after dispose.</returns>
     public RoomEvent? Record(
         string stream,
         string device,
         string eventName,
         string origin,
-        IReadOnlyDictionary<string, object?>? data = null)
+        IReadOnlyDictionary<string, object?>? data = null,
+        DateTimeOffset? at = null)
     {
         if (_disposed)
         {
@@ -181,7 +194,7 @@ public sealed class EventTelemetryLog : IAsyncDisposable
         }
 
         var cleanStream = NormalizeStreamName(stream);
-        var now = DateTimeOffset.Now;
+        var now = at ?? DateTimeOffset.Now;
         if (cleanStream == StreamMedia)
         {
             // Adds coveredSec / exclusiveSec to session.ended so parallel sessions of one viewing

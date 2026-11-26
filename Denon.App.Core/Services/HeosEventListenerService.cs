@@ -33,8 +33,22 @@ public sealed class HeosEventListenerService : BackgroundService
         _receiverController = receiverController;
         _logStore = logStore;
 
-        _settingsStore.SettingsChanged += _ => TriggerReconnect();
+        // Reconnect only when the receiver's address changed: any other settings save (a scene, an automation)
+        // used to drop the push socket for a moment, and changes in that moment were missed.
+        _connectedTo = AddressOf(_settingsStore.Current);
+        _settingsStore.SettingsChanged += settings =>
+        {
+            var address = AddressOf(settings);
+            if (!string.Equals(Interlocked.Exchange(ref _connectedTo, address), address, StringComparison.OrdinalIgnoreCase))
+            {
+                TriggerReconnect();
+            }
+        };
     }
+
+    private string _connectedTo;
+
+    private static string AddressOf(AppSettings settings) => $"{settings.Receiver.Host?.Trim()}:{settings.Receiver.Port}";
 
     public event Action<bool>? PushConnectionChanged;
 

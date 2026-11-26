@@ -92,6 +92,7 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
     private readonly SemaphoreSlim _captureGate = new(1, 1);
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _pendingRequests = new();
     private readonly ConcurrentDictionary<string, Action<JsonElement>> _subscriptions = new();
+    private readonly ConcurrentDictionary<string, byte> _reportedQueryFailures = new();
     private readonly object _stateLock = new();
 
     private ClientWebSocket? _ws;
@@ -1769,9 +1770,17 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
             var payload = await SendRequestCoreAsync(uri, new { }, ct, TimeSpan.FromSeconds(5));
             handler(payload);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // The connection is closing: not a failure of the query.
+        }
         catch (Exception ex)
         {
-            DiagnosticLog?.Invoke($"Optional TV query {uri}: {ex.Message}");
+            // Once per query and answer: the TV gives the same "insufficient permissions" on every connect.
+            if (_reportedQueryFailures.TryAdd($"{uri}|{ex.Message}", 0))
+            {
+                DiagnosticLog?.Invoke($"Optional TV query {uri}: {ex.Message} (shown once)");
+            }
         }
     }
 

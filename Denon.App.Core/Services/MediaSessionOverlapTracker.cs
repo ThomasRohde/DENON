@@ -84,11 +84,20 @@ public sealed class MediaSessionOverlapTracker
             };
             if (coveredSec > 0)
             {
-                result["coveredBy"] = coverers
-                    .Where(c => Min(c.End ?? now, self.End!.Value) > Max(c.Start, self.Start))
+                var overlapping = coverers.Where(c => Min(c.End ?? now, self.End!.Value) > Max(c.Start, self.Start)).ToList();
+                result["coveredBy"] = overlapping
                     .Select(c => c.Label)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
+
+                // How long each one covered it: a cast for 20 s of an hour is not what played on that input.
+                result["coveredBySec"] = overlapping
+                    .GroupBy(c => c.Label, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => (int)Math.Round(Math.Min(durationSec,
+                            UnionSeconds(g.Select(c => (Start: Max(c.Start, self.Start), End: Min(c.End ?? now, self.End!.Value)))))),
+                        StringComparer.OrdinalIgnoreCase);
             }
 
             _closed.Add(self);
@@ -99,6 +108,33 @@ public sealed class MediaSessionOverlapTracker
             }
 
             return result;
+        }
+    }
+
+    /// <summary>The ended sessions that end after <paramref name="since"/>: kept with the open-sessions checkpoint.</summary>
+    internal IReadOnlyList<SessionInterval> ClosedSince(DateTimeOffset since)
+    {
+        lock (_sync)
+        {
+            return _closed.Where(c => c.End > since).ToList();
+        }
+    }
+
+    /// <summary>
+    /// Puts ended sessions of an earlier run back, so a session closed after a crash is not given time that those
+    /// sessions already counted.
+    /// </summary>
+    internal void RestoreClosed(IEnumerable<SessionInterval> intervals)
+    {
+        lock (_sync)
+        {
+            foreach (var interval in intervals)
+            {
+                if (interval.End is not null && !_closed.Contains(interval))
+                {
+                    _closed.Add(interval);
+                }
+            }
         }
     }
 

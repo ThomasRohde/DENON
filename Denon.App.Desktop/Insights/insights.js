@@ -705,7 +705,7 @@ function renderVolume() {
   const vol = receiver.volume;
   const habits = state.live?.habits?.preferredVolumeByTimeBlock ?? {};
   const host = fill("volume", label("Volume"),
-    headline(vol.average !== null && vol.average !== undefined ? `Average ${Math.round(vol.average)} · ${vol.averageDb}` : "No volume changes yet"));
+    headline(vol.average !== null && vol.average !== undefined ? `Average ${Math.round(vol.average)} · ${vol.averageDb}` : "No volume yet"));
 
   if (vol.points.length) {
     host.append(volumeChart(vol, period));
@@ -725,6 +725,15 @@ function renderVolume() {
     ]);
     return el;
   })));
+
+  // The average and the blocks above are weighted by listening time; so is each app here.
+  if (vol.byApp?.length) {
+    host.append(h("p", { class: "sub-label label" }, "BY APP · WEIGHTED BY LISTENING TIME"));
+    host.append(h("ul", { class: "rows" }, vol.byApp.map((a) => h("li", { class: "row" },
+      h("span", { class: "row-name", title: a.label }, a.label),
+      h("span", { class: "row-value" }, `${Math.round(a.average)} · ${a.averageDb}`),
+      h("span", { class: "row-sub" }, duration(a.seconds))))));
+  }
 }
 
 function volumeChart(vol, period) {
@@ -809,8 +818,9 @@ function renderReceiver() {
     host.append(h("p", { class: "sub-label label" }, "INPUTS"));
     const max = receiver.inputs[0].seconds || 1;
     host.append(h("ul", { class: "rows" }, receiver.inputs.slice(0, 5).map((i) => h("li", { class: "row" },
-      h("span", { class: "row-name" }, i.label),
+      h("span", { class: "row-name", title: i.detail ? `${i.label} · ${i.detail}` : i.label }, i.label),
       h("span", { class: "row-value" }, `${i.text} · ${pct(i.share)}`),
+      i.detail ? h("span", { class: "row-sub" }, i.detail) : null,
       h("div", { class: "meter" }, h("span", { style: `width:${(i.seconds / max) * 100}%;background:var(--accent-emerald)` }))))));
   }
 
@@ -870,6 +880,30 @@ function renderControl() {
       fact(lighting.changes, lighting.changes === 1 ? "light change" : "light changes"),
       fact(lighting.musicSyncStarts, "music sync starts"),
       lighting.lastState ? h("div", { class: "fact" }, h("b", { style: "font-size:14px" }, lighting.lastState), h("span", null, "last state")) : null));
+}
+
+// ---------------------------------------------------------------- automations
+function renderAutomations() {
+  const a = state.report.automations;
+  const host = fill("automations", label("Automations"),
+    headline(a.runs ? `${a.acted} of ${a.runs} ${a.runs === 1 ? "run" : "runs"} changed something` : "No automation runs yet"));
+  if (!a.runs) {
+    host.append(empty("Each automation run shows here with what it did: ran a scene, nothing to do (and why), or failed. A run that only checked and found nothing to do does not count as a change."));
+    return;
+  }
+
+  host.append(h("div", { class: "facts" },
+    fact(a.acted, "changed something"),
+    fact(a.nothing, "nothing to do"),
+    fact(a.failed, "failed")));
+  host.append(h("ul", { class: "rows" }, a.byAutomation.slice(0, 8).map((r) => {
+    const when = r.lastTs ? new Date(r.lastTs) : null;
+    return h("li", { class: "row" },
+      h("span", { class: "row-name", title: r.name }, r.name),
+      h("span", { class: "row-value" }, `${r.acted} of ${r.runs}`),
+      h("span", { class: "row-sub", title: r.lastSummary ?? "" },
+        `${when ? `${fmtDay(when, { weekday: "short" })} ${fmtTime(when)}: ` : ""}${r.lastSummary ?? ""}`));
+  })));
 }
 
 // ---------------------------------------------------------------- activity feed
@@ -961,6 +995,7 @@ function renderReport() {
   renderVolume();
   renderReceiver();
   renderControl();
+  renderAutomations();
   renderActivity();
 }
 

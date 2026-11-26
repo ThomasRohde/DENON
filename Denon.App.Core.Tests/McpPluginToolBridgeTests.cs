@@ -65,6 +65,22 @@ public sealed class McpPluginToolBridgeTests
         Assert.Equal(expectDestructive, hints.Destructive);
     }
 
+    [Theory]
+    [InlineData("now-playing", false)]   // declared read-only: a read, not a user action (no log line, no origin mark)
+    [InlineData("hue.refresh", false)]   // undeclared *.refresh
+    [InlineData("play", true)]           // declared, not read-only
+    [InlineData("tv.toast", true)]       // undeclared, any other id
+    public void Host_logs_only_actions_that_change_something(string id, bool expectLogged)
+    {
+        IReadOnlyList<PluginActionDescriptor> actions =
+        [
+            new("now-playing", "Now playing", "Reads.") { IsReadOnly = true },
+            new("play", "Play", "Plays.") { IsDestructive = false },
+        ];
+
+        Assert.Equal(expectLogged, !Denon.App.Core.Plugins.PluginHostService.IsReadOnlyAction(actions, id));
+    }
+
     [Fact]
     public void Result_keeps_json_data_and_image()
     {

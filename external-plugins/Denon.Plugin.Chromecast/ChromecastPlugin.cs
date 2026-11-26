@@ -25,6 +25,10 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
     private readonly SemaphoreSlim _configGate = new(1, 1);
 
     private IPluginContext? _context;
+    private int _lastDiscoveryAnswered = -1;
+    private static readonly TimeSpan PlaybackHold = TimeSpan.FromSeconds(5);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CancellationTokenSource> _playbackHolds = new(StringComparer.Ordinal);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string?> _lastRecordedPlayback = new(StringComparer.Ordinal);
     private IPluginReceiverControl? _receiverControl;
     private ChromecastConfig _config = new();
     private CancellationTokenSource? _lifetime;
@@ -400,7 +404,13 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
             await RestartClientAsync(config);
         }
 
-        _context?.Logger.Info($"mDNS discovery: {found.Count} device(s) answered, {added} new.");
+        // Only a change is worth a line: discovery runs every few minutes and usually finds the same devices.
+        if (added > 0 || restart.Count > 0 || found.Count != _lastDiscoveryAnswered)
+        {
+            _context?.Logger.Info($"mDNS discovery: {found.Count} device(s) answered, {added} new.");
+        }
+
+        _lastDiscoveryAnswered = found.Count;
         DevicesChanged?.Invoke();
         ReportAggregateStatus();
         return added;
@@ -666,9 +676,19 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
             }
         }
 
-        if (previous.PlayerState != current.PlayerState && !string.IsNullOrEmpty(current.PlayerState))
+        if (!string.IsNullOrEmpty(current.PlayerState) &&
+            !string.Equals(PlaybackOf(previous.PlayerState), PlaybackOf(current.PlayerState), StringComparison.OrdinalIgnoreCase))
         {
-            RecordEvent("cast.playback_changed", config, current, origin: "external");
+            if (previous.Connection != CastConnectionState.Connected || !_lastRecordedPlayback.ContainsKey(deviceId))
+            {
+                // The first state after a connect (the app starting) is how it already was, not a change. The
+                // media status can come a moment after the connection, so "nothing recorded yet" counts too.
+                _lastRecordedPlayback[deviceId] = PlaybackOf(current.PlayerState);
+            }
+            else
+            {
+                HoldPlaybackChange(config, deviceId);
+            }
         }
 
         // The status text carries "what plays" for the plugin card and the host's now-playing hero.
@@ -677,6 +697,63 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
         {
             ReportAggregateStatus();
         }
+    }
+
+    /// <summary>Buffering is part of playing: PLAYING → BUFFERING → PLAYING is no change.</summary>
+    private static string? PlaybackOf(string? playerState) =>
+        string.Equals(playerState, "BUFFERING", StringComparison.OrdinalIgnoreCase) ? "PLAYING" : playerState;
+
+    /// <summary>
+    /// Writes cast.playback_changed only when the new state holds for <see cref="PlaybackHold"/>, so a stream that
+    /// stutters (PLAYING, BUFFERING, PLAYING within seconds) writes nothing.
+    /// </summary>
+    private void HoldPlaybackChange(CastDeviceConfig config, string deviceId)
+    {
+        var hold = new CancellationTokenSource();
+        if (_playbackHolds.TryGetValue(deviceId, out var earlier))
+        {
+            try
+            {
+                earlier.Cancel(); // Its own task removes and disposes it.
+            }
+            catch (ObjectDisposedException)
+            {
+                // It had just finished.
+            }
+        }
+
+        _playbackHolds[deviceId] = hold;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(PlaybackHold, hold.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            finally
+            {
+                _playbackHolds.TryRemove(new KeyValuePair<string, CancellationTokenSource>(deviceId, hold));
+                hold.Dispose();
+            }
+
+            if (GetClient(deviceId)?.State is not { } state || string.IsNullOrEmpty(state.PlayerState))
+            {
+                return;
+            }
+
+            var playback = PlaybackOf(state.PlayerState);
+            var last = _lastRecordedPlayback.GetValueOrDefault(deviceId);
+            if (!string.Equals(last, playback, StringComparison.OrdinalIgnoreCase))
+            {
+                _lastRecordedPlayback[deviceId] = playback;
+                // The state as it is compared (BUFFERING written as PLAYING), so the next real change is not lost and
+                // an automation on playerState=PLAYING sees the resume.
+                RecordEvent("cast.playback_changed", config, state with { PlayerState = playback ?? state.PlayerState }, origin: "external");
+            }
+        });
     }
 
     private async Task OnSessionStartedAsync(CastDeviceConfig config, CastDeviceState state)

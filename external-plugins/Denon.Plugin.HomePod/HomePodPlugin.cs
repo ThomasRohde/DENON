@@ -32,6 +32,7 @@ public sealed class HomePodPlugin : IDenonPlugin, IPluginViewProvider
     private readonly CompanionIdentity _identity = CompanionIdentity.Create("Denon Desktop");
 
     private IPluginContext? _context;
+    private string? _lastDiscoverySeen;
     private HomePodConfig _config = new();
     private HomePodListenLog? _listenLog;
     private CancellationTokenSource? _lifetime;
@@ -354,7 +355,16 @@ public sealed class HomePodPlugin : IDenonPlugin, IPluginViewProvider
             StartClient(speaker); // No-op for running clients.
         }
 
-        _context?.Logger.Info($"HomePod discovery: {found.Count} speaker(s) ({string.Join("; ", found.Select(f => $"{f.Name} at {f.Host}"))}), {added} new.");
+        // Only a change is worth a line: discovery runs every few minutes and usually finds the same speakers.
+        var seen = string.Join("; ", found
+            .Select(f => $"{f.Name} at {f.Host}")
+            .Order(StringComparer.OrdinalIgnoreCase)); // The same speakers can answer in another order.
+        if (added > 0 || !string.Equals(seen, _lastDiscoverySeen, StringComparison.Ordinal))
+        {
+            _context?.Logger.Info($"HomePod discovery: {found.Count} speaker(s) ({seen}), {added} new.");
+        }
+
+        _lastDiscoverySeen = seen;
         SpeakersChanged?.Invoke();
         ReportStatus(force: true);
         return added;

@@ -18,6 +18,15 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
     private SmartTvConfig _config = new();
     private SmartTvDashboardViewModel? _viewModel;
     private LgTvLiveState? _lastTelemetryState;
+
+    // The app starting (or the plugin restarting) is not the TV changing. A connection soon after start is the TV as
+    // it already was: for a short while after it, the first app, channel and sound output are taken as they are,
+    // without events. A connection later is a real power-on.
+    private static readonly TimeSpan StartConnectWindow = TimeSpan.FromSeconds(45);
+    private static readonly TimeSpan BaselineSettle = TimeSpan.FromSeconds(20);
+    private DateTimeOffset _startedAt = DateTimeOffset.MinValue;
+    private DateTimeOffset _baselineUntil = DateTimeOffset.MinValue;
+    private bool _baselineTaken;
     private bool _isStarted;
     private ChannelLogoCache? _logoCache;
     private CancellationTokenSource? _logoCts;
@@ -69,6 +78,10 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
         _isStarted = true;
+        _startedAt = DateTimeOffset.UtcNow;
+        _baselineTaken = false;
+        _baselineUntil = DateTimeOffset.MinValue;
+        _lastTelemetryState = null;
         _client.Configure(_config.TvIp, _config.ClientKey, _config.DemoMode, _config.LastModelName, _config.LastWebOsVersion);
         _client.StartBackgroundMonitor();
         UpdateHealthStatus();
@@ -77,7 +90,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
-        _isStarted = false;
+        _isStarted = false; // EmitTvTelemetryDeltas writes nothing from here: the plugin stopping is not the TV turning off.
         _logoCts?.Cancel();
         await _client.StopBackgroundMonitorAsync();
         _context?.ReportStatus("Stopped", PluginHealthState.Disabled);
@@ -642,7 +655,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
 
     private void EmitTvTelemetryDeltas(LgTvLiveState state)
     {
-        if (state.IsDemo || _context is null)
+        if (state.IsDemo || _context is null || !_isStarted)
         {
             return;
         }
@@ -650,6 +663,21 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
         var prev = _lastTelemetryState;
         _lastTelemetryState = state;
         if (prev is null)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        if (!_baselineTaken && state.IsConnected)
+        {
+            _baselineTaken = true;
+            if (now - _startedAt <= StartConnectWindow)
+            {
+                _baselineUntil = now + BaselineSettle; // The TV was already on when the app started.
+            }
+        }
+
+        if (now < _baselineUntil)
         {
             return;
         }

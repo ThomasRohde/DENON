@@ -239,9 +239,19 @@ public static class ActivityFeed
                 break;
 
             case "automation.triggered":
-                text = $"Automation {Get("ruleName") ?? ""}".TrimEnd();
+            {
+                // The summary is "<trigger> → <what it did>"; the feed shows the automation and what it did.
+                var summary = Get("summary") ?? "";
+                var prefix = (Get("trigger") ?? "") + " → ";
+                var what = summary.StartsWith(prefix, StringComparison.Ordinal) ? summary[prefix.Length..] : summary;
+                var automationName = Get("automation") ?? "";
+                text = what.Length > 0
+                    ? $"Automation {automationName}: {what}"
+                    : $"Automation {automationName}".TrimEnd();
                 icon = "bolt";
+                quiet = Get("outcome") == "nothing"; // a run whose checks said no changed nothing
                 break;
+            }
 
             default:
                 text = $"{who}: {name.Replace('_', ' ').Replace('.', ' ')}";

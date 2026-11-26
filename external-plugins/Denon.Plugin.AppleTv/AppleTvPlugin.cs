@@ -30,6 +30,7 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
     private readonly SemaphoreSlim _configGate = new(1, 1);
 
     private IPluginContext? _context;
+    private int _lastDiscoveryAnswered = -1;
     private IPluginReceiverControl? _receiverControl;
     private AppleTvConfig _config = new();
     private CancellationTokenSource? _lifetime;
@@ -512,7 +513,13 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
             await RestartClientAsync(config);
         }
 
-        _context?.Logger.Info($"Apple TV discovery: {found.Count} answered, {added} new.");
+        // Only a change is worth a line: discovery runs every few minutes and usually finds the same devices.
+        if (added > 0 || restart.Count > 0 || found.Count != _lastDiscoveryAnswered)
+        {
+            _context?.Logger.Info($"Apple TV discovery: {found.Count} answered, {added} new.");
+        }
+
+        _lastDiscoveryAnswered = found.Count;
         DevicesChanged?.Invoke();
         ReportAggregateStatus();
         return added;

@@ -531,18 +531,6 @@ public sealed class AutomationEngineService : BackgroundService
         CooldownMark? mark = null,
         LoopTicket? ticket = null)
     {
-        if (!dryRun)
-        {
-            // Only the log entry here. The "automation" origin is stamped by each step right before it changes a domain
-            // (OriginStampingEffects): a run that waits or whose checks say no must not hide the user's own changes
-            // (a real power-on) from event triggers for the next seconds.
-            _telemetry.Record(EventTelemetryLog.StreamControl, "automation", "automation.triggered", AutomationTriggers.AutomationOrigin, new Dictionary<string, object?>
-            {
-                ["automation"] = graph.Name,
-                ["trigger"] = detail,
-            });
-        }
-
         var effects = dryRun ? EffectsOverride ?? _effects : new OriginStampingEffects(EffectsOverride ?? _effects, _telemetry, PluginDomains);
 
         AutomationRun run;
@@ -573,6 +561,18 @@ public sealed class AutomationEngineService : BackgroundService
 
         if (!dryRun)
         {
+            // The event says what the run did (after it ran), so Insights counts only runs that acted. The "automation"
+            // origin is stamped by each step right before it changes a domain (OriginStampingEffects): a run that
+            // waits or whose checks say no must not hide the user's own changes from event triggers.
+            var acted = ActedOnTheRoom(graph, run);
+            _telemetry.Record(EventTelemetryLog.StreamControl, "automation", "automation.triggered", AutomationTriggers.AutomationOrigin, new Dictionary<string, object?>
+            {
+                ["automation"] = graph.Name,
+                ["trigger"] = detail,
+                ["outcome"] = !run.Success ? "failed" : acted ? "acted" : "nothing",
+                ["summary"] = run.Summary,
+            });
+
             if (run.Success)
             {
                 _logStore.Info($"[Automation] {graph.Name}: {run.Summary}");
