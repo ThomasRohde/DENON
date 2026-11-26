@@ -4,6 +4,20 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Volume memory** (Scenes & Acoustics → Volume memory): the app learns how loud you listen to each source (a live TV
+  channel such as DR1 or TV 2 Charlie, a TV app or HDMI input, a Chromecast or Apple TV app such as Netflix or DRTV, a
+  receiver input) and sets that volume when the source changes and holds for 5 s. Down at once, up in a short fade,
+  never above the safe volume (`MaxSafeVolume`). It leaves the volume alone when you changed it after the switch, when a
+  scene, an automation, an agent or a plugin switched the source, when the receiver is muted, or when the difference is
+  under 3 steps. It learns from the time spent at each volume (a level moves about 63 % toward a new volume in 15
+  minutes of listening) and starts from the last 30 days of logs. Change a level with −1/+1, forget it, or tick
+  **Only turn down**. The levels are in `volume-memory.json`.
+- **Automation trigger "Source changes"** (`trigger.source`, on the new `source.changed` event, optionally for one
+  source) and **action "Learned volume"** (`action.learned_volume`).
+
 ## [2.9.5] - 2026-11-26
 
 ### Fixed

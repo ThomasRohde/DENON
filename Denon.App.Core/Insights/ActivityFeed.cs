@@ -250,6 +250,12 @@ public static class ActivityFeed
                 break;
             }
 
+            case "source.changed":
+                text = $"Now playing from {Get("source") ?? "a new source"}";
+                icon = "play";
+                quiet = true; // the input, app or channel change already has its own entry
+                break;
+
             case "scene.activated":
                 text = $"Scene {Get("sceneName") ?? ""}".TrimEnd();
                 icon = "bolt";

@@ -72,6 +72,7 @@ public sealed class AutomationEngineService : BackgroundService
     private bool _hasBaselineSnapshot;
     private DateTimeOffset _eventTriggersPausedUntil = DateTimeOffset.MinValue;
     private CancellationToken _stopping = CancellationToken.None;
+    private readonly VolumeMemoryService? _volumeMemory;
 
     public AutomationEngineService(
         AppSettingsStore settingsStore,
@@ -80,8 +81,10 @@ public sealed class AutomationEngineService : BackgroundService
         PluginHostService pluginHost,
         EventTelemetryLog telemetry,
         RoomEventBus eventBus,
-        AppLogStore logStore)
+        AppLogStore logStore,
+        VolumeMemoryService? volumeMemory = null)
     {
+        _volumeMemory = volumeMemory;
         _settingsStore = settingsStore;
         _receiverController = receiverController;
         _stateStore = stateStore;
@@ -678,6 +681,12 @@ public sealed class AutomationEngineService : BackgroundService
 
         public Task DelayAsync(TimeSpan delay, CancellationToken ct) => inner.DelayAsync(delay, ct);
 
+        public Task<string> SetLearnedVolumeAsync(CancellationToken ct)
+        {
+            Stamp(EventTelemetryLog.StreamAvr);
+            return inner.SetLearnedVolumeAsync(ct);
+        }
+
         private void Stamp(params string[] domains)
         {
             foreach (var domain in domains)
@@ -765,6 +774,10 @@ public sealed class AutomationEngineService : BackgroundService
         }
 
         public Task DelayAsync(TimeSpan delay, CancellationToken ct) => Task.Delay(delay, ct);
+
+        public Task<string> SetLearnedVolumeAsync(CancellationToken ct) =>
+            engine._volumeMemory?.ApplyLearnedNowAsync(AutomationTriggers.AutomationOrigin, ct)
+            ?? throw new InvalidOperationException("Volume memory is not running.");
 
         private ScenePreset? FindScene(string sceneId) =>
             engine._settingsStore.Current.Receiver.Scenes.FirstOrDefault(s => string.Equals(s.Id, sceneId, StringComparison.OrdinalIgnoreCase));

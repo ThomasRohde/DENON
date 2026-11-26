@@ -511,6 +511,7 @@ public static partial class InsightsReport
         "mcp_agent" => "AI agent (MCP)",
         "phone_remote" => "Phone remote",
         "automation" => "Automations",
+        "volume_memory" => "Volume memory",
         "smart_scene" => "Smart scenes",
         "hotkey" => "Hotkeys",
         "plugin" => "Plugins",
@@ -562,6 +563,8 @@ public static partial class InsightsReport
         {
             case "automation.triggered":
                 return Data(ev, "outcome") == "acted"; // a run whose checks said no changed nothing
+            case "source.changed":
+                return false; // what plays changed: the change itself (an input, an app) is counted where it happened
             case "sound_mode.changed" when origin == "external":
                 return false; // the receiver follows the TV's signal (Dolby between ads and the programme)
             case "lighting.state_changed":

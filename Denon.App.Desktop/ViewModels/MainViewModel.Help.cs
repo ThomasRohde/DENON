@@ -589,7 +589,7 @@ public sealed partial class MainViewModel
             accentHex: "#8B5CF6",
             category: "Scenes & Acoustics",
             title: "Smart Scenes, Automations & Acoustics",
-            subtitle: "Scenes that set several devices, automations that run on a room event, a webhook, a schedule or an app start, and live Audyssey and tone settings.",
+            subtitle: "Scenes that set several devices, automations that run on a room event, a webhook, a schedule, an app start or a source change, Volume memory, and live Audyssey and tone settings.",
             overview: "A Smart Scene sets the receiver (power, volume, input, sound mode) and can run plugin actions in order, for example on Philips Hue, the LG TV or Home Assistant. You can run a scene from the app, a hotkey, the Phone Remote, an automation or an AI agent.",
             steps:
             [
@@ -600,7 +600,8 @@ public sealed partial class MainViewModel
                 new("05", "Save the scenes", "Click Save Scenes."),
                 new("06", "Build an automation", "Click Automation Rules, then Open automation editor. Drag a trigger onto the canvas (a room event, a webhook, a schedule or an app start), add checks and actions, connect them, and click Save."),
                 new("07", "Try it and switch it on", "Click Dry run in the editor to see what would happen now without changing anything. Then switch the automation on in the list. AUTOMATION ACTIVITY LOG shows what ran."),
-                new("08", "Tune the acoustics", "In Smart Scenes & Acoustics → LIVE ACOUSTIC TUNING & AUDYSSEY, set MultEQ, Dynamic EQ, Dynamic Volume, Audio Restorer, the display dimmer, Subwoofer and Dialog levels, and Bass and Treble. Click Sync from AVR to read the values from the receiver."),
+                new("08", "Let the app remember volumes", "Click Volume memory. The app learns how loud you listen to each TV channel, app and input, and sets that volume when you switch: down at once, up in a short fade, never above the safe volume. Change a level with −1 and +1, or tick Only turn down."),
+                new("09", "Tune the acoustics", "In Smart Scenes & Acoustics → LIVE ACOUSTIC TUNING & AUDYSSEY, set MultEQ, Dynamic EQ, Dynamic Volume, Audio Restorer, the display dimmer, Subwoofer and Dialog levels, and Bass and Treble. Click Sync from AVR to read the values from the receiver."),
             ],
             proTips:
             [
@@ -608,11 +609,13 @@ public sealed partial class MainViewModel
                 "Tick 'Show on-screen TV toast on Smart Scenes' in the LG TV plugin to see a message on the TV when a scene runs.",
                 "In the editor, open Recent events and click Use as trigger to build an automation from something that just happened. Then narrow it in Only when, for example stream=avr, to=on for 'the receiver turns on'.",
                 "A condition has a yes and a no output: connect different actions to each, for example a scene in the evening and nothing at night.",
+                "To use Volume memory only at some times, switch it off and build an automation: Source changes → Time window → Learned volume.",
                 "For an iPhone Shortcut: Automation → a trigger (join home Wi-Fi, a Focus, an NFC tag) → Get Contents of URL with the webhook's URL from the editor, method POST and the header Authorization: Bearer <owner token>. Add Get Dictionary Value 'message' → Show Result to see what the automation did: ran, nothing to do (and why) or skipped by its cooldown.",
             ],
             troubleshooting:
             [
                 new("An automation did not run a second time?", "After a run that did something, it waits for its cooldown (seconds, set in the editor); a run whose checks said no does not count. A trigger that the cooldown blocks shows in AUTOMATION ACTIVITY LOG as 'skipped: in its cooldown until …'. An automation started by a room event waits at least 10 seconds. Click Run now to run it at once."),
+                new("Volume memory did not change the volume?", "It waits until the new source has played for 5 seconds, and leaves the volume alone when you changed it in that time, when a scene, an automation or an agent switched the source, when the receiver is muted, or when the difference is under 3 steps. A source it has not heard yet shows 'nothing learned yet'."),
                 new("A room event automation does not run?", "Changes made by an automation never start a room event trigger. If more than 20 event-started runs happen in one minute, the app pauses event triggers for a minute and says so in AUTOMATION ACTIVITY LOG. Use Dry run in the editor to see which check said no."),
                 new("The Shortcut gets 401 or no answer?", "Use the owner token (not the guest token) and the PC's address on your Wi-Fi. Phone Remote must be on, and the firewall must allow port 18925 (Cast & Remote → Allow Firewall). The answer names the automations that listen to the hook."),
                 new("A plugin step fails with 'Missing … parameter'?", "Fill in the required action parameters shown under PLUGIN ACTION CHAIN (for example entityId for Home Assistant or roomId for Philips Hue) and click Save Scenes."),

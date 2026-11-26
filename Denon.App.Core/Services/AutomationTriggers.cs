@@ -108,6 +108,19 @@ public static partial class AutomationTriggers
                 return nameMatches && FilterMatches(roomEvent, ParseFilter(trigger.Get("filter")));
             }
 
+            case AutomationNodeTypes.TriggerSource:
+            {
+                if (!string.Equals(roomEvent.Event, VolumeMemoryService.SourceChangedEvent, StringComparison.Ordinal) ||
+                    string.Equals(roomEvent.Origin, AutomationOrigin, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                var only = trigger.Get("source").Trim();
+                return (only.Length == 0 || string.Equals(roomEvent.GetText("source"), only, StringComparison.OrdinalIgnoreCase)) &&
+                       FilterMatches(roomEvent, ParseFilter(trigger.Get("filter")));
+            }
+
             case AutomationNodeTypes.TriggerWebhook:
             {
                 var hook = NormalizeHookName(trigger.Get("hook"));

@@ -929,6 +929,7 @@ public sealed partial class MainViewModel
 
     public void LoadShowcaseStateForScreenshots()
     {
+        LoadShowcaseVolumeMemory();
         var demoPlayer = new ReceiverPlayerInfo(
             Name: "Denon AVR-X2400H",
             PlayerId: 1001,

@@ -18,6 +18,8 @@ public sealed class AppSettings
 
     public TelemetrySettings Telemetry { get; set; } = new();
 
+    public VolumeMemorySettings VolumeMemory { get; set; } = new();
+
     public List<AutomationGraph> AutomationGraphs { get; set; } = AutomationGraph.CreateDefaults();
 
     public AppSettings Clone() =>
@@ -31,10 +33,29 @@ public sealed class AppSettings
             Mcp = Mcp.Clone(),
             Remote = Remote.Clone(),
             Telemetry = Telemetry.Clone(),
+            VolumeMemory = VolumeMemory.Clone(),
             AutomationGraphs = AutomationGraphs.Select(static a => a.Clone()).ToList(),
         };
 
     public static AppSettings CreateDefault() => new();
+}
+
+/// <summary>
+/// Volume memory: the app learns the listening volume of each source (a TV channel, a streaming app, an input) and
+/// sets it when the source changes. The learned levels are in volume-memory.json, not here.
+/// </summary>
+public sealed class VolumeMemorySettings
+{
+    /// <summary>Set the learned volume when the source changes.</summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>Only turn the volume down, never up.</summary>
+    public bool OnlyLower { get; set; }
+
+    /// <summary>Smaller differences (in volume steps, 1 dB each) are left alone.</summary>
+    public int MinDifference { get; set; } = 3;
+
+    public VolumeMemorySettings Clone() => new() { Enabled = Enabled, OnlyLower = OnlyLower, MinDifference = MinDifference };
 }
 
 public sealed class PluginSettings
