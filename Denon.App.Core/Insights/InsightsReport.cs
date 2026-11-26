@@ -692,10 +692,10 @@ public static partial class InsightsReport
             var quieter = l < e;
             list.Add(new Insight("info", "volume",
                 quieter ? "Quieter late at night" : "Louder late at night",
-                $"Late at night the volume is {Math.Abs(e - l).ToString("0.#", CultureInfo.InvariantCulture)} dB {(quieter ? "lower" : "higher")} than in the evening ({late.AverageDb} against {evening.AverageDb})."));
+                $"Late at night the volume is {Math.Round(l):0}, against {Math.Round(e):0} in the evening."));
         }
 
-        // Streaming apps against live TV, by listening time (1 volume step is 1 dB on a Denon).
+        // Streaming apps against live TV, by listening time, as the receiver shows the volume.
         static (double Average, int Seconds)? Mix(IEnumerable<AppVolume> apps)
         {
             var list = apps.ToList();
@@ -710,8 +710,8 @@ public static partial class InsightsReport
             var louder = streaming.Average > liveTv.Average;
             list.Add(new Insight("info", "volume",
                 louder ? "Streaming plays louder than live TV" : "Live TV plays louder than streaming",
-                $"You listen to streaming apps about {Math.Abs(streaming.Average - liveTv.Average):0} dB {(louder ? "louder" : "quieter")} than live TV " +
-                $"({Db(streaming.Average)} against {Db(liveTv.Average)}). Streams are often mixed quieter than broadcast TV."));
+                $"Streaming apps play at volume {Math.Round(streaming.Average):0} and live TV at {Math.Round(liveTv.Average):0}: " +
+                $"about {Math.Abs(Math.Round(streaming.Average) - Math.Round(liveTv.Average)):0} {(louder ? "louder" : "quieter")}. Streams are often mixed quieter than broadcast TV."));
         }
 
         if (control.Total >= 5)

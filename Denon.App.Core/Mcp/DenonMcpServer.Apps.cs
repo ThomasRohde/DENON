@@ -360,7 +360,7 @@ public sealed partial class DenonMcpServer
 
     private CallToolResult ShowNowPlaying() => CardResult(BuildNowPlayingPayload(), s =>
         s.TryGetProperty("on", out var on) && on.GetBoolean()
-            ? $"{Str(s, "title")} — {Str(s, "detail")}. {Str(s, "inputName")}, {Str(s, "soundMode")}, volume {Num(s, "volume")} ({Str(s, "volumeDb")})" +
+            ? $"{Str(s, "title")} — {Str(s, "detail")}. {Str(s, "inputName")}, {Str(s, "soundMode")}, volume {Num(s, "volume")}" +
               $"{(s.TryGetProperty("muted", out var m) && m.GetBoolean() ? ", muted" : string.Empty)}."
             : $"{Str(s, "title")}. {Str(s, "detail")}");
 
