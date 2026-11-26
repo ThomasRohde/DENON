@@ -103,6 +103,8 @@ const Card = (() => {
   }
 
   window.addEventListener("message", (event) => {
+    // Only the host that embeds the card speaks to it; messages from any other window are ignored.
+    if (event.source !== window.parent) return;
     const message = event.data;
     if (!message || message.jsonrpc !== "2.0") return;
     if (message.id !== undefined && !message.method && pending.has(message.id)) {
