@@ -34,6 +34,12 @@ public partial class App : System.Windows.Application
     private bool _isExiting;
     private ReasonSessionEnding? _windowsSessionEnding;
 
+    // An installer's Restart Manager closes the app with WM_QUERYENDSESSION / WM_ENDSESSION and ENDSESSION_CLOSEAPP;
+    // WPF reports that as a Windows shutdown. A hidden top-level window sees the flag (a message-only window would not
+    // get these broadcasts).
+    private System.Windows.Interop.HwndSource? _sessionWatcher;
+    private volatile bool _closedByInstaller;
+
     /// <summary>True once the app exits (tray Exit, sign-out or shutdown): windows then close without asking.</summary>
     internal static bool IsExiting => (Current as App)?._isExiting == true;
 
@@ -214,6 +220,8 @@ public partial class App : System.Windows.Application
 
                 _host.Services.GetRequiredService<AppLogStore>().Info("Denon Desktop started.");
             }
+
+            WatchForInstallerClose();
 
             var window = _host.Services.GetRequiredService<MainWindow>();
             MainWindow = window;
@@ -598,6 +606,45 @@ public partial class App : System.Windows.Application
         }, token);
     }
 
+    private void WatchForInstallerClose()
+    {
+        try
+        {
+            const int wsPopup = unchecked((int)0x80000000); // hidden: no WS_VISIBLE
+            _sessionWatcher = new System.Windows.Interop.HwndSource(new System.Windows.Interop.HwndSourceParameters("DenonDesktopSessionWatcher")
+            {
+                WindowStyle = wsPopup,
+                Width = 0,
+                Height = 0,
+            });
+            _sessionWatcher.AddHook(SessionWatcherHook);
+        }
+        catch (Exception ex)
+        {
+            // Only the shutdown log line's wording depends on it.
+            _host?.Services.GetService<AppLogStore>()?.Warning($"Could not watch for an installer closing the app: {ex.Message}");
+        }
+    }
+
+    private IntPtr SessionWatcherHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        const int wmQueryEndSession = 0x0011;
+        const int wmEndSession = 0x0016;
+        const long endSessionCloseApp = 0x1;
+        var closeApp = (lParam.ToInt64() & endSessionCloseApp) != 0;
+        if (msg == wmQueryEndSession && closeApp)
+        {
+            _closedByInstaller = true;
+        }
+        else if (msg == wmEndSession)
+        {
+            // wParam FALSE: the close was cancelled, so a later exit is not the installer's.
+            _closedByInstaller = wParam != IntPtr.Zero && closeApp;
+        }
+
+        return IntPtr.Zero;
+    }
+
     protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
     {
         _isExiting = true;
@@ -626,6 +673,7 @@ public partial class App : System.Windows.Application
         _activationListenerCts?.Dispose();
         _activationSignal?.Dispose();
         _trayIconController?.Dispose();
+        _sessionWatcher?.Dispose();
 
         // Reached without ExitApplicationAsync when Windows ends the app (logoff, shutdown,
         // Restart Manager during an upgrade). Stop plugins and hosted services first, so open
@@ -638,12 +686,14 @@ public partial class App : System.Windows.Application
             {
                 // Windows sign-out or shutdown says so; anything else here is an installer's Restart Manager or a
                 // closed main window with no tray, not a session ending.
-                var why = _windowsSessionEnding switch
-                {
-                    ReasonSessionEnding.Logoff => "Windows sign-out",
-                    ReasonSessionEnding.Shutdown => "Windows shutdown",
-                    _ => $"exit code {e.ApplicationExitCode}, not through Exit",
-                };
+                var why = _closedByInstaller
+                    ? "closed by an installer"
+                    : _windowsSessionEnding switch
+                    {
+                        ReasonSessionEnding.Logoff => "Windows sign-out",
+                        ReasonSessionEnding.Shutdown => "Windows shutdown",
+                        _ => $"exit code {e.ApplicationExitCode}, not through Exit",
+                    };
                 remainingHost.Services.GetRequiredService<AppLogStore>().Info($"Application shutting down ({why}).");
             }
             catch

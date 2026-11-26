@@ -148,6 +148,23 @@ public sealed class HomePodHostTests
     }
 
     [Fact]
+    public void A_homepod_paused_long_ago_leaves_the_hero()
+    {
+        // Its own speaker name: the resolver remembers when each stream last played.
+        var playing = new Dictionary<string, string>(PlayingRadio) { ["speaker"] = "Stue test" };
+        var paused = new Dictionary<string, string>(playing) { ["playbackState"] = "Paused" };
+        var t = new DateTimeOffset(2026, 11, 26, 4, 0, 0, TimeSpan.Zero);
+
+        Assert.Equal("Playing", NowPlayingResolver.TryResolveHomePod([HomePodPlugin(playing)], now: t)?.PlayStateLabel);
+        Assert.Equal("Paused", NowPlayingResolver.TryResolveHomePod([HomePodPlugin(paused)], now: t.AddMinutes(5))?.PlayStateLabel);
+        Assert.Null(NowPlayingResolver.TryResolveHomePod([HomePodPlugin(paused)], now: t.AddMinutes(11)));
+
+        // Never seen playing in this run (paused since before the app started): not shown.
+        var neverPlayed = new Dictionary<string, string>(paused) { ["speaker"] = "Køkken test" };
+        Assert.Null(NowPlayingResolver.TryResolveHomePod([HomePodPlugin(neverPlayed)], now: t));
+    }
+
+    [Fact]
     public void Homepod_plugin_releases_are_tracked()
     {
         const string releases = """
