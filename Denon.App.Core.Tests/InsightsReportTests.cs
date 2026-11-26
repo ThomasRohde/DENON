@@ -391,6 +391,7 @@ public sealed class InsightsReportTests
 
         Assert.Equal(51, report.Receiver.Volume.Average);
         Assert.Equal(56, report.Receiver.Volume.Min);
+        Assert.DoesNotContain(report.Receiver.Volume.Points, p => p.Volume == 0);
         Assert.Contains(report.Receiver.Volume.ByApp, a => a.Label == "Netflix" && a.Average == 56);
         Assert.Contains(report.Insights, i => i.Title == "Streaming plays louder than live TV" && i.Text.Contains("15 dB"));
     }
@@ -470,6 +471,11 @@ public sealed class InsightsReportTests
         Assert.Equal("3 of 4 on", report.Lighting.LastState);
 
         var feed = ActivityFeed.Describe(events);
+        Assert.True(feed.Single(i => i.Event == "plugin.action").Quiet); // an old artwork read
+        var lights = feed.Where(i => i.Event == "lighting.state_changed").ToList();
+        Assert.True(lights[0].Quiet); // the old status text
+        Assert.Equal("Lights: 3 of 4 on", lights[1].Text);
+        Assert.False(lights[1].Quiet);
         var acted = feed.First(i => i.Event == "automation.triggered");
         Assert.Equal("Automation Arrive home: Scene 'Morning Jazz'", acted.Text);
         Assert.False(acted.Quiet);

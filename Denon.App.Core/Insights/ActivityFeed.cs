@@ -218,9 +218,21 @@ public static class ActivityFeed
                 break;
 
             case "lighting.state_changed":
-                text = $"Lights: {Get("to") ?? "changed"}";
+                // "to" is how many lights are on (2.9.3 and later). Older entries logged the Hue plugin's status text
+                // ("Connecting…", "Stopped"): not a light changing, so they are quiet.
                 icon = "bulb";
-                quiet = (Get("to") ?? "").StartsWith("Connecting", StringComparison.OrdinalIgnoreCase);
+                if (Num("to") is { } on)
+                {
+                    text = on == 0
+                        ? "Lights off"
+                        : Num("total") is { } total ? $"Lights: {on:0} of {total:0} on" : $"Lights: {on:0} on";
+                }
+                else
+                {
+                    text = $"Lights: {Get("to") ?? "changed"}";
+                    quiet = true;
+                }
+
                 break;
 
             case "music_sync.changed":
@@ -229,9 +241,14 @@ public static class ActivityFeed
                 break;
 
             case "plugin.action":
-                text = $"{Get("pluginId") ?? device}: {Get("actionId") ?? "action"}";
+            {
+                var actionId = Get("actionId") ?? "action";
+                text = $"{Get("pluginId") ?? device}: {actionId}";
                 icon = "bolt";
+                // Reads logged as actions before 2.9.3 (the Deck's artwork read every 15 s): quiet, like Insights skips them.
+                quiet = actionId == "now-playing" || actionId.EndsWith(".refresh", StringComparison.OrdinalIgnoreCase);
                 break;
+            }
 
             case "scene.activated":
                 text = $"Scene {Get("sceneName") ?? ""}".TrimEnd();
