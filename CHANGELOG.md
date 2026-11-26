@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 - **A light change reads "Lights: 3 of 4 on" in the activity feed** (or "Lights off"). In 2.9.3 the new events showed
   "Lights: changed"; older Hue status lines ("Lights: Stopped") are now quiet.
+- **Old "chromecast: now-playing" reads are quiet in the activity feed.** 2.9.3 stopped writing them; the ones already
+  in the log (about 700 from one evening) now show only with all events, as Insights already left them out.
 - **The volume chart leaves out readings of 0** (the receiver switching inputs, from before 2.9.3), so its scale is not
   pulled down to −80 dB.
 

@@ -471,6 +471,7 @@ public sealed class InsightsReportTests
         Assert.Equal("3 of 4 on", report.Lighting.LastState);
 
         var feed = ActivityFeed.Describe(events);
+        Assert.True(feed.Single(i => i.Event == "plugin.action").Quiet); // an old artwork read
         var lights = feed.Where(i => i.Event == "lighting.state_changed").ToList();
         Assert.True(lights[0].Quiet); // the old status text
         Assert.Equal("Lights: 3 of 4 on", lights[1].Text);

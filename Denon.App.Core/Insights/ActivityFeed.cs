@@ -241,9 +241,14 @@ public static class ActivityFeed
                 break;
 
             case "plugin.action":
-                text = $"{Get("pluginId") ?? device}: {Get("actionId") ?? "action"}";
+            {
+                var actionId = Get("actionId") ?? "action";
+                text = $"{Get("pluginId") ?? device}: {actionId}";
                 icon = "bolt";
+                // Reads logged as actions before 2.9.3 (the Deck's artwork read every 15 s): quiet, like Insights skips them.
+                quiet = actionId == "now-playing" || actionId.EndsWith(".refresh", StringComparison.OrdinalIgnoreCase);
                 break;
+            }
 
             case "scene.activated":
                 text = $"Scene {Get("sceneName") ?? ""}".TrimEnd();
