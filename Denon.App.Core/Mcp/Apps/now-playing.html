@@ -74,7 +74,7 @@ function render(data) {
   Card.resize();
 }
 
-const act = (label, tool, args) => Card.run(label, async () => { await Card.callTool(tool, args); await Card.reload({}); });
+const act = (label, tool, args) => Card.run(label, () => Card.act(tool, args, {}));
 
 $("down").addEventListener("click", () => act("Volume down", "avr_set_volume", { volume: Math.max(0, Math.round(state.volume) - 2) }));
 $("up").addEventListener("click", () => act("Volume up", "avr_set_volume", { volume: Math.min(state.safeVolume, Math.round(state.volume) + 2) }));

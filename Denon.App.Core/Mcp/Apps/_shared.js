@@ -92,6 +92,16 @@ const Card = (() => {
     if (data) options.render(data);
   }
 
+  /**
+   * Calls a tool that changes the receiver, then reads the card again, and once more a little later: the receiver
+   * reports some changes (a station's name, the input) only after the next poll.
+   */
+  async function act(tool, args, reloadArgs) {
+    await callTool(tool, args);
+    await reload(reloadArgs);
+    setTimeout(() => { if (!busy) reload(reloadArgs).catch(() => {}); }, 2500);
+  }
+
   let lastSize = "";
   function resize() {
     const width = document.documentElement.scrollWidth;
@@ -153,5 +163,5 @@ const Card = (() => {
     notify("ui/notifications/initialized", {});
   }
 
-  return { $, el, start, run, reload, callTool, resultText, setStatus, resize, isBusy: () => busy };
+  return { $, el, start, run, reload, act, callTool, resultText, setStatus, resize, isBusy: () => busy };
 })();

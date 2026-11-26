@@ -44,7 +44,7 @@ const { $, el } = Card;
 let state = null;
 
 const same = (a, b) => (a || "").replace(/[\s/]/g, "").toUpperCase() === (b || "").replace(/[\s/]/g, "").toUpperCase();
-const act = (label, tool, args) => Card.run(label, async () => { await Card.callTool(tool, args); await Card.reload({}); });
+const act = (label, tool, args) => Card.run(label, () => Card.act(tool, args, {}));
 const safeColor = (hex) => /^#[0-9a-f]{3,8}$/i.test(hex || "") ? hex : "#0b7a75";
 
 function chip(text, active, onclick, title) {
