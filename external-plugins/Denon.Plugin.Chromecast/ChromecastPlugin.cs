@@ -749,7 +749,9 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
             if (!string.Equals(last, playback, StringComparison.OrdinalIgnoreCase))
             {
                 _lastRecordedPlayback[deviceId] = playback;
-                RecordEvent("cast.playback_changed", config, state, origin: "external");
+                // The state as it is compared (BUFFERING written as PLAYING), so the next real change is not lost and
+                // an automation on playerState=PLAYING sees the resume.
+                RecordEvent("cast.playback_changed", config, state with { PlayerState = playback ?? state.PlayerState }, origin: "external");
             }
         });
     }

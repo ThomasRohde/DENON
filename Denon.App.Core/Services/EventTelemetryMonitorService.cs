@@ -158,7 +158,15 @@ public sealed partial class EventTelemetryMonitorService : BackgroundService
                 {
                     _openSessionsChanged = false;
                     _lastOpenSessionsSaveUtc = nowUtc;
-                    SaveOpenSessions(nowUtc);
+                    if (cfg.Enabled)
+                    {
+                        SaveOpenSessions(nowUtc);
+                    }
+                    else
+                    {
+                        // Event logging is off: no viewing activity is kept on disk, the checkpoint included.
+                        TryDelete(_telemetry.OpenSessionsPath);
+                    }
                 }
 
                 // Daily retention & disk-cap pruning

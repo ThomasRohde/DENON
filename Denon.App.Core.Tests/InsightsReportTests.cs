@@ -404,13 +404,31 @@ public sealed class InsightsReportTests
             Ev("media", "avr", "session.ended", "external", t, new
             {
                 kind = "avr_input", title = "DVD Player (HDMI 1)", input = "DVD", durationSec = 3600, exclusiveSec = 0,
-                coveredBy = new[] { "cast:Stuen 2" },
+                coveredSec = 3600, coveredBy = new[] { "cast:Stuen 2" },
             }),
         };
 
         var report = InsightsReport.Build(events, At(Now), 1);
 
         Assert.Equal("Mostly Chromecast Stuen 2", report.Receiver.Inputs.Single().Detail);
+    }
+
+    [Fact]
+    public void A_streamer_that_covered_a_moment_does_not_name_the_input()
+    {
+        var t = Now.AddHours(-1);
+        var events = new[]
+        {
+            Ev("media", "avr", "session.ended", "external", t, new
+            {
+                kind = "avr_input", title = "DVD Player (HDMI 1)", input = "DVD", durationSec = 3600, exclusiveSec = 3580,
+                coveredSec = 20, coveredBy = new[] { "cast:Stuen 2" }, coveredBySec = new Dictionary<string, int> { ["cast:Stuen 2"] = 20 },
+            }),
+        };
+
+        var report = InsightsReport.Build(events, At(Now), 1);
+
+        Assert.Null(report.Receiver.Inputs.Single().Detail);
     }
 
     [Fact]

@@ -123,7 +123,7 @@ public static partial class InsightsReport
         string Device = "",
         string? Reason = null,
         double? AvgVolume = null,
-        IReadOnlyList<string>? CoveredBy = null)
+        IReadOnlyDictionary<string, int>? CoveredSeconds = null)
     {
         public DateTimeOffset End => Start.AddSeconds(Duration);
     }
@@ -767,8 +767,27 @@ public static partial class InsightsReport
             DataStr(data, "reason"),
             Num(data, "avgVolume") is { } avgVolume && avgVolume > 0.5 ? avgVolume : null,
             data.TryGetProperty("coveredBy", out var covered) && covered.ValueKind == JsonValueKind.Array
-                ? covered.EnumerateArray().Where(static c => c.ValueKind == JsonValueKind.String).Select(static c => c.GetString()!).ToList()
+                ? CoveredSecondsOf(data, covered)
                 : null);
+    }
+
+    /// <summary>
+    /// Seconds each session covered this one: "coveredBySec" (2.9.3 and later), or, for older entries with a single
+    /// coverer, all of "coveredSec". Older entries with several coverers do not say who covered how long.
+    /// </summary>
+    private static IReadOnlyDictionary<string, int>? CoveredSecondsOf(JsonElement data, JsonElement coveredBy)
+    {
+        if (data.TryGetProperty("coveredBySec", out var bySec) && bySec.ValueKind == JsonValueKind.Object)
+        {
+            return bySec.EnumerateObject()
+                .Where(static p => p.Value.ValueKind == JsonValueKind.Number)
+                .ToDictionary(static p => p.Name, static p => (int)Math.Round(p.Value.GetDouble()), StringComparer.OrdinalIgnoreCase);
+        }
+
+        var labels = coveredBy.EnumerateArray().Where(static c => c.ValueKind == JsonValueKind.String).Select(static c => c.GetString()!).ToList();
+        return labels.Count == 1 && Num(data, "coveredSec") is { } sec
+            ? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { [labels[0]] = (int)Math.Round(sec) }
+            : null;
     }
 
     /// <summary>
@@ -803,8 +822,8 @@ public static partial class InsightsReport
         }
 
         var best = list
-            .Where(static s => s.CoveredBy is { Count: > 0 })
-            .SelectMany(static s => s.CoveredBy!.Where(IsPlayer).Select(c => (Label: c, s.Duration)))
+            .Where(static s => s.CoveredSeconds is { Count: > 0 })
+            .SelectMany(static s => s.CoveredSeconds!.Where(c => IsPlayer(c.Key)).Select(static c => (Label: c.Key, Duration: c.Value)))
             .GroupBy(static c => c.Label, StringComparer.OrdinalIgnoreCase)
             .Select(static g => (Label: g.Key, Seconds: g.Sum(static c => c.Duration)))
             .OrderByDescending(static g => g.Seconds)
@@ -881,9 +900,12 @@ public static partial class InsightsReport
                         Exclusive = before.Exclusive + session.Exclusive + (both ? gapSeconds : 0),
                         Reason = session.Reason,
                         AvgVolume = JoinVolume(before, session),
-                        CoveredBy = before.CoveredBy is null && session.CoveredBy is null
+                        CoveredSeconds = before.CoveredSeconds is null && session.CoveredSeconds is null
                             ? null
-                            : [.. (before.CoveredBy ?? []).Concat(session.CoveredBy ?? []).Distinct(StringComparer.OrdinalIgnoreCase)],
+                            : (before.CoveredSeconds ?? new Dictionary<string, int>())
+                                .Concat(session.CoveredSeconds ?? new Dictionary<string, int>())
+                                .GroupBy(static c => c.Key, StringComparer.OrdinalIgnoreCase)
+                                .ToDictionary(static g => g.Key, static g => g.Sum(static c => c.Value), StringComparer.OrdinalIgnoreCase),
                     };
                     if (session.Reason != "app_shutdown")
                     {
