@@ -33,11 +33,14 @@ Phase 2 is done in 1.18.0: YouTube / YouTube Music and jukebox tracks are decode
 ## Habit telemetry
 
 - [ ] Events written before 1.15.0 have no `coveredSec` / `exclusiveSec`. Readers must fall back to `durationSec`.
-- [ ] **Open sessions are lost when the app is killed.** On 2026-11-24 the app stopped at 21:57:42 with no
-      "Application shutting down" line (probably the installer). "TV Audio" (receiver, from 18:54) and an LG TV channel
-      session (from 21:35) never got a `session.ended`, so their time is not in Insights. Idea: at start, end the
-      sessions the last run left open (reason `app_crashed`, end time = the last log line of that run).
-      Found by Room Dev Deck (`tools/room-dev-deck`).
+- [x] **Open sessions lost when the app is killed** (2.9.3): the monitor saves its open sessions (receiver, LG TV)
+      every minute to `logs/events/open-sessions.json`; the next start closes them with reason `app_crashed`.
+- [ ] The plugins' own sessions (Chromecast, Apple TV, HomePod) are still lost on a crash: they keep them in the
+      plugins' watch logs. Same idea, in each plugin.
+- [ ] `WatchTimeReport` (the MCP `get_watch_time` tool) does not join restart splits yet; Insights does
+      (`InsightsReport.JoinRestartSplits`). Share one helper.
+- [ ] The Chromecast, Apple TV and HomePod plugin changes in 2.9.3 (discovery log lines, cast playback hold) need a
+      plugin release each to reach the installed app.
 
 ## Insights page
 

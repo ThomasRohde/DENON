@@ -127,7 +127,8 @@ public static class AutomationGraphRunner
         }
 
         var failed = steps.Where(static s => s.Outcome == "failed").Select(static s => s.Message).FirstOrDefault();
-        var stoppedBy = done.Count == 0 ? steps.LastOrDefault(static s => s.Outcome == "no") : null;
+        // Nothing ran: the last check that answered says why (a "no", or a "yes" with nothing connected to it).
+        var stoppedBy = done.Count == 0 ? steps.LastOrDefault(static s => s.Outcome is "no" or "yes") : null;
         var summary = failed is not null
             ? $"{triggerDetail} → failed: {failed}"
             : done.Count > 0
@@ -206,7 +207,29 @@ public static class AutomationGraphRunner
                         break;
                 }
 
-                return (pass, pass ? "The receiver matches." : "No: " + string.Join(", ", reasons) + ".");
+                if (pass)
+                {
+                    // Say what matched, so "nothing to do" after a yes with nothing connected reads well.
+                    var matched = new List<string>();
+                    if (node.Get("power") is "on" or "standby")
+                    {
+                        matched.Add(facts.IsOn == true ? "the receiver is on" : "the receiver is in standby");
+                    }
+
+                    if (input.Length > 0)
+                    {
+                        matched.Add($"the input is {facts.Input}");
+                    }
+
+                    if (node.Get("muted") is "yes" or "no")
+                    {
+                        matched.Add(facts.IsMuted == true ? "it is muted" : "it is not muted");
+                    }
+
+                    return (true, matched.Count == 0 ? "The receiver matches." : "Yes: " + string.Join(", ", matched) + ".");
+                }
+
+                return (false, "No: " + string.Join(", ", reasons) + ".");
             }
 
             default:

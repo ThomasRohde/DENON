@@ -103,7 +103,7 @@ public sealed class InsightsReportTests
         Assert.Equal(2, report.Control.FromApp);
         Assert.Contains(report.Control.Origins, o => o.Key == "mcp_agent" && o.Label == "AI agent (MCP)");
         Assert.Equal(2, report.Receiver.Volume.Changes);
-        Assert.Equal(50, report.Receiver.Volume.Average);
+        Assert.Null(report.Receiver.Volume.Average); // weighted by listening time, and there are no sessions
     }
 
     [Fact]
@@ -255,5 +255,143 @@ public sealed class InsightsReportTests
             }),
         });
         Assert.All(activeAndUncovered, item => Assert.False(item.Quiet));
+    }
+
+    private static JsonElement Session(DateTime end, string device, string kind, string title, int seconds, string? reason = null, double? avgVolume = null, string[]? coveredBy = null) =>
+        Ev("media", device, "session.ended", "external", end, new
+        {
+            kind,
+            title,
+            durationSec = seconds,
+            exclusiveSec = seconds,
+            reason,
+            avgVolume,
+            coveredBy,
+        });
+
+    [Fact]
+    public void A_session_the_app_restart_cut_in_two_counts_as_one()
+    {
+        // 20:00–20:40, the app restarts (2 min gap), 20:42–21:30: one sitting of 1 h 30 min.
+        var day = Now.Date.AddHours(20);
+        var events = new[]
+        {
+            Session(day.AddMinutes(40), "lg-tv", "tv_app", "Netflix", 40 * 60, reason: "app_shutdown"),
+            Session(day.AddMinutes(90), "lg-tv", "tv_app", "Netflix", 48 * 60, reason: "standby"),
+            // A real second session later the same evening stays apart.
+            Session(day.AddMinutes(150), "lg-tv", "tv_app", "Netflix", 20 * 60, reason: "standby"),
+        };
+
+        var report = InsightsReport.Build(events, At(Now), 1);
+
+        Assert.Equal(2, report.Watch.Sessions);
+        Assert.Equal(90 * 60, report.Watch.Longest!.Seconds);
+        Assert.Equal((90 + 20) * 60, report.Watch.TotalSeconds);
+    }
+
+    [Theory]
+    [InlineData("TVA (1397)", "TVA")]
+    [InlineData("Kriminalkommissær Barnaby XVII (1) (1)", "Kriminalkommissær Barnaby XVII")]
+    [InlineData("Min familie og andre dyr III (7:8)", "Min familie og andre dyr III")]
+    [InlineData("Blade Runner 2049", "Blade Runner 2049")]
+    [InlineData("(1)", "(1)")]
+    public void Episodes_group_under_their_series(string title, string series) =>
+        Assert.Equal(series, InsightsReport.SeriesTitle(title));
+
+    [Fact]
+    public void Volume_is_weighted_by_listening_time_and_compared_by_app()
+    {
+        var t = Now.AddHours(-1);
+        var events = new[]
+        {
+            // 2 h of Netflix at 56 and 1 h of DR1 at 41: the average is 51, not the middle of the two.
+            Session(t, "lg-tv", "tv_app", "Netflix", 2 * 3600, avgVolume: 56),
+            Session(t.AddMinutes(-150), "lg-tv", "tv_channel", "DR1", 3600, avgVolume: 41),
+            // A settled change to 0 (the receiver switching inputs) is not the quietest level.
+            Ev("avr", "Denon", "volume.settled", "external", t, new { from = 41, to = 0 }),
+            Ev("avr", "Denon", "volume.settled", "external", t.AddMinutes(1), new { from = 0, to = 56 }),
+        };
+
+        var report = InsightsReport.Build(events, At(Now), 1);
+
+        Assert.Equal(51, report.Receiver.Volume.Average);
+        Assert.Equal(56, report.Receiver.Volume.Min);
+        Assert.Contains(report.Receiver.Volume.ByApp, a => a.Label == "Netflix" && a.Average == 56);
+        Assert.Contains(report.Insights, i => i.Title == "Streaming plays louder than live TV" && i.Text.Contains("15 dB"));
+    }
+
+    [Fact]
+    public void An_input_is_named_by_the_streamer_seen_on_it()
+    {
+        var t = Now.AddHours(-1);
+        var events = new[]
+        {
+            Ev("media", "avr", "session.ended", "external", t, new
+            {
+                kind = "avr_input", title = "DVD Player (HDMI 1)", input = "DVD", durationSec = 3600, exclusiveSec = 0,
+                coveredBy = new[] { "cast:Stuen 2" },
+            }),
+        };
+
+        var report = InsightsReport.Build(events, At(Now), 1);
+
+        Assert.Equal("Mostly Chromecast Stuen 2", report.Receiver.Inputs.Single().Detail);
+    }
+
+    [Fact]
+    public void Only_automation_runs_that_acted_count_as_changes()
+    {
+        var t = Now.AddHours(-2);
+        var events = new[]
+        {
+            Ev("control", "automation", "automation.triggered", "automation", t, new
+            {
+                automation = "Arrive home", trigger = "Webhook 'arrive-home'", outcome = "acted",
+                summary = "Webhook 'arrive-home' → Scene 'Morning Jazz'",
+            }),
+            Ev("control", "automation", "automation.triggered", "automation", t.AddMinutes(5), new
+            {
+                automation = "Arrive home", trigger = "Webhook 'arrive-home'", outcome = "nothing",
+                summary = "Webhook 'arrive-home' → nothing to do: No: the receiver is on.",
+            }),
+            // A read the Deck made (logged as an action before 2.9.3) is not a change.
+            Ev("control", "chromecast", "plugin.action", "desktop_ui", t, new { pluginId = "chromecast", actionId = "now-playing" }),
+            // An older run without an outcome is not counted at all.
+            Ev("control", "automation", "automation.triggered", "automation", t, new { automation = "Old", trigger = "x" }),
+            // The receiver following the TV's signal is not someone at the remote.
+            Ev("avr", "Denon", "sound_mode.changed", "external", t, new { from = "MCH STEREO", to = "DOLBY D+" }),
+            // The Hue plugin's status text (older entries) is not a light changing; a count is.
+            Ev("lighting", "philips-hue", "lighting.state_changed", "external", t, new { from = "Connecting…", to = "Stopped" }),
+            Ev("lighting", "philips-hue", "lighting.state_changed", "external", t.AddMinutes(1), new { from = 0, to = 3, total = 4 }),
+        };
+
+        var report = InsightsReport.Build(events, At(Now), 1);
+
+        Assert.Equal(2, report.Control.Total); // the acted run and the light count
+        Assert.Equal(2, report.Automations.Runs);
+        Assert.Equal(1, report.Automations.Acted);
+        Assert.Equal(1, report.Automations.Nothing);
+        var row = Assert.Single(report.Automations.ByAutomation);
+        Assert.Equal("nothing to do: No: the receiver is on.", row.LastSummary);
+        Assert.Equal(1, report.Lighting.Changes);
+        Assert.Equal("3 of 4 on", report.Lighting.LastState);
+
+        var feed = ActivityFeed.Describe(events);
+        var acted = feed.First(i => i.Event == "automation.triggered");
+        Assert.Equal("Automation Arrive home: Scene 'Morning Jazz'", acted.Text);
+        Assert.False(acted.Quiet);
+        Assert.True(feed.Where(i => i.Event == "automation.triggered").ElementAt(1).Quiet);
+    }
+
+    [Theory]
+    [InlineData("192.168.1.16 • 3/4 lights on", true, 3, 4)]
+    [InlineData("192.168.1.16 • 1/1 light on", true, 1, 1)]
+    [InlineData("Connecting to 192.168.1.16...", false, 0, 0)]
+    [InlineData("Stopped", false, 0, 0)]
+    public void Hue_status_gives_the_lights_on(string status, bool ok, int on, int total)
+    {
+        Assert.Equal(ok, EventTelemetryMonitorService.TryReadLightsOn(status, out var readOn, out var readTotal));
+        Assert.Equal(on, readOn);
+        Assert.Equal(total, readTotal);
     }
 }

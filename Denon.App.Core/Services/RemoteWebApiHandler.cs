@@ -34,6 +34,11 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
     /// <summary>How long a webhook call waits for its automations before it answers "still running".</summary>
     internal static TimeSpan WebhookReplyWait { get; set; } = TimeSpan.FromSeconds(4);
 
+    private static readonly TimeSpan WebhookRepeatWindow = TimeSpan.FromSeconds(5);
+    private readonly Lock _webhookGate = new();
+    private string? _lastWebhookKey;
+    private DateTimeOffset _lastWebhookAt;
+
     public RemoteWebApiHandler(
         ReceiverController receiverController,
         ReceiverStateStore stateStore,
@@ -340,7 +345,21 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
         var data = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["hook"] = name };
         ReadWebhookPayload(body, data);
 
-        var published = _telemetry.Record(EventTelemetryLog.StreamControl, AutomationTriggers.WebhookDevice, AutomationTriggers.WebhookEventName, AutomationTriggers.WebhookOrigin, data);
+        // A Shortcut tapped several times sends the same call in a burst: each one runs its automations, but only
+        // the first in 5 s is written to the event log and the app log.
+        var key = name + "|" + string.Join("&", data.OrderBy(static p => p.Key, StringComparer.OrdinalIgnoreCase).Select(static p => $"{p.Key}={p.Value}"));
+        var now = DateTimeOffset.Now;
+        bool repeat;
+        lock (_webhookGate)
+        {
+            repeat = key == _lastWebhookKey && now - _lastWebhookAt < WebhookRepeatWindow;
+            _lastWebhookKey = key;
+            _lastWebhookAt = now;
+        }
+
+        var published = repeat
+            ? new RoomEvent(now, EventTelemetryLog.StreamControl, AutomationTriggers.WebhookDevice, AutomationTriggers.WebhookEventName, AutomationTriggers.WebhookOrigin, data)
+            : _telemetry.Record(EventTelemetryLog.StreamControl, AutomationTriggers.WebhookDevice, AutomationTriggers.WebhookEventName, AutomationTriggers.WebhookOrigin, data);
         IReadOnlyList<TriggerOutcome> outcomes = published is null ? [] : _automations.HandleWebhookCall(published);
 
         var runs = outcomes.Where(static o => o.Run is not null).Select(static o => (Task)o.Run!).ToList();
@@ -366,7 +385,11 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
             ? $"Received '{name}', but no enabled automation listens to it."
             : string.Join("\n", results.Select(static r => r.Message));
 
-        _logStore.Info($"[Webhook] '{name}' received; {results.Count} enabled automation(s) listen to it.");
+        if (!repeat)
+        {
+            _logStore.Info($"[Webhook] '{name}' received; {results.Count} enabled automation(s) listen to it.");
+        }
+
         return JsonOk(new { hook = name, automations = listening, results, message });
     }
 

@@ -32,6 +32,7 @@ public partial class App : System.Windows.Application
     private IHost? _host;
     private TrayIconController? _trayIconController;
     private bool _isExiting;
+    private ReasonSessionEnding? _windowsSessionEnding;
 
     /// <summary>True once the app exits (tray Exit, sign-out or shutdown): windows then close without asking.</summary>
     internal static bool IsExiting => (Current as App)?._isExiting == true;
@@ -600,6 +601,7 @@ public partial class App : System.Windows.Application
     protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
     {
         _isExiting = true;
+        _windowsSessionEnding = e.ReasonSessionEnding;
 
         // Sign-out or shutdown skips ExitApplicationAsync: save the window placement here (off the UI thread, bounded).
         if (MainWindow is MainWindow window && window.IsLoaded && _host?.Services.GetService<AppSettingsStore>() is { } store)
@@ -634,7 +636,15 @@ public partial class App : System.Windows.Application
         {
             try
             {
-                remainingHost.Services.GetRequiredService<AppLogStore>().Info("Application shutting down (Windows session ending).");
+                // Windows sign-out or shutdown says so; anything else here is an installer's Restart Manager or a
+                // closed main window with no tray, not a session ending.
+                var why = _windowsSessionEnding switch
+                {
+                    ReasonSessionEnding.Logoff => "Windows sign-out",
+                    ReasonSessionEnding.Shutdown => "Windows shutdown",
+                    _ => $"exit code {e.ApplicationExitCode}, not through Exit",
+                };
+                remainingHost.Services.GetRequiredService<AppLogStore>().Info($"Application shutting down ({why}).");
             }
             catch
             {

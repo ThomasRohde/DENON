@@ -10,7 +10,7 @@ namespace Denon.App.Core.Insights;
 /// period before it for comparison. Watch time uses <c>exclusiveSec</c> as <see cref="WatchTimeReport"/> does (no
 /// double counting of parallel sessions); receiver time uses the receiver-input sessions' <c>durationSec</c>.
 /// </summary>
-public static class InsightsReport
+public static partial class InsightsReport
 {
     public static readonly string[] Blocks = ["Morning", "Afternoon", "Evening", "LateNight"];
 
@@ -54,6 +54,13 @@ public static class InsightsReport
 
     public sealed record BlockVolume(string Block, string Label, double? Average, string? AverageDb, int Samples);
 
+    /// <summary>The listening volume of one app or source, weighted by the time it played.</summary>
+    public sealed record AppVolume(string Label, string Kind, double Average, string AverageDb, int Seconds);
+
+    /// <summary>
+    /// <paramref name="Average"/> and <paramref name="ByBlock"/> are weighted by listening time (the sessions' average
+    /// volume × their time), not by how often the volume changed. <paramref name="Points"/> are the settled changes.
+    /// </summary>
     public sealed record Volume(
         double? Average,
         string? AverageDb,
@@ -61,7 +68,8 @@ public static class InsightsReport
         double? Max,
         int Changes,
         IReadOnlyList<VolumePoint> Points,
-        IReadOnlyList<BlockVolume> ByBlock);
+        IReadOnlyList<BlockVolume> ByBlock,
+        IReadOnlyList<AppVolume> ByApp);
 
     public sealed record ReceiverDay(string Date, int Seconds);
 
@@ -80,6 +88,11 @@ public static class InsightsReport
 
     public sealed record Lighting(int Changes, int MusicSyncStarts, string? LastState);
 
+    public sealed record AutomationRow(string Name, int Runs, int Acted, string? LastSummary, string? LastTs);
+
+    /// <summary>What the automations did: runs that acted, runs whose checks said no, runs that failed.</summary>
+    public sealed record Automations(int Runs, int Acted, int Nothing, int Failed, IReadOnlyList<AutomationRow> ByAutomation);
+
     public sealed record Device(string Key, string Stream, int Events, string LastSeen);
 
     public sealed record Insight(string Tone, string Icon, string Title, string Text);
@@ -93,6 +106,7 @@ public static class InsightsReport
         Receiver Receiver,
         Control Control,
         Lighting Lighting,
+        Automations Automations,
         IReadOnlyList<Device> Devices,
         IReadOnlyList<Insight> Insights);
 
@@ -105,7 +119,17 @@ public static class InsightsReport
         int Duration,
         string? Input,
         string? SoundMode,
-        string? Logo);
+        string? Logo,
+        string Device = "",
+        string? Reason = null,
+        double? AvgVolume = null,
+        IReadOnlyList<string>? CoveredBy = null)
+    {
+        public DateTimeOffset End => Start.AddSeconds(Duration);
+    }
+
+    /// <summary>A session the app's restart cut in two is one session when it starts again this soon.</summary>
+    private static readonly TimeSpan RestartJoin = TimeSpan.FromMinutes(5);
 
     private static readonly HashSet<string> VideoKinds = new(StringComparer.Ordinal)
     {
@@ -143,6 +167,7 @@ public static class InsightsReport
             .Where(s => s is not null)
             .Select(s => s!)
             .ToList();
+        sessions = JoinRestartSplits(sessions);
 
         var current = sessions.Where(s => LocalDate(s.Start) >= from && LocalDate(s.Start) <= today).ToList();
         var previous = sessions.Where(s => LocalDate(s.Start) >= previousFrom && LocalDate(s.Start) < from).ToList();
@@ -152,6 +177,7 @@ public static class InsightsReport
         var receiver = BuildReceiver(current, inPeriod, from, today);
         var control = BuildControl(inPeriod);
         var lighting = BuildLighting(inPeriod);
+        var automations = BuildAutomations(inPeriod);
         var devices = inPeriod
             .GroupBy(e => Str(e.Ev, "device") ?? "unknown")
             .Select(g => new Device(g.Key, Str(g.Last().Ev, "stream") ?? "", g.Count(), g.Last().Ts.ToString("O", CultureInfo.InvariantCulture)))
@@ -174,6 +200,7 @@ public static class InsightsReport
             receiver,
             control,
             lighting,
+            automations,
             devices,
             BuildInsights(period, watch, rhythm, receiver, control, lighting));
     }
@@ -280,8 +307,8 @@ public static class InsightsReport
             Slices(counted, s => s.App, s => s.App, s => s.Kind, total, 8),
             Slices(
                 counted.Where(s => WatchTimeReport.IsRealTitle(s.Title, s.App)),
-                s => s.Title,
-                s => s.Title,
+                s => SeriesTitle(s.Title),
+                s => SeriesTitle(s.Title),
                 s => s.Kind,
                 total,
                 8,
@@ -399,7 +426,8 @@ public static class InsightsReport
         var inputs = inputSessions
             .GroupBy(s => s.Title.Length > 0 ? s.Title : s.Input ?? "Input")
             .Select(g => new Slice(g.Key, g.Key, "avr_input", g.Sum(s => s.Duration), WatchTimeReport.FormatDuration(g.Sum(s => s.Duration)), g.Count(),
-                inUse > 0 ? Math.Round(g.Sum(s => s.Duration) / (double)inUse, 4) : 0))
+                inUse > 0 ? Math.Round(g.Sum(s => s.Duration) / (double)inUse, 4) : 0,
+                SeenOn(g) is { } seen ? $"Mostly {seen}" : null))
             .OrderByDescending(s => s.Seconds)
             .ToList();
 
@@ -423,24 +451,52 @@ public static class InsightsReport
             }
         }
 
-        double? avg = points.Count > 0 ? Math.Round(points.Average(p => p.Volume), 1) : null;
+        // Weighted by listening time: a session's average volume counts for as long as it played alone (its exclusive
+        // time), so an evening at 50 outweighs five quick changes at 30. Sessions without a volume do not count.
+        var heard = current.Where(static s => s.AvgVolume is not null && s.Exclusive > 0).ToList();
+        static double? Weighted(IEnumerable<Session> list)
+        {
+            var seconds = 0.0;
+            var sum = 0.0;
+            foreach (var s in list)
+            {
+                seconds += s.Exclusive;
+                sum += s.AvgVolume!.Value * s.Exclusive;
+            }
+
+            return seconds > 0 ? Math.Round(sum / seconds, 1) : null;
+        }
+
+        var avg = Weighted(heard);
         var byBlock = Blocks
             .Select(b =>
             {
-                var inBlock = points.Where(p => p.Block == b).ToList();
-                double? blockAvg = inBlock.Count > 0 ? Math.Round(inBlock.Average(p => p.Volume), 1) : null;
+                var inBlock = heard.Where(s => BlockOf(s.Start.LocalDateTime.Hour) == b).ToList();
+                var blockAvg = Weighted(inBlock);
                 return new BlockVolume(b, BlockLabel(b), blockAvg, blockAvg is { } v ? Db(v) : null, inBlock.Count);
             })
             .ToList();
 
+        var byApp = heard
+            .GroupBy(static s => s.App)
+            .Select(g => (App: g.Key, Kind: g.OrderByDescending(static s => s.Exclusive).First().Kind, Seconds: g.Sum(static s => s.Exclusive), Average: Weighted(g)))
+            .Where(static g => g.Average is not null && g.Seconds >= 10 * 60)
+            .OrderByDescending(static g => g.Seconds)
+            .Take(8)
+            .Select(static g => new AppVolume(g.App, g.Kind, g.Average!.Value, Db(g.Average!.Value), g.Seconds))
+            .ToList();
+
+        // A 0 is the receiver switching inputs or muting, not a listening level.
+        var levels = points.Where(static p => p.Volume > 0.5).ToList();
         var volume = new Volume(
             avg,
             avg is { } a ? Db(a) : null,
-            points.Count > 0 ? points.Min(p => p.Volume) : null,
-            points.Count > 0 ? points.Max(p => p.Volume) : null,
+            levels.Count > 0 ? levels.Min(p => p.Volume) : null,
+            levels.Count > 0 ? levels.Max(p => p.Volume) : null,
             points.Count,
             points.Select(p => new VolumePoint(p.Ts.ToString("O", CultureInfo.InvariantCulture), p.Volume, Db(p.Volume))).ToList(),
-            byBlock);
+            byBlock,
+            byApp);
 
         return new Receiver(inUse, WatchTimeReport.FormatDuration(inUse), powerOns, byDay, inputs, modes, volume);
     }
@@ -489,9 +545,28 @@ public static class InsightsReport
             return false;
         }
 
-        if (name is "volume.settled" or "plugin.action" or "scene.activated" or "automation.triggered")
+        if (name is "volume.settled" or "scene.activated")
         {
             return true;
+        }
+
+        if (name == "plugin.action")
+        {
+            // Reads were logged as actions before 2.9.3 (the Deck's artwork read every 15 s): not someone's change.
+            var actionId = Data(ev, "actionId") ?? "";
+            return actionId != "now-playing" && !actionId.EndsWith(".refresh", StringComparison.OrdinalIgnoreCase);
+        }
+
+        switch (name)
+        {
+            case "automation.triggered":
+                return Data(ev, "outcome") == "acted"; // a run whose checks said no changed nothing
+            case "sound_mode.changed" when origin == "external":
+                return false; // the receiver follows the TV's signal (Dolby between ads and the programme)
+            case "lighting.state_changed":
+                // Only a change in lights on (a number); older entries logged the plugin's status text.
+                return ev.TryGetProperty("data", out var light) && light.ValueKind == JsonValueKind.Object &&
+                       light.TryGetProperty("to", out var to) && to.ValueKind == JsonValueKind.Number;
         }
 
         return name.EndsWith(".changed", StringComparison.Ordinal) &&
@@ -502,9 +577,48 @@ public static class InsightsReport
     private static Lighting BuildLighting(List<(DateTimeOffset Ts, JsonElement Ev)> inPeriod)
     {
         var lighting = inPeriod.Where(e => Str(e.Ev, "stream") == EventTelemetryLog.StreamLighting).ToList();
-        var changes = lighting.Where(e => Str(e.Ev, "event") == "lighting.state_changed").ToList();
+        // Changes in how many lights are on; older entries (the plugin's status text) do not count.
+        var changes = lighting.Where(e => Str(e.Ev, "event") == "lighting.state_changed" && IsAction(e.Ev)).ToList();
         var syncStarts = lighting.Count(e => Str(e.Ev, "event") == "music_sync.changed" && DataBool(e.Ev, "enabled") == true);
-        return new Lighting(changes.Count, syncStarts, changes.Count > 0 ? Data(changes[^1].Ev, "to") : null);
+        string? last = null;
+        if (changes.Count > 0 && changes[^1].Ev.TryGetProperty("data", out var data))
+        {
+            var on = Num(data, "to");
+            var total = Num(data, "total");
+            last = on is { } n ? total is { } t ? $"{n:0} of {t:0} on" : $"{n:0} on" : null;
+        }
+
+        return new Lighting(changes.Count, syncStarts, last);
+    }
+
+    private static Automations BuildAutomations(List<(DateTimeOffset Ts, JsonElement Ev)> inPeriod)
+    {
+        // Runs that say what they did (2.9.3 and later); older entries were written before the run, without an outcome.
+        var runs = inPeriod.Where(e => Str(e.Ev, "event") == "automation.triggered" && Data(e.Ev, "outcome") is not null).ToList();
+        var rows = runs
+            .GroupBy(e => Data(e.Ev, "automation") ?? "Automation")
+            .Select(g =>
+            {
+                var last = g.Last();
+                var summary = Data(last.Ev, "summary");
+                var trigger = Data(last.Ev, "trigger");
+                if (summary is not null && trigger is not null && summary.StartsWith(trigger + " → ", StringComparison.Ordinal))
+                {
+                    summary = summary[(trigger.Length + 3)..];
+                }
+
+                return new AutomationRow(g.Key, g.Count(), g.Count(e => Data(e.Ev, "outcome") == "acted"), summary,
+                    last.Ts.ToString("O", CultureInfo.InvariantCulture));
+            })
+            .OrderByDescending(static r => r.Acted)
+            .ThenByDescending(static r => r.Runs)
+            .ToList();
+        return new Automations(
+            runs.Count,
+            runs.Count(e => Data(e.Ev, "outcome") == "acted"),
+            runs.Count(e => Data(e.Ev, "outcome") == "nothing"),
+            runs.Count(e => Data(e.Ev, "outcome") == "failed"),
+            rows);
     }
 
     // ---------------------------------------------------------------- observations
@@ -577,6 +691,25 @@ public static class InsightsReport
                 $"Late at night the volume is {Math.Abs(e - l).ToString("0.#", CultureInfo.InvariantCulture)} dB {(quieter ? "lower" : "higher")} than in the evening ({late.AverageDb} against {evening.AverageDb})."));
         }
 
+        // Streaming apps against live TV, by listening time (1 volume step is 1 dB on a Denon).
+        static (double Average, int Seconds)? Mix(IEnumerable<AppVolume> apps)
+        {
+            var list = apps.ToList();
+            var seconds = list.Sum(static a => a.Seconds);
+            return seconds >= 30 * 60 ? (list.Sum(static a => a.Average * a.Seconds) / seconds, seconds) : null;
+        }
+
+        if (Mix(receiver.Volume.ByApp.Where(static a => a.Kind is "cast" or "appletv" or "tv_app")) is { } streaming &&
+            Mix(receiver.Volume.ByApp.Where(static a => a.Kind == "tv_channel")) is { } liveTv &&
+            Math.Abs(streaming.Average - liveTv.Average) >= 4)
+        {
+            var louder = streaming.Average > liveTv.Average;
+            list.Add(new Insight("info", "volume",
+                louder ? "Streaming plays louder than live TV" : "Live TV plays louder than streaming",
+                $"You listen to streaming apps about {Math.Abs(streaming.Average - liveTv.Average):0} dB {(louder ? "louder" : "quieter")} than live TV " +
+                $"({Db(streaming.Average)} against {Db(liveTv.Average)}). Streams are often mixed quieter than broadcast TV."));
+        }
+
         if (control.Total >= 5)
         {
             var agent = control.Origins.FirstOrDefault(o => o.Key == "mcp_agent");
@@ -628,7 +761,113 @@ public static class InsightsReport
             Math.Max(0, duration),
             DataStr(data, "input"),
             DataStr(data, "soundMode"),
-            logo);
+            logo,
+            Str(ev, "device") ?? "",
+            DataStr(data, "reason"),
+            Num(data, "avgVolume") is { } avgVolume && avgVolume > 0.5 ? avgVolume : null,
+            data.TryGetProperty("coveredBy", out var covered) && covered.ValueKind == JsonValueKind.Array
+                ? covered.EnumerateArray().Where(static c => c.ValueKind == JsonValueKind.String).Select(static c => c.GetString()!).ToList()
+                : null);
+    }
+
+    /// <summary>
+    /// A series as one title: "TVA (1397)" and "TVA (1398)" are episodes of "TVA". The TV guide puts the episode
+    /// number in brackets at the end, sometimes twice ("Barnaby XVII (1) (1)") or as part of a run ("(7:8)").
+    /// </summary>
+    public static string SeriesTitle(string title)
+    {
+        var t = title.Trim();
+        while (EpisodeSuffix().Match(t) is { Success: true } m && m.Index > 0)
+        {
+            t = t[..m.Index].TrimEnd();
+        }
+
+        return t.Length > 0 ? t : title;
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"\s*\(\d{1,5}(?:[:/]\d{1,5})?\)$")]
+    private static partial System.Text.RegularExpressions.Regex EpisodeSuffix();
+
+    /// <summary>
+    /// The device that played on an input, when one device covers most of its time ("cast:Stuen 2" on HDMI 1 →
+    /// "Chromecast Stuen 2"). Null when no device covers at least half.
+    /// </summary>
+    private static string? SeenOn(IEnumerable<Session> sessions)
+    {
+        var list = sessions.ToList();
+        var total = list.Sum(static s => s.Duration);
+        if (total <= 0)
+        {
+            return null;
+        }
+
+        var best = list
+            .Where(static s => s.CoveredBy is { Count: > 0 })
+            .SelectMany(static s => s.CoveredBy!.Where(IsPlayer).Select(c => (Label: c, s.Duration)))
+            .GroupBy(static c => c.Label, StringComparer.OrdinalIgnoreCase)
+            .Select(static g => (Label: g.Key, Seconds: g.Sum(static c => c.Duration)))
+            .OrderByDescending(static g => g.Seconds)
+            .FirstOrDefault();
+        return best.Label is { } label && best.Seconds * 2 >= total ? PlayerLabel(label) : null;
+
+        // A streamer, not the TV's own Live TV or apps (they cover the receiver's TV input, not an HDMI device).
+        static bool IsPlayer(string label) => label.StartsWith("cast:", StringComparison.Ordinal) || label.StartsWith("appletv:", StringComparison.Ordinal);
+    }
+
+    private static string PlayerLabel(string coverer)
+    {
+        var colon = coverer.IndexOf(':');
+        var kind = colon > 0 ? coverer[..colon] : coverer;
+        var name = colon > 0 ? coverer[(colon + 1)..] : string.Empty;
+        return name.Length > 0 ? $"{KindLabel(kind)} {name}" : KindLabel(kind);
+    }
+
+    /// <summary>
+    /// Joins a session that ended only because the app stopped ("app_shutdown") with the same session when it starts
+    /// again within <see cref="RestartJoin"/>: a restart is not a new session. The gap counts as watched, since the
+    /// programme went on while the app was away.
+    /// </summary>
+    private static List<Session> JoinRestartSplits(List<Session> sessions)
+    {
+        var ordered = sessions.OrderBy(static s => s.Start).ToList();
+        var joined = new List<Session>(ordered.Count);
+        var openSplits = new Dictionary<string, int>(StringComparer.Ordinal); // key → index in joined
+        foreach (var session in ordered)
+        {
+            var key = $"{session.Device}|{session.Kind}|{session.App}|{session.Title}";
+            if (openSplits.TryGetValue(key, out var index))
+            {
+                var before = joined[index];
+                var gap = session.Start - before.End;
+                if (gap >= TimeSpan.Zero && gap <= RestartJoin)
+                {
+                    var gapSeconds = (int)Math.Round(gap.TotalSeconds);
+                    var both = before.Exclusive > 0 && session.Exclusive > 0;
+                    joined[index] = before with
+                    {
+                        Duration = before.Duration + gapSeconds + session.Duration,
+                        Exclusive = before.Exclusive + session.Exclusive + (both ? gapSeconds : 0),
+                        Reason = session.Reason,
+                    };
+                    if (session.Reason != "app_shutdown")
+                    {
+                        openSplits.Remove(key);
+                    }
+
+                    continue;
+                }
+
+                openSplits.Remove(key);
+            }
+
+            joined.Add(session);
+            if (session.Reason == "app_shutdown")
+            {
+                openSplits[key] = joined.Count - 1;
+            }
+        }
+
+        return joined;
     }
 
     /// <summary>A logo file name as the Smart TV plugin caches it ("dr1-dk.png"), or null for anything else.</summary>

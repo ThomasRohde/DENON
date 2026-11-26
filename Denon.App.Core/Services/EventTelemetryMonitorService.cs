@@ -15,7 +15,7 @@ namespace Denon.App.Core.Services;
 /// - Runs an adaptive background probe (15s active / 60s standby) plus periodic Hue bridge sync
 ///   to capture external remote, wall-switch, and phone-app usage.
 /// </summary>
-public sealed class EventTelemetryMonitorService : BackgroundService
+public sealed partial class EventTelemetryMonitorService : BackgroundService
 {
     private readonly EventTelemetryLog _telemetry;
     private readonly AppSettingsStore _settingsStore;
@@ -37,12 +37,35 @@ public sealed class EventTelemetryMonitorService : BackgroundService
     private string _volInput = string.Empty;
     private string _volSoundMode = string.Empty;
 
+    // Held changes: a zone 2, sound mode or mute change is written only when it holds. The receiver flips zone 2 and
+    // mute for a moment while it switches inputs or the app stops, and the sound mode follows the TV's signal
+    // (MCH STEREO ↔ DOLBY D+ between ads and the programme); a change that flips back in time is not written.
+    internal static readonly TimeSpan Zone2Hold = TimeSpan.FromSeconds(10);
+    internal static readonly TimeSpan SoundModeHold = TimeSpan.FromSeconds(10);
+    internal static readonly TimeSpan MuteHold = TimeSpan.FromSeconds(3);
+
+    /// <summary>A volume at 0 is often the receiver switching inputs: it waits this long before it counts.</summary>
+    internal static readonly TimeSpan ZeroVolumeSettle = TimeSpan.FromSeconds(10);
+
+    private readonly Dictionary<string, HeldChange> _held = new(StringComparer.Ordinal);
+
+    private sealed class HeldChange
+    {
+        public required string Event { get; init; }
+        public required string From { get; init; }
+        public required string To { get; set; }
+        public required DateTimeOffset Since { get; set; }
+        public required TimeSpan Hold { get; init; }
+        public required string Origin { get; set; }
+        public required Dictionary<string, object?> Data { get; set; }
+    }
+
     // Media session slots (15s dwell filter)
     private readonly MediaSessionSlot _avrSession = new("avr");
     private readonly MediaSessionSlot _tvSession = new("lg-tv");
 
     // Lighting delta cache
-    private string? _lastHueStatus;
+    private int? _lastHueLightsOn;
     private DateTimeOffset _lastHueRefreshUtc = DateTimeOffset.MinValue;
     private DateTimeOffset _lastProbeEvalUtc = DateTimeOffset.MinValue;
     private DateTimeOffset _lastPruneUtc = DateTimeOffset.UtcNow;
@@ -68,6 +91,8 @@ public sealed class EventTelemetryMonitorService : BackgroundService
         _stateStore.StateChanged += OnReceiverStateChanged;
         _youTubeQueueService.QueueChanged += OnYouTubeQueueChanged;
         _pluginHostService.PluginsChanged += OnPluginsChanged;
+
+        CloseSessionsLeftOpen();
 
         // Capture any state that is already present on startup.
         ProcessReceiverSnapshot(_stateStore.Snapshot);
@@ -103,6 +128,7 @@ public sealed class EventTelemetryMonitorService : BackgroundService
                 lock (_sync)
                 {
                     EvaluateVolumeSettleLocked(nowUtc, cfg.VolumeSettleMs);
+                    EvaluateHeldChangesLocked(nowUtc);
                     EvaluateMediaDwellLocked(_avrSession, nowUtc, cfg.MediaDwellSeconds);
                     EvaluateMediaDwellLocked(_tvSession, nowUtc, cfg.MediaDwellSeconds);
                     isSystemAwake = (_lastAvr is { IsPoweredOn: true, IsMainZoneOn: true }) || IsTvActiveLocked();
@@ -128,6 +154,12 @@ public sealed class EventTelemetryMonitorService : BackgroundService
                     _ = RefreshHueSilentlyAsync(stoppingToken);
                 }
 
+                if (nowUtc - _lastOpenSessionsSaveUtc >= OpenSessionsSaveInterval)
+                {
+                    _lastOpenSessionsSaveUtc = nowUtc;
+                    SaveOpenSessions(nowUtc);
+                }
+
                 // Daily retention & disk-cap pruning
                 if (cfg.Enabled && nowUtc - _lastPruneUtc >= TimeSpan.FromHours(24))
                 {
@@ -151,7 +183,7 @@ public sealed class EventTelemetryMonitorService : BackgroundService
 
     private void OnPluginsChanged() => ProcessPluginSnapshots();
 
-    private void ProcessReceiverSnapshot(ReceiverStateSnapshot snapshot)
+    internal void ProcessReceiverSnapshot(ReceiverStateSnapshot snapshot)
     {
         var nowUtc = DateTimeOffset.UtcNow;
         var ytSnapshot = _youTubeQueueService.Snapshot;
@@ -229,16 +261,7 @@ public sealed class EventTelemetryMonitorService : BackgroundService
 
         if (prev.IsZone2On != cur.IsZone2On)
         {
-            _telemetry.Record(
-                EventTelemetryLog.StreamAvr,
-                _avrDeviceName,
-                "zone2.changed",
-                origin,
-                new Dictionary<string, object?>
-                {
-                    ["from"] = prev.IsZone2On ? "on" : "off",
-                    ["to"] = cur.IsZone2On ? "on" : "off",
-                });
+            HoldChangeLocked("zone2.changed", prev.IsZone2On ? "on" : "off", cur.IsZone2On ? "on" : "off", Zone2Hold, origin, nowUtc, []);
         }
 
         if (!string.Equals(prev.InputSource, cur.InputSource, StringComparison.OrdinalIgnoreCase) &&
@@ -262,32 +285,14 @@ public sealed class EventTelemetryMonitorService : BackgroundService
         if (!string.Equals(prev.SoundMode, cur.SoundMode, StringComparison.OrdinalIgnoreCase) &&
             !string.IsNullOrWhiteSpace(cur.SoundMode))
         {
-            _telemetry.Record(
-                EventTelemetryLog.StreamAvr,
-                _avrDeviceName,
-                "sound_mode.changed",
-                origin,
-                new Dictionary<string, object?>
-                {
-                    ["from"] = prev.SoundMode,
-                    ["to"] = cur.SoundMode,
-                    ["input"] = cur.InputSource,
-                });
+            HoldChangeLocked("sound_mode.changed", prev.SoundMode ?? string.Empty, cur.SoundMode, SoundModeHold, origin, nowUtc,
+                new Dictionary<string, object?> { ["input"] = cur.InputSource });
         }
 
         if (prev.IsMuted != cur.IsMuted)
         {
-            _telemetry.Record(
-                EventTelemetryLog.StreamAvr,
-                _avrDeviceName,
-                "mute.changed",
-                origin,
-                new Dictionary<string, object?>
-                {
-                    ["muted"] = cur.IsMuted,
-                    ["volume"] = Math.Round(curVol, 1),
-                    ["input"] = cur.InputSource,
-                });
+            HoldChangeLocked("mute.changed", prev.IsMuted ? "true" : "false", cur.IsMuted ? "true" : "false", MuteHold, origin, nowUtc,
+                new Dictionary<string, object?> { ["muted"] = cur.IsMuted, ["volume"] = Math.Round(curVol, 1), ["input"] = cur.InputSource });
         }
 
         if (!string.Equals(prev.EcoMode, cur.EcoMode, StringComparison.OrdinalIgnoreCase) &&
@@ -346,6 +351,13 @@ public sealed class EventTelemetryMonitorService : BackgroundService
         }
 
         if ((nowUtc - _volLastChangeUtc).TotalMilliseconds < settleMs)
+        {
+            return;
+        }
+
+        // A volume at 0 waits longer: the receiver reports 0 for a moment while it switches inputs, and then the
+        // volume comes back to where it was (30 → 0 → 30 is no change at all).
+        if (_volPendingCurrent <= 0.5 && nowUtc - _volLastChangeUtc < ZeroVolumeSettle)
         {
             return;
         }
@@ -542,15 +554,13 @@ public sealed class EventTelemetryMonitorService : BackgroundService
                     : tv is null || tv.Health != PluginHealthState.Connected ? "standby" : "switched";
             UpdateMediaSlotLocked(_tvSession, tvCandidate, nowUtc, tvEndReason);
 
-            // Track Philips Hue lighting status transitions on the `lighting` stream
+            // Philips Hue on the `lighting` stream: only a change in how many lights are on, while the bridge is
+            // connected. The plugin's status text ("Connecting…", "Stopped") is not a light changing.
             var hue = plugins.FirstOrDefault(static p => p.Id.Equals("philips-hue", StringComparison.OrdinalIgnoreCase));
-            if (hue is { IsEnabled: true, IsStarted: true } &&
-                !string.IsNullOrWhiteSpace(hue.StatusText) &&
-                !hue.StatusText.Contains("Demo", StringComparison.OrdinalIgnoreCase) &&
-                !hue.StatusText.Equals("Initializing...", StringComparison.OrdinalIgnoreCase))
+            if (hue is { IsEnabled: true, IsStarted: true, Health: PluginHealthState.Connected } &&
+                TryReadLightsOn(hue.StatusText, out var lightsOn, out var lightsTotal))
             {
-                if (_lastHueStatus is not null &&
-                    !string.Equals(_lastHueStatus, hue.StatusText, StringComparison.Ordinal))
+                if (_lastHueLightsOn is { } before && before != lightsOn)
                 {
                     var origin = _telemetry.ResolveOrigin("lighting");
                     _telemetry.Record(
@@ -560,16 +570,29 @@ public sealed class EventTelemetryMonitorService : BackgroundService
                         origin,
                         new Dictionary<string, object?>
                         {
-                            ["from"] = _lastHueStatus,
-                            ["to"] = hue.StatusText,
-                            ["health"] = hue.Health.ToString(),
+                            ["from"] = before,
+                            ["to"] = lightsOn,
+                            ["total"] = lightsTotal,
                         });
                 }
 
-                _lastHueStatus = hue.StatusText;
+                _lastHueLightsOn = lightsOn;
             }
         }
     }
+
+    /// <summary>Reads "3/4 lights on" from the Hue plugin's status ("192.168.1.16 • 3/4 lights on").</summary>
+    internal static bool TryReadLightsOn(string? status, out int on, out int total)
+    {
+        on = total = 0;
+        var match = status is null ? null : LightsOnPattern().Match(status);
+        return match is { Success: true } &&
+               int.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out on) &&
+               int.TryParse(match.Groups[2].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out total);
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"(\d+)\s*/\s*(\d+)\s+lights? on", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex LightsOnPattern();
 
     private MediaCandidate? BuildTvMediaCandidate(PluginRecordSnapshot? tv, DateTimeOffset nowUtc)
     {
@@ -779,12 +802,70 @@ public sealed class EventTelemetryMonitorService : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Starts holding a change, or updates the held one. A change back to where it started drops it: nothing changed.
+    /// </summary>
+    private void HoldChangeLocked(string eventName, string from, string to, TimeSpan hold, string origin, DateTimeOffset nowUtc, Dictionary<string, object?> data)
+    {
+        if (_held.TryGetValue(eventName, out var held))
+        {
+            if (string.Equals(held.From, to, StringComparison.OrdinalIgnoreCase))
+            {
+                _held.Remove(eventName); // It flipped back in time.
+                return;
+            }
+
+            held.To = to;
+            held.Since = nowUtc;
+            held.Data = data;
+            if (origin != "external")
+            {
+                held.Origin = origin;
+            }
+
+            return;
+        }
+
+        _held[eventName] = new HeldChange { Event = eventName, From = from, To = to, Since = nowUtc, Hold = hold, Origin = origin, Data = data };
+    }
+
+    /// <summary>Writes the held changes that have held long enough by <paramref name="nowUtc"/> (the tick, and tests).</summary>
+    internal void EvaluateHeldChanges(DateTimeOffset nowUtc)
+    {
+        lock (_sync)
+        {
+            EvaluateHeldChangesLocked(nowUtc);
+        }
+    }
+
+    private void EvaluateHeldChangesLocked(DateTimeOffset nowUtc)
+    {
+        if (_held.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var held in _held.Values.Where(h => nowUtc - h.Since >= h.Hold).ToList())
+        {
+            _held.Remove(held.Event);
+            var data = new Dictionary<string, object?>(held.Data);
+            if (held.Event != "mute.changed")
+            {
+                data["from"] = held.From;
+                data["to"] = held.To;
+            }
+
+            _telemetry.Record(EventTelemetryLog.StreamAvr, _avrDeviceName, held.Event, held.Origin, data);
+        }
+    }
+
     private void FlushShutdownState()
     {
         var nowUtc = DateTimeOffset.UtcNow;
         lock (_sync)
         {
             FlushPendingVolumeLocked();
+            _held.Clear(); // A change seen while the app stops is the app stopping, not the receiver.
 
             if (_avrSession.Active is not null)
             {
@@ -800,6 +881,128 @@ public sealed class EventTelemetryMonitorService : BackgroundService
 
             _avrSession.Pending = null;
             _tvSession.Pending = null;
+        }
+
+        // A clean stop: nothing is left open for the next start to close.
+        TryDelete(_telemetry.OpenSessionsPath);
+    }
+
+    // ---------------------------------------------------------------- sessions left open by a crash
+
+    private static readonly TimeSpan OpenSessionsSaveInterval = TimeSpan.FromMinutes(1);
+    private DateTimeOffset _lastOpenSessionsSaveUtc = DateTimeOffset.MinValue;
+
+    private sealed record OpenSessionRecord(string Device, string Origin, DateTimeOffset StartedUtc, Dictionary<string, object?> Data);
+
+    private sealed record OpenSessionsFile(DateTimeOffset LastSeenUtc, List<OpenSessionRecord> Sessions);
+
+    private static readonly System.Text.Json.JsonSerializerOptions OpenSessionsJson = new(System.Text.Json.JsonSerializerDefaults.Web);
+
+    /// <summary>
+    /// Every minute: the sessions that are open now, and the time. The file is deleted on a clean stop, so finding it at
+    /// start means the app did not stop cleanly (a crash or a kill).
+    /// </summary>
+    private void SaveOpenSessions(DateTimeOffset nowUtc)
+    {
+        List<OpenSessionRecord> open;
+        lock (_sync)
+        {
+            open = [];
+            foreach (var slot in new[] { _avrSession, _tvSession })
+            {
+                if (slot.Active is { } active)
+                {
+                    var data = BuildSessionPayload(active.Candidate);
+                    if (active.AverageVolume is { } avg)
+                    {
+                        data["avgVolume"] = Math.Round(avg, 1);
+                    }
+
+                    open.Add(new OpenSessionRecord(slot.Device, active.Candidate.Origin, active.Candidate.StartedUtc, data));
+                }
+            }
+        }
+
+        try
+        {
+            var path = _telemetry.OpenSessionsPath;
+            var temp = path + ".tmp";
+            File.WriteAllText(temp, System.Text.Json.JsonSerializer.Serialize(new OpenSessionsFile(nowUtc, open), OpenSessionsJson));
+            File.Move(temp, path, overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Next minute.
+        }
+    }
+
+    /// <summary>
+    /// At start: the app did not stop cleanly last time when the file is still there. Its open sessions get their
+    /// session.ended, at the last time the app saw them, with reason "app_crashed".
+    /// </summary>
+    internal void CloseSessionsLeftOpen()
+    {
+        var path = _telemetry.OpenSessionsPath;
+        OpenSessionsFile? left;
+        try
+        {
+            if (!File.Exists(path))
+            {
+                return;
+            }
+
+            left = System.Text.Json.JsonSerializer.Deserialize<OpenSessionsFile>(File.ReadAllText(path), OpenSessionsJson);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            left = null;
+        }
+
+        TryDelete(path);
+        if (left is null)
+        {
+            return;
+        }
+
+        var lastSeen = left.LastSeenUtc.ToLocalTime();
+        _logStore.Warning($"[Telemetry] The app did not stop cleanly last time (last seen {lastSeen:yyyy-MM-dd HH:mm}). " +
+                          $"Closed {left.Sessions.Count} open session(s) at that time.");
+        foreach (var session in left.Sessions)
+        {
+            var seconds = (int)Math.Round((left.LastSeenUtc - session.StartedUtc).TotalSeconds);
+            if (seconds <= 0)
+            {
+                continue;
+            }
+
+            var data = new Dictionary<string, object?>(session.Data.Select(static p =>
+                new KeyValuePair<string, object?>(p.Key, p.Value is System.Text.Json.JsonElement el ? FromJson(el) : p.Value)),
+                StringComparer.OrdinalIgnoreCase)
+            {
+                ["durationSec"] = seconds,
+                ["reason"] = "app_crashed",
+            };
+            _telemetry.Record(EventTelemetryLog.StreamMedia, session.Device, "session.ended", session.Origin, data, at: lastSeen);
+        }
+    }
+
+    private static object? FromJson(System.Text.Json.JsonElement el) => el.ValueKind switch
+    {
+        System.Text.Json.JsonValueKind.String => el.GetString(),
+        System.Text.Json.JsonValueKind.Number => el.TryGetInt64(out var l) ? l : el.GetDouble(),
+        System.Text.Json.JsonValueKind.True => true,
+        System.Text.Json.JsonValueKind.False => false,
+        _ => null,
+    };
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
         }
     }
 

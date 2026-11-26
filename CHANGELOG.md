@@ -6,7 +6,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- **Insights shows what the automations did**: a new Automations card with the runs that changed something, the runs
+  with nothing to do and the runs that failed, and the last result of each automation. The activity feed names the
+  automation and what it did; a run with nothing to do is a quiet entry.
+- **Volume by app** in the Volume card, weighted by listening time, and an observation when streaming plays clearly
+  louder (or quieter) than live TV.
+- **An input is named by the streamer seen on it** in the Receiver card, for example "Media Player · Mostly Apple TV".
+
+### Changed
+- **The volume average is weighted by listening time**: an evening at 50 now counts more than five quick changes at
+  30. Before, Insights averaged the change events. A volume of 0 no longer counts as the quietest level.
+- **Episodes group under their series** in Most watched: "TVA (1397)" and "TVA (1398)" are "TVA".
+- **Who's in control counts only real changes**: not automation runs with nothing to do, not the receiver changing
+  sound mode with the TV's signal, not reads, and not the Hue plugin's status text.
+- **An automation event says what the run did** (`outcome`: acted, nothing or failed, and `summary`), written after
+  the run. A check that says yes with nothing after it now reads "nothing to do: Yes: the input is TV" instead of
+  "no actions connected".
+
 ### Fixed
+- **A restart is not a new session.** A session the app's restart cut in two counts as one sitting in Insights, and
+  the app saves the open sessions every minute: after a crash, the next start closes them at the time they were last
+  seen (reason `app_crashed`) and writes a warning to the log. Before, a crash lost them.
+- **Starting and stopping the app no longer writes fake changes.** The LG TV connecting at start is not "the TV turned
+  on", and its first app and channel are not changes; the plugin stopping is not "the TV turned off". The Chromecast's
+  first state after a connect is not a playback change.
+- **Brief flips are not written**: zone 2, mute and sound mode must hold (10, 3 and 10 seconds) before they count, so
+  the receiver switching inputs or following the TV's signal writes nothing. A volume of 0 for a moment while the
+  receiver switches inputs is not a volume change. Chromecast PLAYING → BUFFERING → PLAYING is no change.
+- **Hue writes a light change only when the number of lights on changes**, not its status text ("Connecting…",
+  "Stopped").
+- **Less log noise**: no line every 93 s for the Audyssey sync, discovery lines only when the devices found change,
+  the LG TV's "insufficient permissions" answer once per run, and a webhook repeated within 5 s is not written again
+  (it still runs its automations).
+- **A settings save no longer reconnects the receiver's live updates** (HEOS push) unless the receiver's address
+  changed. Changes made in that moment were missed.
+- **The shutdown line says why**: Windows sign-out, Windows shutdown, or an exit without the app's own Exit (an
+  installer). Before, every such exit said "Windows session ending".
 - **Reading a plugin is no longer logged as an action.** A read-only action (declared so by the plugin, or named
   `*.refresh`) writes no `plugin.action` event, no app.log line and no "used from the app" mark. Before, the Deck's
   artwork reads wrote about 700 identical Chromecast events in one evening and marked real play and pause changes as

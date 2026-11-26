@@ -471,9 +471,8 @@ public sealed class ReceiverController
         try
         {
             var settings = _settingsStore.Current.Receiver;
-            var acoustics = await _avrClient.GetAcousticStatusAsync(settings, cancellationToken);
-            _logStore.Info("Synced acoustic & Audyssey parameters from receiver.");
-            return acoustics;
+            // No log line: the Brain reads this every 90 s while the receiver is on.
+            return await _avrClient.GetAcousticStatusAsync(settings, cancellationToken);
         }
         finally
         {

@@ -167,13 +167,18 @@ public sealed class EventTelemetryLog : IAsyncDisposable
     /// Publishes the event on the live <see cref="RoomEventBus"/> (always), and when event logging is on, also
     /// enqueues it to the daily JSONL file of its stream without blocking the caller.
     /// </summary>
+    /// <param name="at">When it happened, for an event written later (a session closed after a crash); else now.</param>
     /// <returns>The published event, or null after dispose.</returns>
+    /// <summary>Where the monitor keeps the sessions that are open now, to close them after a crash.</summary>
+    public string OpenSessionsPath => Path.Combine(_eventsDir, "open-sessions.json");
+
     public RoomEvent? Record(
         string stream,
         string device,
         string eventName,
         string origin,
-        IReadOnlyDictionary<string, object?>? data = null)
+        IReadOnlyDictionary<string, object?>? data = null,
+        DateTimeOffset? at = null)
     {
         if (_disposed)
         {
@@ -181,7 +186,7 @@ public sealed class EventTelemetryLog : IAsyncDisposable
         }
 
         var cleanStream = NormalizeStreamName(stream);
-        var now = DateTimeOffset.Now;
+        var now = at ?? DateTimeOffset.Now;
         if (cleanStream == StreamMedia)
         {
             // Adds coveredSec / exclusiveSec to session.ended so parallel sessions of one viewing
