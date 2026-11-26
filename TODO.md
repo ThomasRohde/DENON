@@ -65,6 +65,7 @@ On the official MCP C# SDK since 2.10.1 (`DenonMcpServer`, `ModelContextProtocol
 - [x] The card works in the Codex desktop app (2.10.3): it renders in standby and on; volume −/+ and mute/unmute
       from the card change the receiver and the card updates.
 - [ ] Try the card's play/pause button, and the card in Claude Desktop.
+- [ ] Check live that a scene's stream (Morning Jazz) shows the station name, not "Local Music" (fixed in 2.10.4).
 - [ ] More MCP Apps: a room remote (inputs, scenes, Volume memory levels) and the Insights charts.
 - [ ] Room-state updates reach only session clients (initialize, 2025-11-25). 2026-07-28 clients get none: the SDK does
       not yet fan out resource updates over `subscriptions/listen` (csharp-sdk #1662).
