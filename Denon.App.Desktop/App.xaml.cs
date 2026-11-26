@@ -149,7 +149,7 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<EventTelemetryMonitorService>();
             builder.Services.AddHostedService(sp => sp.GetRequiredService<EventTelemetryMonitorService>());
             builder.Services.AddSingleton<RoomIntelligenceService>();
-            builder.Services.AddSingleton<DenonMcpHttpServer>();
+            builder.Services.AddSingleton<DenonMcpServer>();
             builder.Services.AddSingleton<LyricsService>();
             builder.Services.AddSingleton<UpdateService>();
             builder.Services.AddSingleton<AutomationEditorApi>();
@@ -212,7 +212,7 @@ public partial class App : System.Windows.Application
 
                     try
                     {
-                        var mcpServer = _host.Services.GetRequiredService<DenonMcpHttpServer>();
+                        var mcpServer = _host.Services.GetRequiredService<DenonMcpServer>();
                         await mcpServer.ApplySettingsAsync();
                     }
                     catch (Exception ex)

@@ -384,7 +384,7 @@ public sealed partial class MainViewModel
         HelpPortsReference.Add(new("TCP 23", "Denon / Marantz AVR control (Telnet)", "Power, volume, inputs, sound modes, Audyssey, ECO, Zone 2 and dimmer. The receiver accepts one client at a time."));
         HelpPortsReference.Add(new("TCP 1255", "HEOS CLI and LIVE PUSH", "Playback, volume, track data, artwork, favorites and queue, plus push events from the receiver"));
         HelpPortsReference.Add(new("TCP 18925", "Audio relay and Phone Remote", "Streams YouTube, PC Audio Cast and jukebox files to HEOS and serves the Phone Remote. Inbound: use Allow Firewall. Change it in Settings → Relay Port."));
-        HelpPortsReference.Add(new("TCP 18926", "MCP server (HTTP)", "POST /mcp and SSE with a Bearer token. Localhost only by default. Change it in Brain → HTTP PORT."));
+        HelpPortsReference.Add(new("TCP 18926", "MCP server (HTTP)", "MCP Streamable HTTP on /mcp (official MCP C# SDK, protocol 2026-07-28) with a Bearer token. Localhost only by default. Change it in Brain → HTTP PORT."));
         HelpPortsReference.Add(new("TCP (free port)", "Insights page (HTTP)", "127.0.0.1 only, a new port and key each app start. Settings → Open Insights opens it in the browser."));
         HelpPortsReference.Add(new("UDP 1900", "SSDP discovery", "Finds Denon / Marantz receivers, Philips Hue Bridges and LG webOS TVs on the LAN"));
         HelpPortsReference.Add(new("HTTPS 443 / HTTP 80", "Philips Hue Bridge API", "Rooms, lights, Hue scenes and Entertainment Areas on the LAN"));
@@ -933,7 +933,7 @@ public sealed partial class MainViewModel
             category: "Plugins",
             title: "MCP Server & Room Brain",
             subtitle: "Connect AI agents over Streamable HTTP (/mcp), set safety limits, and use the Room Doctor and Undo.",
-            overview: "Denon Desktop has a built-in Model Context Protocol (MCP) server (POST /mcp and SSE) on TCP 18926. AI clients such as Claude Desktop, Cursor, VS Code or Antigravity can read the room state and control the receiver, the plugins and the scenes. Safety limits and an Undo snapshot protect the room. The Room Brain also checks the devices for problems and learns your volume habits on this PC only.",
+            overview: "Denon Desktop has a built-in Model Context Protocol (MCP) server on TCP 18926 (Streamable HTTP on /mcp, built on the official MCP C# SDK, protocol 2026-07-28; older clients still connect). AI clients such as Claude Desktop, Cursor, VS Code or Antigravity can read the room state and control the receiver, the plugins and the scenes. Safety limits and an Undo snapshot protect the room. The Room Brain also checks the devices for problems and learns your volume habits on this PC only.",
             steps:
             [
                 new("01", "Open the page", "Click Brain in the left rail, or the MCP :18926 badge in the title bar."),
@@ -954,7 +954,7 @@ public sealed partial class MainViewModel
             troubleshooting:
             [
                 new("The MCP client gets 401 Unauthorized?", "The Authorization: Bearer header must match BEARER AUTH TOKEN. Use Copy MCP Config JSON to avoid typing errors. Click Regenerate only if you want a new token; then update every client."),
-                new("Another PC on the LAN cannot connect?", "Tick 'Allow LAN connections' and click Save & Apply. Windows needs a URL reservation (URLACL) or one run as administrator to listen on the LAN. Without it, the server stays on localhost."),
+                new("Another PC on the LAN cannot connect?", "Tick 'Allow LAN connections' and click Save & Apply; no administrator rights are needed. The other PC needs the Bearer token, and the Windows firewall must allow TCP 18926 (or the port you set) on your network."),
             ],
             quickJumps:
             [

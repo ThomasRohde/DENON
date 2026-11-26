@@ -7,7 +7,7 @@ namespace Denon.App.Core.Tests;
 
 public sealed class McpPluginToolBridgeTests
 {
-    private static JsonElement ToJson(object value) => JsonSerializer.SerializeToElement(value);
+    private static JsonElement ToJson(object value) => JsonSerializer.SerializeToElement(value, value.GetType(), ModelContextProtocol.McpJsonUtilities.DefaultOptions);
 
     [Fact]
     public void Declared_parameters_become_the_input_schema()
