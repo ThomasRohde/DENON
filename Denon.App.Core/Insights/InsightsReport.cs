@@ -762,7 +762,8 @@ public static partial class InsightsReport
             DataStr(data, "input"),
             DataStr(data, "soundMode"),
             logo,
-            Str(ev, "device") ?? "",
+            // The player, not only the plugin: one Chromecast plugin can log several Cast devices.
+            PlayerOf(Str(ev, "device") ?? "", data),
             DataStr(data, "reason"),
             Num(data, "avgVolume") is { } avgVolume && avgVolume > 0.5 ? avgVolume : null,
             data.TryGetProperty("coveredBy", out var covered) && covered.ValueKind == JsonValueKind.Array
@@ -822,6 +823,13 @@ public static partial class InsightsReport
         return name.Length > 0 ? $"{KindLabel(kind)} {name}" : KindLabel(kind);
     }
 
+    /// <summary>"chromecast/Stuen 2": the plugin and, when it names one, the player (Cast device, Apple TV, HomePod).</summary>
+    private static string PlayerOf(string device, JsonElement data)
+    {
+        var player = DataStr(data, "castDevice") ?? DataStr(data, "appleTvDevice") ?? DataStr(data, "homepodDevice");
+        return string.IsNullOrWhiteSpace(player) ? device : $"{device}/{player}";
+    }
+
     /// <summary>The average volume of two parts, weighted by their time; a part without a volume does not count.</summary>
     private static double? JoinVolume(Session a, Session b)
     {
@@ -847,7 +855,7 @@ public static partial class InsightsReport
         var openSplits = new Dictionary<string, int>(StringComparer.Ordinal); // key → index in joined
         foreach (var session in ordered)
         {
-            var key = $"{session.Device}|{session.Kind}|{session.App}|{session.Title}";
+            var key = $"{session.Device}|{session.Kind}|{session.App}|{session.Title}"; // Device includes the player
 
             // Something else on the same device after the restart (a minute of Live TV) means the first session did
             // not go on: the gap was not continued viewing.
@@ -863,7 +871,10 @@ public static partial class InsightsReport
                 if (gap >= TimeSpan.Zero && gap <= RestartJoin)
                 {
                     var gapSeconds = (int)Math.Round(gap.TotalSeconds);
-                    var both = before.Exclusive > 0 && session.Exclusive > 0;
+                    // The gap counts as this session's own time only when nothing covered either part: a receiver
+                    // input under the TV gets the gap in its duration, and the TV (which resumes too) counts it once.
+                    var both = before.Exclusive >= before.Duration - 1 && session.Exclusive >= session.Duration - 1 &&
+                               before.Exclusive > 0 && session.Exclusive > 0;
                     joined[index] = before with
                     {
                         Duration = before.Duration + gapSeconds + session.Duration,

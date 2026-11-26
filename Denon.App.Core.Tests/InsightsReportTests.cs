@@ -309,6 +309,45 @@ public sealed class InsightsReportTests
     }
 
     [Fact]
+    public void A_restart_gap_is_counted_once_when_the_tv_covers_the_receiver()
+    {
+        // Receiver 20:00–20:40 and 20:42–21:30 (10 min of its own in each part); TV 20:10–20:40 and 20:42–21:20.
+        // 90 minutes of viewing, not 92.
+        var day = Now.Date.AddHours(20);
+        JsonElement Part(DateTime end, string device, string kind, string title, int duration, int exclusive, string reason) =>
+            Ev("media", device, "session.ended", "external", end, new { kind, title, durationSec = duration, exclusiveSec = exclusive, reason });
+        var events = new[]
+        {
+            Part(day.AddMinutes(40), "avr", "avr_input", "TV Audio", 40 * 60, 10 * 60, "app_shutdown"),
+            Part(day.AddMinutes(40), "lg-tv", "tv_channel", "DR1", 30 * 60, 30 * 60, "app_shutdown"),
+            Part(day.AddMinutes(90), "avr", "avr_input", "TV Audio", 48 * 60, 10 * 60, "standby"),
+            Part(day.AddMinutes(80), "lg-tv", "tv_channel", "DR1", 38 * 60, 38 * 60, "standby"),
+        };
+
+        var report = InsightsReport.Build(events, At(Now), 1);
+
+        Assert.Equal(90 * 60, report.Watch.TotalSeconds);
+    }
+
+    [Fact]
+    public void Two_players_with_the_same_title_are_not_joined()
+    {
+        var day = Now.Date.AddHours(20);
+        JsonElement Cast(DateTime end, string player, int seconds, string reason) =>
+            Ev("media", "chromecast", "session.ended", "external", end, new { kind = "cast", title = "YouTube", castDevice = player, durationSec = seconds, exclusiveSec = seconds, reason });
+        var events = new[]
+        {
+            Cast(day.AddMinutes(30), "Stuen 2", 30 * 60, "app_shutdown"),
+            Cast(day.AddMinutes(62), "Køkken", 30 * 60, "standby"),
+        };
+
+        var report = InsightsReport.Build(events, At(Now), 1);
+
+        Assert.Equal(2, report.Watch.Sessions);
+        Assert.Equal(60 * 60, report.Watch.TotalSeconds);
+    }
+
+    [Fact]
     public void A_joined_session_keeps_the_volume_of_both_parts()
     {
         // Two equal parts at 30 and 60: the joined session plays at 45, not 30.
