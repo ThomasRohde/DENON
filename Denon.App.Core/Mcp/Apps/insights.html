@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Insights · Denon Desktop</title>
+<style>
+/*@shared-css*/
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 8px; margin-top: 12px; }
+.tile { padding: 10px 12px; border-radius: 10px; background: var(--color-background-secondary); }
+.tile .value { font-size: 16px; font-weight: 650; white-space: nowrap; }
+.tile .label { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
+.tile .delta { font-size: 11px; margin-top: 2px; }
+.delta.up { color: var(--good); } .delta.down { color: var(--warn); }
+.days { display: flex; align-items: flex-end; gap: 4px; height: 96px; }
+.day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; height: 100%; justify-content: flex-end; }
+.day .col { width: 100%; max-width: 30px; border-radius: 4px 4px 2px 2px; background: var(--accent); min-height: 2px; }
+.day .wd { font-size: 10px; color: var(--color-text-secondary); }
+.heat { display: grid; grid-template-columns: 26px repeat(24, 1fr); gap: 2px; font-size: 9px; color: var(--color-text-secondary); }
+.heat .cell { aspect-ratio: 1; border-radius: 2px; background: var(--accent); }
+.heat .cell.zero { background: var(--color-background-secondary); }
+.hbars { display: grid; gap: 6px; }
+.hbar { display: grid; grid-template-columns: minmax(80px, 34%) 1fr auto; gap: 8px; align-items: center; font-size: 12px; }
+.hbar .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hbar .track { height: 8px; border-radius: 999px; background: var(--color-background-secondary); position: relative; overflow: hidden; }
+.hbar .track span { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: inherit; }
+.hbar .value { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-secondary); white-space: nowrap; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 20px; }
+.notes { display: grid; gap: 6px; }
+.note { font-size: 12px; padding: 8px 10px; border-radius: 8px; background: var(--color-background-secondary); }
+.note strong { display: block; font-size: 13px; margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<main class="card" aria-live="polite">
+  <div class="top"><span class="name">Insights</span><span class="right chips" id="periods"></span></div>
+  <h1 id="title">Loading…</h1>
+  <p class="detail" id="detail"></p>
+  <div class="tiles" id="tiles"></div>
+  <div id="sections"></div>
+  <p class="status" id="status"></p>
+</main>
+<script>
+/*@shared-js*/
+</script>
+<script>
+"use strict";
+const { $, el } = Card;
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function tile(value, label, delta) {
+  return el("div", { className: "tile" },
+    el("div", { className: "value" }, value ?? "—"),
+    el("div", { className: "label" }, label),
+    delta ?? null);
+}
+
+function hbars(rows, valueText, max) {
+  const top = max ?? Math.max(1, ...rows.map((r) => r.value || 0));
+  return el("div", { className: "hbars" }, rows.map((r) => el("div", { className: "hbar" },
+    el("span", { className: "label", title: r.label }, r.label),
+    el("span", { className: "track" }, el("span", { style: { width: `${Math.max(2, Math.min(100, ((r.value || 0) / top) * 100))}%` } })),
+    el("span", { className: "value" }, valueText(r)))));
+}
+
+function section(title, ...content) { return [el("h2", {}, title), ...content]; }
+
+function render(data) {
+  const w = data.watch, rv = data.receiver, rh = data.rhythm;
+  $("periods").replaceChildren(...[1, 7, 30].map((d) => el("button", {
+    className: `small ${d === data.days ? "active" : ""}`,
+    onclick: () => Card.run("Reading the logs", () => Card.reload({ days: d })),
+  }, d === 1 ? "Today" : `${d} days`)));
+  $("title").textContent = data.period;
+  $("detail").textContent = `${data.events} events in the logs.`;
+
+  const change = w.changePercent;
+  const delta = change == null ? null
+    : el("div", { className: `delta ${change >= 0 ? "up" : "down"}` }, `${change >= 0 ? "+" : ""}${change}% vs before (${w.previousText})`);
+  $("tiles").replaceChildren(
+    tile(w.totalText, "Listening and watching", delta),
+    tile(String(w.sessions), `Sessions on ${w.activeDays} day(s)`),
+    tile(w.averagePerActiveDayText, "Per active day"),
+    tile(rv.inUseText, `Receiver on · ${rv.powerOns} power-on(s)`),
+    tile(rv.volume.averageDb || "—", `Average volume${rv.volume.average ? ` (${Math.round(rv.volume.average)})` : ""}`));
+
+  const parts = [];
+  const byDay = w.byDay || [];
+  if (byDay.length > 1) {
+    const max = Math.max(1, ...byDay.map((d) => d.seconds));
+    parts.push(...section("Per day", el("div", { className: "days" }, byDay.map((d) => el("div", { className: "day", title: `${d.date}: ${d.text}` },
+      el("div", { className: "col", style: { height: `${(d.seconds / max) * 80}%` } }),
+      el("span", { className: "wd" }, d.weekday.slice(0, 2)))))));
+  }
+
+  if (rh && rh.maxCell > 0) {
+    const grid = [el("span", {}, "")];
+    for (let h = 0; h < 24; h++) grid.push(el("span", { style: { textAlign: "center" } }, h % 6 === 0 ? String(h) : ""));
+    rh.cells.forEach((row, d) => {
+      grid.push(el("span", {}, WEEKDAYS[d]));
+      row.forEach((seconds, h) => grid.push(el("span", {
+        className: `cell ${seconds ? "" : "zero"}`,
+        title: `${WEEKDAYS[d]} ${String(h).padStart(2, "0")}:00 · ${Math.round(seconds / 60)} min`,
+        style: seconds ? { opacity: String(0.18 + 0.82 * (seconds / rh.maxCell)) } : undefined,
+      })));
+    });
+    parts.push(...section(`Rhythm · peak ${rh.peakText}`, el("div", { className: "heat" }, grid)));
+  }
+
+  const left = [], right = [];
+  if (w.topApps?.length) left.push(...section("Top apps and sources", hbars(w.topApps.map((a) => ({ label: a.label, value: a.seconds, text: a.text })), (r) => r.text)));
+  if (rv.inputs?.length) right.push(...section("Receiver inputs", hbars(rv.inputs.map((a) => ({ label: a.label, value: a.seconds, text: a.text })), (r) => r.text)));
+  const vb = (rv.volume.byBlock || []).filter((b) => b.average != null);
+  if (vb.length) left.push(...section("Volume by time of day", hbars(vb.map((b) => ({ label: b.label, value: b.average, db: b.averageDb })), (r) => `${Math.round(r.value)} · ${r.db}`, 98)));
+  if (rv.volume.byApp?.length) right.push(...section("Volume by source", hbars(rv.volume.byApp.map((b) => ({ label: b.label, value: b.average, db: b.averageDb })), (r) => `${Math.round(r.value)} · ${r.db}`, 98)));
+  if (left.length || right.length) parts.push(el("div", { className: "two" }, el("div", {}, left), el("div", {}, right)));
+
+  const a = data.automations;
+  if (a && a.runs > 0) {
+    parts.push(...section(`Automations · ${a.runs} runs, ${a.acted} acted${a.failed ? `, ${a.failed} failed` : ""}`,
+      hbars(a.top.map((t) => ({ label: t.name, value: t.runs, text: `${t.acted}/${t.runs}` })), (r) => r.text)));
+  }
+
+  if (data.insights?.length) {
+    parts.push(...section("Notes", el("div", { className: "notes" }, data.insights.map((i) => el("div", { className: "note" }, el("strong", {}, i.title), i.text)))));
+  }
+  if (!parts.length) parts.push(el("p", { className: "empty" }, "No listening in this period yet."));
+  $("sections").replaceChildren(...parts);
+  Card.resize();
+}
+
+Card.start({
+  name: "denon-insights",
+  tool: "show_insights",
+  render,
+  outsideHost() {
+    $("title").textContent = "Open this card from an MCP host";
+    $("detail").textContent = "It is shown by the Denon Desktop tool show_insights in an MCP Apps host.";
+  },
+});
+</script>
+</body>
+</html>

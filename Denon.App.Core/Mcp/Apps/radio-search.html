@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radio Search · Denon Desktop</title>
+<style>
+/*@shared-css*/
+form { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; margin-top: 12px; }
+label.check { font-size: 12px; display: flex; gap: 5px; align-items: center; color: var(--color-text-secondary); white-space: nowrap; }
+.rows { display: grid; gap: 6px; margin-top: 12px; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; background: var(--color-background-secondary); }
+.row .name { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.row .meta { font-size: 11px; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.row .acts { display: flex; gap: 6px; }
+</style>
+</head>
+<body>
+<main class="card" aria-live="polite">
+  <div class="top"><span class="name">Internet radio</span><span class="right"><span class="pill" id="count">…</span></span></div>
+  <form id="form">
+    <input type="search" id="query" placeholder="Station, city or genre" aria-label="Search radio stations">
+    <label class="check"><input type="checkbox" id="hires"> Hi-res only</label>
+    <button class="primary" type="submit">Search</button>
+  </form>
+  <div class="rows" id="rows"></div>
+  <p class="status" id="status"></p>
+</main>
+<script>
+/*@shared-js*/
+</script>
+<script>
+"use strict";
+const { $, el } = Card;
+let state = null;
+
+function meta(s) {
+  const parts = [];
+  if (s.codec) parts.push(s.bitrate ? `${s.codec} ${s.bitrate} kbps` : s.codec);
+  if (s.country) parts.push(s.country);
+  if (s.tags) parts.push(String(s.tags).split(",").slice(0, 4).join(", "));
+  return parts.join(" · ");
+}
+
+function render(data) {
+  state = data;
+  if (document.activeElement !== $("query")) $("query").value = data.query || data.tag || "";
+  $("hires").checked = !!data.hiRes;
+  const stations = data.stations || [];
+  $("count").textContent = `${stations.length} found`;
+  $("rows").replaceChildren(...(stations.length ? stations.map((s) => el("div", { className: "row" },
+    el("div", {}, el("div", { className: "name" }, s.name), el("div", { className: "meta" }, meta(s))),
+    el("div", { className: "acts" },
+      el("button", { className: "small primary", onclick: () => Card.run(`Playing ${s.name}`, async () => {
+        await Card.callTool("media_play_station_url", { url: s.url, title: s.name });
+        return `Playing ${s.name}.`;
+      }) }, "Play"),
+      el("button", {
+        className: "small",
+        disabled: s.saved || !data.canSave,
+        title: s.saved ? "Saved already" : data.canSave ? "Save as a station button in Denon Desktop" : "Saving needs the FullOrchestration permission tier",
+        onclick: () => Card.run(`Saving ${s.name}`, async () => {
+          const result = await Card.callTool("save_station", { name: s.name, url: s.url });
+          await Card.reload();
+          return Card.resultText(result);
+        }),
+      }, s.saved ? "Saved" : "Save"))))
+    : [el("p", { className: "empty" }, "No stations found. Try another word or a genre like jazz.")]));
+  Card.resize();
+}
+
+$("form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const query = $("query").value.trim();
+  Card.run("Searching", () => Card.reload({ query, hi_res_only: $("hires").checked }));
+});
+
+Card.start({
+  name: "denon-radio-search",
+  tool: "show_radio_search",
+  render,
+  outsideHost() { $("count").textContent = "Open this card from an MCP host (show_radio_search)."; },
+});
+</script>
+</body>
+</html>

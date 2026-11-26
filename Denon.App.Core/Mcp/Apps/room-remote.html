@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Room Remote · Denon Desktop</title>
+<style>
+/*@shared-css*/
+.scenes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.scene { display: flex; align-items: center; gap: 8px; text-align: left; padding: 8px 10px; }
+.badge { font-size: 10px; font-weight: 700; letter-spacing: .04em; padding: 2px 6px; border-radius: 5px; color: #fff; flex: none; }
+.scene .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chips button { padding: 5px 11px; }
+</style>
+</head>
+<body>
+<main class="card" aria-live="polite">
+  <div class="top">
+    <span class="name" id="receiver">Denon Desktop</span>
+    <span class="right"><span class="pill" id="power">…</span><button class="small" id="powerButton">Power on</button></span>
+  </div>
+  <h1 id="title">Loading…</h1>
+  <p class="detail" id="detail"></p>
+
+  <h2>Scenes</h2>
+  <div class="scenes" id="scenes"></div>
+  <h2>Stations</h2>
+  <div class="chips" id="stations"></div>
+  <h2>Input</h2>
+  <div class="chips" id="inputs"></div>
+  <h2>Sound mode</h2>
+  <div class="chips" id="soundModes"></div>
+  <h2>Sleep timer</h2>
+  <div class="chips" id="sleep"></div>
+  <div class="buttons"><button id="refresh" title="Read the receiver again">Refresh</button></div>
+  <p class="status" id="status"></p>
+</main>
+<script>
+/*@shared-js*/
+</script>
+<script>
+"use strict";
+const { $, el } = Card;
+let state = null;
+
+const same = (a, b) => (a || "").replace(/[\s/]/g, "").toUpperCase() === (b || "").replace(/[\s/]/g, "").toUpperCase();
+const act = (label, tool, args) => Card.run(label, async () => { await Card.callTool(tool, args); await Card.reload({}); });
+const safeColor = (hex) => /^#[0-9a-f]{3,8}$/i.test(hex || "") ? hex : "#0b7a75";
+
+function chip(text, active, onclick, title) {
+  return el("button", { className: active ? "active" : "", onclick, title, "aria-pressed": active ? "true" : "false" }, text);
+}
+
+function render(data) {
+  state = data;
+  $("receiver").textContent = data.receiver || "Denon Desktop";
+  const power = $("power");
+  power.textContent = !data.connected ? "Offline" : data.on ? "On" : "Standby";
+  power.classList.toggle("on", !!data.on);
+  $("powerButton").textContent = data.on ? "Standby" : "Power on";
+  $("powerButton").hidden = !data.connected;
+  $("title").textContent = data.title || "";
+  $("detail").textContent = data.detail || "";
+
+  $("scenes").replaceChildren(...(data.scenes || []).map((s) =>
+    el("button", { className: "scene", title: s.description || s.name, onclick: () => act(`Starting ${s.name}`, "activate_smart_scene", { scene_id_or_name: s.id }) },
+      el("span", { className: "badge", style: { background: safeColor(s.accent) } }, s.badge || "SCN"),
+      el("span", { className: "label" }, s.name))));
+
+  $("stations").replaceChildren(...(data.stations || []).map((s) =>
+    chip(s.name, data.on && s.alias === data.activeStation, () => act(`Playing ${s.name}`, "media_play_station", { station: s.alias }))));
+
+  $("inputs").replaceChildren(...(data.inputs || []).map((i) =>
+    chip(i.name, data.on && same(i.code, data.input), () => act(`Switching to ${i.name}`, "avr_set_input", { input_source: i.code }))));
+
+  $("soundModes").replaceChildren(...(data.soundModes || []).map((m) =>
+    chip(m.name, data.on && same(m.code, data.soundMode), () => act(`Sound mode ${m.name}`, "avr_set_sound_mode", { sound_mode: m.code }))));
+
+  $("sleep").replaceChildren(...(data.sleepOptions || []).map((minutes) =>
+    chip(minutes === 0 ? "Off" : `${minutes} min`, data.on && (data.sleepMinutes || 0) === minutes,
+      () => act(minutes === 0 ? "Turning the sleep timer off" : `Sleep in ${minutes} min`, "avr_set_sleep_timer", { minutes }))));
+  Card.resize();
+}
+
+$("powerButton").addEventListener("click", () => act(state.on ? "Going to standby" : "Powering on", "avr_set_power", { power_on: !state.on }));
+$("refresh").addEventListener("click", () => Card.run("Reading the receiver", () => Card.reload({})));
+
+Card.start({
+  name: "denon-room-remote",
+  tool: "show_room_remote",
+  render,
+  outsideHost() {
+    $("title").textContent = "Open this card from an MCP host";
+    $("detail").textContent = "It is shown by the Denon Desktop tool show_room_remote in an MCP Apps host.";
+  },
+});
+</script>
+</body>
+</html>
