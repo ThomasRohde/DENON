@@ -87,6 +87,7 @@ public static class McpPluginToolBridge
         var content = new List<ContentBlock>();
         if (!string.IsNullOrWhiteSpace(result.ImageBase64))
         {
+            // The SDK's Data is the base64 text as UTF-8 bytes (it writes them as is); FromBytes is for raw image bytes.
             content.Add(new ImageContentBlock
             {
                 Data = System.Text.Encoding.UTF8.GetBytes(result.ImageBase64),

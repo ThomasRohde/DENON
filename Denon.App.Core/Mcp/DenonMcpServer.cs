@@ -444,7 +444,7 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
 
         var supplied = Encoding.UTF8.GetBytes(auth[7..].Trim());
         var expected = Encoding.UTF8.GetBytes(cfg.BearerToken.Trim());
-        return CryptographicOperations.FixedTimeEquals(supplied, expected);
+        return supplied.Length == expected.Length && CryptographicOperations.FixedTimeEquals(supplied, expected);
     }
 
     // ---------------------------------------------------------------- tools
@@ -545,6 +545,11 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
         if (!string.IsNullOrWhiteSpace(uri) && _resourceSubscribers.TryGetValue(session, out var uris))
         {
             uris.TryRemove(uri, out _);
+            if (uris.IsEmpty)
+            {
+                // Forget the session with its last subscription (only if no new one came in meanwhile).
+                _resourceSubscribers.TryRemove(new KeyValuePair<McpServer, ConcurrentDictionary<string, byte>>(session, uris));
+            }
         }
 
         return ValueTask.FromResult(new EmptyResult());
