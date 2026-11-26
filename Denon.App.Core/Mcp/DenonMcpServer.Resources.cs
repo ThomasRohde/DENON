@@ -42,6 +42,7 @@ public sealed partial class DenonMcpServer
                 Description = "Locally learned preferred volume per time of day (Morning/Afternoon/Evening/LateNight), top inputs, sound modes, scenes, and plugin actions.",
                 MimeType = JsonMime,
             },
+            NowPlayingResource(),
         ],
     };
 
@@ -77,6 +78,12 @@ public sealed partial class DenonMcpServer
     {
         var sw = Stopwatch.StartNew();
         var lower = uri.ToLowerInvariant();
+        if (lower == NowPlayingUiUri)
+        {
+            LogActivity("resources/read", uri, "OK", sw.ElapsedMilliseconds);
+            return ReadNowPlayingResource();
+        }
+
         object payload;
 
         if (lower == RoomStateUri)

@@ -4,6 +4,16 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **The first MCP App: a now-playing card in the chat.** The new MCP tool `show_now_playing` points at the card
+  (`ui://denon/now-playing.html`, MCP Apps extension `io.modelcontextprotocol/ui`). A host that shows MCP Apps (Claude,
+  VS Code, ChatGPT and others) draws it in the conversation: what plays, the input and sound mode, the volume with the
+  safe ceiling marked, and buttons for volume −/+, mute and play/pause (HEOS). The buttons use the ordinary tools, so
+  the permission tier and the safe-volume ceiling apply. The card follows the host's light or dark theme. Hosts without
+  MCP Apps get the same data as text. Built on `ModelContextProtocol.Extensions.Apps` 2.4 (experimental in the SDK).
+
 ## [2.10.2] - 2026-11-26
 
 ### Fixed

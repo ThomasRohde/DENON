@@ -132,6 +132,36 @@ public sealed class McpServerIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_now_playing_card_is_an_mcp_app()
+    {
+        await using var client = await ConnectAsync();
+
+        // The server announces MCP Apps; the tool points at its card.
+        Assert.True(client.ServerCapabilities.Extensions?.ContainsKey("io.modelcontextprotocol/ui"));
+        var tool = Assert.Single(await client.ListToolsAsync(), t => t.Name == "show_now_playing");
+        var ui = tool.ProtocolTool.Meta?["ui"];
+        Assert.Equal("ui://denon/now-playing.html", ui?["resourceUri"]?.GetValue<string>());
+        Assert.True(tool.ProtocolTool.Annotations?.ReadOnlyHint);
+
+        // The card is a ui:// resource with the MCP Apps MIME type: a whole HTML page that speaks the view protocol.
+        var resource = Assert.Single(await client.ListResourcesAsync(), r => r.Uri == "ui://denon/now-playing.html");
+        Assert.Equal("text/html;profile=mcp-app", resource.MimeType);
+        var html = Assert.IsType<TextResourceContents>(Assert.Single((await client.ReadResourceAsync("ui://denon/now-playing.html")).Contents));
+        Assert.Equal("text/html;profile=mcp-app", html.MimeType);
+        Assert.StartsWith("<!DOCTYPE html>", html.Text);
+        Assert.Contains("ui/initialize", html.Text);
+        Assert.Contains("ui/notifications/tool-result", html.Text);
+
+        // Without a receiver it says so, as text and as data for the card.
+        var result = await client.CallToolAsync("show_now_playing");
+        Assert.NotEqual(true, result.IsError);
+        var data = result.StructuredContent!.Value;
+        Assert.False(data.GetProperty("connected").GetBoolean());
+        Assert.Equal(65, data.GetProperty("safeVolume").GetInt32());
+        Assert.Contains("not connected", Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text);
+    }
+
+    [Fact]
     public async Task A_client_on_the_older_protocol_still_works_with_a_session()
     {
         await using var client = await McpClient.CreateAsync(

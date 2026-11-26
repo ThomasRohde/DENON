@@ -933,7 +933,7 @@ public sealed partial class MainViewModel
             category: "Plugins",
             title: "MCP Server & Room Brain",
             subtitle: "Connect AI agents over Streamable HTTP (/mcp), set safety limits, and use the Room Doctor and Undo.",
-            overview: "Denon Desktop has a built-in Model Context Protocol (MCP) server on TCP 18926 (Streamable HTTP on /mcp, built on the official MCP C# SDK, protocol 2026-07-28; older clients still connect). AI clients such as Claude Desktop, Cursor, VS Code or Antigravity can read the room state and control the receiver, the plugins and the scenes. Safety limits and an Undo snapshot protect the room. The Room Brain also checks the devices for problems and learns your volume habits on this PC only.",
+            overview: "Ask an MCP client for show_now_playing to get a now-playing card with volume and mute buttons in the chat (in clients that support MCP Apps). Denon Desktop has a built-in Model Context Protocol (MCP) server on TCP 18926 (Streamable HTTP on /mcp, built on the official MCP C# SDK, protocol 2026-07-28; older clients still connect). AI clients such as Claude Desktop, Cursor, VS Code or Antigravity can read the room state and control the receiver, the plugins and the scenes. Safety limits and an Undo snapshot protect the room. The Room Brain also checks the devices for problems and learns your volume habits on this PC only.",
             steps:
             [
                 new("01", "Open the page", "Click Brain in the left rail, or the MCP :18926 badge in the title bar."),

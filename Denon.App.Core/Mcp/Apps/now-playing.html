@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Now Playing · Denon Desktop</title>
+<style>
+  /* Host theme variables (MCP Apps hostContext.styles.variables) win; these are the fallbacks. */
+  :root {
+    color-scheme: light dark;
+    --color-background-primary: light-dark(#ffffff, #16181d);
+    --color-background-secondary: light-dark(#f3f4f6, #20232a);
+    --color-text-primary: light-dark(#14161a, #eceef2);
+    --color-text-secondary: light-dark(#5b6270, #9aa1ad);
+    --color-border-primary: light-dark(#dfe2e7, #2e323b);
+    --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+    --font-mono: "Cascadia Mono", Consolas, ui-monospace, monospace;
+    --border-radius-md: 10px;
+    --accent: light-dark(#0b7a75, #3fd1c6);
+    --warn: light-dark(#b45309, #f5a524);
+  }
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="dark"] { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--color-background-primary); color: var(--color-text-primary); font-family: var(--font-sans); }
+  .card { padding: 16px 18px 14px; max-width: 560px; }
+  .top { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-text-secondary); letter-spacing: .02em; }
+  .top .name { font-weight: 600; }
+  .pill { margin-left: auto; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600;
+          background: var(--color-background-secondary); border: 1px solid var(--color-border-primary); }
+  .pill.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+  h1 { margin: 10px 0 2px; font-size: 21px; line-height: 1.2; font-weight: 650; overflow-wrap: anywhere; }
+  .detail { margin: 0; font-size: 13px; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+  .facts { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 14px; }
+  .fact { font-size: 12px; padding: 3px 8px; border-radius: 6px; background: var(--color-background-secondary); }
+  .volume { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 10px; }
+  .bar { position: relative; height: 8px; border-radius: 999px; background: var(--color-background-secondary); border: 1px solid var(--color-border-primary); }
+  .bar .fill { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--accent); width: 0; transition: width .25s ease; }
+  .bar .safe { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--warn); border-radius: 1px; }
+  .readout { font-family: var(--font-mono); font-size: 13px; min-width: 9em; white-space: nowrap; }
+  .readout.muted { color: var(--warn); }
+  .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  button { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: var(--border-radius-md); cursor: pointer;
+           background: var(--color-background-secondary); color: var(--color-text-primary); border: 1px solid var(--color-border-primary); }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.step { width: 34px; padding: 6px 0; font-weight: 700; }
+  .status { min-height: 1.3em; margin: 10px 0 0; font-size: 12px; color: var(--color-text-secondary); }
+  .status.error { color: var(--warn); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main class="card" aria-live="polite">
+  <div class="top"><span class="name" id="receiver">Denon Desktop</span><span class="pill" id="power">…</span></div>
+  <h1 id="title">Loading…</h1>
+  <p class="detail" id="detail"></p>
+  <div class="facts" id="facts"></div>
+  <div class="volume" id="volumeRow" hidden>
+    <button class="step" id="down" title="Volume down 2 steps" aria-label="Volume down">−</button>
+    <div class="bar" title="Volume, with the safe ceiling marked"><div class="fill" id="fill"></div><div class="safe" id="safe"></div></div>
+    <button class="step" id="up" title="Volume up 2 steps (never above the safe ceiling)" aria-label="Volume up">+</button>
+    <span class="readout" id="readout"></span>
+  </div>
+  <div class="buttons" id="buttonRow" hidden>
+    <button id="mute">Mute</button>
+    <button id="playPause" hidden>Pause</button>
+    <button id="refresh" title="Read the receiver again">Refresh</button>
+  </div>
+  <p class="status" id="status"></p>
+</main>
+<script>
+"use strict";
+// MCP Apps view protocol: JSON-RPC 2.0 over postMessage with the host (spec 2026-01-26).
+let nextId = 1;
+const pending = new Map();
+let state = null;
+let busy = false;
+
+const send = (message) => window.parent.postMessage({ jsonrpc: "2.0", ...message }, "*");
+const notify = (method, params) => send({ method, params });
+const request = (method, params) => new Promise((resolve, reject) => {
+  const id = nextId++;
+  pending.set(id, { resolve, reject });
+  send({ id, method, params });
+  setTimeout(() => { if (pending.delete(id)) reject(new Error("The host did not answer.")); }, 20000);
+});
+
+const $ = (id) => document.getElementById(id);
+
+function applyHostContext(context) {
+  if (!context) return;
+  if (context.theme) document.documentElement.dataset.theme = context.theme;
+  const variables = context.styles?.variables || {};
+  for (const [name, value] of Object.entries(variables)) {
+    if (value) document.documentElement.style.setProperty(name, value);
+  }
+}
+
+function setStatus(text, isError = false) {
+  $("status").textContent = text || "";
+  $("status").classList.toggle("error", isError);
+}
+
+function fact(text) {
+  const el = document.createElement("span");
+  el.className = "fact";
+  el.textContent = text;
+  return el;
+}
+
+function render(data) {
+  if (!data) return;
+  state = data;
+  $("receiver").textContent = data.receiver || "Denon Desktop";
+  const power = $("power");
+  power.textContent = !data.connected ? "Offline" : data.on ? "On" : "Standby";
+  power.classList.toggle("on", !!data.on);
+  $("title").textContent = data.title || "";
+  $("detail").textContent = data.detail || "";
+
+  const facts = $("facts");
+  facts.replaceChildren();
+  if (data.on) {
+    if (data.inputName) facts.append(fact(data.inputName));
+    if (data.soundMode) facts.append(fact(data.soundMode));
+    if (data.playState) facts.append(fact(data.playState));
+  }
+
+  const live = !!(data.connected && data.on);
+  $("volumeRow").hidden = !live;
+  $("buttonRow").hidden = !live;
+  if (live) {
+    const max = data.maxVolume || 98;
+    $("fill").style.width = `${Math.max(0, Math.min(100, (data.volume / max) * 100))}%`;
+    $("safe").style.left = `${Math.max(0, Math.min(100, (data.safeVolume / max) * 100))}%`;
+    $("safe").title = `Safe ceiling ${data.safeVolume}`;
+    const readout = $("readout");
+    readout.textContent = data.muted ? `Muted · ${data.volume}` : `${data.volume} · ${data.volumeDb}`;
+    readout.classList.toggle("muted", !!data.muted);
+    $("mute").textContent = data.muted ? "Unmute" : "Mute";
+    $("up").disabled = busy || data.volume >= data.safeVolume;
+    $("playPause").hidden = !data.canPlayPause;
+    $("playPause").textContent = data.playing ? "Pause" : "Play";
+  }
+  for (const id of ["down", "mute", "playPause", "refresh"]) $(id).disabled = busy;
+  resize();
+}
+
+function structuredFrom(result) {
+  if (!result) return null;
+  if (result.structuredContent) return result.structuredContent;
+  const text = (result.content || []).find((c) => c.type === "text")?.text;
+  try { return text ? JSON.parse(text) : null; } catch { return null; }
+}
+
+function errorText(result) {
+  return (result?.content || []).find((c) => c.type === "text")?.text || "The tool reported an error.";
+}
+
+async function callTool(name, args) {
+  const result = await request("tools/call", { name, arguments: args || {} });
+  if (result?.isError) throw new Error(errorText(result));
+  return result;
+}
+
+async function refresh() {
+  render(structuredFrom(await callTool("show_now_playing", {})));
+}
+
+async function act(label, name, args) {
+  if (busy) return;
+  busy = true;
+  render(state);
+  setStatus(`${label}…`);
+  try {
+    if (name === "show_now_playing") {
+      await refresh();
+    } else {
+      await callTool(name, args);
+      await refresh();
+    }
+    setStatus("");
+  } catch (error) {
+    setStatus(error.message || String(error), true);
+  } finally {
+    busy = false;
+    render(state);
+  }
+}
+
+$("down").addEventListener("click", () => act("Volume down", "avr_set_volume", { volume: Math.max(0, Math.round(state.volume) - 2) }));
+$("up").addEventListener("click", () => act("Volume up", "avr_set_volume", { volume: Math.min(state.safeVolume, Math.round(state.volume) + 2) }));
+$("mute").addEventListener("click", () => act(state.muted ? "Unmuting" : "Muting", "avr_set_mute", { muted: !state.muted }));
+$("playPause").addEventListener("click", () => act(state.playing ? "Pausing" : "Playing", "avr_playback_control", { action: state.playing ? "pause" : "play" }));
+$("refresh").addEventListener("click", () => act("Reading the receiver", "show_now_playing", {}));
+
+let lastSize = "";
+function resize() {
+  const size = `${document.documentElement.scrollWidth}x${document.documentElement.scrollHeight}`;
+  if (size === lastSize) return;
+  lastSize = size;
+  notify("ui/notifications/size-changed", { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight });
+}
+
+window.addEventListener("message", (event) => {
+  const message = event.data;
+  if (!message || message.jsonrpc !== "2.0") return;
+  if (message.id !== undefined && !message.method && pending.has(message.id)) {
+    const { resolve, reject } = pending.get(message.id);
+    pending.delete(message.id);
+    if (message.error) reject(new Error(message.error.message || "Error")); else resolve(message.result);
+    return;
+  }
+  switch (message.method) {
+    case "ui/notifications/tool-result":
+      if (message.params?.isError) setStatus(errorText(message.params), true);
+      else render(structuredFrom(message.params));
+      break;
+    case "ui/notifications/host-context-changed":
+      applyHostContext(message.params);
+      break;
+    case "ui/resource-teardown":
+      if (message.id !== undefined) send({ id: message.id, result: {} });
+      break;
+  }
+});
+
+new ResizeObserver(resize).observe(document.body);
+
+(async () => {
+  if (window.parent === window) {
+    $("title").textContent = "Open this card from an MCP host";
+    $("detail").textContent = "It is shown by the Denon Desktop tool show_now_playing in an MCP Apps host.";
+    return;
+  }
+  try {
+    const init = await request("ui/initialize", {
+      protocolVersion: "2026-01-26",
+      appInfo: { name: "denon-now-playing", version: "1.0.0" },
+      appCapabilities: { availableDisplayModes: ["inline"] },
+    });
+    applyHostContext(init?.hostContext);
+  } catch (error) {
+    setStatus("The host did not start the card.", true);
+  }
+  notify("ui/notifications/initialized", {});
+})();
+</script>
+</body>
+</html>
