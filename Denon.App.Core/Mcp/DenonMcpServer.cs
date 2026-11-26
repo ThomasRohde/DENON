@@ -280,6 +280,14 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
                 }
             });
 
+            // Browser clients on this PC (the MCP Inspector) send a preflight without the token: CORS answers it for
+            // this PC's origins only, before the token check. Other origins get no CORS headers (and 403 below).
+            builder.Services.AddCors(cors => cors.AddDefaultPolicy(policy => policy
+                .SetIsOriginAllowed(static origin => IsAllowedOrigin(origin))
+                .AllowAnyHeader()
+                .WithMethods("GET", "POST", "DELETE")
+                .WithExposedHeaders("Mcp-Session-Id", "MCP-Protocol-Version")));
+
             builder.Services
                 .AddMcpServer(options =>
                 {
@@ -298,6 +306,7 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
                 .WithCompleteHandler((request, _) => ValueTask.FromResult(Complete(request.Params?.Argument)));
 
             app = builder.Build();
+            app.UseCors();
             app.Use(GuardAsync);
             app.MapGet("/health", Health);
             app.MapMcp("/mcp");

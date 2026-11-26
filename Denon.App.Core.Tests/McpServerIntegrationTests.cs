@@ -190,6 +190,28 @@ public sealed class McpServerIntegrationTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, (await http.SendAsync(Initialize(_token, "https://evil.example"))).StatusCode);
     }
 
+    [Fact]
+    public async Task A_browser_client_on_this_pc_passes_the_preflight_and_others_do_not()
+    {
+        using var http = new HttpClient();
+
+        HttpRequestMessage Preflight(string origin)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Options, Endpoint);
+            request.Headers.Add("Origin", origin);
+            request.Headers.Add("Access-Control-Request-Method", "POST");
+            request.Headers.Add("Access-Control-Request-Headers", "authorization, content-type, mcp-protocol-version");
+            return request;
+        }
+
+        var local = await http.SendAsync(Preflight("http://localhost:6274"));
+        Assert.True(local.IsSuccessStatusCode, $"preflight: {(int)local.StatusCode}");
+        Assert.Equal("http://localhost:6274", local.Headers.GetValues("Access-Control-Allow-Origin").Single());
+
+        var foreign = await http.SendAsync(Preflight("https://evil.example"));
+        Assert.False(foreign.Headers.Contains("Access-Control-Allow-Origin"));
+    }
+
     [Theory]
     [InlineData(null, true)]
     [InlineData("http://localhost:6274", true)]
