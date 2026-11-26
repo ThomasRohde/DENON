@@ -13,6 +13,10 @@ public sealed partial class MainViewModel
     private string? _castArtKey;
     private string _castArtUrl = string.Empty;
     private DateTimeOffset _castArtFetchedUtc = DateTimeOffset.MinValue;
+    private int _castArtTries;
+
+    /// <summary>Artwork reads per program: the first and three retries 15 s apart. Some apps (Prime Video) never send one.</summary>
+    private const int MaxCastArtTries = 4;
     private bool _isTransportPlaying;
     private bool _canPauseTransport = true;
 
@@ -70,14 +74,17 @@ public sealed partial class MainViewModel
         {
             _castArtKey = key;
             _castArtUrl = string.Empty;
+            _castArtTries = 0;
         }
 
-        // Fetch on a new program; retry a missing artwork at most every 15 s (it can arrive after the title: the
-        // Chromecast sends it later, the Apple TV plugin fetches it from the Apple TV first).
+        // Fetch on a new program; retry a missing artwork every 15 s, a few times only (it can arrive after the
+        // title: the Chromecast sends it later, the Apple TV plugin fetches it from the Apple TV first).
         if (isNewProgram ||
-            (_castArtUrl.Length == 0 && DateTimeOffset.UtcNow - _castArtFetchedUtc > TimeSpan.FromSeconds(15)))
+            (_castArtUrl.Length == 0 && _castArtTries < MaxCastArtTries &&
+             DateTimeOffset.UtcNow - _castArtFetchedUtc > TimeSpan.FromSeconds(15)))
         {
             _castArtFetchedUtc = DateTimeOffset.UtcNow;
+            _castArtTries++;
             _ = FetchCastArtworkAsync(key, cast.PluginId, cast.DeviceName);
         }
 

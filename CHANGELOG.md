@@ -4,6 +4,16 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Reading a plugin is no longer logged as an action.** A read-only action (declared so by the plugin, or named
+  `*.refresh`) writes no `plugin.action` event, no app.log line and no "used from the app" mark. Before, the Deck's
+  artwork reads wrote about 700 identical Chromecast events in one evening and marked real play and pause changes as
+  done from the app.
+- **The Deck stops asking for cast artwork that does not come.** It tries four times, 15 s apart, per program. Prime
+  Video never sends artwork, so before it asked every 15 s for as long as it played.
+
 ## [2.9.2] - 2026-11-25
 
 ### Changed

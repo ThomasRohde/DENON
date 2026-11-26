@@ -199,6 +199,15 @@ public sealed class PluginHostService : IAsyncDisposable
         NotifyPluginsChanged();
     }
 
+    /// <summary>True for an action the plugin declares read-only, or (undeclared) one named *.refresh.</summary>
+    internal static bool IsReadOnlyAction(IReadOnlyList<PluginActionDescriptor> actions, string actionId)
+    {
+        var declared = actions.FirstOrDefault(a => string.Equals(a.ActionId, actionId, StringComparison.OrdinalIgnoreCase));
+        return declared is not null
+            ? Mcp.McpPluginToolBridge.ResolveHints(declared).ReadOnly
+            : actionId.EndsWith(".refresh", StringComparison.OrdinalIgnoreCase);
+    }
+
     public async Task<PluginActionResult> ExecuteActionAsync(
         string pluginId,
         string actionId,
@@ -223,9 +232,12 @@ public sealed class PluginHostService : IAsyncDisposable
 
         try
         {
-            var isReadOnlyRefresh = actionId.EndsWith(".refresh", StringComparison.OrdinalIgnoreCase);
+            // A read (declared read-only, or *.refresh) changes nothing: it is not an action of the user. It writes no
+            // plugin.action event and no log line, and it does not mark the domain, so the real changes that follow
+            // (a cast pausing) keep their own origin.
+            var isRead = IsReadOnlyAction(entry.Actions, actionId);
             var domain = MapPluginToDomain(entry.Manifest.Id);
-            if (!isReadOnlyRefresh)
+            if (!isRead)
             {
                 _telemetry.MarkOrigin(domain, "desktop_ui", overwriteRecent: false);
             }
@@ -235,23 +247,20 @@ public sealed class PluginHostService : IAsyncDisposable
             {
                 _logStore.Warning($"[Plugin:{entry.Manifest.Id}] Action '{actionId}' failed: {result.Message}");
             }
-            else
+            else if (!isRead)
             {
                 _logStore.Info($"[Plugin:{entry.Manifest.Id}] Action '{actionId}': {result.Message}");
-                if (!isReadOnlyRefresh)
-                {
-                    var effectiveOrigin = _telemetry.ResolveOrigin(domain, fallback: "desktop_ui");
-                    _telemetry.Record(
-                        EventTelemetryLog.StreamControl,
-                        entry.Manifest.Id,
-                        "plugin.action",
-                        effectiveOrigin,
-                        new Dictionary<string, object?>
-                        {
-                            ["pluginId"] = entry.Manifest.Id,
-                            ["actionId"] = actionId,
-                        });
-                }
+                var effectiveOrigin = _telemetry.ResolveOrigin(domain, fallback: "desktop_ui");
+                _telemetry.Record(
+                    EventTelemetryLog.StreamControl,
+                    entry.Manifest.Id,
+                    "plugin.action",
+                    effectiveOrigin,
+                    new Dictionary<string, object?>
+                    {
+                        ["pluginId"] = entry.Manifest.Id,
+                        ["actionId"] = actionId,
+                    });
             }
 
             return result;
