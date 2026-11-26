@@ -98,6 +98,7 @@ public sealed class AutomationGraphItem : ObservableObject
                 AutomationNodeTypes.TriggerWebhook => "WEBHOOK",
                 AutomationNodeTypes.TriggerSchedule => "SCHEDULE",
                 AutomationNodeTypes.TriggerAppLaunch => "APP START",
+                AutomationNodeTypes.TriggerSource => "SOURCE",
                 _ => "TRIGGER",
             },
         };
@@ -110,6 +111,7 @@ public sealed class AutomationGraphItem : ObservableObject
                 AutomationNodeTypes.TriggerWebhook => $"On webhook '{t.Get("hook")}'",
                 AutomationNodeTypes.TriggerSchedule => $"At {t.Get("time")} ({t.Get("days")})",
                 AutomationNodeTypes.TriggerAppLaunch => $"When {t.Get("processes")} starts",
+                AutomationNodeTypes.TriggerSource => t.Get("source").Length > 0 ? $"When {t.Get("source")} starts playing" : "When the source changes",
                 _ => t.Type,
             }));
 

@@ -38,6 +38,15 @@
                             </Border>
                         </StackPanel>
                     </Button>
+
+                    <Button Content="Volume memory"
+                            Command="{Binding SetAcousticsSubTabCommand}"
+                            CommandParameter="VolumeMemory"
+                            Padding="{skin:Space 12,6}"
+                            FontSize="{DynamicResource FontSize06}"
+                            Margin="{skin:Space 8,0,0,0}"
+                            Style="{StaticResource ChipButton}"
+                            infra:Chip.IsActive="{Binding AcousticsSubTab, Converter={StaticResource EqualityConverter}, ConverterParameter=VolumeMemory}" />
                 </StackPanel>
 
                 <TextBlock Text="Chain plugin actions onto Smart Scenes, and run them on app launches, schedules, room events or webhooks"
@@ -772,5 +781,82 @@
                 </Grid>
             </Border>
         </Grid>
+        <!-- Sub-View 3: Volume memory (learned listening volume per source) -->
+        <Border Grid.Row="1" Style="{StaticResource SurfaceCard}" Visibility="{Binding AcousticsSubTab, Converter={StaticResource EqualityToVis}, ConverterParameter=VolumeMemory}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <DockPanel Grid.Row="0" Margin="{skin:Space 0,0,0,10}">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                        <CheckBox IsChecked="{Binding VolumeMemoryOnlyLower}" Content="Only turn down" Foreground="{DynamicResource TextSecondaryBrush}"
+                                  FontSize="{DynamicResource FontSize04}" VerticalAlignment="Center" Margin="{skin:Space 0,0,16,0}"
+                                  ToolTip="Never raise the volume, only lower it when a source is louder than you like it" />
+                        <TextBlock Text="On" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="{skin:Space 0,0,8,0}" />
+                        <CheckBox IsChecked="{Binding VolumeMemoryEnabled}" Style="{StaticResource ToggleSwitchStyle}" VerticalAlignment="Center"
+                                  ToolTip="Set the learned volume when the source changes (it keeps learning when off)" />
+                    </StackPanel>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="VOLUME MEMORY" Style="{StaticResource SectionLabelStyle}" />
+                        <TextBlock FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="{skin:Space 0,3,12,0}"
+                                   Text="Learns how loud you listen to each TV channel, app and input. When the source changes and holds for 5 s, it sets that volume: down at once, up in a short fade, never above the safe volume. It leaves the volume alone when you, a scene or an automation set it, and when the difference is under 3 steps." />
+                    </StackPanel>
+                </DockPanel>
+
+                <TextBlock Grid.Row="1" Text="{Binding VolumeMemoryNowText}" FontSize="{DynamicResource FontSize05}" FontWeight="SemiBold"
+                           Foreground="{DynamicResource AccentCyanBrightBrush}" Margin="{skin:Space 0,0,0,10}" />
+
+                <Grid Grid.Row="2">
+                    <TextBlock Text="Nothing learned yet. Volume memory learns while you listen: after a few minutes of a channel or app, its level shows here."
+                               FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"
+                               Visibility="{Binding HasLearnedVolumes, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding LearnedVolumes}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource CardElevatedBrush}" BorderBrush="{DynamicResource Ink11Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius04}" Padding="{skin:Space 12,8}" Margin="{skin:Space 0,0,0,6}">
+                                        <DockPanel>
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Button Content="−1" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,4}" FontSize="{DynamicResource FontSize03}" Margin="{skin:Space 0,0,4,0}"
+                                                        Command="{Binding DataContext.StepLearnedVolumeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding Key, StringFormat='{}{0}|-1'}" ToolTip="One step quieter for this source" />
+                                                <Button Content="+1" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,4}" FontSize="{DynamicResource FontSize03}" Margin="{skin:Space 0,0,8,0}"
+                                                        Command="{Binding DataContext.StepLearnedVolumeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding Key, StringFormat='{}{0}|1'}" ToolTip="One step louder for this source" />
+                                                <Button Content="Forget" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,4}" FontSize="{DynamicResource FontSize03}"
+                                                        Command="{Binding DataContext.ForgetLearnedVolumeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding Key}" ToolTip="Forget this level; it is learned again while you listen" />
+                                            </StackPanel>
+                                            <Grid VerticalAlignment="Center">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="{skin:Size 104}" />
+                                                    <ColumnDefinition Width="{skin:Size 220}" />
+                                                    <ColumnDefinition Width="{skin:Size 140}" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border Grid.Column="0" Background="{DynamicResource Ink11Brush}" BorderBrush="{DynamicResource Ink14Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 6,1.5}" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding KindLabel}" FontSize="{DynamicResource FontSize00}" FontWeight="Bold" Foreground="{DynamicResource AccentCyanBrightBrush}" />
+                                                </Border>
+                                                <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="{DynamicResource FontSize07}" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Label}" />
+                                                <TextBlock Grid.Column="2" Text="{Binding LevelText}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize06}" Foreground="{DynamicResource AccentEmeraldBrush}" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="3" Text="{Binding HeardText}" FontSize="{DynamicResource FontSize03}" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
+                                                <Border Grid.Column="4" Background="{DynamicResource AccentEmeraldSubtleBgBrush}" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 6,1.5}" Margin="{skin:Space 12,0,0,0}" VerticalAlignment="Center"
+                                                        Visibility="{Binding IsCurrent, Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock Text="PLAYING NOW" FontSize="{DynamicResource FontSize00}" FontWeight="Bold" Foreground="{DynamicResource AccentEmeraldBrush}" />
+                                                </Border>
+                                            </Grid>
+                                        </DockPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+        </Border>
     </Grid>
 </UserControl>

@@ -37,6 +37,9 @@ public interface IAutomationEffects
     Task<string> RunReceiverCommandAsync(string command, string value, CancellationToken ct);
 
     Task DelayAsync(TimeSpan delay, CancellationToken ct);
+
+    /// <summary>Sets the learned volume of what plays now (Volume memory) and returns what it did. Throws when it fails.</summary>
+    Task<string> SetLearnedVolumeAsync(CancellationToken ct);
 }
 
 /// <summary>Walks an automation graph from one trigger. See docs/automation-graphs.md, "How a run works".</summary>
@@ -244,6 +247,7 @@ public static class AutomationGraphRunner
             AutomationNodeTypes.ActionPlugin => effects.DescribePluginAction(node.Get("pluginId"), node.Get("actionId")),
             AutomationNodeTypes.ActionReceiver => $"Receiver {node.Get("command").Replace('_', ' ')} {node.Get("value")}".TrimEnd(),
             AutomationNodeTypes.ActionDelay => $"Wait {node.Get("seconds")} s",
+            AutomationNodeTypes.ActionLearnedVolume => "Set the learned volume",
             _ => node.Type,
         };
 
@@ -267,6 +271,9 @@ public static class AutomationGraphRunner
 
             case AutomationNodeTypes.ActionReceiver:
                 return await effects.RunReceiverCommandAsync(node.Get("command"), node.Get("value"), ct);
+
+            case AutomationNodeTypes.ActionLearnedVolume:
+                return await effects.SetLearnedVolumeAsync(ct);
 
             case AutomationNodeTypes.ActionDelay:
             {

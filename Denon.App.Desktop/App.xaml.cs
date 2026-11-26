@@ -158,6 +158,9 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<LiveAudioAnalyzerService>();
             builder.Services.AddHostedService(sp => sp.GetRequiredService<LiveAudioAnalyzerService>());
             builder.Services.AddSingleton<AlbumArtPaletteService>();
+            builder.Services.AddSingleton(sp => new VolumeMemoryStore(sp.GetRequiredService<AppLogStore>()));
+            builder.Services.AddSingleton<VolumeMemoryService>();
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<VolumeMemoryService>());
             builder.Services.AddSingleton<AutomationEngineService>();
             builder.Services.AddHostedService(sp => sp.GetRequiredService<AutomationEngineService>());
             builder.Services.AddSingleton<YouTubeCinemaWindow>();
@@ -374,6 +377,7 @@ public partial class App : System.Windows.Application
             // writes its address (with the key) to the file, without a browser (for tests).
             var insights = _host.Services.GetRequiredService<InsightsServer>();
             mainVm.AttachInsights(insights);
+            mainVm.AttachVolumeMemory(_host.Services.GetRequiredService<VolumeMemoryService>());
             if (ArgValue(e.Args, "--insights-url-file") is { } insightsUrlFile)
             {
                 await System.IO.File.WriteAllTextAsync(insightsUrlFile, await insights.StartAsync());
@@ -543,6 +547,7 @@ public partial class App : System.Windows.Application
         if (allPages)
         {
             shots.Add(("Stations", "Presets", "07-stations-presets.png", null));
+            shots.Add(("Acoustics", "VolumeMemory", "07b-volume-memory.png", null));
             shots.Add(("Mcp", null, "08-brain.png", null));
             shots.Add(("Diagnostics", null, "09-health.png", null));
             shots.Add(("Help", null, "10-help.png", null));
@@ -558,7 +563,12 @@ public partial class App : System.Windows.Application
                 vm.OpenPluginCommand.Execute(plugin);
             }
 
-            if (!string.IsNullOrWhiteSpace(stationsTab))
+            // The second field is the page's sub-tab: Stations (Explorer, Presets) or Scenes & Acoustics.
+            if (section == "Acoustics")
+            {
+                vm.AcousticsSubTab = stationsTab ?? "Scenes";
+            }
+            else if (!string.IsNullOrWhiteSpace(stationsTab))
             {
                 vm.StationsSubTab = stationsTab;
             }

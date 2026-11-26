@@ -40,6 +40,7 @@ editor, a page that the app serves on `127.0.0.1` (the Insights server) and show
 | `trigger.webhook` | trigger | `out` | `hook` (name in `POST /api/hooks/{hook}`), `filter` |
 | `trigger.schedule` | trigger | `out` | `time` (`HH:mm`), `days` (`Daily`, `Weekdays`, `Weekends`) |
 | `trigger.app_launch` | trigger | `out` | `processes` (comma-separated, without `.exe`) |
+| `trigger.source` | trigger | `out` | `source` (a source name such as `DR1`, `Netflix`, `Media Player`; empty for any), `filter` (`kind=tv_channel`, `from=…`) |
 | `condition.event` | condition | `yes`, `no` | `filter`: tests the data of the event that started the run |
 | `condition.time` | condition | `yes`, `no` | `from`, `to` (`HH:mm`, may pass midnight), `days` |
 | `condition.receiver` | condition | `yes`, `no` | `power` (`any`, `on`, `standby`), `input` (code or empty), `muted` (`any`, `yes`, `no`) |
@@ -47,6 +48,11 @@ editor, a page that the app serves on `127.0.0.1` (the Insights server) and show
 | `action.plugin` | action | `out` | `pluginId`, `actionId`, `p:<name>` parameters |
 | `action.receiver` | action | `out` | `command` (`power_on`, `power_off`, `mute`, `unmute`, `volume`, `input`, `sound_mode`), `value` |
 | `action.delay` | action | `out` | `seconds` (1–600) |
+| `action.learned_volume` | action | `out` | none: sets the Volume memory level of what plays now (capped at the safe volume) |
+
+`trigger.source` fires on `source.changed`, which Volume memory publishes when what plays through the receiver changes
+and holds for 5 s. Its data: `source` (the name), `kind` (`tv_channel`, `tv_app`, `cast`, `appletv`, `input`), `key`
+and `from` (the source before). A source change an automation caused does not start it.
 
 A receiver volume set by an automation is capped by the safe-volume ceiling (Settings → MCP, `MaxSafeVolume`), as for
 AI agents: nobody watches an automation when it runs.

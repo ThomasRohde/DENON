@@ -53,6 +53,16 @@ Phase 2 is done in 1.18.0: YouTube / YouTube Music and jukebox tracks are decode
       `session.ended` quiet once a receiver-input session ends covered by a Chromecast or Apple TV session (uncovered
       and still-running sessions stay visible).
 
+## Volume memory
+
+Learns the listening volume per source and sets it on a source change (2.10.0, `VolumeMemoryService`,
+`volume-memory.json`).
+
+- [ ] Verify live: switch between the Apple TV, DR1 and TV 2 Charlie and check the volume follows; check a Smart Scene
+      (Morning Jazz) keeps its own volume.
+- [ ] HEOS radio is one source ("HEOS Music") for now; stations differ in loudness too. Idea: a key per station.
+- [ ] MCP: no tool reads or sets the learned levels yet.
+
 ## Automations
 
 Automation graphs (trigger → conditions → actions), the node editor (`Denon.App.Desktop/Automations`, served by the

@@ -36,6 +36,7 @@ public static class AutomationNodeTypes
     public const string TriggerWebhook = "trigger.webhook";
     public const string TriggerSchedule = "trigger.schedule";
     public const string TriggerAppLaunch = "trigger.app_launch";
+    public const string TriggerSource = "trigger.source";
     public const string ConditionEvent = "condition.event";
     public const string ConditionTime = "condition.time";
     public const string ConditionReceiver = "condition.receiver";
@@ -43,6 +44,7 @@ public static class AutomationNodeTypes
     public const string ActionPlugin = "action.plugin";
     public const string ActionReceiver = "action.receiver";
     public const string ActionDelay = "action.delay";
+    public const string ActionLearnedVolume = "action.learned_volume";
 
     /// <summary>Plugin action parameters are config keys with this prefix, e.g. "p:roomId".</summary>
     public const string ParameterPrefix = "p:";
@@ -77,6 +79,15 @@ public static class AutomationNodeTypes
             [
                 new("time", "Time", "time", Required: true, Placeholder: "22:00"),
                 new("days", "Days", "days", Options: Days),
+            ]),
+        new(TriggerSource, GroupTrigger, "Source changes",
+            "Starts when what plays through the receiver changes and holds for 5 s: a TV channel, a TV or streaming app, an input.",
+            OutPort, false,
+            [
+                new("source", "Only for", "text", Placeholder: "DR1",
+                    Help: "A source name as Volume memory shows it (DR1, Netflix, Media Player). Leave empty for any source."),
+                new("filter", "Only when", "filter", Placeholder: "kind=tv_channel",
+                    Help: "kind is tv_channel, tv_app, cast, appletv or input; from is the source before."),
             ]),
         new(TriggerAppLaunch, GroupTrigger, "App starts", "Starts when a program starts on this PC.",
             OutPort, false,
@@ -121,6 +132,9 @@ public static class AutomationNodeTypes
                 new("value", "Value", "text", Placeholder: "45, TV or MOVIE",
                     Help: "Volume 0–98 (capped at the safe volume), an input code, or a sound mode."),
             ]),
+        new(ActionLearnedVolume, GroupAction, "Learned volume",
+            "Sets the volume Volume memory learned for what plays now, capped at the safe volume.",
+            OutPort, true, []),
         new(ActionDelay, GroupAction, "Wait", "Waits before the next step.",
             OutPort, true,
             [new("seconds", "Seconds", "number", Required: true, Placeholder: "5", Help: "1 to 600.")]),
@@ -133,6 +147,7 @@ public static class AutomationNodeTypes
         "sleep_timer.changed", "connection.changed", "session.started", "session.ended", "app.changed",
         "scene.activated", "lighting.state_changed", "appletv.woke", "appletv.slept", "appletv.playback_changed",
         "cast.app_started", "cast.playback_changed", "cast.app_ended", "homepod.connected", "homepod.disconnected",
+        "source.changed",
     ];
 
     private static readonly Dictionary<string, AutomationNodeTypeInfo> ByType =

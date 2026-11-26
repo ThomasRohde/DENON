@@ -100,6 +100,12 @@ public sealed class AutomationEventTests : IDisposable
             OnDelay?.Invoke();
             return DelayGate?.Task ?? Task.CompletedTask;
         }
+
+        public Task<string> SetLearnedVolumeAsync(CancellationToken ct)
+        {
+            lock (Calls) Calls.Add("learned-volume");
+            return Task.FromResult("Volume 42 for DR1 (learned)");
+        }
     }
 
     // ---- Event bus -----------------------------------------------------------------------------------------
@@ -795,6 +801,33 @@ public sealed class AutomationEventTests : IDisposable
             RemoteWebApiHandler.WebhookReplyWait = wait;
             gate.TrySetResult();
         }
+    }
+
+    [Fact]
+    public async Task A_source_change_runs_the_learned_volume_action()
+    {
+        var graph = new AutomationGraph
+        {
+            Id = "dr1-level", Name = "DR1 level", Enabled = true, CooldownSeconds = 0,
+            Nodes =
+            [
+                Node("t", AutomationNodeTypes.TriggerSource, ("source", "DR1"), ("filter", "")),
+                Node("a", AutomationNodeTypes.ActionLearnedVolume),
+            ],
+            Edges = [Edge("t", "a")],
+        };
+        Assert.Empty(AutomationGraphValidator.Validate(graph));
+        var rig = await CreateRigAsync(graph);
+        using var _ = rig.Cleanup;
+
+        RoomEvent Changed(string source, string origin = "external") =>
+            Event(VolumeMemoryService.SourceChangedEvent, origin, "control", "source", ("source", source), ("kind", "tv_channel"));
+
+        Assert.Empty(await rig.Engine.HandleRoomEventAsync(Changed("TV 2"), DateTimeOffset.Now));
+        Assert.Empty(await rig.Engine.HandleRoomEventAsync(Changed("DR1", origin: "automation"), DateTimeOffset.Now)); // its own change
+        var run = Assert.Single(await rig.Engine.HandleRoomEventAsync(Changed("DR1"), DateTimeOffset.Now.AddMinutes(1)));
+        Assert.Contains("Volume 42 for DR1 (learned)", run.Summary);
+        Assert.Equal(new[] { "learned-volume" }, rig.Effects.Calls);
     }
 
     [Fact]

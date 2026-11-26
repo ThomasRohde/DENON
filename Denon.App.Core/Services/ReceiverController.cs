@@ -165,7 +165,8 @@ public sealed class ReceiverController
             logFailures: true,
             cancellationToken);
 
-    public Task<ReceiverStatus> SetVolumeAsync(int level, CancellationToken cancellationToken = default) =>
+    /// <param name="logSuccess">False for the steps of a fade: only its last step is worth a log line.</param>
+    public Task<ReceiverStatus> SetVolumeAsync(int level, CancellationToken cancellationToken = default, bool logSuccess = true) =>
         ExecuteAsync(
             $"Set volume to {level} ({DenonVolumeMath.FormatDecibels(level)})",
             async (settings, token) =>
@@ -174,7 +175,7 @@ public sealed class ReceiverController
                 return await GetMergedStatusAsync(settings, token);
             },
             markBusy: false,
-            logSuccess: true,
+            logSuccess: logSuccess,
             logFailures: true,
             cancellationToken);
 
