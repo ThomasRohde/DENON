@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Automation · Denon Desktop</title>
+<style>
+/*@shared-css*/
+.steps { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
+.step { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; padding: 8px 10px; border-radius: 8px;
+        background: var(--color-background-secondary); border-left: 3px solid var(--color-border-primary); }
+.step.trigger { border-left-color: var(--accent); }
+.step.condition { border-left-color: var(--warn); }
+.step.action { border-left-color: var(--good); }
+.step.problem { outline: 1px solid var(--warn); }
+.kind { font-size: 10px; font-weight: 700; letter-spacing: .04em; color: var(--color-text-secondary); padding-top: 2px; min-width: 4.6em; }
+.step .title { font-size: 13px; font-weight: 600; }
+.step .text { font-size: 12px; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.branch { font-size: 11px; font-weight: 700; margin-right: 6px; }
+.branch.yes { color: var(--good); }
+.branch.no, .branch.unreached { color: var(--warn); }
+.problems { margin: 12px 0 0; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--warn); font-size: 12px; }
+.problems li { margin: 2px 0 2px 16px; }
+.rows { display: grid; gap: 6px; margin-top: 12px; }
+.row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 8px; background: var(--color-background-secondary); }
+.row .name { font-size: 13px; font-weight: 600; }
+.row .summary { font-size: 12px; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<main class="card" aria-live="polite">
+  <div class="top"><span class="name" id="kicker">Automation</span><span class="right" id="pills"></span></div>
+  <h1 id="title">Loading…</h1>
+  <p class="detail" id="detail"></p>
+  <div id="body"></div>
+  <div class="buttons" id="actions"></div>
+  <p class="status" id="status"></p>
+</main>
+<script>
+/*@shared-js*/
+</script>
+<script>
+"use strict";
+const { $, el } = Card;
+let state = null;
+
+const KIND = { trigger: "WHEN", condition: "ONLY IF", action: "DO" };
+
+function pill(text, cls) { return el("span", { className: `pill ${cls || ""}` }, text); }
+
+function stepItem(step, problemIds) {
+  const group = step.group in KIND ? step.group : "unknown";
+  return el("li", { className: `step ${group}${problemIds.has(step.id) ? " problem" : ""}`, style: { marginLeft: `${Math.min(step.depth, 6) * 14}px` } },
+    el("span", { className: "kind" }, KIND[group] || "?"),
+    el("div", {},
+      el("div", { className: "title" },
+        step.port ? el("span", { className: `branch ${step.port}` }, step.port === "unreached" ? "not reached" : `if ${step.port}`) : null,
+        step.title),
+      el("div", { className: "text" }, step.text)));
+}
+
+async function save(graph, enabled, label) {
+  await Card.run(label, async () => {
+    const automation = { ...graph, enabled };
+    const result = await Card.callTool("create_or_update_automation", { automation });
+    await Card.reload({ automation_id: graph.id });
+    return enabled ? "Saved and on." : "Saved. It is off until you turn it on.";
+  });
+}
+
+function renderGraph(data) {
+  const graph = data.automation;
+  const problems = data.problems || [];
+  const problemIds = new Set(problems.map((p) => p.nodeId).filter(Boolean));
+  $("kicker").textContent = data.mode === "preview" ? "Automation preview · not saved" : "Saved automation";
+  $("title").textContent = graph.name;
+  $("pills").replaceChildren(
+    pill(graph.enabled ? "On" : "Off", graph.enabled ? "on" : ""),
+    pill(`Cooldown ${graph.cooldownSeconds ?? 0} s`));
+  $("detail").textContent = data.replaces
+    ? `Saving replaces the saved automation '${data.replaces.name}' (now ${data.replaces.enabled ? "on" : "off"}).`
+    : data.mode === "preview" ? "Check the steps. Nothing is saved until you press Save." : "";
+
+  const body = [el("ol", { className: "steps" }, (data.steps || []).map((s) => stepItem(s, problemIds)))];
+  if (problems.length) {
+    body.unshift(el("div", { className: "problems" }, el("strong", {}, "It can't be saved yet:"),
+      el("ul", { style: { margin: "4px 0 0", padding: 0 } }, problems.map((p) => el("li", {}, p.nodeId ? `${p.nodeId}: ${p.message}` : p.message)))));
+  }
+  $("body").replaceChildren(...body);
+
+  const actions = [];
+  if (data.mode === "preview") {
+    const blocked = problems.length > 0 || !data.canSave;
+    actions.push(
+      el("button", { className: "primary", disabled: blocked, onclick: () => save(graph, true, "Saving") }, "Save and turn on"),
+      el("button", { disabled: blocked, onclick: () => save(graph, false, "Saving") }, "Save, keep off"));
+  } else {
+    actions.push(
+      el("button", { className: graph.enabled ? "" : "primary", disabled: !data.canSave, onclick: () => save(graph, !graph.enabled, graph.enabled ? "Turning off" : "Turning on") },
+        graph.enabled ? "Turn off" : "Turn on"),
+      el("button", { onclick: () => Card.run("Loading", () => Card.reload({})) }, "All automations"));
+  }
+  if (!data.canSave) Card.setStatus("Saving needs the FullOrchestration permission tier in Denon Desktop.");
+  $("actions").replaceChildren(...actions);
+}
+
+function renderList(data) {
+  const list = data.automations || [];
+  $("kicker").textContent = "Automations";
+  $("title").textContent = `${list.length} saved`;
+  $("pills").replaceChildren(pill(`${list.filter((a) => a.enabled).length} on`, "on"));
+  $("detail").textContent = "Open one to see its steps.";
+  $("body").replaceChildren(list.length
+    ? el("div", { className: "rows" }, list.map((a) => el("div", { className: "row" },
+        el("div", {}, el("div", { className: "name" }, a.name), el("div", { className: "summary" }, a.summary)),
+        pill(a.enabled ? "On" : "Off", a.enabled ? "on" : ""),
+        el("button", { className: "small", onclick: () => Card.run("Loading", () => Card.reload({ automation_id: a.id })) }, "Open"))))
+    : el("p", { className: "empty" }, "No automations yet."));
+  $("actions").replaceChildren();
+}
+
+function render(data) {
+  state = data;
+  if (data.mode === "error") {
+    $("kicker").textContent = "Automation";
+    $("title").textContent = "Can't show it";
+    $("detail").textContent = data.message || "";
+    $("pills").replaceChildren();
+    $("body").replaceChildren();
+    $("actions").replaceChildren(el("button", { onclick: () => Card.run("Loading", () => Card.reload({})) }, "All automations"));
+  } else if (data.mode === "list") {
+    renderList(data);
+  } else {
+    renderGraph(data);
+  }
+  Card.resize();
+}
+
+Card.start({
+  name: "denon-automation",
+  tool: "preview_automation",
+  render,
+  outsideHost() {
+    $("title").textContent = "Open this card from an MCP host";
+    $("detail").textContent = "It is shown by the Denon Desktop tool preview_automation in an MCP Apps host.";
+  },
+});
+</script>
+</body>
+</html>

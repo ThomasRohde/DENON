@@ -66,7 +66,8 @@ On the official MCP C# SDK since 2.10.1 (`DenonMcpServer`, `ModelContextProtocol
       from the card change the receiver and the card updates.
 - [ ] Try the card's play/pause button, and the card in Claude Desktop.
 - [x] Live check (2.10.4): Morning Jazz shows "DR P8 Jazz" in the app and the MCP card, and the P8 tile is ON AIR.
-- [ ] More MCP Apps: a room remote (inputs, scenes, Volume memory levels) and the Insights charts.
+- [x] More MCP Apps: room remote, automation preview, Insights, radio search, Volume memory (2.10.5).
+- [ ] Try the five new cards in Codex: the buttons of each, and the automation Save from a preview.
 - [ ] Room-state updates reach only session clients (initialize, 2025-11-25). 2026-07-28 clients get none: the SDK does
       not yet fan out resource updates over `subscriptions/listen` (csharp-sdk #1662).
 - [ ] Verify live with Claude Code / Claude Desktop after the release (which protocol version they choose).

@@ -13,7 +13,7 @@
 
   <ItemGroup>
     <!-- MCP App views, served as ui:// resources (DenonMcpServer.Apps.cs). -->
-    <EmbeddedResource Include="Mcp\Apps\*.html" LogicalName="Denon.App.Core.Mcp.Apps.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Mcp\Apps\*.html;Mcp\Apps\*.css;Mcp\Apps\*.js" LogicalName="Denon.App.Core.Mcp.Apps.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

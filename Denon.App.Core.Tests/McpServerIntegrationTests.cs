@@ -62,7 +62,7 @@ public sealed class McpServerIntegrationTests : IAsyncLifetime
         var plugins = new PluginHostService([], _settings, state, controller, telemetry, log);
         var heos = new HeosEventListenerService(_settings, state, controller, log);
         var intelligence = new RoomIntelligenceService(state, controller, _settings, plugins, ytQueue, heos, log, Path.Combine(_tempDir, "room-habits.json"));
-        _server = new DenonMcpServer(_settings, controller, state, plugins, intelligence, new RadioBrowserService(log), ytMedia, relay, ytQueue, new LyricsService(), telemetry, log);
+        _server = new DenonMcpServer(_settings, controller, state, plugins, intelligence, new RadioBrowserService(log), ytMedia, relay, ytQueue, new LyricsService(), telemetry, new VolumeMemoryStore(log, Path.Combine(_tempDir, "volume-memory.json")), log);
 
         _asyncDisposables.Add(_server);
         _asyncDisposables.Add(telemetry);
@@ -159,6 +159,123 @@ public sealed class McpServerIntegrationTests : IAsyncLifetime
         Assert.False(data.GetProperty("connected").GetBoolean());
         Assert.Equal(65, data.GetProperty("safeVolume").GetInt32());
         Assert.Contains("not connected", Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text);
+    }
+
+    [Fact]
+    public async Task Every_card_is_an_mcp_app_with_the_shared_script_put_in()
+    {
+        await using var client = await ConnectAsync();
+        var tools = await client.ListToolsAsync();
+        var resources = await client.ListResourcesAsync();
+
+        foreach (var card in DenonMcpServer.AppCards)
+        {
+            var tool = Assert.Single(tools, t => t.Name == card.ToolName);
+            Assert.Equal(card.Uri, tool.ProtocolTool.Meta?["ui"]?["resourceUri"]?.GetValue<string>());
+            Assert.True(tool.ProtocolTool.Annotations?.ReadOnlyHint, card.ToolName);
+            Assert.Contains(resources, r => r.Uri == card.Uri && r.MimeType == "text/html;profile=mcp-app");
+
+            var page = Assert.IsType<TextResourceContents>(Assert.Single((await client.ReadResourceAsync(card.Uri)).Contents)).Text;
+            Assert.StartsWith("<!DOCTYPE html>", page);
+            Assert.Contains("ui/initialize", page);
+            Assert.Contains("--color-background-primary", page);
+            Assert.DoesNotContain("/*@shared", page);
+            Assert.Contains($"tool: \"{card.ToolName}\"", page);
+        }
+
+        foreach (var helper in new[] { "media_play_station", "save_station", "volume_memory_set_level", "volume_memory_forget" })
+        {
+            Assert.Contains(tools, t => t.Name == helper);
+        }
+    }
+
+    [Fact]
+    public async Task The_cards_return_their_data_without_a_receiver()
+    {
+        await using var client = await ConnectAsync();
+
+        var remote = (await client.CallToolAsync("show_room_remote")).StructuredContent!.Value;
+        Assert.False(remote.GetProperty("connected").GetBoolean());
+        Assert.True(remote.GetProperty("scenes").GetArrayLength() > 0);
+        Assert.True(remote.GetProperty("stations").GetArrayLength() > 0);
+        Assert.Contains(remote.GetProperty("inputs").EnumerateArray(), i => i.GetProperty("code").GetString() == "NET");
+
+        var list = (await client.CallToolAsync("preview_automation")).StructuredContent!.Value;
+        Assert.Equal("list", list.GetProperty("mode").GetString());
+
+        var insights = await client.CallToolAsync("show_insights", new Dictionary<string, object?> { ["days"] = 7 });
+        Assert.NotEqual(true, insights.IsError);
+        Assert.Equal(7, insights.StructuredContent!.Value.GetProperty("days").GetInt32());
+
+        var memory = (await client.CallToolAsync("show_volume_memory")).StructuredContent!.Value;
+        Assert.Equal(65, memory.GetProperty("safeVolume").GetInt32());
+        Assert.Equal(0, memory.GetProperty("levels").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task An_automation_preview_shows_steps_and_problems_and_saves_nothing()
+    {
+        await using var client = await ConnectAsync();
+        var before = _settings.Current.AutomationGraphs.Count;
+        var scene = _settings.Current.Receiver.Scenes[0];
+
+        var good = new Dictionary<string, object?>
+        {
+            ["automation"] = new Dictionary<string, object?>
+            {
+                ["name"] = "Webhook to scene",
+                ["nodes"] = new object[]
+                {
+                    new { id = "t", type = "trigger.webhook", config = new Dictionary<string, string> { ["hook"] = "arrive-home" } },
+                    new { id = "w", type = "condition.time", config = new Dictionary<string, string> { ["from"] = "07:00", ["to"] = "22:00", ["days"] = "Daily" } },
+                    new { id = "a", type = "action.scene", config = new Dictionary<string, string> { ["sceneId"] = scene.Id } },
+                },
+                ["edges"] = new object[] { new { from = "t", port = "out", to = "w" }, new { from = "w", port = "yes", to = "a" } },
+            },
+        };
+        var data = (await client.CallToolAsync("preview_automation", good)).StructuredContent!.Value;
+        Assert.Equal("preview", data.GetProperty("mode").GetString());
+        Assert.Equal(0, data.GetProperty("problems").GetArrayLength());
+        var steps = data.GetProperty("steps").EnumerateArray().ToList();
+        Assert.Equal(["t", "w", "a"], steps.Select(s => s.GetProperty("id").GetString()));
+        Assert.Equal("yes", steps[2].GetProperty("port").GetString());
+        Assert.Contains(scene.Name, steps[2].GetProperty("text").GetString());
+        Assert.Contains("arrive-home", steps[0].GetProperty("text").GetString());
+        Assert.False(data.GetProperty("automation").GetProperty("enabled").GetBoolean());
+
+        var bad = await client.CallToolAsync("preview_automation", new Dictionary<string, object?>
+        {
+            ["automation"] = new Dictionary<string, object?> { ["name"] = "No trigger", ["nodes"] = Array.Empty<object>(), ["edges"] = Array.Empty<object>() },
+        });
+        Assert.True(bad.StructuredContent!.Value.GetProperty("problems").GetArrayLength() > 0);
+        Assert.Equal(before, _settings.Current.AutomationGraphs.Count); // a preview saves nothing
+
+        var saved = _settings.Current.AutomationGraphs[0];
+        var shown = (await client.CallToolAsync("preview_automation", new Dictionary<string, object?> { ["automation_id"] = saved.Id })).StructuredContent!.Value;
+        Assert.Equal("saved", shown.GetProperty("mode").GetString());
+        Assert.Equal(saved.Name, shown.GetProperty("automation").GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task The_card_helpers_save_a_station_and_check_their_input()
+    {
+        await using var client = await ConnectAsync();
+
+        var save = await client.CallToolAsync("save_station", new Dictionary<string, object?> { ["name"] = "Test FM", ["url"] = "https://example.com/test.mp3" });
+        Assert.NotEqual(true, save.IsError);
+        Assert.Contains(_settings.Current.Receiver.Stations, s => s.Alias == "test-fm" && s.Url == "https://example.com/test.mp3");
+        var again = await client.CallToolAsync("save_station", new Dictionary<string, object?> { ["name"] = "Test FM 2", ["url"] = "https://example.com/test.mp3" });
+        Assert.Contains("saved already", Assert.IsType<TextContentBlock>(Assert.Single(again.Content)).Text);
+        var notHttp = await client.CallToolAsync("save_station", new Dictionary<string, object?> { ["name"] = "X", ["url"] = "file:///c:/x.mp3" });
+        Assert.True(notHttp.IsError);
+
+        // Unknown keys and stations are invalid params.
+        var unknown = await Assert.ThrowsAsync<McpProtocolException>(() => client.CallToolAsync(
+            "volume_memory_set_level", new Dictionary<string, object?> { ["key"] = "input:nothing", ["level"] = 30 }).AsTask());
+        Assert.Contains("No learned volume", unknown.Message);
+        var missing = await Assert.ThrowsAsync<McpProtocolException>(() => client.CallToolAsync(
+            "media_play_station", new Dictionary<string, object?> { ["station"] = "no-such-station" }).AsTask());
+        Assert.Contains("No saved station", missing.Message);
     }
 
     [Fact]

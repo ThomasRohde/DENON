@@ -69,6 +69,7 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
     private readonly YouTubeQueueService _queueService;
     private readonly LyricsService _lyricsService;
     private readonly EventTelemetryLog _telemetry;
+    private readonly VolumeMemoryStore _volumeMemory;
     private readonly AppLogStore _logStore;
 
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
@@ -98,6 +99,7 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
         YouTubeQueueService queueService,
         LyricsService lyricsService,
         EventTelemetryLog telemetry,
+        VolumeMemoryStore volumeMemory,
         AppLogStore logStore)
     {
         _settingsStore = settingsStore;
@@ -111,6 +113,7 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
         _queueService = queueService;
         _lyricsService = lyricsService;
         _telemetry = telemetry;
+        _volumeMemory = volumeMemory;
         _logStore = logStore;
 
         _intelligence.RoomGraphChanged += NotifyRoomStateUpdated;

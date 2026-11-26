@@ -4,6 +4,26 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Five more MCP Apps (cards in the chat).** In a host that shows MCP Apps:
+  - **Room remote** (`show_room_remote`): buttons for power, the Smart Scenes, the saved stations, the inputs, the
+    sound modes and the sleep timer.
+  - **Automation preview** (`preview_automation`): an automation as WHEN / ONLY IF / DO steps with its branches and
+    any problems, before it is saved. Save it on or off from the card. With an id it shows a saved automation with an
+    on/off button; with nothing it lists them all.
+  - **Insights** (`show_insights`): listening time per day, the week's rhythm by hour, the top apps and inputs,
+    the listening volume by time of day and by source, and automation runs, for today, 7 or 30 days.
+  - **Radio search** (`show_radio_search`): Radio Browser results with Play and Save buttons and a search box.
+  - **Volume memory** (`show_volume_memory`): each learned level with −/+ and Forget; the current source is marked.
+- New MCP tools for the cards' buttons: `media_play_station` (a saved station by alias or name), `save_station`,
+  `volume_memory_set_level` (never above the safe ceiling) and `volume_memory_forget`. Saving and changing levels
+  need the FullOrchestration tier.
+
+### Changed
+- The cards share one script (the MCP Apps view protocol) and one stylesheet, which the server puts into each page.
+
 ## [2.10.4] - 2026-11-26
 
 ### Fixed

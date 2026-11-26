@@ -319,7 +319,8 @@ public sealed partial class DenonMcpServer
         };
 
         // MCP App: the now-playing card (hosts without MCP Apps get its data as text).
-        tools.Add(NowPlayingTool());
+        tools.AddRange(AppCardTools());
+        tools.AddRange(AppHelperTools());
 
         // Zero-config auto-bridge: expose enabled plugin actions as annotated MCP tools
         // (Skip hue.set_color since curated hue_set_color already exposes its full typed schema)
@@ -353,12 +354,15 @@ public sealed partial class DenonMcpServer
     {
         var cfg = _settingsStore.Current.Mcp;
 
+        // The MCP App cards only read (allowed in all permission tiers including Observer).
+        if (await TryHandleAppCardAsync(toolName, args, ct) is { } card)
+        {
+            return card;
+        }
+
         // Read-only tools (allowed in all permission tiers including Observer)
         switch (toolName)
         {
-            case NowPlayingToolName:
-                return ShowNowPlaying();
-
             case "get_room_state":
                 return BuildToolJson(_intelligence.BuildRoomStatePayload());
 
@@ -624,6 +628,11 @@ public sealed partial class DenonMcpServer
         _telemetry.MarkOrigin("avr", "mcp_agent", "mcp.tool", new Dictionary<string, object?> { ["tool"] = toolName });
         _telemetry.MarkOrigin("tv", "mcp_agent");
         _telemetry.MarkOrigin("lighting", "mcp_agent");
+
+        if (await TryHandleAppHelperAsync(toolName, args, cfg, ct) is { } helper)
+        {
+            return helper;
+        }
 
         switch (toolName)
         {
