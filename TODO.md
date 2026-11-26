@@ -62,8 +62,8 @@ On the official MCP C# SDK since 2.10.1 (`DenonMcpServer`, `ModelContextProtocol
       volume above the safe ceiling, power off, or which Chromecast. Needs a client that supports it (`IsMrtrSupported`
       or a session with elicitation).
 - [x] MCP Apps: the now-playing card (`show_now_playing`, `ui://denon/now-playing.html`, 2.10.3).
-- [ ] Check the card in a real host (ChatGPT/Codex, Claude Desktop) after the release: the view protocol was written
-      from the 2026-01-26 spec and tried in a stand-in host only.
+- [x] The card renders in the Codex desktop app (2.10.3, receiver in standby; Refresh gave no error).
+- [ ] Try the card's volume, mute and play/pause buttons with the receiver on, and the card in Claude Desktop.
 - [ ] More MCP Apps: a room remote (inputs, scenes, Volume memory levels) and the Insights charts.
 - [ ] Room-state updates reach only session clients (initialize, 2025-11-25). 2026-07-28 clients get none: the SDK does
       not yet fan out resource updates over `subscriptions/listen` (csharp-sdk #1662).
