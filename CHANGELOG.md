@@ -4,6 +4,14 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **A save that does not happen now says why.** When Save Changes (Stations) or Save & Sync (Settings) is refused
+  because of a shortcut collision, or fails, the app log gets a warning naming the shortcuts or the error. The same
+  reason shows in red under the Stations page's Save Changes, as well as in the status line. Before, it showed only
+  in the status line, so a refused save looked like nothing happened.
+
 ## [2.10.6] - 2026-11-26
 
 ### Fixed

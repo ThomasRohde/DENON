@@ -70,7 +70,9 @@ On the official MCP C# SDK since 2.10.1 (`DenonMcpServer`, `ModelContextProtocol
 - [x] The five new cards render in Codex (2.10.5); the automation card's Open button works through the host.
 - [x] The cards' buttons work in Codex (2.10.5): station, input, sleep timer, power, automation off/on, volume
       memory −/+, radio Play and Save. The cards read the receiver again 2.5 s after a button (2.10.6).
-- [ ] Stations page: Save Changes does not save (no "Settings updated" in the log); Save & Sync in Settings does.
+- [x] Stations page: Save Changes does not save (no "Settings updated" in the log); Save & Sync in Settings does.
+      Cause not found: on 2.10.5 and 2.10.6 the button saved both from UI Automation and from a real click. A refused
+      or failed save now logs a warning with its reason and shows it on the Stations page.
 - [ ] Room-state updates reach only session clients (initialize, 2025-11-25). 2026-07-28 clients get none: the SDK does
       not yet fan out resource updates over `subscriptions/listen` (csharp-sdk #1662).
 - [ ] Verify live with Claude Code / Claude Desktop after the release (which protocol version they choose).
