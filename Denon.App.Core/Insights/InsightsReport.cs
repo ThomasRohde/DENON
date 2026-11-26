@@ -822,6 +822,19 @@ public static partial class InsightsReport
         return name.Length > 0 ? $"{KindLabel(kind)} {name}" : KindLabel(kind);
     }
 
+    /// <summary>The average volume of two parts, weighted by their time; a part without a volume does not count.</summary>
+    private static double? JoinVolume(Session a, Session b)
+    {
+        static double Weight(Session s) => Math.Max(1, s.Exclusive > 0 ? s.Exclusive : s.Duration);
+        return (a.AvgVolume, b.AvgVolume) switch
+        {
+            ({ } x, { } y) => (x * Weight(a) + y * Weight(b)) / (Weight(a) + Weight(b)),
+            ({ } x, null) => x,
+            (null, { } y) => y,
+            _ => null,
+        };
+    }
+
     /// <summary>
     /// Joins a session that ended only because the app stopped ("app_shutdown") with the same session when it starts
     /// again within <see cref="RestartJoin"/>: a restart is not a new session. The gap counts as watched, since the
@@ -848,6 +861,10 @@ public static partial class InsightsReport
                         Duration = before.Duration + gapSeconds + session.Duration,
                         Exclusive = before.Exclusive + session.Exclusive + (both ? gapSeconds : 0),
                         Reason = session.Reason,
+                        AvgVolume = JoinVolume(before, session),
+                        CoveredBy = before.CoveredBy is null && session.CoveredBy is null
+                            ? null
+                            : [.. (before.CoveredBy ?? []).Concat(session.CoveredBy ?? []).Distinct(StringComparer.OrdinalIgnoreCase)],
                     };
                     if (session.Reason != "app_shutdown")
                     {

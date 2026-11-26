@@ -712,7 +712,14 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
         var hold = new CancellationTokenSource();
         if (_playbackHolds.TryGetValue(deviceId, out var earlier))
         {
-            earlier.Cancel();
+            try
+            {
+                earlier.Cancel(); // Its own task removes and disposes it.
+            }
+            catch (ObjectDisposedException)
+            {
+                // It had just finished.
+            }
         }
 
         _playbackHolds[deviceId] = hold;
@@ -726,8 +733,12 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
             {
                 return;
             }
+            finally
+            {
+                _playbackHolds.TryRemove(new KeyValuePair<string, CancellationTokenSource>(deviceId, hold));
+                hold.Dispose();
+            }
 
-            _playbackHolds.TryRemove(new KeyValuePair<string, CancellationTokenSource>(deviceId, hold));
             if (GetClient(deviceId)?.State is not { } state || string.IsNullOrEmpty(state.PlayerState))
             {
                 return;

@@ -178,4 +178,41 @@ public sealed class EventNoiseTests : IDisposable
         Assert.Equal(lastSeen, ended.Timestamp);
         Assert.False(File.Exists(rig.Telemetry.OpenSessionsPath));
     }
+
+    [Fact]
+    public async Task A_recovered_receiver_input_under_the_tv_is_not_counted_twice()
+    {
+        var rig = await CreateRigAsync();
+        using var _ = rig.Cleanup;
+        var lastSeen = DateTimeOffset.UtcNow.AddHours(-1);
+        object Open(string device, string kind, string title) => new
+        {
+            device,
+            origin = "external",
+            startedUtc = lastSeen.AddHours(-2),
+            data = new Dictionary<string, object?> { ["kind"] = kind, ["title"] = title, ["input"] = kind == "avr_input" ? "TV" : null },
+        };
+
+        // Saved as the monitor saves them: the receiver first.
+        File.WriteAllText(rig.Telemetry.OpenSessionsPath, JsonSerializer.Serialize(new
+        {
+            lastSeenUtc = lastSeen,
+            sessions = new[] { Open("avr", "avr_input", "TV Audio"), Open("lg-tv", "tv_channel", "DR1") },
+        }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+
+        rig.Monitor.CloseSessionsLeftOpen();
+        await DeliveredAsync(rig);
+
+        List<RoomEvent> ended;
+        lock (rig.Seen)
+        {
+            ended = rig.Seen.Where(static e => e.Event == "session.ended").ToList();
+        }
+
+        Assert.Equal(2, ended.Count);
+        Assert.Equal("lg-tv", ended[0].Device);
+        Assert.Equal("7200", ended[0].GetText("exclusiveSec"));
+        Assert.Equal("avr", ended[1].Device);
+        Assert.Equal("0", ended[1].GetText("exclusiveSec")); // the TV covered it
+    }
 }

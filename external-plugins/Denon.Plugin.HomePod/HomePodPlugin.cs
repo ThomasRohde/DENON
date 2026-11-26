@@ -356,7 +356,9 @@ public sealed class HomePodPlugin : IDenonPlugin, IPluginViewProvider
         }
 
         // Only a change is worth a line: discovery runs every few minutes and usually finds the same speakers.
-        var seen = string.Join("; ", found.Select(f => $"{f.Name} at {f.Host}"));
+        var seen = string.Join("; ", found
+            .Select(f => $"{f.Name} at {f.Host}")
+            .Order(StringComparer.OrdinalIgnoreCase)); // The same speakers can answer in another order.
         if (added > 0 || !string.Equals(seen, _lastDiscoverySeen, StringComparison.Ordinal))
         {
             _context?.Logger.Info($"HomePod discovery: {found.Count} speaker(s) ({seen}), {added} new.");

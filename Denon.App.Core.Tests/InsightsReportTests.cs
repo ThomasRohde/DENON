@@ -289,6 +289,23 @@ public sealed class InsightsReportTests
         Assert.Equal((90 + 20) * 60, report.Watch.TotalSeconds);
     }
 
+    [Fact]
+    public void A_joined_session_keeps_the_volume_of_both_parts()
+    {
+        // Two equal parts at 30 and 60: the joined session plays at 45, not 30.
+        var day = Now.Date.AddHours(20);
+        var events = new[]
+        {
+            Session(day.AddMinutes(30), "lg-tv", "tv_app", "Netflix", 30 * 60, reason: "app_shutdown", avgVolume: 30),
+            Session(day.AddMinutes(61), "lg-tv", "tv_app", "Netflix", 30 * 60, reason: "standby", avgVolume: 60),
+        };
+
+        var report = InsightsReport.Build(events, At(Now), 1);
+
+        Assert.Equal(1, report.Watch.Sessions);
+        Assert.Equal(45, report.Receiver.Volume.Average);
+    }
+
     [Theory]
     [InlineData("TVA (1397)", "TVA")]
     [InlineData("Kriminalkommissær Barnaby XVII (1) (1)", "Kriminalkommissær Barnaby XVII")]

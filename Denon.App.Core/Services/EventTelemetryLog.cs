@@ -163,15 +163,15 @@ public sealed class EventTelemetryLog : IAsyncDisposable
         return fallback;
     }
 
+    /// <summary>Where the monitor keeps the sessions that are open now, to close them after a crash.</summary>
+    public string OpenSessionsPath => Path.Combine(_eventsDir, "open-sessions.json");
+
     /// <summary>
     /// Publishes the event on the live <see cref="RoomEventBus"/> (always), and when event logging is on, also
     /// enqueues it to the daily JSONL file of its stream without blocking the caller.
     /// </summary>
     /// <param name="at">When it happened, for an event written later (a session closed after a crash); else now.</param>
     /// <returns>The published event, or null after dispose.</returns>
-    /// <summary>Where the monitor keeps the sessions that are open now, to close them after a crash.</summary>
-    public string OpenSessionsPath => Path.Combine(_eventsDir, "open-sessions.json");
-
     public RoomEvent? Record(
         string stream,
         string device,

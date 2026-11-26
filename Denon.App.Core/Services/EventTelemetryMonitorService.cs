@@ -154,8 +154,9 @@ public sealed partial class EventTelemetryMonitorService : BackgroundService
                     _ = RefreshHueSilentlyAsync(stoppingToken);
                 }
 
-                if (nowUtc - _lastOpenSessionsSaveUtc >= OpenSessionsSaveInterval)
+                if (_openSessionsChanged || nowUtc - _lastOpenSessionsSaveUtc >= OpenSessionsSaveInterval)
                 {
+                    _openSessionsChanged = false;
                     _lastOpenSessionsSaveUtc = nowUtc;
                     SaveOpenSessions(nowUtc);
                 }
@@ -746,6 +747,7 @@ public sealed partial class EventTelemetryMonitorService : BackgroundService
         }
 
         slot.Active = active;
+        _openSessionsChanged = true;
 
         var data = BuildSessionPayload(candidate);
         // Real seconds since the candidate started (>= dwellSeconds; ticks add a few seconds),
@@ -779,6 +781,7 @@ public sealed partial class EventTelemetryMonitorService : BackgroundService
             data["avgVolume"] = Math.Round(active.AverageVolume.Value, 1);
         }
 
+        _openSessionsChanged = true;
         _telemetry.Record(
             EventTelemetryLog.StreamMedia,
             slot.Device,
@@ -892,6 +895,10 @@ public sealed partial class EventTelemetryMonitorService : BackgroundService
     private static readonly TimeSpan OpenSessionsSaveInterval = TimeSpan.FromMinutes(1);
     private DateTimeOffset _lastOpenSessionsSaveUtc = DateTimeOffset.MinValue;
 
+    // A session started or ended: save at the next tick (1 s), so a session that ended before a crash is not closed
+    // again from an older checkpoint.
+    private volatile bool _openSessionsChanged;
+
     private sealed record OpenSessionRecord(string Device, string Origin, DateTimeOffset StartedUtc, Dictionary<string, object?> Data);
 
     private sealed record OpenSessionsFile(DateTimeOffset LastSeenUtc, List<OpenSessionRecord> Sessions);
@@ -967,7 +974,9 @@ public sealed partial class EventTelemetryMonitorService : BackgroundService
         var lastSeen = left.LastSeenUtc.ToLocalTime();
         _logStore.Warning($"[Telemetry] The app did not stop cleanly last time (last seen {lastSeen:yyyy-MM-dd HH:mm}). " +
                           $"Closed {left.Sessions.Count} open session(s) at that time.");
-        foreach (var session in left.Sessions)
+        // The receiver's input last: the overlap tracker then knows the TV session that covered it, so its time is not
+        // counted twice.
+        foreach (var session in left.Sessions.OrderBy(static s => s.Device == "avr" ? 1 : 0))
         {
             var seconds = (int)Math.Round((left.LastSeenUtc - session.StartedUtc).TotalSeconds);
             if (seconds <= 0)
