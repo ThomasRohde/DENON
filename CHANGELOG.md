@@ -4,6 +4,13 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **The now-playing card and the room remote show the change a button made.** After a station, input, power or
+  volume button they read the receiver again 2.5 s later, because the receiver reports some changes (the station's
+  name, the input) only after its next poll.
+
 ## [2.10.5] - 2026-11-26
 
 ### Added
