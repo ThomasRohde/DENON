@@ -4,6 +4,16 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **A HomePod paused long ago no longer fills "Now playing".** While the receiver sleeps, a paused HomePod shows for
+  10 minutes after it last played, then the card goes back to "Receiver in Standby". A HomePod keeps its last stream
+  paused for hours; before, that old stream (for example DR P4 from earlier in the day) stayed on the card. The same
+  applies to the phone remote and MCP.
+- **The shutdown line says "closed by an installer"** when an installer's Restart Manager closes the app. In 2.9.3 and
+  2.9.4 it said "Windows shutdown".
+
 ## [2.9.4] - 2026-11-26
 
 ### Fixed

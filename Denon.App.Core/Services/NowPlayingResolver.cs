@@ -88,7 +88,7 @@ public static class NowPlayingResolver
 
         if (!status.IsPoweredOn || !status.IsMainZoneOn)
         {
-            // The receiver sleeps: a HomePod that plays (or is paused) is what plays in the house, so show it.
+            // The receiver sleeps: a HomePod that plays (or paused a moment ago) is what plays in the house, so show it.
             if (TryResolveHomePod(plugins) is { } homePod)
             {
                 return homePod;
@@ -380,8 +380,16 @@ public static class NowPlayingResolver
     /// What a HomePod plays, from the HomePod plugin's status details (kind "homepod"), as a hero entry: the title,
     /// "artist • app • speaker", its artwork (a file in the plugin data folder) and a <see cref="CastNowPlaying"/>
     /// so play/pause goes to the HomePod. Null when the plugin is missing, stopped or nothing plays.
+    /// A paused HomePod shows for <see cref="PausedHomePodShownFor"/> after it was last seen playing: a HomePod keeps its
+    /// last stream "paused" for hours, and that is not what plays now. One never seen playing in this run is not shown.
     /// </summary>
-    public static ResolvedNowPlaying? TryResolveHomePod(IReadOnlyList<PluginRecordSnapshot>? plugins, string? homePodDataDirectory = null)
+    /// <summary>How long a paused HomePod stays in the hero after it was last seen playing.</summary>
+    public static readonly TimeSpan PausedHomePodShownFor = TimeSpan.FromMinutes(10);
+
+    // When each HomePod stream (speaker, app, title) was last seen playing. Shared by the hero, the phone remote and MCP.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTimeOffset> HomePodLastPlaying = new(StringComparer.Ordinal);
+
+    public static ResolvedNowPlaying? TryResolveHomePod(IReadOnlyList<PluginRecordSnapshot>? plugins, string? homePodDataDirectory = null, DateTimeOffset? now = null)
     {
         var plugin = plugins?.FirstOrDefault(p =>
             p.Id.Equals(HomePodPluginId, StringComparison.OrdinalIgnoreCase) && p.IsEnabled && p.IsStarted);
@@ -394,6 +402,17 @@ public static class NowPlayingResolver
 
         var playing = Get("playbackState") == "Playing";
         var title = Get("title");
+        var key = $"{speaker}|{app}|{title}";
+        var at = now ?? DateTimeOffset.UtcNow;
+        if (playing)
+        {
+            HomePodLastPlaying[key] = at;
+        }
+        else if (!HomePodLastPlaying.TryGetValue(key, out var lastPlaying) || at - lastPlaying > PausedHomePodShownFor)
+        {
+            return null;
+        }
+
         var parts = new List<string>();
         if (Get("artist") is { } artist)
         {
