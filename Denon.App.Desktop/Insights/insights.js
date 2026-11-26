@@ -406,8 +406,8 @@ function renderNow() {
     h("div", { class: "readings" },
       reading("Input", on ? r.inputSource || "—" : "—"),
       reading("Sound mode", on ? r.soundMode || "—" : "—"),
-      reading("Volume", on ? (r.muted ? "Muted" : `${r.volume} · ${r.volumeDb}`) : "—"),
-      reading("Usual now", learned ? `${Math.round(learned.averageVolume)} · ${learned.averageDb}` : "Learning…")),
+      reading("Volume", on ? (r.muted ? "Muted" : String(r.volume)) : "—"),
+      reading("Usual now", learned ? String(Math.round(learned.averageVolume)) : "Learning…")),
     leds,
     check);
 }
@@ -705,7 +705,7 @@ function renderVolume() {
   const vol = receiver.volume;
   const habits = state.live?.habits?.preferredVolumeByTimeBlock ?? {};
   const host = fill("volume", label("Volume"),
-    headline(vol.average !== null && vol.average !== undefined ? `Average ${Math.round(vol.average)} · ${vol.averageDb}` : "No volume yet"));
+    headline(vol.average !== null && vol.average !== undefined ? `Average ${Math.round(vol.average)}` : "No volume yet"));
 
   if (vol.points.length) {
     host.append(volumeChart(vol, period));
@@ -717,11 +717,11 @@ function renderVolume() {
   host.append(h("div", { class: "block-volumes" }, vol.byBlock.map((b) => {
     const learned = habits[b.block];
     const el = h("div", { class: "block" },
-      h("b", null, b.average !== null && b.average !== undefined ? b.averageDb : learned ? learned.averageDb : "—"),
+      h("b", null, b.average !== null && b.average !== undefined ? String(Math.round(b.average)) : learned ? String(Math.round(learned.averageVolume)) : "—"),
       h("span", null, `${b.label}${b.average === null || b.average === undefined ? (learned ? " · learned" : "") : ` · ${b.samples}×`}`));
     setTip(el, b.label, [
-      ["This period", b.average !== null && b.average !== undefined ? `${b.average} · ${b.averageDb}` : "—"],
-      ["Learned", learned ? `${learned.averageVolume} · ${learned.averageDb} (${learned.samples} samples)` : "—"],
+      ["This period", b.average !== null && b.average !== undefined ? String(b.average) : "—"],
+      ["Learned", learned ? `${learned.averageVolume} (${learned.samples} samples)` : "—"],
     ]);
     return el;
   })));
@@ -731,7 +731,7 @@ function renderVolume() {
     host.append(h("p", { class: "sub-label label" }, "BY APP · WEIGHTED BY LISTENING TIME"));
     host.append(h("ul", { class: "rows" }, vol.byApp.map((a) => h("li", { class: "row" },
       h("span", { class: "row-name", title: a.label }, a.label),
-      h("span", { class: "row-value" }, `${Math.round(a.average)} · ${a.averageDb}`),
+      h("span", { class: "row-value" }, String(Math.round(a.average))),
       h("span", { class: "row-sub" }, duration(a.seconds))))));
   }
 }
@@ -779,7 +779,7 @@ function volumeChart(vol, period) {
   for (const p of pts) {
     const dot = s("circle", { cx: x(p.t), cy: y(p.v), r: 3.5, style: "fill:var(--meter-left-accent);stroke:var(--card);stroke-width:1.5" });
     const date = new Date(p.t);
-    setTip(dot, `${fmtDay(date, { weekday: "short", day: "numeric", month: "short" })} ${fmtTime(date)}`, [["Volume", `${p.v} · ${p.db}`]]);
+    setTip(dot, `${fmtDay(date, { weekday: "short", day: "numeric", month: "short" })} ${fmtTime(date)}`, [["Volume", String(p.v)]]);
     svg.append(dot);
   }
 

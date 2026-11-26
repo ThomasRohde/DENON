@@ -56,7 +56,7 @@ function render(data) {
       el("div", { className: "label" }, item.label, item.key === data.current ? el("span", { className: "now" }, "NOW") : null),
       el("div", { className: "meta" }, `${KINDS[item.kind] || item.kind} · ${item.minutes} min listened · ${item.updated}`)),
     el("button", { className: "step", disabled: !data.canEdit, "aria-label": `Lower ${item.label}`, onclick: () => setLevel(item, item.level - 2) }, "−"),
-    el("span", { className: "level" }, `${item.level} · ${item.levelDb}`),
+    el("span", { className: "level" }, String(item.level)),
     el("button", { className: "step", disabled: !data.canEdit || item.level >= data.safeVolume, "aria-label": `Raise ${item.label}`, onclick: () => setLevel(item, item.level + 2) }, "+"),
     el("button", { className: "small", disabled: !data.canEdit, title: "Forget this level; it is learned again", onclick: () =>
       Card.run(`Forgetting ${item.label}`, async () => { await Card.callTool("volume_memory_forget", { key: item.key }); await Card.reload({}); }) }, "Forget")))

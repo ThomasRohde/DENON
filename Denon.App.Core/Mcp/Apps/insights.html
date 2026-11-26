@@ -82,7 +82,7 @@ function render(data) {
     tile(String(w.sessions), `Sessions on ${w.activeDays} day(s)`),
     tile(w.averagePerActiveDayText, "Per active day"),
     tile(rv.inUseText, `Receiver on · ${rv.powerOns} power-on(s)`),
-    tile(rv.volume.averageDb || "—", `Average volume${rv.volume.average ? ` (${Math.round(rv.volume.average)})` : ""}`));
+    tile(rv.volume.average ? String(Math.round(rv.volume.average)) : "—", "Average volume"));
 
   const parts = [];
   const byDay = w.byDay || [];
@@ -111,8 +111,8 @@ function render(data) {
   if (w.topApps?.length) left.push(...section("Top apps and sources", hbars(w.topApps.map((a) => ({ label: a.label, value: a.seconds, text: a.text })), (r) => r.text)));
   if (rv.inputs?.length) right.push(...section("Receiver inputs", hbars(rv.inputs.map((a) => ({ label: a.label, value: a.seconds, text: a.text })), (r) => r.text)));
   const vb = (rv.volume.byBlock || []).filter((b) => b.average != null);
-  if (vb.length) left.push(...section("Volume by time of day", hbars(vb.map((b) => ({ label: b.label, value: b.average, db: b.averageDb })), (r) => `${Math.round(r.value)} · ${r.db}`, 98)));
-  if (rv.volume.byApp?.length) right.push(...section("Volume by source", hbars(rv.volume.byApp.map((b) => ({ label: b.label, value: b.average, db: b.averageDb })), (r) => `${Math.round(r.value)} · ${r.db}`, 98)));
+  if (vb.length) left.push(...section("Volume by time of day", hbars(vb.map((b) => ({ label: b.label, value: b.average, db: b.averageDb })), (r) => String(Math.round(r.value)), 98)));
+  if (rv.volume.byApp?.length) right.push(...section("Volume by source", hbars(rv.volume.byApp.map((b) => ({ label: b.label, value: b.average, db: b.averageDb })), (r) => String(Math.round(r.value)), 98)));
   if (left.length || right.length) parts.push(el("div", { className: "two" }, el("div", {}, left), el("div", {}, right)));
 
   const a = data.automations;

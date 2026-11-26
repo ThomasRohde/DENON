@@ -393,7 +393,7 @@ public sealed class InsightsReportTests
         Assert.Equal(56, report.Receiver.Volume.Min);
         Assert.DoesNotContain(report.Receiver.Volume.Points, p => p.Volume == 0);
         Assert.Contains(report.Receiver.Volume.ByApp, a => a.Label == "Netflix" && a.Average == 56);
-        Assert.Contains(report.Insights, i => i.Title == "Streaming plays louder than live TV" && i.Text.Contains("15 dB"));
+        Assert.Contains(report.Insights, i => i.Title == "Streaming plays louder than live TV" && i.Text.Contains("about 15 louder") && !i.Text.Contains("dB"));
     }
 
     [Fact]

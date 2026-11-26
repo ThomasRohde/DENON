@@ -38,15 +38,8 @@ public sealed class LearnedVolumeItem : ObservableObject
         }
     }
 
-    /// <summary>"42 · −38 dB".</summary>
-    public string LevelText
-    {
-        get
-        {
-            var rounded = (int)Math.Round(Level);
-            return $"{rounded.ToString(CultureInfo.InvariantCulture)} · {DenonVolumeMath.FormatDecibels(rounded)}";
-        }
-    }
+    /// <summary>The volume as the receiver shows it: "42".</summary>
+    public string LevelText => ((int)Math.Round(Level)).ToString(CultureInfo.InvariantCulture);
 
     /// <summary>True for the source that plays now.</summary>
     public bool IsCurrent

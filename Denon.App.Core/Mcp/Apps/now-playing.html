@@ -65,7 +65,7 @@ function render(data) {
     $("safe").style.left = `${Math.max(0, Math.min(100, (data.safeVolume / max) * 100))}%`;
     $("safe").title = `Safe ceiling ${data.safeVolume}`;
     const readout = $("readout");
-    readout.textContent = data.muted ? `Muted · ${data.volume}` : `${data.volume} · ${data.volumeDb}`;
+    readout.textContent = data.muted ? `Muted · ${data.volume}` : `Volume ${data.volume}`;
     readout.classList.toggle("muted", !!data.muted);
     $("mute").textContent = data.muted ? "Unmute" : "Mute";
     $("up").disabled = data.volume >= data.safeVolume;

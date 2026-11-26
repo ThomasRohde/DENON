@@ -4,6 +4,13 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **Volume shows as the number on the receiver's display, without dB.** The MCP cards (now playing, Volume memory,
+  Insights), the Volume memory page, the Insights page and the Insights notes show the 0–98 volume only, for example
+  "Streaming apps play at volume 56 and live TV at 41: about 15 louder". The logs keep dB.
+
 ## [2.10.7] - 2026-11-26
 
 ### Changed

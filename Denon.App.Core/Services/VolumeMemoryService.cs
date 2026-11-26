@@ -395,5 +395,5 @@ public sealed class VolumeMemoryService : BackgroundService
     }
 
     public static string Describe(LearnedVolume level) =>
-        $"{level.Label}: {Math.Round(level.Level).ToString(CultureInfo.InvariantCulture)} ({DenonVolumeMath.FormatDecibels((int)Math.Round(level.Level))})";
+        $"{level.Label}: {Math.Round(level.Level).ToString(CultureInfo.InvariantCulture)}";
 }
