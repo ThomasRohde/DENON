@@ -720,8 +720,8 @@ function renderVolume() {
       h("b", null, b.average !== null && b.average !== undefined ? String(Math.round(b.average)) : learned ? String(Math.round(learned.averageVolume)) : "—"),
       h("span", null, `${b.label}${b.average === null || b.average === undefined ? (learned ? " · learned" : "") : ` · ${b.samples}×`}`));
     setTip(el, b.label, [
-      ["This period", b.average !== null && b.average !== undefined ? String(b.average) : "—"],
-      ["Learned", learned ? `${learned.averageVolume} (${learned.samples} samples)` : "—"],
+      ["This period", b.average !== null && b.average !== undefined ? String(Math.round(b.average)) : "—"],
+      ["Learned", learned ? `${Math.round(learned.averageVolume)} (${learned.samples} samples)` : "—"],
     ]);
     return el;
   })));
