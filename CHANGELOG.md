@@ -4,6 +4,14 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **A light change reads "Lights: 3 of 4 on" in the activity feed** (or "Lights off"). In 2.9.3 the new events showed
+  "Lights: changed"; older Hue status lines ("Lights: Stopped") are now quiet.
+- **The volume chart leaves out readings of 0** (the receiver switching inputs, from before 2.9.3), so its scale is not
+  pulled down to −80 dB.
+
 ## [2.9.3] - 2026-11-26
 
 ### Added

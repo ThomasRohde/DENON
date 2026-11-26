@@ -494,7 +494,8 @@ public static partial class InsightsReport
             levels.Count > 0 ? levels.Min(p => p.Volume) : null,
             levels.Count > 0 ? levels.Max(p => p.Volume) : null,
             points.Count,
-            points.Select(p => new VolumePoint(p.Ts.ToString("O", CultureInfo.InvariantCulture), p.Volume, Db(p.Volume))).ToList(),
+            // The chart too: a 0 would pull its scale down to −80 dB for a moment that was no listening level.
+            levels.Select(p => new VolumePoint(p.Ts.ToString("O", CultureInfo.InvariantCulture), p.Volume, Db(p.Volume))).ToList(),
             byBlock,
             byApp);
 

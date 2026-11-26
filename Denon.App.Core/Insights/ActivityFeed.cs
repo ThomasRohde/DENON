@@ -218,9 +218,21 @@ public static class ActivityFeed
                 break;
 
             case "lighting.state_changed":
-                text = $"Lights: {Get("to") ?? "changed"}";
+                // "to" is how many lights are on (2.9.3 and later). Older entries logged the Hue plugin's status text
+                // ("Connecting…", "Stopped"): not a light changing, so they are quiet.
                 icon = "bulb";
-                quiet = (Get("to") ?? "").StartsWith("Connecting", StringComparison.OrdinalIgnoreCase);
+                if (Num("to") is { } on)
+                {
+                    text = on == 0
+                        ? "Lights off"
+                        : Num("total") is { } total ? $"Lights: {on:0} of {total:0} on" : $"Lights: {on:0} on";
+                }
+                else
+                {
+                    text = $"Lights: {Get("to") ?? "changed"}";
+                    quiet = true;
+                }
+
                 break;
 
             case "music_sync.changed":
