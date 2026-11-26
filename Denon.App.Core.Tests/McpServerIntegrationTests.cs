@@ -101,6 +101,7 @@ public sealed class McpServerIntegrationTests : IAsyncLifetime
     {
         await using var client = await ConnectAsync();
         Assert.Equal("2026-07-28", client.NegotiatedProtocolVersion);
+        Assert.Equal(DenonMcpServer.ServerVersion, client.ServerInfo?.Version); // the app's version, from the entry assembly
 
         var tools = await client.ListToolsAsync();
         Assert.Contains(tools, t => t.Name == "get_room_state");
