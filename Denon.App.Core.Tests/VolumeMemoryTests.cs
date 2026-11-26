@@ -337,4 +337,20 @@ public sealed class VolumeMemoryTests : IDisposable
         Assert.Equal(45, learned!.Level, 1);
         Assert.InRange(learned.Seconds, 19 * 60, 20 * 60); // the first 20 s after the source started are not learned
     }
+
+    [Fact]
+    public async Task Paused_music_does_not_teach_the_level()
+    {
+        var rig = await CreateRigAsync();
+        using var _ = rig.Cleanup;
+        var paused = Status("NET", 20) with { PlayState = "pause" };
+
+        await Tick(rig, T0, paused);
+        for (var s = 5; s <= 60 * 60; s += 5)
+        {
+            await Tick(rig, T0.AddSeconds(s), paused);
+        }
+
+        Assert.Null(rig.Store.Find("input:heos music")); // an hour paused at 20 taught nothing
+    }
 }

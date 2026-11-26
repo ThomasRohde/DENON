@@ -52,6 +52,22 @@ public sealed record ListeningSource(string Key, string Kind, string Label)
         return Create("input", DenonCatalog.GetFriendlyInputName(status.InputSource));
     }
 
+    /// <summary>
+    /// True when the source plays: a streamer that reports pause counts only while it plays, HEOS only in "play".
+    /// Inputs that report nothing (TV, HDMI, Bluetooth) count as playing while the receiver is on.
+    /// </summary>
+    public static bool IsPlaying(ReceiverStatus status, IReadOnlyList<PluginRecordSnapshot>? plugins)
+    {
+        var resolved = NowPlayingResolver.Resolve(status, null, plugins);
+        if (resolved.Cast is { } cast && cast.PluginId != NowPlayingResolver.HomePodPluginId)
+        {
+            return cast.IsPlaying;
+        }
+
+        return !DenonCatalog.InputMatches(status.InputSource, "NET") ||
+               string.Equals(status.PlayState, "play", StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>The source a logged session (session.ended) was, with the same keys as <see cref="From"/>; null for others.</summary>
     public static ListeningSource? FromSession(string kind, JsonElement data, string title) => kind switch
     {
@@ -97,6 +113,7 @@ public sealed class VolumeMemoryStore
     private readonly string _path;
     private readonly AppLogStore _log;
     private readonly Lock _gate = new();
+    private readonly Lock _saveGate = new();
     private Dictionary<string, LearnedVolume> _levels = new(StringComparer.OrdinalIgnoreCase);
     private bool _dirty;
     private bool _loaded;
@@ -316,33 +333,41 @@ public sealed class VolumeMemoryStore
     /// <summary>Writes the file when something changed since the last save.</summary>
     public void SaveIfChanged()
     {
-        List<LearnedVolume> list;
-        lock (_gate)
+        // One save at a time, from taking the list to replacing the file: the service saves every minute and the page
+        // saves after an edit, and an older list must never replace a newer file.
+        lock (_saveGate)
         {
-            if (!_dirty)
-            {
-                return;
-            }
-
-            _dirty = false;
-            list = _levels.Values.OrderBy(static l => l.Key, StringComparer.Ordinal).ToList();
-        }
-
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-            var temp = _path + ".tmp";
-            File.WriteAllText(temp, JsonSerializer.Serialize(list, Json));
-            File.Move(temp, _path, overwrite: true);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
+            List<LearnedVolume> list;
             lock (_gate)
             {
-                _dirty = true; // Next time.
+                if (!_dirty)
+                {
+                    return;
+                }
+
+                _dirty = false;
+                list = _levels.Values
+                    .OrderBy(static l => l.Key, StringComparer.Ordinal)
+                    .Select(static l => new LearnedVolume { Key = l.Key, Kind = l.Kind, Label = l.Label, Level = l.Level, Seconds = l.Seconds, UpdatedUtc = l.UpdatedUtc })
+                    .ToList();
             }
 
-            _log.Warning($"[Volume memory] Could not save: {ex.Message}");
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+                var temp = _path + ".tmp";
+                File.WriteAllText(temp, JsonSerializer.Serialize(list, Json));
+                File.Move(temp, _path, overwrite: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                lock (_gate)
+                {
+                    _dirty = true; // Next time.
+                }
+
+                _log.Warning($"[Volume memory] Could not save: {ex.Message}");
+            }
         }
     }
 

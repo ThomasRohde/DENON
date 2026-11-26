@@ -179,7 +179,7 @@ public sealed class VolumeMemoryService : BackgroundService
             }
         }
 
-        Learn(now, status, volume);
+        Learn(now, status, volume, ListeningSource.IsPlaying(status, plugins));
 
         if (now - _lastSaveAt >= SaveEvery)
         {
@@ -188,9 +188,13 @@ public sealed class VolumeMemoryService : BackgroundService
         }
     }
 
-    private void Learn(DateTimeOffset now, ReceiverStatus status, double volume)
+    /// <summary>
+    /// Learns while the source plays and is heard. Paused, stopped or muted time does not count (the volume set for
+    /// a paused stream overnight is not a listening level).
+    /// </summary>
+    private void Learn(DateTimeOffset now, ReceiverStatus status, double volume, bool playing)
     {
-        if (_current is null || status.IsMuted || !SameSource(_current, _candidate) || now - _currentSince < LearnDelay)
+        if (_current is null || status.IsMuted || !playing || !SameSource(_current, _candidate) || now - _currentSince < LearnDelay)
         {
             _lastLearnAt = now;
             return;
