@@ -65,6 +65,30 @@ public sealed class EventNoiseTests : IDisposable
         rig.Monitor.ProcessReceiverSnapshot(rig.State.Snapshot);
     }
 
+    /// <summary>
+    /// The bus delivers on its own task, in order: once a marker written now has arrived, every event before it has too.
+    /// </summary>
+    private static async Task DeliveredAsync(Rig rig)
+    {
+        var marker = Guid.NewGuid().ToString("N");
+        rig.Telemetry.Record("control", "test", "test.marker", "test", new Dictionary<string, object?> { ["id"] = marker });
+        var until = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < until)
+        {
+            lock (rig.Seen)
+            {
+                if (rig.Seen.Any(e => e.Event == "test.marker" && e.GetText("id") == marker))
+                {
+                    return;
+                }
+            }
+
+            await Task.Delay(20);
+        }
+
+        Assert.Fail("The event bus did not deliver within 10 s.");
+    }
+
     private static List<string> Events(Rig rig)
     {
         lock (rig.Seen)
@@ -85,6 +109,7 @@ public sealed class EventNoiseTests : IDisposable
         Show(rig, soundMode: "DOLBY D+");             // an ad in Dolby
         Show(rig, soundMode: "MCH STEREO");           // the programme again
         rig.Monitor.EvaluateHeldChanges(DateTimeOffset.UtcNow.AddMinutes(1));
+        await DeliveredAsync(rig);
 
         Assert.DoesNotContain("zone2.changed", Events(rig));
         Assert.DoesNotContain("mute.changed", Events(rig));
@@ -101,9 +126,11 @@ public sealed class EventNoiseTests : IDisposable
         Show(rig, soundMode: "DOLBY D+");
         Show(rig, soundMode: "DOLBY SURROUND");
         rig.Monitor.EvaluateHeldChanges(DateTimeOffset.UtcNow); // not held long enough yet
+        await DeliveredAsync(rig);
         Assert.DoesNotContain("sound_mode.changed", Events(rig));
 
         rig.Monitor.EvaluateHeldChanges(DateTimeOffset.UtcNow + EventTelemetryMonitorService.SoundModeHold + TimeSpan.FromSeconds(1));
+        await DeliveredAsync(rig);
 
         RoomEvent changed;
         lock (rig.Seen)
@@ -137,6 +164,7 @@ public sealed class EventNoiseTests : IDisposable
         }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
 
         rig.Monitor.CloseSessionsLeftOpen();
+        await DeliveredAsync(rig);
 
         RoomEvent ended;
         lock (rig.Seen)
