@@ -369,8 +369,12 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
             : null;
     }
 
-    private static readonly string ServerVersion =
-        typeof(DenonMcpServer).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+    /// <summary>
+    /// The app's version (Denon.App.Desktop, the entry assembly), as clients see it in serverInfo and /health. Not the
+    /// Core library's own version, which does not follow the releases.
+    /// </summary>
+    internal static readonly string ServerVersion =
+        (System.Reflection.Assembly.GetEntryAssembly() ?? typeof(DenonMcpServer).Assembly).GetName().Version?.ToString(3) ?? "0.0.0";
 
     private static readonly string SdkVersion =
         typeof(McpServer).Assembly.GetName().Version?.ToString(3) ?? "?";
