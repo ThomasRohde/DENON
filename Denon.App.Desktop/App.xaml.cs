@@ -131,6 +131,7 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<StreamProbeService>();
             builder.Services.AddSingleton<WindowsStartupService>();
             builder.Services.AddSingleton<GlobalHotkeyService>();
+            builder.Services.AddSingleton(_ => new LastStationFile());
             builder.Services.AddSingleton<ReceiverController>();
             builder.Services.AddSingleton<YouTubeMediaService>();
             builder.Services.AddSingleton<LocalAudioRelayServer>();

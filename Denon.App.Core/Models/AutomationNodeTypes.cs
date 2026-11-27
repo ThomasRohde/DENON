@@ -40,6 +40,7 @@ public static class AutomationNodeTypes
     public const string ConditionEvent = "condition.event";
     public const string ConditionTime = "condition.time";
     public const string ConditionReceiver = "condition.receiver";
+    public const string ConditionRecentEvent = "condition.recent_event";
     public const string ActionScene = "action.scene";
     public const string ActionPlugin = "action.plugin";
     public const string ActionReceiver = "action.receiver";
@@ -114,6 +115,16 @@ public static class AutomationNodeTypes
                 new("input", "Input", "input", Help: "Leave empty for any input."),
                 new("muted", "Mute", "select",
                     Options: [new("any", "Any"), new("yes", "Muted"), new("no", "Not muted")]),
+            ]),
+        new(ConditionRecentEvent, GroupCondition, "Recent event",
+            "Yes when a matching event happened in the last seconds, for example a cast that just started.",
+            YesNoPorts, true,
+            [
+                new("event", "Events", "event", Required: true, Placeholder: "cast.app_started, appletv.woke",
+                    Help: "One or more event names, comma-separated. A name ending in * matches all that start so."),
+                new("seconds", "Within seconds", "number", Required: true, Placeholder: "30", Help: "1 to 3600."),
+                new("filter", "Only when", "filter", Placeholder: "origin=external",
+                    Help: "origin=external counts only what the app did not do itself."),
             ]),
         new(ActionScene, GroupAction, "Smart Scene", "Runs a Smart Scene: receiver settings and its plugin steps.",
             OutPort, true,

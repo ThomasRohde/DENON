@@ -308,7 +308,7 @@ public sealed partial class DenonMcpServer
             Tool("create_or_update_automation",
                 "Create or replace an automation graph in settings.json. Nodes: trigger.event (config event, filter), trigger.webhook (hook, filter), " +
                 "trigger.schedule (time HH:mm, days), trigger.app_launch (processes), condition.event (filter), condition.time (from, to, days), " +
-                "condition.receiver (power any/on/standby/idle — idle: standby, or on with HEOS stopped or paused; input, muted any/yes/no), action.scene (sceneId), action.plugin (pluginId, actionId, p:<param>), " +
+                "condition.receiver (power any/on/standby/idle — idle: standby, or on with HEOS stopped or paused; input, muted any/yes/no), condition.recent_event (event names comma-separated, seconds, filter; yes when one happened that recently), action.scene (sceneId), action.plugin (pluginId, actionId, p:<param>), " +
                 "action.receiver (command power_on/power_off/mute/unmute/volume/input/sound_mode, value), action.delay (seconds). " +
                 "Edges {from, port, to}: port 'out', or 'yes'/'no' after a condition. No cycles. Read denon://catalog/capabilities for node types, scenes and plugin actions. " +
                 "The automation starts disabled unless enabled is true; the user turns it on in the app.",

@@ -69,7 +69,27 @@ public sealed class AutomationGraph
             Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "arrive-home"), ("filter", "")),
             Node("c", AutomationNodeTypes.ConditionReceiver, ("power", "idle"), ("input", ""), ("muted", "any")),
             Node("a1", AutomationNodeTypes.ActionScene, ("sceneId", "morning-coffee"))),
+        LiveTvOnPowerOn(),
     ];
+
+    /// <summary>
+    /// The TV came on away from Live TV (it resumes the last input, often HDMI) → Live TV. Not when a cast or the
+    /// Apple TV woke it: those turn the TV on over HDMI-CEC to show their own picture. The wait lets their events
+    /// arrive first; origin=external leaves out the app's own HDMI-CEC wake (that one goes to Live TV itself).
+    /// </summary>
+    private static AutomationGraph LiveTvOnPowerOn()
+    {
+        var graph = Chain("auto-tv-live", "TV on → Live TV", 60,
+            Node("t", AutomationNodeTypes.TriggerEvent, ("event", "app.changed"),
+                ("filter", "stream=tv, fromAppId=, toAppId!=com.webos.app.livetv")),
+            Node("w", AutomationNodeTypes.ActionDelay, ("seconds", "4")),
+            Node("c", AutomationNodeTypes.ConditionRecentEvent,
+                ("event", "cast.app_started, appletv.woke"), ("seconds", "30"), ("filter", "origin=external")),
+            Node("a1", AutomationNodeTypes.ActionPlugin, ("pluginId", "smart-tv"), ("actionId", "tv.livetv")));
+        // No recent cast: switch. Chain wires a condition's "yes"; this one acts on "no".
+        graph.Edges.Single(e => e.From == "c").Port = AutomationNodeTypes.PortNo;
+        return graph;
+    }
 
     private static AutomationNode Node(string id, string type, params (string Key, string Value)[] config) =>
         new() { Id = id, Type = type, Config = config.ToDictionary(static c => c.Key, static c => c.Value) };

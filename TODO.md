@@ -101,6 +101,17 @@ prompt is wired (`create_or_update_automation`) but not tried with a real agent.
       on with the stream stopped. Another input (TV, Apple TV) never counts as idle, since the app cannot see that a
       TV is on.
 - [ ] Check a real arrival with the receiver left on and HEOS stopped after 2.10.12.
+- [x] Phone remote (2.10.12): the pairing code stays in the address for "Add to Home Screen"; a Turn on/Turn off
+      button; the picture is not reloaded on each refresh.
+- [ ] Check on the iPhone: remove the old home-screen icon, scan the QR code, add it again, and open it.
+- [x] TV power on (2.10.12): Wake-on-LAN every second for 15 s (broadcast and direct), then HDMI-CEC through the
+      Chromecast (`wake-tv`, Chromecast plugin 0.6.0), then Live TV. On 2026-11-27, 9 taps at 14:30 got no answer.
+- [ ] Release Chromecast plugin 0.6.0 (`wake-tv`); until then the CEC fallback fails with "Unknown action".
+- [ ] Check on the real TV: a wake from deep standby, and whether LG SimpLink wakes the TV from the Chromecast.
+- [x] "TV on → Live TV" example and the "Recent event" condition (2.10.12). Not when a cast or the Apple TV woke the TV.
+- [ ] Check "TV on → Live TV" live: TV remote on (HDMI 1 → Live TV), and a cast from the iPhone (stays on the cast).
+- [x] Station logos are cached in memory and in `art-cache`; the last started station is kept in `last-station.txt`
+      so a stream that plays at app start shows its name and logo (2.10.12).
 - [ ] **Decide:** should the Phone Remote's `/api/volume` use the safe-volume cap (`MaxSafeVolume`, 65)? MCP agents and
       automations are capped; the Phone Remote, and so a Shortcut that calls it, only stops at the receiver's maximum.
       Left as it is because the remote is the owner at the couch.

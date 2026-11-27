@@ -110,6 +110,14 @@ public static partial class AutomationGraphValidator
                 break;
             }
 
+            case AutomationNodeTypes.ConditionRecentEvent:
+                if (!int.TryParse(node.Get("seconds"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var window) || window is < 1 or > 3600)
+                {
+                    problems.Add(new(node.Id, "Recent event: seconds must be a whole number from 1 to 3600."));
+                }
+
+                break;
+
             case AutomationNodeTypes.ActionDelay:
                 if (!int.TryParse(node.Get("seconds"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var seconds) || seconds is < 1 or > 600)
                 {

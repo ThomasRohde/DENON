@@ -656,6 +656,8 @@ public sealed class AutomationEngineService : BackgroundService
     {
         public ReceiverFacts GetReceiverFacts() => inner.GetReceiverFacts();
 
+        public IReadOnlyList<RoomEvent> GetRecentEvents() => inner.GetRecentEvents();
+
         public string DescribeScene(string sceneId) => inner.DescribeScene(sceneId);
 
         public string DescribePluginAction(string pluginId, string actionId) => inner.DescribePluginAction(pluginId, actionId);
@@ -699,6 +701,8 @@ public sealed class AutomationEngineService : BackgroundService
     /// <summary>The real room: the receiver, the Smart Scenes and the plugins.</summary>
     private sealed class RoomEffects(AutomationEngineService engine) : IAutomationEffects
     {
+        public IReadOnlyList<RoomEvent> GetRecentEvents() => engine._eventBus.GetRecent(200);
+
         public ReceiverFacts GetReceiverFacts()
         {
             var snapshot = engine._stateStore.Snapshot;

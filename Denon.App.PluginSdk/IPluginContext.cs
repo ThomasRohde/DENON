@@ -82,4 +82,15 @@ public interface IPluginContext
     /// (times as ISO 8601 round-trip text).
     /// </summary>
     void ReportStatus(string statusText, PluginHealthState health, IReadOnlyDictionary<string, string>? details);
+
+    /// <summary>
+    /// Runs an action of another plugin, as the host does for a Smart Scene step (for example the TV plugin asks the
+    /// Cast plugin to wake the TV over HDMI-CEC). Fails, without throwing, when that plugin is missing or disabled,
+    /// and for the calling plugin itself. Events the other plugin writes for this change are not "external".
+    /// </summary>
+    Task<PluginActionResult> RunPluginActionAsync(
+        string pluginId,
+        string actionId,
+        IReadOnlyDictionary<string, string>? parameters = null,
+        CancellationToken cancellationToken = default);
 }

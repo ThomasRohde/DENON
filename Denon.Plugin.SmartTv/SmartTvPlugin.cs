@@ -44,7 +44,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
     public PluginManifest Manifest { get; } = new(
         Id: "smart-tv",
         Name: "Smart TV Control (LG webOS)",
-        Version: "2.3.0",
+        Version: "2.4.0",
         Author: "Denon Desktop",
         Description: "Full persistent LG webOS SSAP (wss://:3001) controller: live TV state subscriptions, auto-discovered apps & HDMI inputs, Magic Remote D-Pad & keyboard, OLED Screen Off, eARC Audio Output switching, YouTube deep-link casting, SSDP/ARP auto-discovery, Wake-on-LAN, and Denon AVR coordination.",
         Category: "Home Theater TV",
@@ -108,7 +108,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
     [
         // Parameters and hints give MCP clients a typed schema. Destructive stays unset (null) where the
         // host's id guess already applies (power_off, close_app), so permission tiers do not change.
-        new("tv.power_on", "TV Wake-on-LAN (Power On)", "Send multi-interface Wake-on-LAN magic packets to power on the LG TV.", "Power") { Parameters = [], IsDestructive = false },
+        new("tv.power_on", "TV Power On", "Turns the LG TV on: Wake-on-LAN every second for up to 15 s, then HDMI-CEC through the Chromecast (the TV then goes to Live TV). Waits until the TV answers, up to about 35 s.", "Power") { Parameters = [], IsDestructive = false },
         new("tv.power_off", "TV Power Off", "Put the LG webOS TV into standby.", "Power") { Parameters = [] },
         new("tv.screen_off", "Screen Off (Audio Only)", "Blank the TV screen while keeping HDMI eARC / music audio playing.", "Display") { Parameters = [], IsDestructive = false },
         new("tv.screen_on", "Screen On", "Wake the TV screen back on from Audio-Only Screen Off mode.", "Display") { Parameters = [], IsDestructive = false },
@@ -162,26 +162,12 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
             switch (actionId.ToLowerInvariant())
             {
                 case "tv.power_on":
-                    if (!_config.DemoMode)
+                    if (_config.DemoMode)
                     {
-                        await _client.SendWakeOnLanAsync(_config.MacAddress, cancellationToken);
-                        if (!string.IsNullOrWhiteSpace(_config.TvIp) && !string.IsNullOrWhiteSpace(_config.ClientKey))
-                        {
-                            _ = Task.Run(async () =>
-                            {
-                                try
-                                {
-                                    await Task.Delay(TimeSpan.FromSeconds(6), CancellationToken.None);
-                                    await _client.RefreshStateAsync(CancellationToken.None);
-                                }
-                                catch
-                                {
-                                    // Background monitor will continue retrying if TV takes longer to boot.
-                                }
-                            });
-                        }
+                        return ReportAction("Demo mode: the simulated TV is on (no packets sent).");
                     }
-                    return ReportAction("Sent Wake-on-LAN magic packets to TV.");
+
+                    return await PowerOnAsync(cancellationToken);
 
                 case "tv.power_off":
                     await _client.PowerOffAsync(cancellationToken);
@@ -653,6 +639,20 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
         }
     }
 
+    /// <summary>A reconnect after at least this long offline counts as a power-on; a shorter one as a network drop.</summary>
+    internal static readonly TimeSpan PowerOnGap = TimeSpan.FromSeconds(20);
+
+    private string? _appBeforeDisconnect;
+    private DateTimeOffset _disconnectedAt;
+    private bool _standbyBeforeDisconnect;
+
+    /// <summary>webOS power states of a TV going to standby ("Suspend", "Active Standby", "Power Off").</summary>
+    internal static bool IsStandbyPowerState(string? powerState) =>
+        powerState is not null &&
+        (powerState.Contains("Standby", StringComparison.OrdinalIgnoreCase) ||
+         powerState.Contains("Suspend", StringComparison.OrdinalIgnoreCase) ||
+         powerState.Contains("Power Off", StringComparison.OrdinalIgnoreCase));
+
     private void EmitTvTelemetryDeltas(LgTvLiveState state)
     {
         if (state.IsDemo || _context is null || !_isStarted)
@@ -668,6 +668,15 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
         }
 
         var now = DateTimeOffset.UtcNow;
+        if (prev.IsConnected && !state.IsConnected)
+        {
+            // The client forgets the foreground app on a disconnect. Keep it here, so a reconnect after a short
+            // network drop (the TV stayed on) is not taken for a power-on.
+            _appBeforeDisconnect = prev.ForegroundAppId;
+            _disconnectedAt = now;
+            _standbyBeforeDisconnect = IsStandbyPowerState(prev.PowerState);
+        }
+
         if (!_baselineTaken && state.IsConnected)
         {
             _baselineTaken = true;
@@ -713,14 +722,25 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
                 origin: "auto");
         }
 
-        if (!string.Equals(prev.ForegroundAppId, state.ForegroundAppId, StringComparison.OrdinalIgnoreCase) &&
+        var fromAppId = prev.ForegroundAppId;
+        if (string.IsNullOrWhiteSpace(fromAppId) && _appBeforeDisconnect is { } before &&
+            !string.IsNullOrWhiteSpace(state.ForegroundAppId))
+        {
+            // The first app after a reconnect. A power-on reports fromAppId "" ("TV on → Live TV" keys on it); a
+            // short drop reports the app from before, and nothing when it is the same app.
+            _appBeforeDisconnect = null;
+            var wasPowerOn = _standbyBeforeDisconnect || now - _disconnectedAt >= PowerOnGap;
+            fromAppId = wasPowerOn ? string.Empty : before;
+        }
+
+        if (!string.Equals(fromAppId, state.ForegroundAppId, StringComparison.OrdinalIgnoreCase) &&
             !string.IsNullOrWhiteSpace(state.ForegroundAppId))
         {
             _context.Events.RecordEvent(
                 "app.changed",
                 new Dictionary<string, object?>
                 {
-                    ["fromAppId"] = prev.ForegroundAppId,
+                    ["fromAppId"] = fromAppId,
                     ["toAppId"] = state.ForegroundAppId,
                     ["appTitle"] = state.ForegroundAppTitle,
                     ["model"] = state.ModelName,
@@ -1219,6 +1239,236 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
         }
 
         return null;
+    }
+
+    /// <summary>How long Wake-on-LAN packets go out before the HDMI-CEC fallback.</summary>
+    internal static readonly TimeSpan WakeOnLanWindow = TimeSpan.FromSeconds(15);
+
+    /// <summary>
+    /// The device value that makes the Cast plugin use its only device and refuse when it knows several (it then
+    /// lists them), so a playing Chromecast on another TV is never picked.
+    /// </summary>
+    internal const string OnlyCastDevice = "only";
+
+    /// <summary>How long the TV gets to answer after the Chromecast woke it over HDMI-CEC.</summary>
+    internal static readonly TimeSpan CecWakeWindow = TimeSpan.FromSeconds(20);
+
+    private readonly SemaphoreSlim _powerOnGate = new(1, 1);
+
+    /// <summary>
+    /// Turns the TV on. Wake-on-LAN over Wi-Fi often misses one packet (the TV's radio sleeps between beacons), so
+    /// packets go out every second for up to 15 s, to the broadcast address and straight to the TV, until the TV
+    /// answers. If it does not, the Chromecast wakes it over HDMI-CEC; then the TV goes to Live TV (CEC selected the
+    /// Chromecast's input) and the Chromecast app closes. One wake at a time: more taps while it runs do nothing.
+    /// </summary>
+    private async Task<PluginActionResult> PowerOnAsync(CancellationToken ct)
+    {
+        if (_client.IsConnected)
+        {
+            return ReportAction("The TV is already on.");
+        }
+
+        if (!await _powerOnGate.WaitAsync(0, ct))
+        {
+            return PluginActionResult.Ok("The TV is already waking.");
+        }
+
+        try
+        {
+            var hasMac = new string(_config.MacAddress.Where(Uri.IsHexDigit).ToArray()).Length == 12;
+            var canConnect = !string.IsNullOrWhiteSpace(_config.TvIp) && !string.IsNullOrWhiteSpace(_config.ClientKey);
+            if (!hasMac && !canConnect)
+            {
+                return PluginActionResult.Fail("Enter the TV's MAC address (or click Auto-MAC) so Wake-on-LAN can reach it.");
+            }
+
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            if (hasMac)
+            {
+                while (clock.Elapsed < WakeOnLanWindow)
+                {
+                    await _client.SendWakeOnLanAsync(_config.MacAddress, _config.TvIp, ct);
+                    if (!canConnect)
+                    {
+                        return ReportAction("Sent Wake-on-LAN magic packets to TV.");
+                    }
+
+                    if (await TryConnectAsync(ct))
+                    {
+                        return ReportAction($"The TV woke on Wake-on-LAN after {clock.Elapsed.TotalSeconds:0} s.");
+                    }
+
+                    await Task.Delay(TimeSpan.FromSeconds(1), ct);
+                }
+            }
+
+            if (!canConnect || _context is null)
+            {
+                return PluginActionResult.Fail("The TV did not answer Wake-on-LAN.");
+            }
+
+            // The Chromecast on this TV: the configured one, else the Cast plugin's only device. Never "the one
+            // that plays" (Cast picks that without a device), which may sit on another TV.
+            var castDevice = string.IsNullOrWhiteSpace(_config.CecWakeCastDevice) ? null : _config.CecWakeCastDevice.Trim();
+            var wake = await _context.RunPluginActionAsync(
+                "chromecast", "wake-tv", new Dictionary<string, string> { ["device"] = castDevice ?? OnlyCastDevice }, ct);
+            if (!wake.Success)
+            {
+                return PluginActionResult.Fail(
+                    $"The TV did not answer Wake-on-LAN in {WakeOnLanWindow.TotalSeconds:0} s, and the Chromecast could not wake it: {wake.Message}");
+            }
+
+            _context.Logger.Info($"The TV did not answer Wake-on-LAN in {WakeOnLanWindow.TotalSeconds:0} s. {wake.Message}");
+            // Only the session the wake started is ours to close. A cast the user already runs stays, and so does
+            // its input: no Live TV then.
+            var (launched, wakeSession) = ReadWakeResult(wake.DataJson);
+            var closeWakeSession = launched && wakeSession is not null
+                ? new Dictionary<string, string> { ["sessionId"] = wakeSession, ["device"] = castDevice ?? OnlyCastDevice }
+                : null;
+            var cec = System.Diagnostics.Stopwatch.StartNew();
+            while (cec.Elapsed < CecWakeWindow)
+            {
+                if (await TryConnectAsync(ct))
+                {
+                    if (!launched)
+                    {
+                        return ReportAction("The TV is on (the Chromecast already casts).");
+                    }
+
+                    // CEC switched the TV to the Chromecast's input. Close the empty wake app first: only when it still
+                    // owned the Chromecast go to Live TV. A cast the user started meanwhile keeps its input.
+                    if (closeWakeSession is null)
+                    {
+                        return ReportAction("The Chromecast woke the TV over HDMI-CEC; it stays on the Chromecast input (the wake session is not known).");
+                    }
+
+                    var quit = await _context.RunPluginActionAsync("chromecast", "quit-app", closeWakeSession, ct);
+                    if (!ReadClosed(quit))
+                    {
+                        return ReportAction("The Chromecast woke the TV over HDMI-CEC. A cast started meanwhile, so the TV stays on it.");
+                    }
+
+                    try
+                    {
+                        await _client.LaunchAppAsync("com.webos.app.livetv", null, ct);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _context.Logger.Warning($"Live TV after the HDMI-CEC wake failed: {ex.Message}");
+                    }
+
+                    return ReportAction($"The Chromecast woke the TV over HDMI-CEC (Wake-on-LAN did not answer). Switched to Live TV.");
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(1), ct);
+            }
+
+            if (closeWakeSession is not null)
+            {
+                await _context.RunPluginActionAsync("chromecast", "quit-app", closeWakeSession, ct);
+            }
+
+            return PluginActionResult.Fail(
+                "The TV did not answer Wake-on-LAN or HDMI-CEC. On the TV, turn on SimpLink (HDMI-CEC) and \"Turn on via Wi-Fi\".");
+        }
+        finally
+        {
+            _powerOnGate.Release();
+        }
+    }
+
+    /// <summary>True when the Chromecast's quit-app closed the session (its data says "closed": true).</summary>
+    internal static bool ReadClosed(PluginActionResult quit)
+    {
+        if (!quit.Success || string.IsNullOrWhiteSpace(quit.DataJson))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(quit.DataJson);
+            return doc.RootElement.TryGetProperty("closed", out var c) && c.ValueKind == JsonValueKind.True;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Reads the Chromecast's wake-tv data: did it start a session, and which one.</summary>
+    internal static (bool Launched, string? SessionId) ReadWakeResult(string? dataJson)
+    {
+        if (string.IsNullOrWhiteSpace(dataJson))
+        {
+            return (false, null);
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(dataJson);
+            var root = doc.RootElement;
+            var launched = root.TryGetProperty("launched", out var l) && l.ValueKind == JsonValueKind.True;
+            var session = root.TryGetProperty("sessionId", out var s) && s.ValueKind == JsonValueKind.String ? s.GetString() : null;
+            return (launched, string.IsNullOrWhiteSpace(session) ? null : session);
+        }
+        catch (JsonException)
+        {
+            return (false, null);
+        }
+    }
+
+    /// <summary>True when the TV accepts a TCP connection on its SSAP port (3001, or 3000) within the timeout.</summary>
+    internal static async Task<bool> IsTvPortOpenAsync(string host, TimeSpan timeout, CancellationToken ct)
+    {
+        foreach (var port in new[] { 3001, 3000 })
+        {
+            using var attempt = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            attempt.CancelAfter(timeout);
+            try
+            {
+                using var tcp = new System.Net.Sockets.TcpClient();
+                await tcp.ConnectAsync(host.Trim(), port, attempt.Token);
+                return true;
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                // No answer in time on this port: try the other one (a TV may drop 3001 but serve 3000).
+            }
+            catch (System.Net.Sockets.SocketException)
+            {
+                // Refused or unreachable: try the other port.
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>One connect try. True when the TV answers.</summary>
+    private async Task<bool> TryConnectAsync(CancellationToken ct)
+    {
+        if (_client.IsConnected)
+        {
+            return true;
+        }
+
+        // A short TCP probe tells whether the TV is up. Only then connect, with no short timeout: cancelling the
+        // connect mid-way would also cancel the state hydration and leave the session without push subscriptions.
+        if (!await IsTvPortOpenAsync(_config.TvIp, TimeSpan.FromMilliseconds(1500), ct))
+        {
+            return false;
+        }
+
+        try
+        {
+            await _client.RefreshStateAsync(ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Up but not ready yet: the next try or the background monitor connects.
+        }
+
+        return _client.IsConnected;
     }
 
     private PluginActionResult ReportAction(string message)

@@ -12,6 +12,7 @@ public sealed class ReceiverController
     private readonly ReceiverStateStore _stateStore;
     private readonly EventTelemetryLog _telemetry;
     private readonly AppLogStore _logStore;
+    private readonly LastStationFile? _lastStationFile;
     private string? _lastPlayedStationAlias;
     private bool _avrProtocolAvailable = true;
     private bool _hasConfirmedAvrOnce;
@@ -23,7 +24,8 @@ public sealed class ReceiverController
         AppSettingsStore settingsStore,
         ReceiverStateStore stateStore,
         EventTelemetryLog telemetry,
-        AppLogStore logStore)
+        AppLogStore logStore,
+        LastStationFile? lastStationFile = null)
     {
         _heosClient = heosClient;
         _avrClient = avrClient;
@@ -31,6 +33,24 @@ public sealed class ReceiverController
         _stateStore = stateStore;
         _telemetry = telemetry;
         _logStore = logStore;
+        _lastStationFile = lastStationFile;
+        // A stream that still plays from before a restart is the station this app started last.
+        _lastPlayedStationAlias = lastStationFile?.Load();
+    }
+
+    /// <summary>The saved station this app started last; null after another source took over. Kept on disk.</summary>
+    private string? LastPlayedStation
+    {
+        set
+        {
+            if (string.Equals(_lastPlayedStationAlias, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _lastPlayedStationAlias = value;
+            _lastStationFile?.Save(value);
+        }
     }
 
     public event Action? NonRelaySourceActivated;
@@ -75,7 +95,7 @@ public sealed class ReceiverController
                 }
                 else
                 {
-                    _lastPlayedStationAlias = null;
+                    LastPlayedStation = null;
                 }
 
                 await Task.Delay(300, token);
@@ -113,7 +133,7 @@ public sealed class ReceiverController
             {
                 if (!DenonCatalog.InputMatches(sourceCode, "NET"))
                 {
-                    _lastPlayedStationAlias = null;
+                    LastPlayedStation = null;
                     NonRelaySourceActivated?.Invoke();
                     await TryStopHeosPlaybackAsync(settings, token);
                 }
@@ -279,7 +299,7 @@ public sealed class ReceiverController
                 }
 
                 await _heosClient.PlayUrlAsync(settings, preset.Url, volume: null, unmute: unmute, token);
-                _lastPlayedStationAlias = preset.Alias;
+                LastPlayedStation = preset.Alias;
                 NonRelaySourceActivated?.Invoke();
                 StreamUrlStarted?.Invoke(preset.Url, preset.DisplayName);
                 return await GetMergedStatusAsync(settings, token);
@@ -315,7 +335,7 @@ public sealed class ReceiverController
                 }
 
                 await _heosClient.PlayUrlAsync(settings, url, volume: null, unmute: unmute, token);
-                _lastPlayedStationAlias = null;
+                LastPlayedStation = null;
                 NonRelaySourceActivated?.Invoke();
                 StreamUrlStarted?.Invoke(url, string.IsNullOrWhiteSpace(title) ? "Internet radio" : title);
                 return await GetMergedStatusAsync(settings, token);
@@ -366,7 +386,7 @@ public sealed class ReceiverController
                 }
 
                 await _heosClient.PlayFavoriteAsync(settings, favorite.PresetIndex, token);
-                _lastPlayedStationAlias = null;
+                LastPlayedStation = null;
                 NonRelaySourceActivated?.Invoke();
                 return await GetMergedStatusAsync(settings, token);
             },
@@ -466,7 +486,7 @@ public sealed class ReceiverController
                 }
 
                 await _heosClient.PlayUrlAsync(settings, relayUrl, volume: null, unmute: unmute, token);
-                _lastPlayedStationAlias = null;
+                LastPlayedStation = null;
                 return await GetMergedStatusAsync(settings, token);
             },
             markBusy: true,
@@ -564,7 +584,7 @@ public sealed class ReceiverController
                     }
                     else
                     {
-                        _lastPlayedStationAlias = null;
+                        LastPlayedStation = null;
                         NonRelaySourceActivated?.Invoke();
                         await TryStopHeosPlaybackAsync(settings, token);
                         await _avrClient.SetInputSourceAsync(settings, scene.InputSource, token);
@@ -651,7 +671,7 @@ public sealed class ReceiverController
                     // A scene that starts a saved station's stream plays that station: name it in Now playing.
                     var station = settings.Stations
                         .FirstOrDefault(s => string.Equals(s.Url.Trim(), streamUrl, StringComparison.OrdinalIgnoreCase));
-                    _lastPlayedStationAlias = station?.Alias;
+                    LastPlayedStation = station?.Alias;
                     NonRelaySourceActivated?.Invoke();
                     StreamUrlStarted?.Invoke(streamUrl, station?.DisplayName ?? scene.Name);
                 }
@@ -922,7 +942,7 @@ public sealed class ReceiverController
     {
         if (!avrStatus.IsPoweredOn || !avrStatus.IsMainZoneOn || !DenonCatalog.InputMatches(avrStatus.InputSource, "NET"))
         {
-            _lastPlayedStationAlias = null;
+            LastPlayedStation = null;
             return null;
         }
 
@@ -950,7 +970,7 @@ public sealed class ReceiverController
         // this app's own URL streams as sid 1024 "Local Music" with placeholder metadata: those keep it.
         if (heosStatus.NowPlaying.IsNamedServiceSource)
         {
-            _lastPlayedStationAlias = null;
+            LastPlayedStation = null;
             return null;
         }
 

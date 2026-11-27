@@ -29,6 +29,39 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
     private static readonly TimeSpan PlaybackHold = TimeSpan.FromSeconds(5);
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CancellationTokenSource> _playbackHolds = new(StringComparer.Ordinal);
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string?> _lastRecordedPlayback = new(StringComparer.Ordinal);
+
+    /// <summary>How long after a wake-tv launch a new default-receiver session counts as the wake's own.</summary>
+    private static readonly TimeSpan WakePendingWindow = TimeSpan.FromSeconds(15);
+
+    // Per device: a wake-tv launch in progress, and the session it started. Those sessions skip the receiver hooks.
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _wakePendingUntil = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, string> _wakeSessions = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// True when <paramref name="state"/> is the default-receiver session a wake-tv started: its session id, or a new
+    /// one while the launch is pending. With <paramref name="claim"/>, a pending launch takes that session id.
+    /// </summary>
+    private bool IsWakeSession(string deviceId, CastDeviceState state, bool claim)
+    {
+        if (!string.Equals(state.AppId, CastDeviceClient.DefaultMediaReceiverAppId, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (_wakeSessions.TryGetValue(deviceId, out var known) && string.Equals(known, state.SessionId, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (claim && state.SessionId is { } sessionId &&
+            _wakePendingUntil.TryRemove(deviceId, out var until) && DateTimeOffset.UtcNow <= until)
+        {
+            _wakeSessions[deviceId] = sessionId;
+            return true;
+        }
+
+        return false;
+    }
     private IPluginReceiverControl? _receiverControl;
     private ChromecastConfig _config = new();
     private CancellationTokenSource? _lifetime;
@@ -150,7 +183,7 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
         "device",
         "string",
         "Cast device name, id or IP (for example \"Stuen 2\"). Optional: default is the device that plays, " +
-        "then the device with an active app, then the only device.");
+        "then the device with an active app, then the only device. \"only\": the only device, never another.");
 
     private static readonly PluginActionParameter[] DeviceOnly = [DeviceParam];
 
@@ -182,7 +215,13 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
         new("toggle-play", "Play / Pause", "Toggles playback.", "Playback") { Parameters = DeviceOnly, IsDestructive = false },
         new("stop", "Stop media", "Stops the media session (the program closes; it cannot be resumed).", "Playback")
             { Parameters = DeviceOnly, IsDestructive = true },
-        new("quit-app", "Quit app", "Closes the running Cast app.", "Playback") { Parameters = DeviceOnly, IsDestructive = true },
+        new("quit-app", "Quit app", "Closes the running Cast app. With 'sessionId', only when that session still runs.", "Playback")
+        {
+            Parameters = [DeviceParam, new("sessionId", "string", "Optional: close only this session (for example the one wake-tv started).")],
+            IsDestructive = true,
+        },
+        new("wake-tv", "Wake the TV (HDMI-CEC)", "Starts the Cast default receiver, so HDMI-CEC turns on the TV and selects this device's input. Does nothing when an app already runs. Data: launched, sessionId; close it with quit-app and that sessionId.", "Cast")
+            { Parameters = DeviceOnly, IsDestructive = false },
         new("pause-all", "Pause all Cast devices", "Pauses every Cast device that plays.", "Playback") { Parameters = [], IsDestructive = false },
         new("set-volume", "Set Cast volume", "Sets the Cast device volume.", "Volume")
         {
@@ -244,8 +283,34 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
                     await client.StopMediaAsync(cancellationToken);
                     break;
                 case "quit-app":
-                    await client.QuitAppAsync(cancellationToken);
-                    break;
+                    var onlySession = Param(parameters, "sessionId");
+                    // Data "closed" tells a caller (the TV wake) whether its session still owned the device.
+                    var closed = await client.QuitAppAsync(onlySession, cancellationToken);
+                    return PluginActionResult.OkWithData(
+                        closed ? $"Closed the app on {device.Name}." : $"{device.Name}: that session no longer runs, so nothing closed.",
+                        JsonSerializer.Serialize(new { closed }, JsonOptions));
+                case "wake-tv":
+                    if (client.State.HasActiveApp)
+                    {
+                        // A cast already runs: the device is the active source, so the TV is on or waking. It is
+                        // the user's session: launched=false tells the caller not to close it.
+                        return PluginActionResult.OkWithData(
+                            $"{device.Name} already runs {client.State.AppName ?? "an app"}.",
+                            JsonSerializer.Serialize(new { launched = false }, JsonOptions));
+                    }
+
+                    // The status push of the new session can come before the launch answer: mark the wake first.
+                    _wakePendingUntil[device.Id] = DateTimeOffset.UtcNow + WakePendingWindow;
+                    var wakeSession = await client.LaunchDefaultReceiverAsync(cancellationToken);
+                    if (wakeSession is not null)
+                    {
+                        _wakeSessions[device.Id] = wakeSession;
+                        _wakePendingUntil.TryRemove(device.Id, out _);
+                    }
+
+                    return PluginActionResult.OkWithData(
+                        $"Started the default receiver on {device.Name}, so HDMI-CEC wakes the TV.",
+                        JsonSerializer.Serialize(new { launched = true, sessionId = wakeSession }, JsonOptions));
                 case "set-volume":
                     var levelText = Param(parameters, "level") ?? throw new ArgumentException("Parameter 'level' (0-100) is required.");
                     if (!double.TryParse(levelText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var level))
@@ -667,12 +732,23 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
             if (sessionStarted)
             {
                 RecordEvent("cast.app_started", config, current, origin: "external");
-                _ = Task.Run(() => OnSessionStartedAsync(config, current));
+                // A wake-tv session only turns the TV on: no receiver automation (scene, input, sound mode).
+                if (!IsWakeSession(deviceId, current, claim: true))
+                {
+                    _ = Task.Run(() => OnSessionStartedAsync(config, current));
+                }
             }
 
             if (sessionEnded)
             {
-                OnSessionEnded(config, previous);
+                if (IsWakeSession(deviceId, previous, claim: false))
+                {
+                    _wakeSessions.TryRemove(deviceId, out _);
+                }
+                else
+                {
+                    OnSessionEnded(config, previous);
+                }
             }
         }
 
@@ -907,7 +983,15 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
         }
 
         (CastDeviceConfig Config, CastDeviceState State)? match;
-        if (key is null)
+        if (string.Equals(key, "only", StringComparison.OrdinalIgnoreCase))
+        {
+            // "The only device, or none": never the one that plays, which may sit on another TV (the TV wake).
+            match = views.Count == 1
+                ? views[0]
+                : throw new ArgumentException(
+                    $"Several Cast devices are known ({string.Join(", ", views.Select(v => v.Config.Name))}). Give the 'device' parameter (name, id or IP).");
+        }
+        else if (key is null)
         {
             match = views.FirstOrDefault(v => v.State.IsPlaying);
             if (match?.Config is null)

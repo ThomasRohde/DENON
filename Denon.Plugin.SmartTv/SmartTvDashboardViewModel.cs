@@ -668,6 +668,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
             MovieNightInputAppId = _plugin.Config.MovieNightInputAppId,
             LastModelName = _plugin.Config.LastModelName,
             LastWebOsVersion = _plugin.Config.LastWebOsVersion,
+            CecWakeCastDevice = _plugin.Config.CecWakeCastDevice, // Not on the dashboard: keep it.
         });
         StatusMessage = quiet ? "✓ Coordination setting saved automatically." : "✓ Saved Smart TV settings.";
     }

@@ -166,6 +166,14 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
             switch (lowerPath)
             {
                 case "/api/power":
+                    // {"on": true|false} sets the power; no body toggles it.
+                    if (root.TryGetProperty("on", out var onEl) && onEl.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                    {
+                        var on = onEl.GetBoolean();
+                        await _receiverController.SetPowerAsync(on, cancellationToken);
+                        return JsonOk(new { message = on ? "Receiver on." : "Receiver in standby." });
+                    }
+
                     await _receiverController.TogglePowerAsync(cancellationToken);
                     return JsonOk(new { message = "Power toggled." });
 
@@ -548,7 +556,7 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
         {
             connectionState = "standby";
             title = "Receiver in Standby";
-            detail = "Tap STANDBY or pick a Scene to wake";
+            detail = "Tap Turn on or pick a Scene to wake";
         }
         else if (status is not null)
         {

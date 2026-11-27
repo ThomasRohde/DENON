@@ -114,19 +114,7 @@ public sealed class SafeImageSourceConverter : IValueConverter
             return null;
         }
 
-        try
-        {
-            var bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.UriSource = uri;
-            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.EndInit();
-            return bitmap;
-        }
-        catch
-        {
-            return null;
-        }
+        return ArtworkImageCache.Get(uri);
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>

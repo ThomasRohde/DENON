@@ -67,6 +67,11 @@ public sealed class AutomationEventTests : IDisposable
 
         public ReceiverFacts GetReceiverFacts() => Facts;
 
+        /// <summary>Newest first, as the bus gives them.</summary>
+        public List<RoomEvent> Recent { get; } = [];
+
+        public IReadOnlyList<RoomEvent> GetRecentEvents() => Recent;
+
         public string DescribeScene(string sceneId) => sceneId;
 
         public string DescribePluginAction(string pluginId, string actionId) => $"{pluginId}:{actionId}";
@@ -385,6 +390,52 @@ public sealed class AutomationEventTests : IDisposable
         Assert.False(AutomationGraphRunner.Evaluate(muted, e, effects, At(12, 0)).Pass);
         effects.Facts = new ReceiverFacts(true, "TV", false);
         Assert.True(AutomationGraphRunner.Evaluate(notMuted, e, effects, At(12, 0)).Pass);
+    }
+
+    [Fact]
+    public void Condition_RecentEvent_SeesACastThatStartedJustBefore()
+    {
+        var effects = new FakeEffects();
+        var now = new DateTimeOffset(2026, 11, 27, 20, 0, 0, TimeSpan.Zero);
+        var tvOn = new RoomEvent(now, "tv", "smart-tv", "app.changed", "external", new Dictionary<string, object?> { ["fromAppId"] = "" });
+        var recentCast = Node("r", AutomationNodeTypes.ConditionRecentEvent,
+            ("event", "cast.app_started, appletv.woke"), ("seconds", "30"), ("filter", "origin=external"));
+
+        Assert.False(AutomationGraphRunner.Evaluate(recentCast, tvOn, effects, now).Pass);
+
+        // A cast the user started 12 s ago: yes.
+        effects.Recent.Add(new RoomEvent(now.AddSeconds(-12), "plugin:chromecast", "chromecast", "cast.app_started", "external", null));
+        var yes = AutomationGraphRunner.Evaluate(recentCast, tvOn, effects, now);
+        Assert.True(yes.Pass);
+        Assert.Contains("cast.app_started from chromecast 12 s ago", yes.Why);
+
+        // Too old, or started by the app itself (the TV plugin's HDMI-CEC wake): no.
+        effects.Recent.Clear();
+        effects.Recent.Add(new RoomEvent(now.AddSeconds(-45), "plugin:chromecast", "chromecast", "cast.app_started", "external", null));
+        effects.Recent.Add(new RoomEvent(now.AddSeconds(-5), "plugin:chromecast", "chromecast", "cast.app_started", "desktop_ui", null));
+        Assert.False(AutomationGraphRunner.Evaluate(recentCast, tvOn, effects, now).Pass);
+
+        // Wildcards, and the triggering event itself never counts.
+        var anyTv = Node("r", AutomationNodeTypes.ConditionRecentEvent, ("event", "app.*"), ("seconds", "30"), ("filter", ""));
+        effects.Recent.Insert(0, tvOn);
+        Assert.False(AutomationGraphRunner.Evaluate(anyTv, tvOn, effects, now).Pass);
+        effects.Recent.Insert(0, new RoomEvent(now.AddSeconds(-1), "tv", "smart-tv", "app.changed", "external", null));
+        Assert.True(AutomationGraphRunner.Evaluate(anyTv, tvOn, effects, now).Pass);
+    }
+
+    [Fact]
+    public void The_live_tv_example_switches_only_when_the_tv_comes_on_elsewhere()
+    {
+        var graph = AutomationGraph.CreateDefaults().Single(g => g.Id == "auto-tv-live");
+        Assert.Empty(AutomationGraphValidator.Validate(graph));
+        var trigger = graph.Nodes.Single(n => n.Type == AutomationNodeTypes.TriggerEvent);
+        DateTimeOffset now = DateTimeOffset.Now;
+        RoomEvent App(string from, string to) => new(now, "tv", "smart-tv", "app.changed", "external",
+            new Dictionary<string, object?> { ["fromAppId"] = from, ["toAppId"] = to });
+
+        Assert.True(AutomationTriggers.Matches(trigger, App("", "com.webos.app.hdmi1")));
+        Assert.False(AutomationTriggers.Matches(trigger, App("", "com.webos.app.livetv")));
+        Assert.False(AutomationTriggers.Matches(trigger, App("com.webos.app.livetv", "com.webos.app.hdmi1")));
     }
 
     [Fact]

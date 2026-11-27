@@ -8,6 +8,8 @@ public static class RemoteWebUiHtml
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- The address holds the pairing code: never send it to the hosts of logos and thumbnails. -->
+<meta name="referrer" content="no-referrer" />
 <title>Denon Remote &amp; Jukebox</title>
 <style>
   :root {
@@ -22,6 +24,8 @@ public static class RemoteWebUiHtml
   .logo { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, #0284c7, #00d4ff); color: #04151c; display: grid; place-items: center; font-weight: 900; flex-shrink: 0; }
   .pill { font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 99px; border: 1px solid var(--border); background: var(--card); color: var(--sub); cursor: pointer; }
   .pill.on { background: #0c2d22; border-color: var(--green); color: var(--green); }
+  .pill.power { font-size: 12.5px; padding: 7px 13px; }
+  .pill.power.off { background: #3a1217; border-color: var(--red); color: #fecaca; }
   .pill.guest { background: #261f0d; border-color: var(--amber); color: #fcd34d; cursor: default; }
   .banner { display: none; align-items: center; justify-content: space-between; gap: 8px; background: #2a1216; border: 1px solid #ef4444; border-radius: 12px; padding: 9px 12px; margin-bottom: 12px; font-size: 12px; color: #fecaca; }
   .banner.show { display: flex; }
@@ -86,7 +90,7 @@ public static class RemoteWebUiHtml
   <div class="brand"><div class="logo" aria-hidden="true">D</div><span id="rxName">DENON REMOTE</span></div>
   <div id="headerControls" style="display:flex;gap:6px;align-items:center">
     <span id="roleBadge" class="pill guest" style="display:none">GUEST</span>
-    <button id="powerBtn" class="pill owner-only" type="button" aria-label="Toggle Receiver Power" onclick="post('/api/power')">STANDBY</button>
+    <button id="powerBtn" class="pill power owner-only" type="button" aria-label="Turn the receiver on" onclick="setPower()">⏻ Turn on</button>
   </div>
 </div>
 
@@ -105,6 +109,9 @@ public static class RemoteWebUiHtml
   <p style="font-size:13px;color:var(--sub);margin:0 0 12px;line-height:1.45">
     Scan the Owner or Guest QR code in <strong>Denon Desktop → Cast &amp; Phone Remote</strong>, or paste your pairing code below.
   </p>
+  <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.45">
+    On an iPhone: scan the QR code first, then use Share → Add to Home Screen. The icon keeps the pairing.
+  </p>
   <div class="search-row">
     <input id="pairInput" class="search-input" type="password" placeholder="Paste pairing token..." aria-label="Pairing token" onkeydown="if(event.key==='Enter') submitPairToken()" />
     <button class="btn primary" type="button" onclick="submitPairToken()">Pair</button>
@@ -122,7 +129,7 @@ public static class RemoteWebUiHtml
   <div id="tab-remote" class="panel active" role="tabpanel">
     <div class="card hero">
       <div class="now-row">
-        <img id="artImg" class="art" alt="Album artwork" style="display:none" />
+        <img id="artImg" class="art" alt="Album artwork" referrerpolicy="no-referrer" style="display:none" />
         <div style="flex:1; min-width:0">
           <div class="badges">
             <span id="badgeInput" class="badge cyan">HEOS</span>
@@ -221,18 +228,32 @@ let lastSuccessTime = null;
 let ytSearchTracks = [];
 const lastMarkup = { scenes: '', inputs: '', stations: '', plugins: '', queue: '' };
 
+// The pairing code stays in the page address. iOS gives a home-screen web app its own storage, so "Add to Home
+// Screen" must save an address that holds the code, or the icon opens at the pairing gate.
 function initTokenFromUrl() {
   try {
     const params = new URLSearchParams(window.location.search);
-    const p = params.get('pair') || params.get('token');
-    if (p && p.trim()) {
-      localStorage.setItem(TOKEN_KEY, p.trim());
-      params.delete('pair');
-      params.delete('token');
-      const clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
-      window.history.replaceState({}, '', clean);
+    const p = (params.get('pair') || params.get('token') || '').trim();
+    if (p) {
+      localStorage.setItem(TOKEN_KEY, p);
     }
+    keepTokenInUrl(p || getToken());
   } catch (e) {}
+}
+
+function keepTokenInUrl(token) {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    params.delete('token');
+    if (token) params.set('pair', token); else params.delete('pair');
+    const url = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+    if (url !== window.location.pathname + window.location.search) window.history.replaceState({}, '', url);
+  } catch (e) {}
+}
+
+function setPower() {
+  if (!state) return;
+  post('/api/power', { on: !state.isAwake });
 }
 
 function getToken() {
@@ -274,6 +295,7 @@ function submitPairToken() {
   const val = document.getElementById('pairInput').value.trim();
   if (!val) return;
   try { localStorage.setItem(TOKEN_KEY, val); } catch (e) {}
+  keepTokenInUrl(val);
   document.getElementById('pairInput').value = '';
   refreshStatus();
 }
@@ -507,8 +529,12 @@ async function refreshStatus() {
 
     document.getElementById('rxName').textContent = state.receiverName || 'DENON REMOTE';
     const pbtn = document.getElementById('powerBtn');
-    pbtn.textContent = state.connectionState === 'receiver_unreachable' ? 'OFFLINE' : (state.isAwake ? 'ACTIVE' : 'STANDBY');
-    pbtn.classList.toggle('on', !!state.isAwake);
+    const offline = state.connectionState === 'receiver_unreachable';
+    pbtn.textContent = offline ? 'OFFLINE' : (state.isAwake ? '⏻ Turn off' : '⏻ Turn on');
+    pbtn.disabled = offline;
+    pbtn.setAttribute('aria-label', state.isAwake ? 'Put the receiver in standby' : 'Turn the receiver on');
+    pbtn.classList.toggle('off', !offline && !!state.isAwake);
+    pbtn.classList.toggle('on', !offline && !state.isAwake);
     document.getElementById('badgeInput').textContent = state.inputDisplay || '—';
     document.getElementById('badgeState').textContent = state.connectionState === 'receiver_unreachable' ? 'Offline' : (state.playState || 'Stopped');
     document.getElementById('badgeMode').textContent = state.soundMode || '—';
@@ -520,8 +546,11 @@ async function refreshStatus() {
     pp.setAttribute('aria-label', state.isPlaying ? 'Pause' : 'Play');
 
     const art = document.getElementById('artImg');
-    if (state.artworkUrl) { art.src = state.artworkUrl; art.style.display = 'block'; }
-    else { art.style.display = 'none'; }
+    // Set the address only when it changes, so the picture is not loaded again on every refresh.
+    if (state.artworkUrl) {
+      if (art.getAttribute('src') !== state.artworkUrl) art.setAttribute('src', state.artworkUrl);
+      art.style.display = 'block';
+    } else { art.style.display = 'none'; }
 
     if (!dragging && pendingVol === null) {
       const freshAck = acknowledgedVol !== null && (Date.now() - acknowledgedVolAt) < 2800;
