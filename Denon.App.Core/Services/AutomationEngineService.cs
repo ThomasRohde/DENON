@@ -711,15 +711,20 @@ public sealed class AutomationEngineService : BackgroundService
         }
 
         /// <summary>
-        /// Null (unknown) without a play state, or when the AVR did not confirm the input: with port 23 down the
+        /// Null (unknown) for a play state other than play, stop or pause, or when the AVR did not confirm the input: with port 23 down the
         /// status is a synthetic "on, NET" from HEOS alone, while the receiver may play TV audio.
         /// </summary>
         private static bool? HeosPlaying(ReceiverStatus status)
         {
-            var playState = status.PlayState?.Trim();
-            return !status.IsAvrConfirmed || string.IsNullOrWhiteSpace(playState)
+            // Only "play", "stop" and "pause" are known states; HEOS gives "unknown" when it omits the state.
+            return !status.IsAvrConfirmed
                 ? null
-                : string.Equals(playState, "play", StringComparison.OrdinalIgnoreCase);
+                : status.PlayState?.Trim().ToLowerInvariant() switch
+                {
+                    "play" => true,
+                    "stop" or "pause" => false,
+                    _ => null,
+                };
         }
 
         public string DescribeScene(string sceneId) =>
