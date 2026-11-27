@@ -35,6 +35,12 @@ public sealed class ReceiverController
 
     public event Action? NonRelaySourceActivated;
 
+    /// <summary>
+    /// HEOS was told to play an internet radio stream (a station button, a Smart Scene's stream or a custom URL):
+    /// the URL and a name for it. The synced meters and Hue Music Sync decode a copy of it.
+    /// </summary>
+    public event Action<string, string>? StreamUrlStarted;
+
     public event Action<ScenePreset>? SceneActivated;
 
     /// <summary>
@@ -275,6 +281,7 @@ public sealed class ReceiverController
                 await _heosClient.PlayUrlAsync(settings, preset.Url, volume: null, unmute: unmute, token);
                 _lastPlayedStationAlias = preset.Alias;
                 NonRelaySourceActivated?.Invoke();
+                StreamUrlStarted?.Invoke(preset.Url, preset.DisplayName);
                 return await GetMergedStatusAsync(settings, token);
             },
             markBusy: true,
@@ -287,7 +294,8 @@ public sealed class ReceiverController
         string url,
         bool useLowVolume,
         bool unmute,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? title = null)
     {
         var volume = useLowVolume ? (int?)_settingsStore.Current.Receiver.DefaultLowVolume : null;
         return ExecuteAsync(
@@ -309,6 +317,7 @@ public sealed class ReceiverController
                 await _heosClient.PlayUrlAsync(settings, url, volume: null, unmute: unmute, token);
                 _lastPlayedStationAlias = null;
                 NonRelaySourceActivated?.Invoke();
+                StreamUrlStarted?.Invoke(url, string.IsNullOrWhiteSpace(title) ? "Internet radio" : title);
                 return await GetMergedStatusAsync(settings, token);
             },
             markBusy: true,
@@ -640,9 +649,11 @@ public sealed class ReceiverController
                     await _avrClient.EnsureMainZoneNetAsync(settings, token);
                     await _heosClient.PlayUrlAsync(settings, streamUrl, volume: null, unmute: scene.Unmute, token);
                     // A scene that starts a saved station's stream plays that station: name it in Now playing.
-                    _lastPlayedStationAlias = settings.Stations
-                        .FirstOrDefault(s => string.Equals(s.Url.Trim(), streamUrl, StringComparison.OrdinalIgnoreCase))?.Alias;
+                    var station = settings.Stations
+                        .FirstOrDefault(s => string.Equals(s.Url.Trim(), streamUrl, StringComparison.OrdinalIgnoreCase));
+                    _lastPlayedStationAlias = station?.Alias;
                     NonRelaySourceActivated?.Invoke();
+                    StreamUrlStarted?.Invoke(streamUrl, station?.DisplayName ?? scene.Name);
                 }
 
                 await Task.Delay(300, token);

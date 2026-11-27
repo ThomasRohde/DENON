@@ -3,6 +3,8 @@ namespace Denon.App.Core.Services.Metering;
 /// <summary>
 /// Meter frames (stereo level + 31 RTA bands) for one track, indexed by media time.
 /// One writer (the analyzer) appends; the UI reads the frame at the playback position.
+/// A rolling timeline (a live radio stream, which never ends) keeps only the last <see cref="MaxFrames"/>
+/// frames: the oldest chunk goes when a new one is needed, and times before it are no longer analyzed.
 /// </summary>
 public sealed class MeterTimeline
 {
@@ -13,9 +15,10 @@ public sealed class MeterTimeline
     private readonly object _sync = new();
     private readonly List<float[]> _chunks = [];
     private int _count;
+    private int _first; // the absolute index of the first kept frame (a multiple of ChunkFrames)
     private volatile bool _isComplete;
 
-    public MeterTimeline(string key, double hopSeconds, int maxFrames)
+    public MeterTimeline(string key, double hopSeconds, int maxFrames, bool rolling = false)
     {
         if (hopSeconds <= 0)
         {
@@ -24,8 +27,15 @@ public sealed class MeterTimeline
 
         Key = key;
         HopSeconds = hopSeconds;
-        MaxFrames = Math.Max(1, maxFrames);
+        Rolling = rolling;
+        // A rolling timeline drops whole chunks, so it keeps at least two.
+        MaxFrames = rolling
+            ? Math.Max(2, (Math.Max(1, maxFrames) + ChunkFrames - 1) / ChunkFrames) * ChunkFrames
+            : Math.Max(1, maxFrames);
     }
+
+    /// <summary>Keeps only the last <see cref="MaxFrames"/> frames instead of stopping there.</summary>
+    public bool Rolling { get; }
 
     /// <summary>Which track this is (for example <c>yt:&lt;videoId&gt;</c> or <c>local:&lt;path&gt;</c>).</summary>
     public string Key { get; }
@@ -60,7 +70,7 @@ public sealed class MeterTimeline
         {
             lock (_sync)
             {
-                return _count >= MaxFrames;
+                return !Rolling && _count >= MaxFrames;
             }
         }
     }
@@ -69,12 +79,18 @@ public sealed class MeterTimeline
     {
         lock (_sync)
         {
-            if (_count >= MaxFrames)
+            if (_count - _first >= MaxFrames)
             {
-                return false;
+                if (!Rolling)
+                {
+                    return false;
+                }
+
+                _chunks.RemoveAt(0);
+                _first += ChunkFrames;
             }
 
-            var chunkIndex = _count / ChunkFrames;
+            var chunkIndex = (_count - _first) / ChunkFrames;
             if (chunkIndex >= _chunks.Count)
             {
                 _chunks.Add(new float[ChunkFrames * Stride]);
@@ -117,9 +133,14 @@ public sealed class MeterTimeline
         var index = (long)Math.Floor(positionSeconds / HopSeconds);
         lock (_sync)
         {
+            if (index < _first)
+            {
+                return false; // rolled out of a rolling timeline
+            }
+
             if (index >= _count)
             {
-                if (_isComplete && !IsFailed && _count < MaxFrames && _count > 0)
+                if (_isComplete && !IsFailed && !Rolling && _count < MaxFrames && _count > 0)
                 {
                     // The track ended: synced silence until the next track starts.
                     if (bandsDestination is { Length: >= BandCount })
@@ -133,7 +154,7 @@ public sealed class MeterTimeline
                 return false;
             }
 
-            var chunk = _chunks[(int)(index / ChunkFrames)];
+            var chunk = _chunks[(int)((index - _first) / ChunkFrames)];
             var offset = (int)(index % ChunkFrames) * Stride;
             left = chunk[offset];
             right = chunk[offset + 1];
