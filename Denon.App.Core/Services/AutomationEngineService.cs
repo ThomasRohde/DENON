@@ -705,7 +705,26 @@ public sealed class AutomationEngineService : BackgroundService
             var status = snapshot.Status;
             return status is null || !snapshot.IsConnected
                 ? new ReceiverFacts(null, null, null)
-                : new ReceiverFacts(status is { IsPoweredOn: true, IsMainZoneOn: true }, status.InputSource, status.IsMuted);
+                : new ReceiverFacts(
+                    status is { IsPoweredOn: true, IsMainZoneOn: true }, status.InputSource, status.IsMuted,
+                    HeosPlaying(status));
+        }
+
+        /// <summary>
+        /// Null (unknown) for a play state other than play, stop or pause, or when the AVR did not confirm the input: with port 23 down the
+        /// status is a synthetic "on, NET" from HEOS alone, while the receiver may play TV audio.
+        /// </summary>
+        private static bool? HeosPlaying(ReceiverStatus status)
+        {
+            // Only "play", "stop" and "pause" are known states; HEOS gives "unknown" when it omits the state.
+            return !status.IsAvrConfirmed
+                ? null
+                : status.PlayState?.Trim().ToLowerInvariant() switch
+                {
+                    "play" => true,
+                    "stop" or "pause" => false,
+                    _ => null,
+                };
         }
 
         public string DescribeScene(string sceneId) =>

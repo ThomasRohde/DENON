@@ -4,6 +4,13 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **The receiver condition can check "Standby or idle".** It passes when the receiver is in standby, or on with HEOS
+  stopped or paused. Another input never counts as idle, because a TV may be on. The example "iPhone: arrive home"
+  automation uses it, so the jazz plays also when the receiver was left on with the stream stopped.
+
 ## [2.10.11] - 2026-11-27
 
 ### Changed

@@ -43,7 +43,7 @@ editor, a page that the app serves on `127.0.0.1` (the Insights server) and show
 | `trigger.source` | trigger | `out` | `source` (a source name such as `DR1`, `Netflix`, `Media Player`; empty for any), `filter` (`kind=tv_channel`, `from=…`) |
 | `condition.event` | condition | `yes`, `no` | `filter`: tests the data of the event that started the run |
 | `condition.time` | condition | `yes`, `no` | `from`, `to` (`HH:mm`, may pass midnight), `days` |
-| `condition.receiver` | condition | `yes`, `no` | `power` (`any`, `on`, `standby`), `input` (code or empty), `muted` (`any`, `yes`, `no`) |
+| `condition.receiver` | condition | `yes`, `no` | `power` (`any`, `on`, `standby`, `idle` = standby, or on with HEOS stopped or paused; another input is never idle), `input` (code or empty), `muted` (`any`, `yes`, `no`) |
 | `action.scene` | action | `out` | `sceneId` |
 | `action.plugin` | action | `out` | `pluginId`, `actionId`, `p:<name>` parameters |
 | `action.receiver` | action | `out` | `command` (`power_on`, `power_off`, `mute`, `unmute`, `volume`, `input`, `sound_mode`), `value` |
