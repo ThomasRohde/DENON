@@ -106,7 +106,7 @@ prompt is wired (`create_or_update_automation`) but not tried with a real agent.
 - [ ] Check on the iPhone: remove the old home-screen icon, scan the QR code, add it again, and open it.
 - [x] TV power on (2.10.12): Wake-on-LAN every second for 15 s (broadcast and direct), then HDMI-CEC through the
       Chromecast (`wake-tv`, Chromecast plugin 0.6.0), then Live TV. On 2026-11-27, 9 taps at 14:30 got no answer.
-- [ ] Release Chromecast plugin 0.6.0 (`wake-tv`); until then the CEC fallback fails with "Unknown action".
+- [x] Released Chromecast plugin 0.6.0 (`wake-tv`), so the CEC fallback works.
 - [ ] Check on the real TV: a wake from deep standby, and whether LG SimpLink wakes the TV from the Chromecast.
 - [x] "TV on → Live TV" example and the "Recent event" condition (2.10.12). Not when a cast or the Apple TV woke the TV.
 - [ ] Check "TV on → Live TV" live: TV remote on (HDMI 1 → Live TV), and a cast from the iPhone (stays on the cast).

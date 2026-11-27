@@ -2,7 +2,9 @@
 
 Released separately from Denon Desktop with tags `chromecast-vX.Y.Z`.
 
-## [Unreleased] - 0.6.0
+## [0.6.0] - 2026-11-27
+
+Use it with Denon Desktop **2.10.12** or later: the LG TV plugin there calls `wake-tv`.
 
 ### Added
 - **Wake the TV (HDMI-CEC)** (`wake-tv`): starts the Cast default receiver, so HDMI-CEC turns on the TV and selects
