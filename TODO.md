@@ -96,6 +96,11 @@ prompt is wired (`create_or_update_automation`) but not tried with a real agent.
 
 - [x] **A real iPhone Shortcut over Wi-Fi works** (2026-11-25): "arrive home" on joining the home Wi-Fi runs Morning
       Jazz. The reply now says what each automation did; check it on the iPhone with Show Result after 2.9.2.
+- [x] **Arrival plays when the receiver was left on but idle** (2.10.12): the receiver condition has "Standby or
+      idle" (on with HEOS stopped or paused). On 2026-11-27 four arrivals did nothing, because a test left the receiver
+      on with the stream stopped. Another input (TV, Apple TV) never counts as idle, since the app cannot see that a
+      TV is on.
+- [ ] Check a real arrival with the receiver left on and HEOS stopped after 2.10.12.
 - [ ] **Decide:** should the Phone Remote's `/api/volume` use the safe-volume cap (`MaxSafeVolume`, 65)? MCP agents and
       automations are capped; the Phone Remote, and so a Shortcut that calls it, only stops at the receiver's maximum.
       Left as it is because the remote is the owner at the couch.

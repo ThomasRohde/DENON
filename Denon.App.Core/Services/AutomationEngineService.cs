@@ -705,7 +705,9 @@ public sealed class AutomationEngineService : BackgroundService
             var status = snapshot.Status;
             return status is null || !snapshot.IsConnected
                 ? new ReceiverFacts(null, null, null)
-                : new ReceiverFacts(status is { IsPoweredOn: true, IsMainZoneOn: true }, status.InputSource, status.IsMuted);
+                : new ReceiverFacts(
+                    status is { IsPoweredOn: true, IsMainZoneOn: true }, status.InputSource, status.IsMuted,
+                    string.IsNullOrEmpty(status.PlayState) ? null : string.Equals(status.PlayState, "play", StringComparison.OrdinalIgnoreCase));
         }
 
         public string DescribeScene(string sceneId) =>

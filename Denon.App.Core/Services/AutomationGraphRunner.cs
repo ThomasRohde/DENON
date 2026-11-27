@@ -16,8 +16,11 @@ public sealed record AutomationRun(
     string Summary,
     IReadOnlyList<AutomationStep> Steps);
 
-/// <summary>The receiver as a condition sees it. Null values are unknown (no connection yet).</summary>
-public sealed record ReceiverFacts(bool? IsOn, string? Input, bool? IsMuted);
+/// <summary>
+/// The receiver as a condition sees it. Null values are unknown (no connection yet). <paramref name="IsHeosPlaying"/>
+/// is true when HEOS plays (play state "play"), false when it is stopped or paused.
+/// </summary>
+public sealed record ReceiverFacts(bool? IsOn, string? Input, bool? IsMuted, bool? IsHeosPlaying = null);
 
 /// <summary>What a run can read and change. The engine passes the real room; tests pass a fake.</summary>
 public interface IAutomationEffects
@@ -183,13 +186,20 @@ public static class AutomationGraphRunner
 
                 switch (node.Get("power"))
                 {
-                    case "on" or "standby" when facts.IsOn is null:
+                    case "on" or "standby" or "idle" when facts.IsOn is null:
                         return (false, "The receiver state is not known yet.");
                     case "on" when facts.IsOn == false:
                         pass = false; reasons.Add("the receiver is in standby");
                         break;
                     case "standby" when facts.IsOn == true:
                         pass = false; reasons.Add("the receiver is on");
+                        break;
+                    case "idle" when facts.IsOn == true && !IsIdleWhileOn(facts):
+                        // On another input a TV or player may be on: the app cannot see that, so it is not idle.
+                        pass = false;
+                        reasons.Add(DenonCatalog.InputMatches(facts.Input, "NET")
+                            ? "the receiver is on and HEOS is playing"
+                            : $"the receiver is on, on the {facts.Input ?? "unknown"} input");
                         break;
                 }
 
@@ -214,9 +224,11 @@ public static class AutomationGraphRunner
                 {
                     // Say what matched, so "nothing to do" after a yes with nothing connected reads well.
                     var matched = new List<string>();
-                    if (node.Get("power") is "on" or "standby")
+                    if (node.Get("power") is "on" or "standby" or "idle")
                     {
-                        matched.Add(facts.IsOn == true ? "the receiver is on" : "the receiver is in standby");
+                        matched.Add(facts.IsOn != true ? "the receiver is in standby"
+                            : node.Get("power") == "idle" ? "the receiver is on and HEOS plays nothing"
+                            : "the receiver is on");
                     }
 
                     if (input.Length > 0)
@@ -239,6 +251,10 @@ public static class AutomationGraphRunner
                 return (false, $"Unknown condition '{node.Type}'.");
         }
     }
+
+    /// <summary>On, but nothing plays: the HEOS input with HEOS stopped or paused.</summary>
+    private static bool IsIdleWhileOn(ReceiverFacts facts) =>
+        DenonCatalog.InputMatches(facts.Input, "NET") && facts.IsHeosPlaying == false;
 
     private static string Describe(AutomationNode node, IAutomationEffects effects) =>
         node.Type switch

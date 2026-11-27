@@ -396,6 +396,7 @@ function nodeSummary(node) {
       const parts = [];
       if (c.power === "on") parts.push("Power on");
       else if (c.power === "standby") parts.push("In standby");
+      else if (c.power === "idle") parts.push("Standby or idle");
       if (c.input) parts.push(`Input ${inputName(c.input)}`);
       if (c.muted === "yes") parts.push("Muted");
       else if (c.muted === "no") parts.push("Not muted");

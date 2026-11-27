@@ -387,6 +387,37 @@ public sealed class AutomationEventTests : IDisposable
         Assert.True(AutomationGraphRunner.Evaluate(notMuted, e, effects, At(12, 0)).Pass);
     }
 
+    [Fact]
+    public void Condition_StandbyOrIdle_PassesWhenHeosPlaysNothing()
+    {
+        var effects = new FakeEffects();
+        var idle = Node("r", AutomationNodeTypes.ConditionReceiver, ("power", "idle"), ("input", ""), ("muted", "any"));
+        var e = Event("x");
+        var noon = new DateTimeOffset(2026, 11, 27, 12, 0, 0, TimeSpan.Zero);
+        (bool Pass, string Message) Check(ReceiverFacts facts)
+        {
+            effects.Facts = facts;
+            return AutomationGraphRunner.Evaluate(idle, e, effects, noon);
+        }
+
+        Assert.True(Check(new ReceiverFacts(false, "NET", false, false)).Pass);
+        // Left on after a stream was stopped or paused: idle.
+        var stopped = Check(new ReceiverFacts(true, "NET", false, false));
+        Assert.True(stopped.Pass);
+        Assert.Contains("HEOS plays nothing", stopped.Message);
+
+        var playing = Check(new ReceiverFacts(true, "NET", false, true));
+        Assert.False(playing.Pass);
+        Assert.Contains("HEOS is playing", playing.Message);
+        // HEOS state not read yet: not idle.
+        Assert.False(Check(new ReceiverFacts(true, "NET", false, null)).Pass);
+        // On the TV input the TV may be on: never idle.
+        var tv = Check(new ReceiverFacts(true, "TV", false, false));
+        Assert.False(tv.Pass);
+        Assert.Contains("TV input", tv.Message);
+        Assert.False(Check(new ReceiverFacts(null, null, null)).Pass);
+    }
+
     // ---- Endpoint and engine -------------------------------------------------------------------------------
 
     private sealed record Rig(AppSettingsStore Store, RoomEventBus Bus, EventTelemetryLog Telemetry, RemoteWebApiHandler Handler, AutomationEngineService Engine, FakeEffects Effects, IDisposable Cleanup);

@@ -109,7 +109,8 @@ public static class AutomationNodeTypes
             YesNoPorts, true,
             [
                 new("power", "Power", "select",
-                    Options: [new("any", "Any"), new("on", "On"), new("standby", "Standby")]),
+                    Options: [new("any", "Any"), new("on", "On"), new("standby", "Standby"), new("idle", "Standby or idle")],
+                    Help: "Standby or idle: in standby, or on with HEOS stopped or paused. Another input is never idle."),
                 new("input", "Input", "input", Help: "Leave empty for any input."),
                 new("muted", "Mute", "select",
                     Options: [new("any", "Any"), new("yes", "Muted"), new("no", "Not muted")]),

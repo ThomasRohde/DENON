@@ -67,7 +67,7 @@ public sealed class AutomationGraph
             Node("a1", AutomationNodeTypes.ActionPlugin, ("pluginId", "philips-hue"), ("actionId", "hue.all_on"))),
         Chain("auto-arrive-home", "iPhone: arrive home → Morning Jazz", 0,
             Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "arrive-home"), ("filter", "")),
-            Node("c", AutomationNodeTypes.ConditionReceiver, ("power", "standby"), ("input", ""), ("muted", "any")),
+            Node("c", AutomationNodeTypes.ConditionReceiver, ("power", "idle"), ("input", ""), ("muted", "any")),
             Node("a1", AutomationNodeTypes.ActionScene, ("sceneId", "morning-coffee"))),
     ];
 
