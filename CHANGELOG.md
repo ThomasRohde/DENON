@@ -4,7 +4,7 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.10.9] - 2026-11-27
 
 ### Added
 - **Saved stations show their logo.** When the receiver plays a station that the app started (a preset, a shortcut,
