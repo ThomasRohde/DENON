@@ -227,7 +227,7 @@ Design and decisions: `docs/theming.md` (branch `theming-2.0`).
 - [x] Built-in plugins (Hue, Smart TV, Home Assistant): use the app's card and button styles (sizes stay local).
 - [x] Hue Music Sync and the Deck meters follow internet radio that the app starts (FFmpeg decodes a copy; 2.10.10). Checked live
       on DR P8 Jazz: Deck meters DENON · SYNCED, Hue LIVE FFT SYNC with beats. During speech (news) the badge
-      blinks to WAITING FOR AUDIO in pauses (~18% of frames below −50 dBFS); a short hold would smooth it.
+      blinked to WAITING FOR AUDIO in pauses (~18% of frames below −50 dBFS); the badge now holds 2 s (2.10.11).
 - [ ] Radio meters: check the beat timing against the speakers and, if needed, a radio delay setting
       (`RadioPlaybackClock.AssumedStartDelay`, the "play" event). A station HEOS already played before the app
       started (or a HEOS favorite) has no URL for the app, so it stays simulated.
