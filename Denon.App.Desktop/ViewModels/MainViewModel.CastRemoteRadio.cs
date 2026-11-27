@@ -1047,7 +1047,7 @@ public sealed partial class MainViewModel
             HasFfmpeg: true,
             FfmpegPath: "ffmpeg.exe",
             StreamState: "Streaming to Denon (MP3 320k)",
-            ActiveTrackTitle: "Denon Desktop: one app for the whole living room",
+            ActiveTrackTitle: promoVideo.Title,
             BytesStreamed: 4_820_000,
             LastError: null));
 
