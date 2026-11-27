@@ -30,6 +30,7 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
     private readonly EventTelemetryLog _telemetry;
     private readonly AutomationEngineService _automations;
     private readonly AppLogStore _logStore;
+    private readonly StationLogoService? _stationLogos;
 
     /// <summary>How long a webhook call waits for its automations before it answers "still running".</summary>
     internal static TimeSpan WebhookReplyWait { get; set; } = TimeSpan.FromSeconds(4);
@@ -49,8 +50,10 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
         PluginHostService pluginHost,
         EventTelemetryLog telemetry,
         AutomationEngineService automations,
-        AppLogStore logStore)
+        AppLogStore logStore,
+        StationLogoService? stationLogos = null)
     {
+        _stationLogos = stationLogos;
         _receiverController = receiverController;
         _stateStore = stateStore;
         _settingsStore = settingsStore;
@@ -558,7 +561,8 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
                 activeStationName: activeStationName,
                 plugins: _pluginHost.GetPlugins(),
                 activeLocalTrack: localSnap.IsActive ? localSnap.CurrentTrack : null,
-                activeYouTubeTrack: ytSnap.IsActive ? ytSnap.CurrentTrack : null);
+                activeYouTubeTrack: ytSnap.IsActive ? ytSnap.CurrentTrack : null,
+                activeStationLogoUrl: _stationLogos?.TryGet(activeStationName));
             title = resolved.Title;
             detail = resolved.Detail;
             artwork = resolved.ImageUrl;

@@ -235,6 +235,17 @@ Design and decisions: `docs/theming.md` (branch `theming-2.0`).
       need them).
 - [x] Icon set in `Themes/Icons.xaml`: 21 named geometries (sidebar, title bar, transport, chevrons, tick), 25 uses.
 
+## Station logos & plugin list
+
+- [ ] Verify live: the Deck and the phone remote show the TuneIn logo for a saved station (DR P6 Beat). Only tested
+      with a fake directory and in the build; the receiver was not touched.
+- [ ] The logo comes over plain http (the TuneIn logo CDN has no https). The MCP now-playing card does not show the
+      station logo yet.
+- [ ] A station with a wrong or missing TuneIn match has no way to set its own logo. Idea: a logo address per
+      station on the Stations page, and a switch to turn the TuneIn lookup off.
+- [ ] Verify live: the plugin grid with six or more plugins (the screenshot mode has three), in a narrow window and
+      with the Large skin.
+
 ## Settings saves
 
 - [x] Eliminated all three `_suppressNextSettingsReload` sites: dB toggle now uses `SaveUiStateAsync`, and Phone Remote

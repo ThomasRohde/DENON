@@ -138,6 +138,7 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<LocalMediaJukeboxService>();
             builder.Services.AddSingleton<AppStreamMeterService>();
             builder.Services.AddSingleton<RadioBrowserService>();
+            builder.Services.AddSingleton<StationLogoService>();
             builder.Services.AddSingleton<RemoteWebApiHandler>();
             builder.Services.AddSingleton<PcAudioCastService>();
             builder.Services.AddSingleton<HeosEventListenerService>();

@@ -58,18 +58,20 @@
                     </WrapPanel>
                 </Grid>
 
-                <!-- Horizontal Plugin Selector Cards -->
+                <!-- Plugin selector: an even grid of cards. As many columns as fit, all the same width, the same gap
+                     across and down. More than 3 rows scroll, so a long plugin list never pushes the dashboard away. -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="{skin:Size 178}">
                 <ItemsControl ItemsSource="{Binding InstalledPlugins}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <WrapPanel />
+                            <controls:EvenWrapPanel MinItemWidth="{skin:Size 250}" MaxItemWidth="{skin:Size 400}" Spacing="{skin:Size 8}" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Button Command="{Binding DataContext.SelectPluginCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                     CommandParameter="{Binding}"
-                                    Margin="{skin:Space 0,0,8,0}"
+                                    HorizontalContentAlignment="Stretch"
                                     Cursor="Hand"
                                     ToolTip="{Binding Description}">
                                 <Button.Style>
@@ -85,8 +87,7 @@
                                                             BorderBrush="{TemplateBinding BorderBrush}"
                                                             BorderThickness="{TemplateBinding BorderThickness}"
                                                             CornerRadius="{DynamicResource Radius04}"
-                                                            Padding="{skin:Space 11,7}"
-                                                            MinWidth="{skin:Size 215}">
+                                                            Padding="{skin:Space 11,7}">
                                                         <ContentPresenter />
                                                     </Border>
                                                     <ControlTemplate.Triggers>
@@ -129,7 +130,7 @@
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center" />
                                     </Border>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" MaxWidth="{skin:Size 175}">
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                         <DockPanel LastChildFill="True">
                                             <TextBlock DockPanel.Dock="Right" Text="{Binding VersionTag, StringFormat=' {0}'}" FontSize="{DynamicResource FontSize02}" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
                                             <TextBlock Text="{Binding ShortName}" FontSize="{DynamicResource FontSize07}" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
@@ -151,6 +152,7 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                </ScrollViewer>
             </StackPanel>
         </Border>
 

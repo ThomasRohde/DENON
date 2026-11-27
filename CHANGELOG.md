@@ -6,7 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- **Saved stations show their logo.** When the receiver plays a station that the app started (a preset, a shortcut,
+  a station from the directory), the Deck and the phone remote show the station's logo in place of the empty disc.
+  HEOS gives no picture for a stream that an app starts, so the app asks the TuneIn directory for the logo by the
+  station's name (for example "DR P6 Beat"). It asks one time for each station, keeps the answer in
+  `station-logos.json` in the app's data folder, and shows no logo when TuneIn has no station with that name.
+  Only the station name goes to TuneIn.
+
 ### Changed
+- **The plugin list is an even grid.** On the Plugins page the cards have the same width, fill the row, and have
+  the same space between columns and between rows. The number of columns follows the window width and the skin
+  size. A long list scrolls after about three rows, so the selected plugin's page stays in view.
 - **The demo queue starts with the Denon Desktop promo video.** In screenshot mode (`--capture-screenshots`) the
   Up Next queue on the Music page now starts with "Denon Desktop: one app for the whole living room"
   (https://www.youtube.com/watch?v=2BL0w4gOYfA), then the first three search results.

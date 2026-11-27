@@ -38,6 +38,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly LiveAudioAnalyzerService _liveAudioAnalyzer;
     private readonly AppStreamMeterService _appStreamMeters;
     private readonly AlbumArtPaletteService _albumArtPaletteService;
+    private readonly StationLogoService _stationLogos;
     private readonly System.Windows.Threading.Dispatcher _dispatcher;
 
     private CancellationTokenSource? _volumeDebounceCts;
@@ -140,6 +141,7 @@ public sealed partial class MainViewModel : ObservableObject
         YouTubeQueueService youtubeQueueService,
         YouTubeCinemaWindow cinemaWindow,
         RadioBrowserService radioBrowserService,
+        StationLogoService stationLogoService,
         LocalMediaJukeboxService localJukeboxService,
         PcAudioCastService pcAudioCastService,
         HeosEventListenerService heosEventListener,
@@ -166,7 +168,10 @@ public sealed partial class MainViewModel : ObservableObject
         _liveAudioAnalyzer = liveAudioAnalyzerService;
         _appStreamMeters = appStreamMeterService;
         _albumArtPaletteService = albumArtPaletteService;
+        _stationLogos = stationLogoService;
         _dispatcher = System.Windows.Application.Current.Dispatcher;
+        // A logo that a search found shows at once, not at the next change of the receiver's state.
+        _stationLogos.LogoFound += stationName => _dispatcher.InvokeAsync(() => ApplyStateSnapshot(_stateStore.Snapshot));
 
         StationPresets = [];
         HeosFavorites = [];
@@ -1215,6 +1220,13 @@ public sealed partial class MainViewModel : ObservableObject
                 ? _youtubeQueueService.Snapshot.CurrentTrack
                 : null;
 
+            // The logo of a saved station: from the file on this PC, else one search (not in screenshot mode).
+            var stationLogoUrl = _stationLogos.TryGet(activeStation?.DisplayName);
+            if (activeStation is not null && stationLogoUrl is null && !_freezeVuForScreenshots)
+            {
+                _ = _stationLogos.EnsureAsync(activeStation.DisplayName);
+            }
+
             var resolved = ApplyHeroCast(NowPlayingResolver.Resolve(
                 status,
                 activeStationName: activeStation?.DisplayName,
@@ -1222,7 +1234,8 @@ public sealed partial class MainViewModel : ObservableObject
                 isPcCasting: isPcCasting,
                 pcCastDetail: pcCastDetail,
                 activeLocalTrack: activeLocalTrack,
-                activeYouTubeTrack: activeYouTubeTrack));
+                activeYouTubeTrack: activeYouTubeTrack,
+                activeStationLogoUrl: stationLogoUrl));
 
             PlayState = resolved.PlayStateLabel;
             NowPlayingTitle = resolved.Title;
