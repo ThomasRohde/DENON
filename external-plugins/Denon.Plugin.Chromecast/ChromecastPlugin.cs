@@ -284,12 +284,11 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
                     break;
                 case "quit-app":
                     var onlySession = Param(parameters, "sessionId");
-                    if (!await client.QuitAppAsync(onlySession, cancellationToken))
-                    {
-                        return PluginActionResult.Ok($"{device.Name}: that session no longer runs, so nothing closed.");
-                    }
-
-                    break;
+                    // Data "closed" tells a caller (the TV wake) whether its session still owned the device.
+                    var closed = await client.QuitAppAsync(onlySession, cancellationToken);
+                    return PluginActionResult.OkWithData(
+                        closed ? $"Closed the app on {device.Name}." : $"{device.Name}: that session no longer runs, so nothing closed.",
+                        JsonSerializer.Serialize(new { closed }, JsonOptions));
                 case "wake-tv":
                     if (client.State.HasActiveApp)
                     {

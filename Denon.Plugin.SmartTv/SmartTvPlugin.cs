@@ -1325,7 +1325,19 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
                         return ReportAction("The TV is on (the Chromecast already casts).");
                     }
 
-                    // CEC switched the TV to the Chromecast's input. Go to Live TV, then close the empty cast app.
+                    // CEC switched the TV to the Chromecast's input. Close the empty wake app first: only when it still
+                    // owned the Chromecast go to Live TV. A cast the user started meanwhile keeps its input.
+                    if (closeWakeSession is null)
+                    {
+                        return ReportAction("The Chromecast woke the TV over HDMI-CEC; it stays on the Chromecast input (the wake session is not known).");
+                    }
+
+                    var quit = await _context.RunPluginActionAsync("chromecast", "quit-app", closeWakeSession, ct);
+                    if (!ReadClosed(quit))
+                    {
+                        return ReportAction("The Chromecast woke the TV over HDMI-CEC. A cast started meanwhile, so the TV stays on it.");
+                    }
+
                     try
                     {
                         await _client.LaunchAppAsync("com.webos.app.livetv", null, ct);
@@ -1333,11 +1345,6 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
                         _context.Logger.Warning($"Live TV after the HDMI-CEC wake failed: {ex.Message}");
-                    }
-
-                    if (closeWakeSession is not null)
-                    {
-                        await _context.RunPluginActionAsync("chromecast", "quit-app", closeWakeSession, ct);
                     }
 
                     return ReportAction($"The Chromecast woke the TV over HDMI-CEC (Wake-on-LAN did not answer). Switched to Live TV.");
@@ -1357,6 +1364,25 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
         finally
         {
             _powerOnGate.Release();
+        }
+    }
+
+    /// <summary>True when the Chromecast's quit-app closed the session (its data says "closed": true).</summary>
+    internal static bool ReadClosed(PluginActionResult quit)
+    {
+        if (!quit.Success || string.IsNullOrWhiteSpace(quit.DataJson))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(quit.DataJson);
+            return doc.RootElement.TryGetProperty("closed", out var c) && c.ValueKind == JsonValueKind.True;
+        }
+        catch (JsonException)
+        {
+            return false;
         }
     }
 
