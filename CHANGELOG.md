@@ -4,7 +4,7 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.10.12] - 2026-11-27
 
 ### Added
 - **The receiver condition can check "Standby or idle".** It passes when the receiver is in standby, or on with HEOS
@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **The LG TV turns on more reliably.** "TV Power On" sends Wake-on-LAN every second for up to 15 s, to the broadcast
   address and straight to the TV, and waits until the TV answers. A TV on Wi-Fi often misses a single packet. If the
   TV still does not answer, the Chromecast wakes it over HDMI-CEC (needs Chromecast plugin 0.6.0). The TV then goes
-  to Live TV, and the empty cast app closes. Taps while a wake runs do nothing.
+  to Live TV, and the empty cast app closes. Taps while a wake runs do nothing. With several Cast devices, name the TV's Chromecast in the TV plugin's `CecWakeCastDevice` setting. A cast you start meanwhile is never closed, and its input stays. A short network drop is not taken for a power-on.
 - **New automation condition "Recent event".** It is yes when a matching event happened in the last seconds, for
   example `cast.app_started` with `origin=external`.
 - **New example automation "TV on → Live TV".** When the TV comes on away from Live TV (it resumes the last HDMI
