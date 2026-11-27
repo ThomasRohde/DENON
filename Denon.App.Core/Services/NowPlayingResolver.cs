@@ -82,7 +82,8 @@ public static class NowPlayingResolver
         bool isPcCasting = false,
         string? pcCastDetail = null,
         LocalAudioTrackItem? activeLocalTrack = null,
-        YouTubeTrackItem? activeYouTubeTrack = null)
+        YouTubeTrackItem? activeYouTubeTrack = null,
+        string? activeStationLogoUrl = null)
     {
         var soundMode = string.IsNullOrWhiteSpace(status.SoundMode) ? "—" : status.SoundMode.Trim();
 
@@ -313,10 +314,18 @@ public static class NowPlayingResolver
             fallback: "HEOS Network Audio Stream",
             excludeTitle: resolvedTitle);
 
+        // HEOS gives no picture for a station that this app starts from a stream address: use the station's logo.
+        var image = status.NowPlaying.ImageUrl;
+        if (string.IsNullOrWhiteSpace(image) && !string.IsNullOrWhiteSpace(activeStationName) &&
+            (status.NowPlaying.IsPlaceholderUrlStream || !status.NowPlaying.HasRealMetadata))
+        {
+            image = activeStationLogoUrl;
+        }
+
         return new ResolvedNowPlaying(
             Title: resolvedTitle,
             Detail: resolvedDetail,
-            ImageUrl: status.NowPlaying.ImageUrl ?? string.Empty,
+            ImageUrl: image ?? string.Empty,
             PlayStateLabel: ToTitleCase(status.PlayState),
             IsExternalLiveInput: false);
     }
