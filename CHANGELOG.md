@@ -10,6 +10,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **The receiver condition can check "Standby or idle".** It passes when the receiver is in standby, or on with HEOS
   stopped or paused. Another input never counts as idle, because a TV may be on. The example "iPhone: arrive home"
   automation uses it, so the jazz plays also when the receiver was left on with the stream stopped.
+- **The phone remote has a clear power button.** It reads "Turn off" or "Turn on" and sets the power that way, in
+  place of the small ACTIVE/STANDBY label that toggled.
+
+### Fixed
+- **The phone remote stays paired on the iPhone home screen.** The pairing code now stays in the page address, so
+  "Add to Home Screen" saves it. iOS gives a home-screen web app its own storage, so before this the icon asked for
+  the long code again.
+- **Station logos show at once.** The desktop app keeps each picture in memory and on disk (`art-cache`), so a logo
+  is downloaded once, not on each change. The phone remote no longer loads the picture again on every refresh.
+- **A station that plays when the app starts shows its name and logo.** HEOS reports the app's stream only as "Url
+  Stream", so after a restart the app did not know the station. It now remembers the last station it started
+  (`last-station.txt`).
 
 ## [2.10.11] - 2026-11-27
 

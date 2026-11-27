@@ -101,6 +101,11 @@ prompt is wired (`create_or_update_automation`) but not tried with a real agent.
       on with the stream stopped. Another input (TV, Apple TV) never counts as idle, since the app cannot see that a
       TV is on.
 - [ ] Check a real arrival with the receiver left on and HEOS stopped after 2.10.12.
+- [x] Phone remote (2.10.12): the pairing code stays in the address for "Add to Home Screen"; a Turn on/Turn off
+      button; the picture is not reloaded on each refresh.
+- [ ] Check on the iPhone: remove the old home-screen icon, scan the QR code, add it again, and open it.
+- [x] Station logos are cached in memory and in `art-cache`; the last started station is kept in `last-station.txt`
+      so a stream that plays at app start shows its name and logo (2.10.12).
 - [ ] **Decide:** should the Phone Remote's `/api/volume` use the safe-volume cap (`MaxSafeVolume`, 65)? MCP agents and
       automations are capped; the Phone Remote, and so a Shortcut that calls it, only stops at the receiver's maximum.
       Left as it is because the remote is the owner at the couch.
