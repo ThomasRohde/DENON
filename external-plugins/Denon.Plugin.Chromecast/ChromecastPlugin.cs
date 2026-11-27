@@ -183,7 +183,7 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
         "device",
         "string",
         "Cast device name, id or IP (for example \"Stuen 2\"). Optional: default is the device that plays, " +
-        "then the device with an active app, then the only device.");
+        "then the device with an active app, then the only device. \"only\": the only device, never another.");
 
     private static readonly PluginActionParameter[] DeviceOnly = [DeviceParam];
 
@@ -983,7 +983,15 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
         }
 
         (CastDeviceConfig Config, CastDeviceState State)? match;
-        if (key is null)
+        if (string.Equals(key, "only", StringComparison.OrdinalIgnoreCase))
+        {
+            // "The only device, or none": never the one that plays, which may sit on another TV (the TV wake).
+            match = views.Count == 1
+                ? views[0]
+                : throw new ArgumentException(
+                    $"Several Cast devices are known ({string.Join(", ", views.Select(v => v.Config.Name))}). Give the 'device' parameter (name, id or IP).");
+        }
+        else if (key is null)
         {
             match = views.FirstOrDefault(v => v.State.IsPlaying);
             if (match?.Config is null)

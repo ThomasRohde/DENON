@@ -1244,6 +1244,12 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
     /// <summary>How long Wake-on-LAN packets go out before the HDMI-CEC fallback.</summary>
     internal static readonly TimeSpan WakeOnLanWindow = TimeSpan.FromSeconds(15);
 
+    /// <summary>
+    /// The device value that makes the Cast plugin use its only device and refuse when it knows several (it then
+    /// lists them), so a playing Chromecast on another TV is never picked.
+    /// </summary>
+    internal const string OnlyCastDevice = "only";
+
     /// <summary>How long the TV gets to answer after the Chromecast woke it over HDMI-CEC.</summary>
     internal static readonly TimeSpan CecWakeWindow = TimeSpan.FromSeconds(20);
 
@@ -1301,7 +1307,11 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
                 return PluginActionResult.Fail("The TV did not answer Wake-on-LAN.");
             }
 
-            var wake = await _context.RunPluginActionAsync("chromecast", "wake-tv", null, ct);
+            // The Chromecast on this TV: the configured one, else the Cast plugin's only device. Never "the one
+            // that plays" (Cast picks that without a device), which may sit on another TV.
+            var castDevice = string.IsNullOrWhiteSpace(_config.CecWakeCastDevice) ? null : _config.CecWakeCastDevice.Trim();
+            var wake = await _context.RunPluginActionAsync(
+                "chromecast", "wake-tv", new Dictionary<string, string> { ["device"] = castDevice ?? OnlyCastDevice }, ct);
             if (!wake.Success)
             {
                 return PluginActionResult.Fail(
@@ -1313,7 +1323,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
             // its input: no Live TV then.
             var (launched, wakeSession) = ReadWakeResult(wake.DataJson);
             var closeWakeSession = launched && wakeSession is not null
-                ? new Dictionary<string, string> { ["sessionId"] = wakeSession }
+                ? new Dictionary<string, string> { ["sessionId"] = wakeSession, ["device"] = castDevice ?? OnlyCastDevice }
                 : null;
             var cec = System.Diagnostics.Stopwatch.StartNew();
             while (cec.Elapsed < CecWakeWindow)
@@ -1423,7 +1433,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
-                return false; // No answer in time: the TV sleeps. Port 3000 would not answer either.
+                // No answer in time on this port: try the other one (a TV may drop 3001 but serve 3000).
             }
             catch (System.Net.Sockets.SocketException)
             {

@@ -39,6 +39,12 @@ public sealed class SmartTvConfig
     public bool ChannelLogos { get; set; } = true;
 
     /// <summary>
+    /// The Chromecast plugged into this TV (name, id or IP), which wakes it over HDMI-CEC when Wake-on-LAN gets no
+    /// answer. Empty: the only Cast device. With several Cast devices, set it, or the fallback is skipped.
+    /// </summary>
+    public string CecWakeCastDevice { get; set; } = string.Empty;
+
+    /// <summary>
     /// Pins a logo per channel name: an https address or a local image file. The value "none" shows no logo.
     /// </summary>
     public Dictionary<string, string> ChannelLogoOverrides { get; set; } = new(StringComparer.OrdinalIgnoreCase);
