@@ -182,8 +182,12 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
         new("toggle-play", "Play / Pause", "Toggles playback.", "Playback") { Parameters = DeviceOnly, IsDestructive = false },
         new("stop", "Stop media", "Stops the media session (the program closes; it cannot be resumed).", "Playback")
             { Parameters = DeviceOnly, IsDestructive = true },
-        new("quit-app", "Quit app", "Closes the running Cast app.", "Playback") { Parameters = DeviceOnly, IsDestructive = true },
-        new("wake-tv", "Wake the TV (HDMI-CEC)", "Starts the Cast default receiver, so HDMI-CEC turns on the TV and selects this device's input. Does nothing when an app already runs. Quit it with quit-app.", "Cast")
+        new("quit-app", "Quit app", "Closes the running Cast app. With 'sessionId', only when that session still runs.", "Playback")
+        {
+            Parameters = [DeviceParam, new("sessionId", "string", "Optional: close only this session (for example the one wake-tv started).")],
+            IsDestructive = true,
+        },
+        new("wake-tv", "Wake the TV (HDMI-CEC)", "Starts the Cast default receiver, so HDMI-CEC turns on the TV and selects this device's input. Does nothing when an app already runs. Data: launched, sessionId; close it with quit-app and that sessionId.", "Cast")
             { Parameters = DeviceOnly, IsDestructive = false },
         new("pause-all", "Pause all Cast devices", "Pauses every Cast device that plays.", "Playback") { Parameters = [], IsDestructive = false },
         new("set-volume", "Set Cast volume", "Sets the Cast device volume.", "Volume")
@@ -246,17 +250,27 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
                     await client.StopMediaAsync(cancellationToken);
                     break;
                 case "quit-app":
-                    await client.QuitAppAsync(cancellationToken);
+                    var onlySession = Param(parameters, "sessionId");
+                    if (!await client.QuitAppAsync(onlySession, cancellationToken))
+                    {
+                        return PluginActionResult.Ok($"{device.Name}: that session no longer runs, so nothing closed.");
+                    }
+
                     break;
                 case "wake-tv":
                     if (client.State.HasActiveApp)
                     {
-                        // A cast already runs: the device is the active source, so the TV is on or waking.
-                        return PluginActionResult.Ok($"{device.Name} already runs {client.State.AppName ?? "an app"}.");
+                        // A cast already runs: the device is the active source, so the TV is on or waking. It is
+                        // the user's session: launched=false tells the caller not to close it.
+                        return PluginActionResult.OkWithData(
+                            $"{device.Name} already runs {client.State.AppName ?? "an app"}.",
+                            JsonSerializer.Serialize(new { launched = false }, JsonOptions));
                     }
 
-                    await client.LaunchDefaultReceiverAsync(cancellationToken);
-                    return PluginActionResult.Ok($"Started the default receiver on {device.Name}, so HDMI-CEC wakes the TV.");
+                    var wakeSession = await client.LaunchDefaultReceiverAsync(cancellationToken);
+                    return PluginActionResult.OkWithData(
+                        $"Started the default receiver on {device.Name}, so HDMI-CEC wakes the TV.",
+                        JsonSerializer.Serialize(new { launched = true, sessionId = wakeSession }, JsonOptions));
                 case "set-volume":
                     var levelText = Param(parameters, "level") ?? throw new ArgumentException("Parameter 'level' (0-100) is required.");
                     if (!double.TryParse(levelText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var level))

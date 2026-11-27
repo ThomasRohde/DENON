@@ -1275,11 +1275,22 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
             }
 
             _context.Logger.Info($"The TV did not answer Wake-on-LAN in {WakeOnLanWindow.TotalSeconds:0} s. {wake.Message}");
+            // Only the session the wake started is ours to close. A cast the user already runs stays, and so does
+            // its input: no Live TV then.
+            var (launched, wakeSession) = ReadWakeResult(wake.DataJson);
+            var closeWakeSession = launched && wakeSession is not null
+                ? new Dictionary<string, string> { ["sessionId"] = wakeSession }
+                : null;
             var cec = System.Diagnostics.Stopwatch.StartNew();
             while (cec.Elapsed < CecWakeWindow)
             {
                 if (await TryConnectAsync(ct))
                 {
+                    if (!launched)
+                    {
+                        return ReportAction("The TV is on (the Chromecast already casts).");
+                    }
+
                     // CEC switched the TV to the Chromecast's input. Go to Live TV, then close the empty cast app.
                     try
                     {
@@ -1290,20 +1301,50 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
                         _context.Logger.Warning($"Live TV after the HDMI-CEC wake failed: {ex.Message}");
                     }
 
-                    await _context.RunPluginActionAsync("chromecast", "quit-app", null, ct);
+                    if (closeWakeSession is not null)
+                    {
+                        await _context.RunPluginActionAsync("chromecast", "quit-app", closeWakeSession, ct);
+                    }
+
                     return ReportAction($"The Chromecast woke the TV over HDMI-CEC (Wake-on-LAN did not answer). Switched to Live TV.");
                 }
 
                 await Task.Delay(TimeSpan.FromSeconds(1), ct);
             }
 
-            await _context.RunPluginActionAsync("chromecast", "quit-app", null, ct);
+            if (closeWakeSession is not null)
+            {
+                await _context.RunPluginActionAsync("chromecast", "quit-app", closeWakeSession, ct);
+            }
+
             return PluginActionResult.Fail(
                 "The TV did not answer Wake-on-LAN or HDMI-CEC. On the TV, turn on SimpLink (HDMI-CEC) and \"Turn on via Wi-Fi\".");
         }
         finally
         {
             _powerOnGate.Release();
+        }
+    }
+
+    /// <summary>Reads the Chromecast's wake-tv data: did it start a session, and which one.</summary>
+    internal static (bool Launched, string? SessionId) ReadWakeResult(string? dataJson)
+    {
+        if (string.IsNullOrWhiteSpace(dataJson))
+        {
+            return (false, null);
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(dataJson);
+            var root = doc.RootElement;
+            var launched = root.TryGetProperty("launched", out var l) && l.ValueKind == JsonValueKind.True;
+            var session = root.TryGetProperty("sessionId", out var s) && s.ValueKind == JsonValueKind.String ? s.GetString() : null;
+            return (launched, string.IsNullOrWhiteSpace(session) ? null : session);
+        }
+        catch (JsonException)
+        {
+            return (false, null);
         }
     }
 

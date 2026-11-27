@@ -165,18 +165,51 @@ internal sealed class CastDeviceClient : IAsyncDisposable
     /// Starts the Default Media Receiver. Like any cast, it makes the device the active source over HDMI-CEC, which
     /// turns on a TV in standby (when the TV has CEC on: SimpLink on LG, Anynet+ on Samsung).
     /// </summary>
-    public async Task LaunchDefaultReceiverAsync(CancellationToken ct = default)
+    /// <returns>The new session's id from the device's answer, or null when the answer has none.</returns>
+    public async Task<string?> LaunchDefaultReceiverAsync(CancellationToken ct = default)
     {
         var channel = RequireChannel();
-        await ReceiverCommandAsync(channel, new JsonObject { ["type"] = "LAUNCH", ["appId"] = DefaultMediaReceiverAppId }, ct);
+        var response = await ReceiverCommandAsync(channel, new JsonObject { ["type"] = "LAUNCH", ["appId"] = DefaultMediaReceiverAppId }, ct);
+        if (response.TryGetProperty("status", out var status) &&
+            status.TryGetProperty("applications", out var apps) && apps.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var app in apps.EnumerateArray())
+            {
+                if (GetString(app, "appId") == DefaultMediaReceiverAppId && GetString(app, "sessionId") is { Length: > 0 } id)
+                {
+                    return id;
+                }
+            }
+        }
+
+        return null;
     }
 
-    /// <summary>Closes the running app (the device goes back to its idle screen).</summary>
-    public async Task QuitAppAsync(CancellationToken ct = default)
+    /// <summary>
+    /// Closes the running app (the device goes back to its idle screen). With <paramref name="onlySessionId"/>, only
+    /// when that session still runs: an app the user started since then stays. Returns false when nothing closed.
+    /// </summary>
+    public async Task<bool> QuitAppAsync(string? onlySessionId = null, CancellationToken ct = default)
     {
         var channel = RequireChannel();
-        var sessionId = State.SessionId ?? throw new InvalidOperationException("No app is running.");
+        var sessionId = State.SessionId;
+        if (sessionId is null)
+        {
+            if (onlySessionId is not null)
+            {
+                return false;
+            }
+
+            throw new InvalidOperationException("No app is running.");
+        }
+
+        if (onlySessionId is not null && !string.Equals(sessionId, onlySessionId, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
         await ReceiverCommandAsync(channel, new JsonObject { ["type"] = "STOP", ["sessionId"] = sessionId }, ct);
+        return true;
     }
 
     private async Task RunAsync(CancellationToken ct)
@@ -433,7 +466,7 @@ internal sealed class CastDeviceClient : IAsyncDisposable
         }
     }
 
-    private static async Task ReceiverCommandAsync(CastChannel channel, JsonObject payload, CancellationToken ct)
+    private static async Task<JsonElement> ReceiverCommandAsync(CastChannel channel, JsonObject payload, CancellationToken ct)
     {
         var response = await channel.RequestAsync(CastNamespaces.Receiver, CastChannel.ReceiverId, payload, ct);
         var responseType = GetString(response, "type");
@@ -441,6 +474,8 @@ internal sealed class CastDeviceClient : IAsyncDisposable
         {
             throw new InvalidOperationException($"The device refused the command: {GetString(response, "reason") ?? responseType}");
         }
+
+        return response;
     }
 
     private CastChannel RequireChannel()

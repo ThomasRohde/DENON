@@ -1609,11 +1609,14 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
 
             if (ReferenceEquals(_ws, ws) && !_demoMode)
             {
+                // Forget the foreground app: the first app after the next power-on then reports fromAppId "" (the
+                // "TV on → Live TV" automation keys on it), also when the TV resumes the same input.
                 UpdateState(s => s with
                 {
                     IsConnected = false,
                     IsPointerConnected = false,
                     TransportLabel = "STANDBY",
+                    ForegroundAppId = string.Empty,
                 });
             }
         }
