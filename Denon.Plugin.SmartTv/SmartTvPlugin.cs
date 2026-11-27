@@ -164,7 +164,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
                 case "tv.power_on":
                     if (_config.DemoMode)
                     {
-                        return ReportAction("Sent Wake-on-LAN magic packets to TV.");
+                        return ReportAction("Demo mode: the simulated TV is on (no packets sent).");
                     }
 
                     return await PowerOnAsync(cancellationToken);
@@ -1348,7 +1348,33 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
         }
     }
 
-    /// <summary>One short connect try. True when the TV answers.</summary>
+    /// <summary>True when the TV accepts a TCP connection on its SSAP port (3001, or 3000) within the timeout.</summary>
+    internal static async Task<bool> IsTvPortOpenAsync(string host, TimeSpan timeout, CancellationToken ct)
+    {
+        foreach (var port in new[] { 3001, 3000 })
+        {
+            using var attempt = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            attempt.CancelAfter(timeout);
+            try
+            {
+                using var tcp = new System.Net.Sockets.TcpClient();
+                await tcp.ConnectAsync(host.Trim(), port, attempt.Token);
+                return true;
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                return false; // No answer in time: the TV sleeps. Port 3000 would not answer either.
+            }
+            catch (System.Net.Sockets.SocketException)
+            {
+                // Refused or unreachable: try the other port.
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>One connect try. True when the TV answers.</summary>
     private async Task<bool> TryConnectAsync(CancellationToken ct)
     {
         if (_client.IsConnected)
@@ -1356,18 +1382,20 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
             return true;
         }
 
-        using var attempt = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        attempt.CancelAfter(TimeSpan.FromMilliseconds(1500));
+        // A short TCP probe tells whether the TV is up. Only then connect, with no short timeout: cancelling the
+        // connect mid-way would also cancel the state hydration and leave the session without push subscriptions.
+        if (!await IsTvPortOpenAsync(_config.TvIp, TimeSpan.FromMilliseconds(1500), ct))
+        {
+            return false;
+        }
+
         try
         {
-            await _client.RefreshStateAsync(attempt.Token);
-        }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-        {
+            await _client.RefreshStateAsync(ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // Not awake yet.
+            // Up but not ready yet: the next try or the background monitor connects.
         }
 
         return _client.IsConnected;

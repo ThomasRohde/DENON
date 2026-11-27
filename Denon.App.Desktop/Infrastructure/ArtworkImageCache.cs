@@ -102,9 +102,12 @@ public static class ArtworkImageCache
     private static async Task SaveToDiskAsync(Uri uri)
     {
         var key = uri.AbsoluteUri;
-        if (!Downloading.Add(key))
+        lock (Downloading)
         {
-            return;
+            if (!Downloading.Add(key))
+            {
+                return;
+            }
         }
 
         try
@@ -122,6 +125,13 @@ public static class ArtworkImageCache
         catch
         {
             // Best effort: the picture shows from the web anyway.
+        }
+        finally
+        {
+            lock (Downloading)
+            {
+                Downloading.Remove(key);
+            }
         }
     }
 

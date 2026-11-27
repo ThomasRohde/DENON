@@ -1119,7 +1119,7 @@ public sealed class PluginHostService : IAsyncDisposable
             CancellationToken cancellationToken = default) =>
             string.Equals(targetPluginId?.Trim(), PluginId, StringComparison.OrdinalIgnoreCase)
                 ? Task.FromResult(PluginActionResult.Fail("A plugin cannot run its own action through the host."))
-                : runPluginAction(targetPluginId ?? string.Empty, actionId, parameters, cancellationToken);
+                : runPluginAction(targetPluginId?.Trim() ?? string.Empty, actionId, parameters, cancellationToken);
 
         public bool IsAppShuttingDown => isAppShuttingDown();
 

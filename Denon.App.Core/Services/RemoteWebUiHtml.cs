@@ -8,6 +8,8 @@ public static class RemoteWebUiHtml
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- The address holds the pairing code: never send it to the hosts of logos and thumbnails. -->
+<meta name="referrer" content="no-referrer" />
 <title>Denon Remote &amp; Jukebox</title>
 <style>
   :root {
@@ -127,7 +129,7 @@ public static class RemoteWebUiHtml
   <div id="tab-remote" class="panel active" role="tabpanel">
     <div class="card hero">
       <div class="now-row">
-        <img id="artImg" class="art" alt="Album artwork" style="display:none" />
+        <img id="artImg" class="art" alt="Album artwork" referrerpolicy="no-referrer" style="display:none" />
         <div style="flex:1; min-width:0">
           <div class="badges">
             <span id="badgeInput" class="badge cyan">HEOS</span>

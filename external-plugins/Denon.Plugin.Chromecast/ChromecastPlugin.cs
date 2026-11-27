@@ -29,6 +29,39 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
     private static readonly TimeSpan PlaybackHold = TimeSpan.FromSeconds(5);
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CancellationTokenSource> _playbackHolds = new(StringComparer.Ordinal);
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string?> _lastRecordedPlayback = new(StringComparer.Ordinal);
+
+    /// <summary>How long after a wake-tv launch a new default-receiver session counts as the wake's own.</summary>
+    private static readonly TimeSpan WakePendingWindow = TimeSpan.FromSeconds(15);
+
+    // Per device: a wake-tv launch in progress, and the session it started. Those sessions skip the receiver hooks.
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _wakePendingUntil = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, string> _wakeSessions = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// True when <paramref name="state"/> is the default-receiver session a wake-tv started: its session id, or a new
+    /// one while the launch is pending. With <paramref name="claim"/>, a pending launch takes that session id.
+    /// </summary>
+    private bool IsWakeSession(string deviceId, CastDeviceState state, bool claim)
+    {
+        if (!string.Equals(state.AppId, CastDeviceClient.DefaultMediaReceiverAppId, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (_wakeSessions.TryGetValue(deviceId, out var known) && string.Equals(known, state.SessionId, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (claim && state.SessionId is { } sessionId &&
+            _wakePendingUntil.TryRemove(deviceId, out var until) && DateTimeOffset.UtcNow <= until)
+        {
+            _wakeSessions[deviceId] = sessionId;
+            return true;
+        }
+
+        return false;
+    }
     private IPluginReceiverControl? _receiverControl;
     private ChromecastConfig _config = new();
     private CancellationTokenSource? _lifetime;
@@ -267,7 +300,15 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
                             JsonSerializer.Serialize(new { launched = false }, JsonOptions));
                     }
 
+                    // The status push of the new session can come before the launch answer: mark the wake first.
+                    _wakePendingUntil[device.Id] = DateTimeOffset.UtcNow + WakePendingWindow;
                     var wakeSession = await client.LaunchDefaultReceiverAsync(cancellationToken);
+                    if (wakeSession is not null)
+                    {
+                        _wakeSessions[device.Id] = wakeSession;
+                        _wakePendingUntil.TryRemove(device.Id, out _);
+                    }
+
                     return PluginActionResult.OkWithData(
                         $"Started the default receiver on {device.Name}, so HDMI-CEC wakes the TV.",
                         JsonSerializer.Serialize(new { launched = true, sessionId = wakeSession }, JsonOptions));
@@ -692,12 +733,23 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
             if (sessionStarted)
             {
                 RecordEvent("cast.app_started", config, current, origin: "external");
-                _ = Task.Run(() => OnSessionStartedAsync(config, current));
+                // A wake-tv session only turns the TV on: no receiver automation (scene, input, sound mode).
+                if (!IsWakeSession(deviceId, current, claim: true))
+                {
+                    _ = Task.Run(() => OnSessionStartedAsync(config, current));
+                }
             }
 
             if (sessionEnded)
             {
-                OnSessionEnded(config, previous);
+                if (IsWakeSession(deviceId, previous, claim: false))
+                {
+                    _wakeSessions.TryRemove(deviceId, out _);
+                }
+                else
+                {
+                    OnSessionEnded(config, previous);
+                }
             }
         }
 
