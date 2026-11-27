@@ -2,6 +2,13 @@
 
 Released separately from Denon Desktop with tags `chromecast-vX.Y.Z`.
 
+## [Unreleased] - 0.6.0
+
+### Added
+- **Wake the TV (HDMI-CEC)** (`wake-tv`): starts the Cast default receiver, so HDMI-CEC turns on the TV and selects
+  the Chromecast's input. It does nothing when an app already runs. The LG TV plugin uses it when Wake-on-LAN gets
+  no answer, and closes the app with `quit-app` after.
+
 ## [0.5.1] - 2026-11-26
 
 ### Fixed

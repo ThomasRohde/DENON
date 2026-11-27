@@ -43,6 +43,9 @@ public interface IAutomationEffects
 
     /// <summary>Sets the learned volume of what plays now (Volume memory) and returns what it did. Throws when it fails.</summary>
     Task<string> SetLearnedVolumeAsync(CancellationToken ct);
+
+    /// <summary>The latest room events, newest first (the bus keeps the last 200).</summary>
+    IReadOnlyList<RoomEvent> GetRecentEvents();
 }
 
 /// <summary>Walks an automation graph from one trigger. See docs/automation-graphs.md, "How a run works".</summary>
@@ -156,6 +159,31 @@ public static class AutomationGraphRunner
                 var filter = node.Get("filter");
                 var pass = AutomationTriggers.FilterMatches(roomEvent, AutomationTriggers.ParseFilter(filter));
                 return (pass, pass ? $"The event data matches {filter}." : $"The event data does not match {filter}.");
+            }
+
+            case AutomationNodeTypes.ConditionRecentEvent:
+            {
+                var names = node.Get("event");
+                if (names.Length == 0 ||
+                    !int.TryParse(node.Get("seconds"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var seconds) || seconds < 1)
+                {
+                    return (false, "The recent event check is not set.");
+                }
+
+                var since = now - TimeSpan.FromSeconds(seconds);
+                var terms = AutomationTriggers.ParseFilter(node.Get("filter"));
+                var hit = effects.GetRecentEvents().FirstOrDefault(e =>
+                    e.Timestamp >= since &&
+                    !ReferenceEquals(e, roomEvent) &&
+                    AutomationTriggers.EventNameMatches(e.Event, names) &&
+                    AutomationTriggers.FilterMatches(e, terms));
+                if (hit is null)
+                {
+                    return (false, $"No {names} in the last {seconds} s.");
+                }
+
+                var ago = Math.Max(0, (now - hit.Timestamp).TotalSeconds);
+                return (true, $"Yes: {hit.Event} from {hit.Device} {ago:0} s ago.");
             }
 
             case AutomationNodeTypes.ConditionTime:

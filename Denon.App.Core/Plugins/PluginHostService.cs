@@ -582,7 +582,8 @@ public sealed class PluginHostService : IAsyncDisposable
                 entry.Health = entry.IsEnabled ? health : PluginHealthState.Disabled;
                 NotifyPluginsChanged();
             },
-            () => IsStoppingAll);
+            () => IsStoppingAll,
+            ExecuteActionAsync);
 
         lock (_syncRoot)
         {
@@ -1106,9 +1107,19 @@ public sealed class PluginHostService : IAsyncDisposable
         IPluginReceiverControl? receiverControl,
         IPluginEventLogger events,
         Action<string, PluginHealthState, IReadOnlyDictionary<string, string>?> reportStatus,
-        Func<bool> isAppShuttingDown) : IPluginContext
+        Func<bool> isAppShuttingDown,
+        Func<string, string, IReadOnlyDictionary<string, string>?, CancellationToken, Task<PluginActionResult>> runPluginAction) : IPluginContext
     {
         public string PluginId { get; } = pluginId;
+
+        public Task<PluginActionResult> RunPluginActionAsync(
+            string targetPluginId,
+            string actionId,
+            IReadOnlyDictionary<string, string>? parameters = null,
+            CancellationToken cancellationToken = default) =>
+            string.Equals(targetPluginId?.Trim(), PluginId, StringComparison.OrdinalIgnoreCase)
+                ? Task.FromResult(PluginActionResult.Fail("A plugin cannot run its own action through the host."))
+                : runPluginAction(targetPluginId ?? string.Empty, actionId, parameters, cancellationToken);
 
         public bool IsAppShuttingDown => isAppShuttingDown();
 

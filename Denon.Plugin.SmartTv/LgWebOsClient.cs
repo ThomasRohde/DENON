@@ -1230,6 +1230,39 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Sends the magic packet to every adapter's broadcast address and, when <paramref name="tvIp"/> is given, straight
+    /// to the TV: a Wi-Fi access point may hold broadcasts for a sleeping client but still deliver a direct packet
+    /// (Windows knows the TV's MAC from its ARP table for a while after the TV was on).
+    /// </summary>
+    public async Task SendWakeOnLanAsync(string macAddress, string? tvIp, CancellationToken ct = default)
+    {
+        await SendWakeOnLanAsync(macAddress, ct);
+        if (string.IsNullOrWhiteSpace(tvIp) || !IPAddress.TryParse(tvIp.Trim(), out var tvAddress))
+        {
+            return;
+        }
+
+        var hex = new string(macAddress.Where(Uri.IsHexDigit).ToArray());
+        var macBytes = Convert.FromHexString(hex);
+        var packet = new byte[6 + (16 * 6)];
+        for (var i = 0; i < 6; i++) packet[i] = 0xFF;
+        for (var rep = 0; rep < 16; rep++)
+        {
+            Buffer.BlockCopy(macBytes, 0, packet, 6 + (rep * 6), 6);
+        }
+
+        try
+        {
+            using var udp = new UdpClient(tvAddress.AddressFamily);
+            await udp.SendAsync(packet, packet.Length, new IPEndPoint(tvAddress, 9));
+        }
+        catch (SocketException)
+        {
+            // No route or no ARP entry: the broadcast went out anyway.
+        }
+    }
+
     public async Task SendWakeOnLanAsync(string macAddress, CancellationToken ct = default)
     {
         var hex = new string(macAddress.Where(Uri.IsHexDigit).ToArray());

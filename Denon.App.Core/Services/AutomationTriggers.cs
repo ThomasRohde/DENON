@@ -58,6 +58,26 @@ public static partial class AutomationTriggers
     }
 
     /// <summary>
+    /// True when <paramref name="eventName"/> is one of the comma-separated <paramref name="patterns"/>. A pattern
+    /// ending in "*" matches every name that starts with the rest, e.g. "cast.*".
+    /// </summary>
+    public static bool EventNameMatches(string eventName, string patterns)
+    {
+        foreach (var wanted in patterns.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var match = wanted.EndsWith('*')
+                ? eventName.StartsWith(wanted[..^1], StringComparison.OrdinalIgnoreCase)
+                : string.Equals(eventName, wanted, StringComparison.OrdinalIgnoreCase);
+            if (match)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// True when every term matches. "device", "origin" and "stream" match the event itself; other keys match
     /// its data. A missing value never equals anything.
     /// </summary>
@@ -102,10 +122,7 @@ public static partial class AutomationTriggers
                     return false;
                 }
 
-                var nameMatches = wanted.EndsWith('*')
-                    ? roomEvent.Event.StartsWith(wanted[..^1], StringComparison.OrdinalIgnoreCase)
-                    : string.Equals(roomEvent.Event, wanted, StringComparison.OrdinalIgnoreCase);
-                return nameMatches && FilterMatches(roomEvent, ParseFilter(trigger.Get("filter")));
+                return EventNameMatches(roomEvent.Event, wanted) && FilterMatches(roomEvent, ParseFilter(trigger.Get("filter")));
             }
 
             case AutomationNodeTypes.TriggerSource:

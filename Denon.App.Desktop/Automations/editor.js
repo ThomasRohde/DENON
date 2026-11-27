@@ -402,6 +402,8 @@ function nodeSummary(node) {
       else if (c.muted === "no") parts.push("Not muted");
       return parts.join(" · ") || "Any receiver state";
     }
+    case "condition.recent_event":
+      return c.event ? join(`${c.event} in ${c.seconds || "…"} s`, c.filter || "") : "";
     case "action.scene":
       return c.sceneId ? `Scene: ${sceneName(c.sceneId)}` : "";
     case "action.plugin": {

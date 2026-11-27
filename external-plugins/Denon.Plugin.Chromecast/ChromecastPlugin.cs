@@ -183,6 +183,8 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
         new("stop", "Stop media", "Stops the media session (the program closes; it cannot be resumed).", "Playback")
             { Parameters = DeviceOnly, IsDestructive = true },
         new("quit-app", "Quit app", "Closes the running Cast app.", "Playback") { Parameters = DeviceOnly, IsDestructive = true },
+        new("wake-tv", "Wake the TV (HDMI-CEC)", "Starts the Cast default receiver, so HDMI-CEC turns on the TV and selects this device's input. Does nothing when an app already runs. Quit it with quit-app.", "Cast")
+            { Parameters = DeviceOnly, IsDestructive = false },
         new("pause-all", "Pause all Cast devices", "Pauses every Cast device that plays.", "Playback") { Parameters = [], IsDestructive = false },
         new("set-volume", "Set Cast volume", "Sets the Cast device volume.", "Volume")
         {
@@ -246,6 +248,15 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
                 case "quit-app":
                     await client.QuitAppAsync(cancellationToken);
                     break;
+                case "wake-tv":
+                    if (client.State.HasActiveApp)
+                    {
+                        // A cast already runs: the device is the active source, so the TV is on or waking.
+                        return PluginActionResult.Ok($"{device.Name} already runs {client.State.AppName ?? "an app"}.");
+                    }
+
+                    await client.LaunchDefaultReceiverAsync(cancellationToken);
+                    return PluginActionResult.Ok($"Started the default receiver on {device.Name}, so HDMI-CEC wakes the TV.");
                 case "set-volume":
                     var levelText = Param(parameters, "level") ?? throw new ArgumentException("Parameter 'level' (0-100) is required.");
                     if (!double.TryParse(levelText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var level))

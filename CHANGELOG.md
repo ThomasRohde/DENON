@@ -10,6 +10,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **The receiver condition can check "Standby or idle".** It passes when the receiver is in standby, or on with HEOS
   stopped or paused. Another input never counts as idle, because a TV may be on. The example "iPhone: arrive home"
   automation uses it, so the jazz plays also when the receiver was left on with the stream stopped.
+- **The LG TV turns on more reliably.** "TV Power On" sends Wake-on-LAN every second for up to 15 s, to the broadcast
+  address and straight to the TV, and waits until the TV answers. A TV on Wi-Fi often misses a single packet. If the
+  TV still does not answer, the Chromecast wakes it over HDMI-CEC (needs Chromecast plugin 0.6.0). The TV then goes
+  to Live TV, and the empty cast app closes. Taps while a wake runs do nothing.
+- **New automation condition "Recent event".** It is yes when a matching event happened in the last seconds, for
+  example `cast.app_started` with `origin=external`.
+- **New example automation "TV on → Live TV".** When the TV comes on away from Live TV (it resumes the last HDMI
+  input), it switches to Live TV. It doesn't switch when a cast or the Apple TV woke the TV in the last 30 s.
+- **Plugins can run another plugin's action** (`IPluginContext.RunPluginActionAsync`, SDK 2.2.0).
 - **The phone remote has a clear power button.** It reads "Turn off" or "Turn on" and sets the power that way, in
   place of the small ACTIVE/STANDBY label that toggled.
 

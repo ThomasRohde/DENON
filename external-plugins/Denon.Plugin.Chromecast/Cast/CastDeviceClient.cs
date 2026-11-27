@@ -158,6 +158,19 @@ internal sealed class CastDeviceClient : IAsyncDisposable
         }, ct);
     }
 
+    /// <summary>The Cast Default Media Receiver: an empty app that only makes the device the active HDMI source.</summary>
+    public const string DefaultMediaReceiverAppId = "CC1AD845";
+
+    /// <summary>
+    /// Starts the Default Media Receiver. Like any cast, it makes the device the active source over HDMI-CEC, which
+    /// turns on a TV in standby (when the TV has CEC on: SimpLink on LG, Anynet+ on Samsung).
+    /// </summary>
+    public async Task LaunchDefaultReceiverAsync(CancellationToken ct = default)
+    {
+        var channel = RequireChannel();
+        await ReceiverCommandAsync(channel, new JsonObject { ["type"] = "LAUNCH", ["appId"] = DefaultMediaReceiverAppId }, ct);
+    }
+
     /// <summary>Closes the running app (the device goes back to its idle screen).</summary>
     public async Task QuitAppAsync(CancellationToken ct = default)
     {
