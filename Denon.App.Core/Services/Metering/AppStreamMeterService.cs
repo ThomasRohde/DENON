@@ -5,11 +5,12 @@ using Denon.App.Core.Models;
 namespace Denon.App.Core.Services.Metering;
 
 /// <summary>
-/// Real, synced meters for audio that this app streams to the Denon from YouTube / YouTube Music and the
-/// local jukebox. When a track starts, a separate ffmpeg process decodes a copy of the same source to PCM
-/// (the stream to the Denon is not touched), and <see cref="PcmMeterAnalyzer"/> builds a level + 31-band
-/// timeline by media time. The UI reads the frame at the position the speakers play now
-/// (playback clock minus the measured HEOS delay).
+/// Real, synced meters for audio that this app sends to the Denon: YouTube / YouTube Music, the local jukebox, and
+/// internet radio started from the app (a station button, a Smart Scene's stream or an MCP stream). When it starts,
+/// a separate ffmpeg process decodes a copy of the same source to PCM (the stream to the Denon is not touched), and
+/// <see cref="PcmMeterAnalyzer"/> builds a level + 31-band timeline by media time. The UI and Hue Music Sync read the
+/// frame at the position the speakers play now: the track's playback clock minus the HEOS delay, or for radio the
+/// <see cref="RadioPlaybackClock"/> (a live stream keeps a rolling timeline of the last minutes).
 /// </summary>
 public sealed class AppStreamMeterService : IDisposable
 {
@@ -17,28 +18,46 @@ public sealed class AppStreamMeterService : IDisposable
     public const int HopFrames = 1024; // ≈23 ms per frame
     public static readonly TimeSpan MaxAnalyzedDuration = TimeSpan.FromMinutes(90); // ≈19 MB of frames
 
+    /// <summary>A live radio stream keeps this much (≈2 MB of frames).</summary>
+    public static readonly TimeSpan RadioWindow = TimeSpan.FromMinutes(10);
+
+    /// <summary>A radio decoder that stopped (network, server) starts again at most this often while HEOS plays on.</summary>
+    public static readonly TimeSpan RadioRestartInterval = TimeSpan.FromSeconds(15);
+
     private readonly YouTubeQueueService _youtubeQueue;
     private readonly LocalMediaJukeboxService _jukebox;
     private readonly YouTubeMediaService _youtubeMedia;
+    private readonly ReceiverController _receiver;
+    private readonly ReceiverStateStore _state;
     private readonly AppLogStore _logStore;
     private readonly object _sync = new();
     private ActiveAnalysis? _active;
     private CancellationTokenSource? _cts;
     private bool _warnedNoFfmpeg;
 
+    // The radio stream the app started last; kept over a pause so the analysis starts again on play.
+    private RadioSource? _radio;
+    private long _radioRestartAfterMs;
+
     public AppStreamMeterService(
         YouTubeQueueService youtubeQueue,
         LocalMediaJukeboxService jukebox,
         YouTubeMediaService youtubeMedia,
+        ReceiverController receiver,
+        ReceiverStateStore state,
         AppLogStore logStore)
     {
         _youtubeQueue = youtubeQueue;
         _jukebox = jukebox;
         _youtubeMedia = youtubeMedia;
+        _receiver = receiver;
+        _state = state;
         _logStore = logStore;
 
         _youtubeQueue.TrackStarted += OnYouTubeTrackStarted;
         _jukebox.JukeboxChanged += OnJukeboxChanged;
+        _receiver.StreamUrlStarted += OnStreamUrlStarted;
+        _state.StateChanged += OnReceiverStateChanged;
     }
 
     public static double HopSeconds => (double)HopFrames / SampleRate;
@@ -54,31 +73,52 @@ public sealed class AppStreamMeterService : IDisposable
         var active = Volatile.Read(ref _active);
         if (active is null)
         {
+            TryRestartRadio();
             return false;
         }
 
         double position;
-        if (active.IsYouTube)
+        switch (active.Kind)
         {
-            if (!string.Equals(_youtubeQueue.CurrentVideoId, active.SourceId, StringComparison.Ordinal))
-            {
-                return false;
-            }
+            case SourceKind.YouTube:
+                if (!string.Equals(_youtubeQueue.CurrentVideoId, active.SourceId, StringComparison.Ordinal))
+                {
+                    return false;
+                }
 
-            position = _youtubeQueue.GetEstimatedPlaybackPositionSeconds(heosDelayMs);
-        }
-        else
-        {
-            if (!string.Equals(_jukebox.CurrentTrackFilePath, active.SourceId, StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
+                position = _youtubeQueue.GetEstimatedPlaybackPositionSeconds(heosDelayMs);
+                break;
 
-            position = _jukebox.GetEstimatedPlaybackPositionSeconds(heosDelayMs);
+            case SourceKind.Local:
+                if (!string.Equals(_jukebox.CurrentTrackFilePath, active.SourceId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                position = _jukebox.GetEstimatedPlaybackPositionSeconds(heosDelayMs);
+                break;
+
+            default:
+                // Radio: HEOS's own buffering is in the clock, so the relay's HEOS delay does not apply.
+                if (!IsRadioPlaying(_state.Snapshot) || active.Clock?.PositionSeconds(Environment.TickCount64) is not { } radioPosition)
+                {
+                    return false;
+                }
+
+                position = radioPosition;
+                break;
         }
 
         return active.Timeline.TryGetAt(position, out left, out right, bandsDestination);
     }
+
+    /// <summary>The receiver plays a URL stream on HEOS (not a named service such as Spotify, and not another input).</summary>
+    internal static bool IsRadioPlaying(ReceiverStateSnapshot snapshot) =>
+        snapshot.IsConnected &&
+        snapshot.Status is { IsPoweredOn: true, IsMainZoneOn: true } status &&
+        DenonCatalog.InputMatches(status.InputSource, "NET") &&
+        string.Equals(status.PlayState, "play", StringComparison.OrdinalIgnoreCase) &&
+        !status.NowPlaying.IsNamedServiceSource;
 
     private void OnYouTubeTrackStarted(YouTubeTrackItem track)
     {
@@ -87,8 +127,13 @@ public sealed class AppStreamMeterService : IDisposable
             return;
         }
 
+        lock (_sync)
+        {
+            _radio = null; // another source plays now
+        }
+
         var videoId = track.VideoId;
-        StartAnalysis(isYouTube: true, videoId, track.Title, (ffmpeg, timeline, ct) => DecodeToTimelineAsync(
+        StartAnalysis(SourceKind.YouTube, videoId, track.Title, clock: null, (ffmpeg, timeline, ct) => DecodeToTimelineAsync(
             ffmpeg,
             inputFile: null,
             openInput: async token =>
@@ -107,8 +152,13 @@ public sealed class AppStreamMeterService : IDisposable
             return;
         }
 
+        lock (_sync)
+        {
+            _radio = null;
+        }
+
         var path = track.FilePath;
-        StartAnalysis(isYouTube: false, path, track.Title, (ffmpeg, timeline, ct) => DecodeToTimelineAsync(
+        StartAnalysis(SourceKind.Local, path, track.Title, clock: null, (ffmpeg, timeline, ct) => DecodeToTimelineAsync(
             ffmpeg,
             inputFile: path,
             openInput: null,
@@ -116,20 +166,135 @@ public sealed class AppStreamMeterService : IDisposable
             ct));
     }
 
+    private void OnStreamUrlStarted(string url, string title)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            return;
+        }
+
+        lock (_sync)
+        {
+            _radio = new RadioSource(url, title);
+        }
+
+        StartRadio(url, title, RadioPlaybackClock.Commanded(Environment.TickCount64), restart: true);
+    }
+
+    private void OnReceiverStateChanged(ReceiverStateSnapshot snapshot)
+    {
+        var active = Volatile.Read(ref _active);
+        RadioSource? radio;
+        lock (_sync)
+        {
+            radio = _radio;
+        }
+
+        if (radio is null)
+        {
+            return;
+        }
+
+        var status = snapshot.Status;
+        var onHeos = snapshot.IsConnected &&
+                     status is { IsPoweredOn: true, IsMainZoneOn: true } &&
+                     DenonCatalog.InputMatches(status.InputSource, "NET") &&
+                     !status.NowPlaying.IsNamedServiceSource;
+        if (!onHeos && snapshot.IsConnected)
+        {
+            // Standby, another input, or Spotify / AirPlay / TuneIn on HEOS: this stream is over.
+            lock (_sync)
+            {
+                _radio = null;
+                if (Volatile.Read(ref _active) is { Kind: SourceKind.Radio })
+                {
+                    CancelLocked();
+                }
+            }
+
+            return;
+        }
+
+        var playing = IsRadioPlaying(snapshot);
+        if (active is { Kind: SourceKind.Radio } radioAnalysis)
+        {
+            if (playing)
+            {
+                radioAnalysis.Clock?.OnPlayState(status!.PlayState, Environment.TickCount64);
+            }
+            else if (radioAnalysis.Clock is { HasStarted: true } &&
+                     status is { } paused &&
+                     !string.Equals(paused.PlayState, "play", StringComparison.OrdinalIgnoreCase))
+            {
+                // Paused or stopped: a live stream resumes at its live edge, so this timeline no longer lines up.
+                lock (_sync)
+                {
+                    if (ReferenceEquals(_active, radioAnalysis))
+                    {
+                        CancelLocked();
+                    }
+                }
+            }
+        }
+        else if (active is null && playing)
+        {
+            // Playing again after a pause: HEOS reopened the live stream, so decode it again from now.
+            StartRadio(radio.Url, radio.Title, RadioPlaybackClock.PlayingSince(Environment.TickCount64), restart: true);
+        }
+    }
+
+    /// <summary>A radio decoder that stopped while HEOS plays on starts again (at most every <see cref="RadioRestartInterval"/>).</summary>
+    private void TryRestartRadio()
+    {
+        RadioSource? radio;
+        lock (_sync)
+        {
+            radio = _radio;
+            if (radio is null || Environment.TickCount64 < _radioRestartAfterMs)
+            {
+                return;
+            }
+        }
+
+        if (IsRadioPlaying(_state.Snapshot))
+        {
+            StartRadio(radio.Url, radio.Title, RadioPlaybackClock.PlayingSince(Environment.TickCount64), restart: false);
+        }
+    }
+
+    private void StartRadio(string url, string title, RadioPlaybackClock clock, bool restart)
+    {
+        lock (_sync)
+        {
+            _radioRestartAfterMs = Environment.TickCount64 + (long)RadioRestartInterval.TotalMilliseconds;
+        }
+
+        StartAnalysis(SourceKind.Radio, url, title, clock, (ffmpeg, timeline, ct) => DecodeToTimelineAsync(
+            ffmpeg,
+            inputFile: url,
+            openInput: null,
+            timeline,
+            ct), force: restart);
+    }
+
     private void StartAnalysis(
-        bool isYouTube,
+        SourceKind kind,
         string sourceId,
         string title,
-        Func<string, MeterTimeline, CancellationToken, Task<bool>> decode)
+        RadioPlaybackClock? clock,
+        Func<string, MeterTimeline, CancellationToken, Task<bool>> decode,
+        bool force = false)
     {
         CancellationTokenSource cts;
         MeterTimeline timeline;
+        ActiveAnalysis analysis;
         lock (_sync)
         {
-            // Same track again (repeat, or a jukebox refresh): keep the timeline.
-            if (_active is { } current &&
-                current.IsYouTube == isYouTube &&
-                string.Equals(current.SourceId, sourceId, isYouTube ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase) &&
+            // Same track again (repeat, or a jukebox refresh): keep the timeline. A radio stream always starts over.
+            if (!force &&
+                _active is { } current &&
+                current.Kind == kind &&
+                string.Equals(current.SourceId, sourceId, kind == SourceKind.YouTube ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase) &&
                 !current.Timeline.IsFailed)
             {
                 return;
@@ -142,17 +307,21 @@ public sealed class AppStreamMeterService : IDisposable
                 if (!_warnedNoFfmpeg)
                 {
                     _warnedNoFfmpeg = true;
-                    _logStore.Info("Synced Denon meters need FFmpeg; meters use the simulation for YouTube and the jukebox.");
+                    _logStore.Info("Synced Denon meters need FFmpeg; meters and Hue Music Sync use the simulation for YouTube, the jukebox and radio.");
                 }
 
                 return;
             }
 
-            var maxFrames = (int)Math.Ceiling(MaxAnalyzedDuration.TotalSeconds / HopSeconds);
-            timeline = new MeterTimeline((isYouTube ? "yt:" : "local:") + sourceId, HopSeconds, maxFrames);
+            var rolling = kind == SourceKind.Radio;
+            var window = rolling ? RadioWindow : MaxAnalyzedDuration;
+            var maxFrames = (int)Math.Ceiling(window.TotalSeconds / HopSeconds);
+            var prefix = kind switch { SourceKind.YouTube => "yt:", SourceKind.Local => "local:", _ => "radio:" };
+            timeline = new MeterTimeline(prefix + sourceId, HopSeconds, maxFrames, rolling);
             cts = new CancellationTokenSource();
             _cts = cts;
-            Volatile.Write(ref _active, new ActiveAnalysis(timeline, isYouTube, sourceId));
+            analysis = new ActiveAnalysis(timeline, kind, sourceId, clock);
+            Volatile.Write(ref _active, analysis);
 
             var token = cts.Token;
             _ = Task.Run(async () =>
@@ -163,10 +332,19 @@ public sealed class AppStreamMeterService : IDisposable
                     var ok = await decode(ffmpegPath, timeline, token);
                     if (!token.IsCancellationRequested)
                     {
-                        timeline.MarkComplete(failed: !ok);
-                        _logStore.Info(ok
-                            ? $"Synced Denon meters ready for '{title}' ({timeline.AnalyzedSeconds:0} s of audio analyzed in {sw.Elapsed.TotalSeconds:0.0} s)."
-                            : $"Synced Denon meters stopped for '{title}' after {timeline.AnalyzedSeconds:0} s of audio; the rest uses the simulation.");
+                        timeline.MarkComplete(failed: !ok || rolling);
+                        if (rolling)
+                        {
+                            // A live stream does not end by itself: the connection dropped. Try again while HEOS plays.
+                            ClearIfActive(analysis);
+                            _logStore.Info($"Synced meters for '{title}' stopped after {timeline.AnalyzedSeconds:0} s of the stream; trying again while it plays.");
+                        }
+                        else
+                        {
+                            _logStore.Info(ok
+                                ? $"Synced Denon meters ready for '{title}' ({timeline.AnalyzedSeconds:0} s of audio analyzed in {sw.Elapsed.TotalSeconds:0.0} s)."
+                                : $"Synced Denon meters stopped for '{title}' after {timeline.AnalyzedSeconds:0} s of audio; the rest uses the simulation.");
+                        }
                     }
                 }
                 catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -176,16 +354,37 @@ public sealed class AppStreamMeterService : IDisposable
                 catch (Exception ex)
                 {
                     timeline.MarkComplete(failed: true);
+                    if (rolling)
+                    {
+                        ClearIfActive(analysis);
+                    }
+
                     _logStore.Warning($"Synced Denon meter analysis failed for '{title}': {ex.Message}");
                 }
             }, CancellationToken.None);
         }
+
+        if (kind == SourceKind.Radio)
+        {
+            _logStore.Info($"Synced meters and Hue Music Sync follow the radio stream '{title}'.");
+        }
+    }
+
+    private void ClearIfActive(ActiveAnalysis analysis)
+    {
+        lock (_sync)
+        {
+            if (ReferenceEquals(_active, analysis))
+            {
+                CancelLocked();
+            }
+        }
     }
 
     /// <summary>
-    /// Decodes <paramref name="inputFile"/> (or the stream from <paramref name="openInput"/>, piped to stdin)
-    /// with ffmpeg to 44.1 kHz stereo float PCM and fills <paramref name="timeline"/>. Returns true when the
-    /// whole input was decoded (or the timeline is full).
+    /// Decodes <paramref name="inputFile"/> (a file or an http(s) stream URL, or the stream from
+    /// <paramref name="openInput"/>, piped to stdin) with ffmpeg to 44.1 kHz stereo float PCM and fills
+    /// <paramref name="timeline"/>. Returns true when the whole input was decoded (or the timeline is full).
     /// </summary>
     public static async Task<bool> DecodeToTimelineAsync(
         string ffmpegPath,
@@ -320,11 +519,23 @@ public sealed class AppStreamMeterService : IDisposable
     {
         _youtubeQueue.TrackStarted -= OnYouTubeTrackStarted;
         _jukebox.JukeboxChanged -= OnJukeboxChanged;
+        _receiver.StreamUrlStarted -= OnStreamUrlStarted;
+        _state.StateChanged -= OnReceiverStateChanged;
         lock (_sync)
         {
+            _radio = null;
             CancelLocked();
         }
     }
 
-    private sealed record ActiveAnalysis(MeterTimeline Timeline, bool IsYouTube, string SourceId);
+    private enum SourceKind
+    {
+        YouTube,
+        Local,
+        Radio,
+    }
+
+    private sealed record ActiveAnalysis(MeterTimeline Timeline, SourceKind Kind, string SourceId, RadioPlaybackClock? Clock);
+
+    private sealed record RadioSource(string Url, string Title);
 }

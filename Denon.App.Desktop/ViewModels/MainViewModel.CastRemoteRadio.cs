@@ -790,7 +790,7 @@ public sealed partial class MainViewModel
         }
 
         await ExecuteReceiverActionAsync(
-            () => _receiverController.PlayCustomUrlAsync(station.UrlResolved, useLowVolume: false, UnmuteBeforePlay),
+            () => _receiverController.PlayCustomUrlAsync(station.UrlResolved, useLowVolume: false, UnmuteBeforePlay, title: station.Name),
             $"Streaming {station.Name} ({station.CodecBadge})");
     }
 

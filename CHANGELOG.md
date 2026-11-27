@@ -4,6 +4,19 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Hue Music Sync and the Deck meters work with internet radio.** A radio station on HEOS never passes through the
+  PC, so Hue got silence and the meters were simulated (SIM). Now, when the app starts a stream (a station button, a
+  Smart Scene's stream, a station from the directory, a custom URL or the MCP tools), FFmpeg decodes a copy of the same
+  stream and Hue and the meters follow its real level, spectrum and beats. The clock starts when HEOS reports "play"
+  for the new stream, so the beats are close to the speakers (HEOS buffers on its own connection, so not exact).
+  After a pause the stream is decoded again from the live edge; when the connection drops it starts again while HEOS
+  plays on. Spotify, TuneIn, AirPlay and other inputs stop it. A live stream keeps only the last 10 minutes.
+- The Hue panel no longer says "LISTENING (PC AUDIO)" when it waits for audio: it says WAITING FOR AUDIO, and the
+  status line names the sources Music Sync follows.
+
 ## [2.10.9] - 2026-11-27
 
 ### Added

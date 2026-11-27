@@ -789,7 +789,7 @@ public sealed class HueDashboardViewModel : HueObservableObject
         : IsMusicSyncEnabled
             ? (_isDtlsStreaming
                 ? "50 Hz DTLS LIVE"
-                : (HasLiveAudioSignal ? "LIVE FFT SYNC" : "LISTENING (PC AUDIO)"))
+                : (HasLiveAudioSignal ? "LIVE FFT SYNC" : "WAITING FOR AUDIO"))
             : "STANDBY";
 
     public void SetDtlsStreamingState(bool active) => RunOnUi(() =>
@@ -1460,7 +1460,7 @@ public sealed class HueDashboardViewModel : HueObservableObject
         var next = !IsMusicSyncEnabled;
         await _plugin.SetMusicSyncEnabledAsync(next);
         StatusMessage = next
-            ? $"Hue Music Sync LIVE ({MusicSyncMode}) — listening to live PC audio FFT & beats!"
+            ? $"Hue Music Sync on ({MusicSyncMode}): follows what the Denon plays from the app (radio, YouTube, jukebox, PC Cast), PC audio, or the room mic when it is on."
             : "Hue Music Sync paused.";
     }
 

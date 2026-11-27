@@ -743,7 +743,7 @@ public sealed partial class DenonMcpServer
                 var url = RequireString(args, "url");
                 var title = GetString(args, "title", "Internet Radio");
                 var lowVol = GetBool(args, "low_volume") ?? false;
-                await _receiverController.PlayCustomUrlAsync(url, lowVol, unmute: true, cancellationToken: ct);
+                await _receiverController.PlayCustomUrlAsync(url, lowVol, unmute: true, cancellationToken: ct, title: title);
                 return BuildToolText($"Playing stream '{title}' on Denon AVR.");
             }
 
