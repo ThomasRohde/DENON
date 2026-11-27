@@ -409,8 +409,10 @@ public sealed class AutomationEventTests : IDisposable
         var playing = Check(new ReceiverFacts(true, "NET", false, true));
         Assert.False(playing.Pass);
         Assert.Contains("HEOS is playing", playing.Message);
-        // HEOS state not read yet: not idle.
-        Assert.False(Check(new ReceiverFacts(true, "NET", false, null)).Pass);
+        // HEOS state not read yet (or the AVR did not confirm the input): not idle.
+        var unknown = Check(new ReceiverFacts(true, "NET", false, null));
+        Assert.False(unknown.Pass);
+        Assert.Contains("not known", unknown.Message);
         // On the TV input the TV may be on: never idle.
         var tv = Check(new ReceiverFacts(true, "TV", false, false));
         Assert.False(tv.Pass);

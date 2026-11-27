@@ -197,9 +197,11 @@ public static class AutomationGraphRunner
                     case "idle" when facts.IsOn == true && !IsIdleWhileOn(facts):
                         // On another input a TV or player may be on: the app cannot see that, so it is not idle.
                         pass = false;
-                        reasons.Add(DenonCatalog.InputMatches(facts.Input, "NET")
-                            ? "the receiver is on and HEOS is playing"
-                            : $"the receiver is on, on the {facts.Input ?? "unknown"} input");
+                        reasons.Add(!DenonCatalog.InputMatches(facts.Input, "NET")
+                            ? $"the receiver is on, on the {facts.Input ?? "unknown"} input"
+                            : facts.IsHeosPlaying is null
+                                ? "the receiver is on and the HEOS state is not known"
+                                : "the receiver is on and HEOS is playing");
                         break;
                 }
 

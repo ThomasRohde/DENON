@@ -707,7 +707,19 @@ public sealed class AutomationEngineService : BackgroundService
                 ? new ReceiverFacts(null, null, null)
                 : new ReceiverFacts(
                     status is { IsPoweredOn: true, IsMainZoneOn: true }, status.InputSource, status.IsMuted,
-                    string.IsNullOrEmpty(status.PlayState) ? null : string.Equals(status.PlayState, "play", StringComparison.OrdinalIgnoreCase));
+                    HeosPlaying(status));
+        }
+
+        /// <summary>
+        /// Null (unknown) without a play state, or when the AVR did not confirm the input: with port 23 down the
+        /// status is a synthetic "on, NET" from HEOS alone, while the receiver may play TV audio.
+        /// </summary>
+        private static bool? HeosPlaying(ReceiverStatus status)
+        {
+            var playState = status.PlayState?.Trim();
+            return !status.IsAvrConfirmed || string.IsNullOrWhiteSpace(playState)
+                ? null
+                : string.Equals(playState, "play", StringComparison.OrdinalIgnoreCase);
         }
 
         public string DescribeScene(string sceneId) =>
