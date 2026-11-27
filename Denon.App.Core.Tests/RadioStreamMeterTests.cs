@@ -79,6 +79,11 @@ public sealed class RadioStreamMeterTests
         var assumed = RadioPlaybackClock.AssumedStartDelay.TotalSeconds;
         Assert.Equal(10 - assumed, clock.PositionSeconds(10_000));
 
+        // The assumed start stays: a later ordinary "play" read does not rewind the clock.
+        Assert.True(clock.HasStarted);
+        clock.OnPlayState("play", nowMs: 11_000);
+        Assert.Equal(12 - assumed, clock.PositionSeconds(12_000));
+
         var resumed = RadioPlaybackClock.PlayingSince(nowMs: 1_000);
         Assert.True(resumed.HasStarted);
         Assert.Equal(1.5, resumed.PositionSeconds(2_500));

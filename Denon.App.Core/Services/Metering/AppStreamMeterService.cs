@@ -24,6 +24,12 @@ public sealed class AppStreamMeterService : IDisposable
     /// <summary>A radio decoder that stopped (network, server) starts again at most this often while HEOS plays on.</summary>
     public static readonly TimeSpan RadioRestartInterval = TimeSpan.FromSeconds(15);
 
+    /// <summary>
+    /// After the app starts a stream, the receiver's state may still show the source before it (a HEOS push event is
+    /// patched onto the old input and metadata until the next full read), so another source cannot end it this soon.
+    /// </summary>
+    public static readonly TimeSpan RadioStartGrace = TimeSpan.FromSeconds(15);
+
     private readonly YouTubeQueueService _youtubeQueue;
     private readonly LocalMediaJukeboxService _jukebox;
     private readonly YouTubeMediaService _youtubeMedia;
@@ -38,6 +44,8 @@ public sealed class AppStreamMeterService : IDisposable
     // The radio stream the app started last; kept over a pause so the analysis starts again on play.
     private RadioSource? _radio;
     private long _radioRestartAfterMs;
+    private long _radioGraceUntilMs;
+    private bool _radioPaused; // the decoder was stopped for a pause (not by a failure)
 
     public AppStreamMeterService(
         YouTubeQueueService youtubeQueue,
@@ -176,6 +184,8 @@ public sealed class AppStreamMeterService : IDisposable
         lock (_sync)
         {
             _radio = new RadioSource(url, title);
+            _radioPaused = false;
+            _radioGraceUntilMs = Environment.TickCount64 + (long)RadioStartGrace.TotalMilliseconds;
         }
 
         StartRadio(url, title, RadioPlaybackClock.Commanded(Environment.TickCount64), restart: true);
@@ -185,9 +195,11 @@ public sealed class AppStreamMeterService : IDisposable
     {
         var active = Volatile.Read(ref _active);
         RadioSource? radio;
+        bool inGrace;
         lock (_sync)
         {
             radio = _radio;
+            inGrace = Environment.TickCount64 < _radioGraceUntilMs;
         }
 
         if (radio is null)
@@ -200,7 +212,7 @@ public sealed class AppStreamMeterService : IDisposable
                      status is { IsPoweredOn: true, IsMainZoneOn: true } &&
                      DenonCatalog.InputMatches(status.InputSource, "NET") &&
                      !status.NowPlaying.IsNamedServiceSource;
-        if (!onHeos && snapshot.IsConnected)
+        if (!onHeos && snapshot.IsConnected && !inGrace)
         {
             // Standby, another input, or Spotify / AirPlay / TuneIn on HEOS: this stream is over.
             lock (_sync)
@@ -232,14 +244,30 @@ public sealed class AppStreamMeterService : IDisposable
                     if (ReferenceEquals(_active, radioAnalysis))
                     {
                         CancelLocked();
+                        _radioPaused = true;
                     }
                 }
             }
         }
         else if (active is null && playing)
         {
-            // Playing again after a pause: HEOS reopened the live stream, so decode it again from now.
-            StartRadio(radio.Url, radio.Title, RadioPlaybackClock.PlayingSince(Environment.TickCount64), restart: true);
+            bool resumed;
+            lock (_sync)
+            {
+                resumed = _radioPaused;
+                _radioPaused = false;
+            }
+
+            if (resumed)
+            {
+                // Playing again after a pause: HEOS reopened the live stream, so decode it again from now.
+                StartRadio(radio.Url, radio.Title, RadioPlaybackClock.PlayingSince(Environment.TickCount64), restart: true);
+            }
+            else
+            {
+                // The decoder stopped (network, server): try again, but not more often than the retry interval.
+                TryRestartRadio();
+            }
         }
     }
 

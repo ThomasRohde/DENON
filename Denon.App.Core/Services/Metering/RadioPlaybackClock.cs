@@ -56,7 +56,10 @@ public sealed class RadioPlaybackClock
                 return null;
             }
 
-            start = _commandMs + (long)AssumedStartDelay.TotalMilliseconds;
+            // Keep the assumed start: a later "play" (an ordinary poll) must not rewind the clock to zero.
+            var assumed = _commandMs + (long)AssumedStartDelay.TotalMilliseconds;
+            var previous = Interlocked.CompareExchange(ref _playStartMs, assumed, NotStarted);
+            start = previous == NotStarted ? assumed : previous;
         }
 
         return Math.Max(0, nowMs - start) / 1000.0;
