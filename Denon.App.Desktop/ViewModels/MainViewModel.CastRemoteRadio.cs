@@ -1012,10 +1012,19 @@ public sealed partial class MainViewModel
             YouTubeSearchResults.Add(t);
         }
 
+        // The queue starts with the app's own promo video (published 2026-11-27), then the first search results.
+        var promoVideo = new YouTubeTrackItem(
+            "2BL0w4gOYfA",
+            "Denon Desktop: one app for the whole living room (free, open source, Windows)",
+            "Thomas Rohde",
+            TimeSpan.FromSeconds(60),
+            string.Empty,
+            "https://www.youtube.com/watch?v=2BL0w4gOYfA");
+        YouTubeTrackItem[] demoQueue = [promoVideo, demoTracks[0], demoTracks[1], demoTracks[2]];
         YouTubeQueue.Clear();
-        for (var i = 0; i < 4; i++)
+        for (var i = 0; i < demoQueue.Length; i++)
         {
-            YouTubeQueue.Add(new YouTubeQueueItemViewModel(demoTracks[i], i + 1, isCurrent: i == 0));
+            YouTubeQueue.Add(new YouTubeQueueItemViewModel(demoQueue[i], i + 1, isCurrent: i == 0));
         }
 
         OnPropertyChanged(nameof(YouTubeQueueCountLabel));
@@ -1038,7 +1047,7 @@ public sealed partial class MainViewModel
             HasFfmpeg: true,
             FfmpegPath: "ffmpeg.exe",
             StreamState: "Streaming to Denon (MP3 320k)",
-            ActiveTrackTitle: "Daft Punk - Get Lucky",
+            ActiveTrackTitle: "Denon Desktop: one app for the whole living room",
             BytesStreamed: 4_820_000,
             LastError: null));
 
