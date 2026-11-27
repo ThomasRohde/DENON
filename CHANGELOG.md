@@ -4,6 +4,13 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **The demo queue starts with the Denon Desktop promo video.** In screenshot mode (`--capture-screenshots`) the
+  Up Next queue on the Music page now starts with "Denon Desktop: one app for the whole living room"
+  (https://www.youtube.com/watch?v=2BL0w4gOYfA), then the first three search results.
+
 ## [2.10.8] - 2026-11-26
 
 ### Changed

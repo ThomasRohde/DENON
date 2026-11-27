@@ -252,3 +252,6 @@ Design and decisions: `docs/theming.md` (branch `theming-2.0`).
 ## Release / build
 
 - [ ] The installer and exe are unsigned (SmartScreen warning). Consider code signing.
+- [ ] Take the README and site screenshot `02-youtube-music` again: the demo queue now starts with the promo video
+      (https://www.youtube.com/watch?v=2BL0w4gOYfA). The images in `docs/screenshots` and `site/public/shots` still
+      show the old queue.
