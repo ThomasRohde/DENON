@@ -639,6 +639,20 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
         }
     }
 
+    /// <summary>A reconnect after at least this long offline counts as a power-on; a shorter one as a network drop.</summary>
+    internal static readonly TimeSpan PowerOnGap = TimeSpan.FromSeconds(20);
+
+    private string? _appBeforeDisconnect;
+    private DateTimeOffset _disconnectedAt;
+    private bool _standbyBeforeDisconnect;
+
+    /// <summary>webOS power states of a TV going to standby ("Suspend", "Active Standby", "Power Off").</summary>
+    internal static bool IsStandbyPowerState(string? powerState) =>
+        powerState is not null &&
+        (powerState.Contains("Standby", StringComparison.OrdinalIgnoreCase) ||
+         powerState.Contains("Suspend", StringComparison.OrdinalIgnoreCase) ||
+         powerState.Contains("Power Off", StringComparison.OrdinalIgnoreCase));
+
     private void EmitTvTelemetryDeltas(LgTvLiveState state)
     {
         if (state.IsDemo || _context is null || !_isStarted)
@@ -654,6 +668,15 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
         }
 
         var now = DateTimeOffset.UtcNow;
+        if (prev.IsConnected && !state.IsConnected)
+        {
+            // The client forgets the foreground app on a disconnect. Keep it here, so a reconnect after a short
+            // network drop (the TV stayed on) is not taken for a power-on.
+            _appBeforeDisconnect = prev.ForegroundAppId;
+            _disconnectedAt = now;
+            _standbyBeforeDisconnect = IsStandbyPowerState(prev.PowerState);
+        }
+
         if (!_baselineTaken && state.IsConnected)
         {
             _baselineTaken = true;
@@ -699,14 +722,25 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
                 origin: "auto");
         }
 
-        if (!string.Equals(prev.ForegroundAppId, state.ForegroundAppId, StringComparison.OrdinalIgnoreCase) &&
+        var fromAppId = prev.ForegroundAppId;
+        if (string.IsNullOrWhiteSpace(fromAppId) && _appBeforeDisconnect is { } before &&
+            !string.IsNullOrWhiteSpace(state.ForegroundAppId))
+        {
+            // The first app after a reconnect. A power-on reports fromAppId "" ("TV on → Live TV" keys on it); a
+            // short drop reports the app from before, and nothing when it is the same app.
+            _appBeforeDisconnect = null;
+            var wasPowerOn = _standbyBeforeDisconnect || now - _disconnectedAt >= PowerOnGap;
+            fromAppId = wasPowerOn ? string.Empty : before;
+        }
+
+        if (!string.Equals(fromAppId, state.ForegroundAppId, StringComparison.OrdinalIgnoreCase) &&
             !string.IsNullOrWhiteSpace(state.ForegroundAppId))
         {
             _context.Events.RecordEvent(
                 "app.changed",
                 new Dictionary<string, object?>
                 {
-                    ["fromAppId"] = prev.ForegroundAppId,
+                    ["fromAppId"] = fromAppId,
                     ["toAppId"] = state.ForegroundAppId,
                     ["appTitle"] = state.ForegroundAppTitle,
                     ["model"] = state.ModelName,
