@@ -4,6 +4,13 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **The Hue panel's LIVE FFT SYNC badge holds through short pauses.** It switches to WAITING FOR AUDIO only after
+  2 s without sound, so it no longer blinks in the pauses of speech (the news on a radio station). The lights still
+  follow every frame.
+
 ## [2.10.10] - 2026-11-27
 
 ### Fixed

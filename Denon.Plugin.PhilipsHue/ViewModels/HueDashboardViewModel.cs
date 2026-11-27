@@ -429,6 +429,7 @@ public sealed class HueDashboardViewModel : HueObservableObject
     private string _albumArtTrackLabel = "Waiting for artwork...";
     private string _entertainmentAreaSummary = "LAN Fast-Sync Ready";
     private long _lastMeterUiTickMs;
+    private readonly LiveSignalHold _liveSignalHold = new();
 
     public HueDashboardViewModel(PhilipsHuePlugin plugin)
     {
@@ -999,7 +1000,7 @@ public sealed class HueDashboardViewModel : HueObservableObject
             LiveMidPercent = Math.Round(Math.Clamp(mid * 100.0, 0.0, 100.0), 1);
             LiveTreblePercent = Math.Round(Math.Clamp(treble * 100.0, 0.0, 100.0), 1);
             LiveBeatFlash = isBeat;
-            HasLiveAudioSignal = isLiveSignal;
+            HasLiveAudioSignal = _liveSignalHold.Update(isLiveSignal, now);
         });
     }
 
