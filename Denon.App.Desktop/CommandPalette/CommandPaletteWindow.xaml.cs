@@ -22,6 +22,10 @@ public partial class CommandPaletteWindow : Window
     private readonly CommandPaletteViewModel _viewModel;
     private bool _closing;
 
+    // False when the palette closes because another window took focus (a click elsewhere, Alt+Tab):
+    // then the main window must not take focus back from the app the user chose.
+    private bool _restoreOwnerFocus = true;
+
     private CommandPaletteWindow(Window owner, MainViewModel main)
     {
         InitializeComponent();
@@ -74,7 +78,10 @@ public partial class CommandPaletteWindow : Window
     {
         _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
         base.OnClosed(e);
-        Owner?.Activate();
+        if (_restoreOwnerFocus)
+        {
+            Owner?.Activate();
+        }
     }
 
     private void CloseOnce()
@@ -88,7 +95,15 @@ public partial class CommandPaletteWindow : Window
         Close();
     }
 
-    private void Window_Deactivated(object? sender, EventArgs e) => CloseOnce();
+    private void Window_Deactivated(object? sender, EventArgs e)
+    {
+        if (!_closing)
+        {
+            _restoreOwnerFocus = false;
+        }
+
+        CloseOnce();
+    }
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
