@@ -120,7 +120,9 @@ internal sealed class AppleTvWatchLog
                     continue;
                 }
 
-                if (slot.Active is null && slot.Pending is { } pending && (now - pending.StartedUtc).TotalSeconds >= DwellSeconds)
+                // A paused candidate needs the full dwell of real play: a second of play then a pause is no session.
+                if (slot.Active is null && slot.Pending is { } pending && (now - pending.StartedUtc).TotalSeconds >= DwellSeconds &&
+                    (slot.IsPlaying || pending.WatchedSec >= DwellSeconds))
                 {
                     if (pending.ReceiverInput is null && receiver() is { IsPoweredOn: true } rx)
                     {
@@ -155,7 +157,7 @@ internal sealed class AppleTvWatchLog
     {
         lock (_gate)
         {
-            foreach (var slot in _slots.Values.Where(s => deviceId is null || s.DeviceId == deviceId))
+            foreach (var slot in _slots.Values.Where(s => deviceId is null || s.DeviceId.Equals(deviceId, StringComparison.OrdinalIgnoreCase)))
             {
                 slot.Accumulate(now);
                 FlushPendingEnds(slot, "app_closed");

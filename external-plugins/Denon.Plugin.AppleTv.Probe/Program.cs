@@ -213,7 +213,7 @@ static async Task<int> PairAsync(string host, string name, string? pinFile)
     var identity = CompanionIdentity.Create(name);
     ProbeStore.Save(host, new ProbeStore.Entry(credentials.ToString(), identity, port, DateTimeOffset.Now));
     Console.WriteLine($"Paired. {credentials.ToSafeString()}");
-    Console.WriteLine($"Apple TV signature (M6): {(pairing.AccessorySignatureVerified == true ? "verified" : "NOT verified (noted; pairing kept)")}");
+    Console.WriteLine("Apple TV signature (M6): verified");
     Console.WriteLine($"Credentials saved to {ProbeStore.FilePath} (private key: keep this file private).");
 
     // Prove the credentials: pair-verify + encrypted session + a read-only request.
@@ -334,7 +334,7 @@ static async Task<int> AirPlayPairAsync(string host, string name, string? pinFil
 
     var credentials = await Denon.Plugin.AppleTv.Protocol.AirPlay.AirPlayAuth.FinishPairingAsync(connection, setup, pin, cts.Token);
     ProbeStore.Save(host, entry with { AirPlayCredentials = credentials.ToString() });
-    Console.WriteLine($"AirPlay paired. {credentials.ToSafeString()}. Signature (M6): {(setup.AccessorySignatureVerified == true ? "verified" : "NOT verified")}");
+    Console.WriteLine($"AirPlay paired. {credentials.ToSafeString()}. Signature (M6): verified");
     return 0;
 }
 

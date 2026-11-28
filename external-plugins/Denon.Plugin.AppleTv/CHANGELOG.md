@@ -2,6 +2,35 @@
 
 Released separately from Denon Desktop with tags `appletv-vX.Y.Z`.
 
+## [Unreleased]
+
+### Security
+- **Bad network data can no longer crash Denon Desktop or stall the link** (#35). The OPACK reader stops at 64
+  nested levels (a few KB of nested containers in a Companion frame ended the whole app with a stack overflow) and
+  rejects negative references and lengths past the data. The binary plist reader checks its trailer, offsets and
+  lengths before it allocates (a 40-byte file could ask for gigabytes), caps the objects it decodes, and fails with a
+  format error. A data-stream frame smaller than its header or over 16 MB, a negative or huge HTTP Content-Length,
+  and a protobuf length past the data now close the connection (it reconnects) instead of stalling it.
+- **Pairing fails when the Apple TV's signature does not verify** (#35). The M6 signature was checked, but the
+  pairing was saved anyway. A low-order X25519 session key (an all-zero secret) is refused.
+
+### Fixed
+- **Now playing comes back when the link drops right after it opens** (#50). A close before the plugin listened was
+  missed, and now playing stayed dead until the Apple TV slept. A request in flight fails at once when the link
+  closes, instead of after 5 seconds.
+- **A wrong PIN refreshes the Apple TV page** (#70): the PIN box no longer stays on a pairing that has ended.
+- **One damaged saved pairing no longer stops the other Apple TVs** (#70). The log names the Apple TV to pair again.
+- **Wake automation stops when the Apple TV sleeps again** (#70), and the plugin no longer asks a sleeping Apple TV
+  for its queue and artwork when it fell asleep while now playing connected.
+- **Companion encryption starts in step with the reader** (#70): the first encrypted frame is never read as plain
+  text. A frame over 16 MB is refused instead of being cut to the 24-bit length.
+- **Insights: a second of play and then a pause is no session** (#70); it needs 15 seconds of play. Ending the
+  sessions of one Apple TV matches its id in any case.
+- **Discovery: an empty TXT string no longer hides the entries after it** (#70), and a reserved DNS label type
+  drops the packet instead of misreading the rest of it.
+- Connections and timers are cleaned up when a remote-control setup fails part-way or the plugin restarts, and a
+  send lock is no longer disposed while a send may still release it (#70).
+
 ## [0.5.1] - 2026-11-26
 
 ### Fixed

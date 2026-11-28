@@ -47,7 +47,13 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
       YouTube, Stations and Cast pages (a feature) and full dark ContextMenu templates (cosmetic, larger).
 - [ ] PR 10: release, CI, installer, docs: #58, #59, #60, #62, #72, #73.
 - [ ] PR 11: accessibility (after PR 9): #57.
-- [ ] PR 12: Apple TV and HomePod plugins: #35, #50, #70, the HomePod part of #49 (plugin release only when asked).
+- [x] PR 12: Apple TV and HomePod plugins. #35 and #50 closed; the Apple TV and HomePod parts of #70 and the
+      HomePod part of #49 (old-id re-keying, pairs dedupe). Left out: keep a known pair when one follower misses an
+      mDNS reply (#49), partial _companion-link discovery duplicates and atomic artwork writes off the MRP read
+      loop (#70), and a test seam for MrpClient's pending-request failure. No plugin release yet (only when asked).
+- [ ] Verify PR 12 live (needs the user): pair an Apple TV again (the M6 signature is now enforced; a wrong PIN
+      must refresh the page), check Apple TV now playing and artwork after wake and sleep, a wake automation that
+      is cut short by sleep, and that both HomePods (and the stereo pair) link and show what plays.
 - [ ] PR 13: Chromecast plugin and first tests: #49, the Chromecast parts of #59 and #70 (release only when asked).
 
 ## Live receiver updates on port 23 (#74)

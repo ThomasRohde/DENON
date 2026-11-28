@@ -202,7 +202,12 @@ internal static class MdnsBrowser
         while (p < end)
         {
             var len = packet[p++];
-            if (len == 0 || p + len > end)
+            if (len == 0)
+            {
+                continue; // RFC 6763: an empty string is valid; the next one may still follow
+            }
+
+            if (p + len > end)
             {
                 break;
             }
@@ -327,6 +332,12 @@ internal static class MdnsBrowser
                 jumped = true;
                 cursor = target;
                 continue;
+            }
+
+            if ((len & 0xC0) != 0)
+            {
+                // 0x40 and 0x80 label types are reserved (RFC 6891); reading them as lengths would drift.
+                throw new FormatException($"Reserved DNS label type 0x{len:X2}.");
             }
 
             cursor++;

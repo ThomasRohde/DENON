@@ -87,8 +87,9 @@ internal sealed class ProtoReader
                     pos += 8;
                     break;
                 case 2:
-                    var length = checked((int)ReadVarint(bytes, ref pos));
-                    Ensure(bytes, pos, length);
+                    var rawLength = ReadVarint(bytes, ref pos);
+                    Ensure(bytes, pos, rawLength);
+                    var length = (int)rawLength;
                     _fields.Add((field, 2, bytes[pos..(pos + length)]));
                     pos += length;
                     break;
@@ -158,9 +159,11 @@ internal sealed class ProtoReader
         return null;
     }
 
-    private static void Ensure(byte[] data, int pos, int length)
+    /// <summary>Throws unless <paramref name="length"/> bytes remain. Compares against what is left, so a
+    /// huge length cannot overflow.</summary>
+    private static void Ensure(byte[] data, int pos, ulong length)
     {
-        if (length < 0 || pos + length > data.Length)
+        if ((uint)pos > (uint)data.Length || length > (ulong)(data.Length - pos))
         {
             throw new FormatException("Protobuf field runs past the end of the data.");
         }

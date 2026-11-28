@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -31,14 +32,26 @@ internal sealed record HttpMessage(string StartLine, Dictionary<string, string> 
         return body is { Length: > 0 } ? [.. head, .. body] : head;
     }
 
-    /// <summary>Parses one complete message from the start of <paramref name="buffer"/>; null when incomplete.</summary>
+    /// <summary>Largest header block we wait for. Real AirPlay headers are well under 1 KB.</summary>
+    public const int MaxHeaderBytes = 64 * 1024;
+
+    /// <summary>Largest body we accept. AirPlay bodies are small plists.</summary>
+    public const int MaxBodyBytes = 16 * 1024 * 1024;
+
+    /// <summary>
+    /// Parses one complete message from the start of <paramref name="buffer"/>; null when incomplete.
+    /// Throws <see cref="InvalidDataException"/> for a bad or oversized Content-Length or header block,
+    /// so a broken peer fails the connection instead of stalling it.
+    /// </summary>
     public static HttpMessage? TryParse(ReadOnlySpan<byte> buffer, out int consumed)
     {
         consumed = 0;
         var end = buffer.IndexOf("\r\n\r\n"u8);
         if (end < 0)
         {
-            return null;
+            return buffer.Length > MaxHeaderBytes
+                ? throw new InvalidDataException("The HTTP header block is too large.")
+                : null;
         }
 
         var lines = Encoding.UTF8.GetString(buffer[..end]).Split("\r\n");
@@ -52,8 +65,14 @@ internal sealed record HttpMessage(string StartLine, Dictionary<string, string> 
             }
         }
 
-        var length = headers.TryGetValue("Content-Length", out var cl) && int.TryParse(cl, out var n) ? n : 0;
-        if (buffer.Length < end + 4 + length)
+        var length = 0;
+        if (headers.TryGetValue("Content-Length", out var cl)
+            && (!int.TryParse(cl.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out length) || length > MaxBodyBytes))
+        {
+            throw new InvalidDataException($"The HTTP Content-Length '{cl}' is invalid.");
+        }
+
+        if (buffer.Length - (end + 4) < length)
         {
             return null;
         }
@@ -181,7 +200,8 @@ internal sealed class AirPlayConnection : IAsyncDisposable
         {
         }
 
-        _lock.Dispose();
+        // The lock is not disposed: a request still in flight releases it when its read fails, and
+        // releasing a disposed SemaphoreSlim throws. It holds no unmanaged handle, so nothing leaks.
         return ValueTask.CompletedTask;
     }
 }

@@ -16,6 +16,7 @@ internal sealed class MrpClient : IAsyncDisposable
     private readonly RemoteControlSession _session;
     private readonly ConcurrentDictionary<string, TaskCompletionSource<ProtoReader>> _pending = new();
     private readonly SortedSet<int> _seenTypes = [];
+    private int _closed;
 
     /// <summary>All MRP message types received so far, including during start-up (diagnostics).</summary>
     public IReadOnlyCollection<int> SeenTypes
@@ -33,7 +34,11 @@ internal sealed class MrpClient : IAsyncDisposable
     {
         _session = session;
         _session.DataChannel.ProtobufReceived += OnProtobuf;
-        _session.Closed += ex => Closed?.Invoke(ex);
+        _session.Closed += OnSessionClosed;
+        if (_session.IsClosed)
+        {
+            OnSessionClosed(null); // it closed before we subscribed
+        }
     }
 
     public MrpNowPlayingTracker NowPlaying { get; } = new();
@@ -44,7 +49,14 @@ internal sealed class MrpClient : IAsyncDisposable
     /// <summary>Every received message type (for diagnostics).</summary>
     public event Action<int>? MessageReceived;
 
+    /// <summary>The link closed. Fires at most once, and not on dispose.</summary>
     public event Action<Exception?>? Closed;
+
+    /// <summary>
+    /// True once the link has closed or the client was disposed. Subscribers to <see cref="Closed"/> check this
+    /// right after subscribing: the link can drop before they subscribe, and that close is not raised again.
+    /// </summary>
+    public bool IsClosed => Volatile.Read(ref _closed) != 0;
 
     /// <summary>Every received message, parsed (diagnostics).</summary>
     public event Action<ProtoReader>? RawMessageReceived;
@@ -172,6 +184,11 @@ internal sealed class MrpClient : IAsyncDisposable
         var identifier = Guid.NewGuid().ToString().ToUpperInvariant();
         var tcs = new TaskCompletionSource<ProtoReader>(TaskCreationOptions.RunContinuationsAsynchronously);
         _pending[identifier] = tcs;
+        if (IsClosed)
+        {
+            FailPending(); // closed before or while we registered: do not wait for a reply that cannot come
+        }
+
         try
         {
             await _session.DataChannel.SendProtobufAsync(build(identifier), cancellationToken);
@@ -242,5 +259,40 @@ internal sealed class MrpClient : IAsyncDisposable
         }
     }
 
-    public ValueTask DisposeAsync() => _session.DisposeAsync();
+    private void OnSessionClosed(Exception? reason)
+    {
+        // The flag is set before the event is read, so a late subscriber either sees IsClosed or gets the event.
+        if (Interlocked.Exchange(ref _closed, 1) != 0)
+        {
+            return;
+        }
+
+        FailPending();
+        try
+        {
+            Closed?.Invoke(reason);
+        }
+        catch
+        {
+        }
+    }
+
+    /// <summary>Fails every request still waiting for a reply (the link is gone).</summary>
+    private void FailPending()
+    {
+        foreach (var identifier in _pending.Keys)
+        {
+            if (_pending.TryRemove(identifier, out var waiter))
+            {
+                waiter.TrySetException(new CompanionProtocolException("The MRP connection closed."));
+            }
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        Interlocked.Exchange(ref _closed, 1); // a dispose is not reported as a close
+        FailPending();
+        return _session.DisposeAsync();
+    }
 }

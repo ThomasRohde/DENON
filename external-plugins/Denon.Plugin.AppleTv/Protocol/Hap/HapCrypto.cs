@@ -81,10 +81,17 @@ internal static class HapCrypto
             return false;
         }
 
-        var verifier = new Ed25519Signer();
-        verifier.Init(false, new Ed25519PublicKeyParameters(publicKey, 0));
-        verifier.BlockUpdate(message, 0, message.Length);
-        return verifier.VerifySignature(signature);
+        try
+        {
+            var verifier = new Ed25519Signer();
+            verifier.Init(false, new Ed25519PublicKeyParameters(publicKey, 0));
+            verifier.BlockUpdate(message, 0, message.Length);
+            return verifier.VerifySignature(signature);
+        }
+        catch (ArgumentException)
+        {
+            return false; // not a valid curve point
+        }
     }
 
     // ---------------------------------------------------------------- X25519 (session keys)
@@ -111,7 +118,22 @@ internal static class HapCrypto
             var agreement = new X25519Agreement();
             agreement.Init(_private);
             var shared = new byte[agreement.AgreementSize];
-            agreement.CalculateAgreement(new X25519PublicKeyParameters(peerPublicKey, 0), shared, 0);
+            try
+            {
+                agreement.CalculateAgreement(new X25519PublicKeyParameters(peerPublicKey, 0), shared, 0);
+            }
+            catch (InvalidOperationException)
+            {
+                // BouncyCastle refuses a low-order peer key itself; report it like the check below.
+                throw new HapPairingException("The Apple TV session key is invalid.");
+            }
+
+            // RFC 7748: a low-order peer key gives an all-zero secret, which an attacker could predict.
+            if (shared.AsSpan().IndexOfAnyExcept((byte)0) < 0)
+            {
+                throw new HapPairingException("The Apple TV session key is invalid.");
+            }
+
             return shared;
         }
     }

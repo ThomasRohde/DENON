@@ -28,7 +28,6 @@ public sealed class CompanionLoopbackTests
         await using (var pairing = await CompanionPairing.StartAsync("127.0.0.1", port, "Denon Desktop", cts.Token))
         {
             credentials = await pairing.FinishAsync("4321", cts.Token);
-            Assert.True(pairing.AccessorySignatureVerified);
         }
 
         // 2. Connect with the stored credentials: verify, encryption, system info, session start.

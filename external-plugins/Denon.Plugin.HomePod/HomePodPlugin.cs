@@ -78,6 +78,7 @@ public sealed class HomePodPlugin : IDenonPlugin, IPluginViewProvider
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
         _lifetime?.Cancel();
+        _lifetime?.Dispose();
         _lifetime = new CancellationTokenSource();
         foreach (var speaker in SnapshotSpeakers().Where(s => s.Enabled))
         {
@@ -305,49 +306,30 @@ public sealed class HomePodPlugin : IDenonPlugin, IPluginViewProvider
         var devices = await AppleDeviceDiscovery.DiscoverAsync(TimeSpan.FromSeconds(4), known, cancellationToken);
         var found = HomePodGroups.Build(devices);
 
-        var added = 0;
-        var restart = new List<HomePodSpeakerConfig>();
+        HomePodMerge? merge = null;
         await UpdateConfigAsync(c =>
         {
-            foreach (var speaker in found)
-            {
-                // The same speaker by its leader's id, else by a member (the pair's leader can change).
-                var existing = c.Speakers.FirstOrDefault(s => s.Id == speaker.Id) ??
-                               c.Speakers.FirstOrDefault(s => s.Members.Intersect(speaker.Members, StringComparer.OrdinalIgnoreCase).Any());
-                var isNew = existing is null;
-                if (existing is null)
-                {
-                    existing = new HomePodSpeakerConfig { Id = speaker.Id };
-                    c.Speakers.Add(existing);
-                    added++;
-                }
-
-                var moved = isNew || existing.Id != speaker.Id || existing.Host != speaker.Host || existing.AirPlayPort != speaker.AirPlayPort;
-                existing.Id = speaker.Id;
-                existing.Name = speaker.Name;
-                existing.Host = speaker.Host;
-                existing.AirPlayPort = speaker.AirPlayPort;
-                existing.ModelName = speaker.ModelName;
-                existing.OsVersion = speaker.OsVersion;
-                existing.Members = speaker.Members.ToList();
-                existing.LastSeenUtc = DateTimeOffset.UtcNow;
-                if (moved)
-                {
-                    restart.Add(existing);
-                }
-            }
-
-            c.Speakers = c.Speakers
-                .GroupBy(s => s.Id, StringComparer.OrdinalIgnoreCase)
-                .Select(g => g.First())
-                .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            merge = HomePodGroups.Merge(c.Speakers, found, DateTimeOffset.UtcNow);
+            c.Speakers = merge.Speakers;
         });
 
-        foreach (var speaker in restart.Where(s => s.Enabled))
+        var added = merge!.Added;
+
+        // Stop and close the log under the id each client was started with; the config may carry a new one.
+        foreach (var gone in merge.Removed)
         {
-            await StopClientAsync(speaker.Id);
-            StartClient(speaker);
+            await StopClientAsync(gone.Id);
+            _listenLog?.EndSpeaker(gone.Id, DateTimeOffset.UtcNow, "disconnected");
+        }
+
+        foreach (var (oldId, speaker) in merge.Restart)
+        {
+            await StopClientAsync(oldId);
+            _listenLog?.EndSpeaker(oldId, DateTimeOffset.UtcNow, "disconnected");
+            if (speaker.Enabled)
+            {
+                StartClient(speaker);
+            }
         }
 
         foreach (var speaker in SnapshotSpeakers().Where(s => s.Enabled))
@@ -441,8 +423,10 @@ public sealed class HomePodPlugin : IDenonPlugin, IPluginViewProvider
             _clients[speaker.Id] = client;
         }
 
+        // The id is captured now: discovery can give the config a new id, and this client reports under its own.
+        var id = speaker.Id;
         client.Diagnostic += message => _context?.Logger.Info($"[{speaker.Name}] {message}");
-        client.StateChanged += (previous, current) => OnStateChanged(speaker.Id, previous, current);
+        client.StateChanged += (previous, current) => OnStateChanged(id, previous, current);
         client.Start();
     }
 
@@ -462,10 +446,10 @@ public sealed class HomePodPlugin : IDenonPlugin, IPluginViewProvider
 
     private void OnStateChanged(string speakerId, HomePodState previous, HomePodState current)
     {
-        var speaker = SnapshotSpeakers().FirstOrDefault(s => s.Id == speakerId);
+        var speaker = SnapshotSpeakers().FirstOrDefault(s => s.Id.Equals(speakerId, StringComparison.OrdinalIgnoreCase));
         if (speaker is null)
         {
-            return;
+            return; // a client that discovery has replaced (its id changed): its slot was closed there
         }
 
         _listenLog?.Update(speaker, current, DateTimeOffset.UtcNow);
