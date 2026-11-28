@@ -6,7 +6,7 @@ left open, and remove them (with a CHANGELOG entry) when they are done.
 ## Code review issues #28–#79 (Antigravity, 2026-11-28)
 
 All 52 issues were checked against the code. The plan is 13 PRs, one area each, done one at a time. Feature
-requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see below).
+requests stay open for later: #63, #76, #77, #78, #79 (#74 and #75 are done, see below).
 
 - [x] PR 1: guest input security. #29 closed: a phone track gets its watch and thumbnail address from the video
       id. Part of #31: values ride in data-* attributes (no inline JavaScript), and only hex colours go into styles.
@@ -85,10 +85,23 @@ holds and the HEOS events are connected.
       that state changes could be raised out of order from two threads; fixed (one ordered delivery).
 - [ ] Check in the released app that an input change on the remote leaves no extra input.changed (in the live check
       TV → NET → TV was followed by one more TV → NET; not yet known if the receiver really switched).
-- [ ] #75 (HEOS groups and Zone 2 controls) builds on this: Zone 2 source and volume lines (Z2TV, Z240) are read by
-      `AvrLiveState` only for power today.
+- [x] #75 (HEOS groups and Zone 2 controls): `AvrLiveState` reads every Z2 line (power, volume, source, mute).
 - [ ] The Brain still reads the acoustics every 90 s (`RoomIntelligenceService`). With PS/DIM pushes in
       `ReceiverStateSnapshot.Acoustics`, it could read them from the state and only check now and then.
+
+## HEOS groups and Zone 2 (#75)
+
+Done: Zone 2 volume, source and mute (Core, the Control deck, scenes, automations, MCP) and HEOS multi-room groups
+(get_groups, set_group, group volume and mute, the groups_changed, players_changed and group_volume_changed events).
+
+- [ ] Live check with the user (ask first): read the Zone 2 state, and one Zone 2 volume change at or below 20.
+      Group a second HEOS player only with the user there (it plays in another room).
+- [ ] The command palette has Zone 2 power only; add Zone 2 volume, source and mute and the group actions there
+      (after #76, which changes the palette).
+- [ ] The scene editor takes Zone 2 and the group as text fields, like the other scene fields. Pickers (a source
+      list, the HEOS players as chips) would be easier.
+- [ ] HEOS group volume uses the HEOS 0–100 scale, capped at the safe volume like the receiver's 0–98. Check on a
+      real group that the numbers feel the same.
 
 ## Command palette and shortcuts (#76)
 

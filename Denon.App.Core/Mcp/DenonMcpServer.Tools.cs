@@ -137,9 +137,37 @@ public sealed partial class DenonMcpServer
                 ObjSchema(("action", "string", "One of: play, pause, stop, next, previous", true)),
                 title: "HEOS Playback Transport"),
             Tool("avr_set_zone2",
-                "Turn Zone 2 power ON or OFF.",
-                ObjSchema(("power_on", "boolean", "true for Zone 2 ON, false for OFF", true)),
-                title: "Set Zone 2 Power",
+                "Control Zone 2 (the receiver's second room): power, source, volume and mute. Give one or more fields; " +
+                "power on comes first, then source, volume and mute, and power off last. Volume is the receiver's 0-98 number and is capped by MaxSafeVolume.",
+                ObjSchema(
+                    ("power_on", "boolean", "true for Zone 2 ON, false for OFF", false),
+                    ("source", "string", "Zone 2 source code: SOURCE (follow the main zone), TV, NET, BD, GAME, MPLAY, SAT/CBL, BT, CD, AUX1, PHONO, TUNER", false),
+                    ("volume", "integer", "Zone 2 volume (0-98, capped by MaxSafeVolume)", false),
+                    ("muted", "boolean", "true to mute Zone 2, false to unmute", false)),
+                title: "Control Zone 2",
+                idempotent: true),
+            Tool("heos_get_groups",
+                "List the HEOS players on the network and the multi-room groups they form (leader, members, group volume 0-100 and mute).",
+                EmptySchema(),
+                title: "Get HEOS Groups",
+                readOnly: true, idempotent: true,
+                outputSchema: OutputObjSchema(
+                    ("ownPlayerId", "integer"),
+                    ("players", "array"),
+                    ("groups", "array"))),
+            Tool("heos_set_group",
+                "Group HEOS players for multi-room play: the first player leads and plays its source, the others play the same. " +
+                "One player alone ends the group it leads. Requires FullOrchestration: it changes what other rooms play.",
+                ObjSchema(("players", "string", "Player names or ids, comma-separated, leader first (e.g. 'Living Room, Kitchen')", true)),
+                title: "Set HEOS Group",
+                destructive: true, idempotent: true),
+            Tool("heos_set_group_volume",
+                "Set the volume (0-98, capped by MaxSafeVolume) and/or mute of a HEOS group. Without group_id: the group this receiver is in.",
+                ObjSchema(
+                    ("group_id", "integer", "Group id from heos_get_groups (default: this receiver's group)", false),
+                    ("volume", "integer", "Group volume (0-98, capped by MaxSafeVolume)", false),
+                    ("muted", "boolean", "true to mute the group, false to unmute", false)),
+                title: "Set HEOS Group Volume",
                 idempotent: true),
             Tool("avr_set_eco_mode",
                 "Set Denon ECO power mode (ON, AUTO, OFF).",
@@ -301,6 +329,11 @@ public sealed partial class DenonMcpServer
                     ("sound_mode", "string", "AVR sound mode (e.g. MOVIE, STEREO, PURE DIRECT)", false),
                     ("target_volume", "integer", "Target volume (0-98, capped by MaxSafeVolume)", false),
                     ("dynamic_volume", "string", "OFF, LIT, MED, or HEV", false),
+                    ("zone2_on", "boolean", "Zone 2 power: true on, false off", false),
+                    ("zone2_source", "string", "Zone 2 source code (SOURCE, TV, NET, ...)", false),
+                    ("zone2_volume", "integer", "Zone 2 volume (0-98, capped by MaxSafeVolume)", false),
+                    ("zone2_muted", "boolean", "Zone 2 mute", false),
+                    ("heos_group_with", "string", "HEOS player names to group with this receiver, comma-separated (this receiver leads). 'none' ends its group.", false),
                     ("plugin_id", "string", "Optional plugin ID to chain (e.g. 'philips-hue', 'smart-tv', 'home-assistant')", false),
                     ("plugin_action_id", "string", "Optional plugin action ID to chain (e.g. 'hue.movie_dim', 'tv.screen_off')", false)),
                 title: "Create or Update Smart Scene",
@@ -309,7 +342,7 @@ public sealed partial class DenonMcpServer
                 "Create or replace an automation graph in settings.json. Nodes: trigger.event (config event, filter), trigger.webhook (hook, filter), " +
                 "trigger.schedule (time HH:mm, days), trigger.app_launch (processes), condition.event (filter), condition.time (from, to, days), " +
                 "condition.receiver (power any/on/standby/idle — idle: standby, or on with HEOS stopped or paused; input, muted any/yes/no), condition.recent_event (event names comma-separated, seconds, filter; yes when one happened that recently), action.scene (sceneId), action.plugin (pluginId, actionId, p:<param>), " +
-                "action.receiver (command power_on/power_off/mute/unmute/volume/input/sound_mode, value), action.delay (seconds). " +
+                "action.receiver (command power_on/power_off/mute/unmute/volume/input/sound_mode/zone2_on/zone2_off/zone2_volume/zone2_source/zone2_mute/zone2_unmute/group_with/ungroup/group_volume, value; group_with takes HEOS player names comma-separated), action.delay (seconds). " +
                 "Edges {from, port, to}: port 'out', or 'yes'/'no' after a condition. No cycles. Read denon://catalog/capabilities for node types, scenes and plugin actions. " +
                 "The automation starts disabled unless enabled is true; the user turns it on in the app.",
                 ObjSchema(
@@ -374,6 +407,26 @@ public sealed partial class DenonMcpServer
 
             case "get_listening_habits":
                 return BuildToolJson(_intelligence.BuildHabitsPayload());
+
+            case "heos_get_groups":
+            {
+                var own = await _receiverController.GetOwnHeosPlayerAsync(ct);
+                var state = await _receiverController.RefreshHeosGroupsAsync(ct);
+                return BuildToolJson(new
+                {
+                    ownPlayerId = own.PlayerId,
+                    players = state.Players.Select(static p => new { pid = p.PlayerId, name = p.Name, model = p.Model, ip = p.IpAddress }),
+                    groups = state.Groups.Select(static g => new
+                    {
+                        gid = g.GroupId,
+                        name = g.Name,
+                        leader = g.Leader?.Name,
+                        members = g.Members.Select(static m => new { pid = m.PlayerId, name = m.Name, role = m.IsLeader ? "leader" : "member" }),
+                        volume = g.Volume,
+                        muted = g.IsMuted,
+                    }),
+                });
+            }
 
             case "list_scenes_and_rules":
                 return BuildToolJson(new
@@ -704,11 +757,14 @@ public sealed partial class DenonMcpServer
             }
 
             case "avr_set_zone2":
-            {
-                var on = GetBool(args, "power_on") ?? throw new McpInvalidParamsException("Missing boolean 'power_on'.");
-                await _receiverController.SetZone2PowerAsync(on, ct);
-                return BuildToolText(on ? "Turned Zone 2 ON." : "Turned Zone 2 OFF.");
-            }
+                return await ExecuteSetZone2Async(args, cfg, ct);
+
+            case "heos_set_group":
+                EnsureFullOrchestration(cfg, toolName);
+                return await ExecuteSetGroupAsync(args, ct);
+
+            case "heos_set_group_volume":
+                return await ExecuteSetGroupVolumeAsync(args, cfg, ct);
 
             case "avr_set_eco_mode":
             {
@@ -828,6 +884,11 @@ public sealed partial class DenonMcpServer
                 if (safeScene.TargetVolume.HasValue)
                 {
                     safeScene.TargetVolume = ApplyVolumeCeiling(safeScene.TargetVolume.Value, cfg.MaxSafeVolume, out _);
+                }
+
+                if (safeScene.Zone2Volume.HasValue)
+                {
+                    safeScene.Zone2Volume = ApplyVolumeCeiling(safeScene.Zone2Volume.Value, cfg.MaxSafeVolume, out _);
                 }
 
                 _intelligence.CaptureSnapshot($"MCP Smart Scene: {safeScene.Name}");
@@ -1154,6 +1215,21 @@ public sealed partial class DenonMcpServer
         }
 
         var dvol = GetString(args, "dynamic_volume");
+        var zone2On = GetBool(args, "zone2_on");
+        var zone2Source = GetString(args, "zone2_source");
+        if (!string.IsNullOrWhiteSpace(zone2Source) && !DenonCatalog.IsZone2SourceCode(zone2Source))
+        {
+            throw new McpInvalidParamsException($"'{zone2Source}' is not a Zone 2 source.");
+        }
+
+        var zone2Volume = GetInt(args, "zone2_volume");
+        if (zone2Volume.HasValue)
+        {
+            zone2Volume = ApplyVolumeCeiling(zone2Volume.Value, cfg.MaxSafeVolume, out _);
+        }
+
+        var zone2Muted = GetBool(args, "zone2_muted");
+        var groupWith = GetString(args, "heos_group_with").Trim();
         var pluginId = GetString(args, "plugin_id");
         var pluginActionId = GetString(args, "plugin_action_id");
 
@@ -1170,6 +1246,20 @@ public sealed partial class DenonMcpServer
             if (!string.IsNullOrWhiteSpace(mode)) scene.SoundMode = mode.ToUpperInvariant();
             if (targetVol.HasValue) scene.TargetVolume = targetVol.Value;
             if (!string.IsNullOrWhiteSpace(dvol)) scene.DynamicVolume = dvol.ToUpperInvariant();
+            if (zone2On.HasValue) scene.Zone2On = zone2On.Value;
+            if (!string.IsNullOrWhiteSpace(zone2Source)) scene.Zone2Source = zone2Source.Trim().ToUpperInvariant();
+            if (zone2Volume.HasValue) scene.Zone2Volume = zone2Volume.Value;
+            if (zone2Muted.HasValue) scene.Zone2Muted = zone2Muted.Value;
+            if (groupWith.Equals("none", StringComparison.OrdinalIgnoreCase))
+            {
+                scene.HeosGroupMembers = [];
+                scene.HeosUngroup = true;
+            }
+            else if (groupWith.Length > 0)
+            {
+                scene.HeosGroupMembers = [.. groupWith.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+                scene.HeosUngroup = false;
+            }
 
             if (!string.IsNullOrWhiteSpace(pluginId) && !string.IsNullOrWhiteSpace(pluginActionId))
             {
@@ -1286,6 +1376,131 @@ public sealed partial class DenonMcpServer
             throw new UnauthorizedAccessException($"Tool '{toolName}' requires 'FullOrchestration' permission tier in Denon Desktop Settings.");
         }
     }
+
+    /// <summary>avr_set_zone2: power on, source, volume (capped), mute, and power off last.</summary>
+    private async Task<CallToolResult> ExecuteSetZone2Async(JsonElement args, McpServerSettings cfg, CancellationToken ct)
+    {
+        var on = GetBool(args, "power_on");
+        var source = GetString(args, "source");
+        var volume = GetInt(args, "volume");
+        var muted = GetBool(args, "muted");
+        if (on is null && string.IsNullOrWhiteSpace(source) && volume is null && muted is null)
+        {
+            throw new McpInvalidParamsException("Give at least one of power_on, source, volume or muted.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(source) && !DenonCatalog.IsZone2SourceCode(source))
+        {
+            throw new McpInvalidParamsException(
+                $"'{source}' is not a Zone 2 source. Use one of: {string.Join(", ", DenonCatalog.Zone2Sources.Select(static s => s.Code))}.");
+        }
+
+        var applied = new List<string>();
+        if (on == true)
+        {
+            await _receiverController.SetZone2PowerAsync(true, ct);
+            applied.Add("on");
+        }
+
+        if (!string.IsNullOrWhiteSpace(source))
+        {
+            await _receiverController.SetZone2SourceAsync(source, ct);
+            applied.Add($"source {DenonCatalog.GetFriendlyZone2SourceName(source)}");
+        }
+
+        if (volume is int requested)
+        {
+            var level = ApplyVolumeCeiling(requested, cfg.MaxSafeVolume, out var capped);
+            await _receiverController.SetZone2VolumeAsync(level, ct);
+            applied.Add(capped ? $"volume {level} (capped from {requested} by MaxSafeVolume {cfg.MaxSafeVolume})" : $"volume {level}");
+        }
+
+        if (muted is bool mute)
+        {
+            await _receiverController.SetZone2MuteAsync(mute, ct);
+            applied.Add(mute ? "muted" : "unmuted");
+        }
+
+        // Off last: a source command can turn Zone 2 on again.
+        if (on == false)
+        {
+            await _receiverController.SetZone2PowerAsync(false, ct);
+            applied.Add("off");
+        }
+
+        return BuildToolText($"Zone 2: {string.Join(", ", applied)}.");
+    }
+
+    /// <summary>heos_set_group: the named players, leader first; one player alone ends its group.</summary>
+    private async Task<CallToolResult> ExecuteSetGroupAsync(JsonElement args, CancellationToken ct)
+    {
+        var names = RequireString(args, "players").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        IReadOnlyList<int> ids;
+        try
+        {
+            ids = await _receiverController.ResolveHeosPlayerIdsAsync(names, ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new McpInvalidParamsException(ex.Message);
+        }
+
+        if (ids.Count == 0)
+        {
+            throw new McpInvalidParamsException("Name at least one HEOS player.");
+        }
+
+        var state = await _receiverController.SetHeosGroupAsync(ids, ct);
+        return BuildToolText(ids.Count == 1
+            ? $"Ended the HEOS group of {names[0]}. Groups now: {DescribeGroups(state)}."
+            : $"Grouped {string.Join(", ", names)} ({names[0]} leads). Groups now: {DescribeGroups(state)}.");
+    }
+
+    /// <summary>heos_set_group_volume: the named group, or the group this receiver is in.</summary>
+    private async Task<CallToolResult> ExecuteSetGroupVolumeAsync(JsonElement args, McpServerSettings cfg, CancellationToken ct)
+    {
+        var volume = GetInt(args, "volume");
+        var muted = GetBool(args, "muted");
+        if (volume is null && muted is null)
+        {
+            throw new McpInvalidParamsException("Give volume, muted or both.");
+        }
+
+        var state = await _receiverController.RefreshHeosGroupsAsync(ct);
+        HeosGroup group;
+        if (GetInt(args, "group_id") is int gid)
+        {
+            group = state.Groups.FirstOrDefault(g => g.GroupId == gid)
+                ?? throw new McpInvalidParamsException($"No HEOS group {gid}. Groups: {DescribeGroups(state)}.");
+        }
+        else
+        {
+            var own = await _receiverController.GetOwnHeosPlayerAsync(ct);
+            group = state.GroupOf(own.PlayerId)
+                ?? throw new McpInvalidParamsException($"{own.Name} is not in a HEOS group. Groups: {DescribeGroups(state)}.");
+        }
+
+        var applied = new List<string>();
+        if (volume is int requested)
+        {
+            var level = ApplyVolumeCeiling(requested, cfg.MaxSafeVolume, out var capped);
+            await _receiverController.SetHeosGroupVolumeAsync(group.GroupId, level, ct);
+            applied.Add(capped ? $"volume {level} (capped from {requested} by MaxSafeVolume {cfg.MaxSafeVolume})" : $"volume {level}");
+        }
+
+        if (muted is bool mute)
+        {
+            await _receiverController.SetHeosGroupMuteAsync(group.GroupId, mute, ct);
+            applied.Add(mute ? "muted" : "unmuted");
+        }
+
+        return BuildToolText($"HEOS group '{group.Name}': {string.Join(", ", applied)}.");
+    }
+
+    private static string DescribeGroups(HeosGroupsState state) =>
+        state.Groups.Count == 0
+            ? "none"
+            : string.Join("; ", state.Groups.Select(static g => $"{g.Name} (gid {g.GroupId}: {string.Join(", ", g.Members.Select(static m => m.Name))})"));
 
     private static int ApplyVolumeCeiling(int requested, int maxSafeVolume, out bool wasCapped)
     {

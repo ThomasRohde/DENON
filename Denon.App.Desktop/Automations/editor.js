@@ -30,7 +30,18 @@ const RECEIVER_COMMANDS = {
   volume: "Volume",
   input: "Input",
   sound_mode: "Sound mode",
+  zone2_on: "Zone 2 on",
+  zone2_off: "Zone 2 off",
+  zone2_volume: "Zone 2 volume",
+  zone2_source: "Zone 2 source",
+  zone2_mute: "Zone 2 mute",
+  zone2_unmute: "Zone 2 unmute",
+  group_with: "HEOS group with",
+  ungroup: "Leave HEOS group",
+  group_volume: "HEOS group volume",
 };
+// Commands whose value is a volume on the 0–98 scale, capped at the safe volume.
+const VOLUME_COMMANDS = { volume: "Volume", zone2_volume: "Zone 2 volume", group_volume: "HEOS group volume" };
 const LOCKED_TEXT = "Open the automation editor from Denon Desktop (Scenes → Automation Rules).";
 
 const state = {
@@ -364,6 +375,7 @@ function connectProblem(fromId, port, toId) {
 // ---------------------------------------------------------------- summaries
 const sceneName = (id) => state.catalog?.scenes?.find((sc) => sc.id === id)?.name ?? id;
 const inputName = (code) => state.catalog?.inputs?.find((i) => i.code === code)?.name ?? code;
+const zone2SourceName = (code) => state.catalog?.zone2Sources?.find((i) => i.code === code)?.name ?? code;
 const pluginAction = (pluginId, actionId) =>
   state.catalog?.pluginActions?.find((a) => a.pluginId === pluginId && a.actionId === actionId) ?? null;
 
@@ -418,13 +430,16 @@ function nodeSummary(node) {
     case "action.receiver": {
       if (!c.command) return "";
       const label = optionLabel(node.type, "command", c.command) || RECEIVER_COMMANDS[c.command] || c.command;
-      if (c.command === "volume") {
+      if (VOLUME_COMMANDS[c.command]) {
+        const name = VOLUME_COMMANDS[c.command];
         const cap = state.catalog?.maxSafeVolume;
         const over = cap !== undefined && Number(c.value) > cap;
-        return c.value ? `Volume ${c.value}${over ? ` (capped at ${cap})` : ""}` : "Volume";
+        return c.value ? `${name} ${c.value}${over ? ` (capped at ${cap})` : ""}` : name;
       }
       if (c.command === "input") return c.value ? `Input: ${inputName(c.value)}` : "Input";
       if (c.command === "sound_mode") return c.value ? `Sound mode: ${c.value}` : "Sound mode";
+      if (c.command === "zone2_source") return c.value ? `Zone 2 source: ${zone2SourceName(c.value)}` : "Zone 2 source";
+      if (c.command === "group_with") return c.value ? `HEOS group with ${c.value}` : "HEOS group with";
       return RECEIVER_COMMANDS[c.command] ?? label;
     }
     case "action.delay":
@@ -1668,9 +1683,9 @@ function receiverValueField(node, f, id) {
     else c.value = String(v);
     configChanged(node);
   };
-  if (cmd === "volume") {
+  if (VOLUME_COMMANDS[cmd]) {
     const cap = state.catalog.maxSafeVolume;
-    const input = h("input", { id, class: "input mono", type: "number", min: "0", max: "98", step: "0.5", value: c.value ?? "", placeholder: "40" });
+    const input = h("input", { id, class: "input mono", type: "number", min: "0", max: "98", step: "1", value: c.value ?? "", placeholder: "40" });
     const capNote = cap !== undefined ? h("span", { class: "cap", text: `Capped at ${cap}` }) : null;
     const over = h("span", { class: "field-help warn", hidden: true, text: "" });
     const check = () => {
@@ -1683,7 +1698,20 @@ function receiverValueField(node, f, id) {
       set(input.value);
     });
     check();
-    return fieldWrap(id, "Volume", input, { required: true, help: "0 to 98, as on the receiver's display.", extra: [capNote, over] });
+    return fieldWrap(id, VOLUME_COMMANDS[cmd], input, { required: true, help: "0 to 98, as on the receiver's display.", extra: [capNote, over] });
+  }
+  if (cmd === "zone2_source") {
+    const options = (state.catalog.zone2Sources ?? []).map((i) => ({ value: i.code, label: i.name && i.name !== i.code ? `${i.name} (${i.code})` : i.code }));
+    return fieldWrap(id, "Zone 2 source", selectFor(id, options, c.value ?? "", set, "Choose a source"), { required: true });
+  }
+  if (cmd === "group_with") {
+    const players = state.catalog.heosPlayers ?? [];
+    const input = h("input", { id, class: "input", type: "text", value: c.value ?? "", placeholder: players.slice(0, 2).join(", ") || "Kitchen, Patio", autocomplete: "off", spellcheck: "false" });
+    input.addEventListener("input", () => set(input.value.trim()));
+    const help = players.length
+      ? `HEOS players, comma-separated. This receiver leads. Players: ${players.join(", ")}.`
+      : "HEOS players, comma-separated. This receiver leads.";
+    return fieldWrap(id, "Players", input, { required: true, help });
   }
   if (cmd === "input") {
     const options = (state.catalog.inputs ?? []).map((i) => ({ value: i.code, label: i.name && i.name !== i.code ? `${i.name} (${i.code})` : i.code }));

@@ -140,9 +140,13 @@ public static class AutomationNodeTypes
                     [
                         new("power_on", "Power on"), new("power_off", "Standby"), new("mute", "Mute"), new("unmute", "Unmute"),
                         new("volume", "Volume"), new("input", "Input"), new("sound_mode", "Sound mode"),
+                        new("zone2_on", "Zone 2 on"), new("zone2_off", "Zone 2 off"), new("zone2_volume", "Zone 2 volume"),
+                        new("zone2_source", "Zone 2 source"), new("zone2_mute", "Zone 2 mute"), new("zone2_unmute", "Zone 2 unmute"),
+                        new("group_with", "HEOS group with"), new("ungroup", "Leave HEOS group"), new("group_volume", "HEOS group volume"),
                     ]),
                 new("value", "Value", "text", Placeholder: "45, TV or MOVIE",
-                    Help: "Volume 0–98 (capped at the safe volume), an input code, or a sound mode."),
+                    Help: "Volume 0–98 (capped at the safe volume), an input code, a sound mode, a Zone 2 source, " +
+                          "or HEOS player names (comma-separated) to group with this receiver."),
             ]),
         new(ActionLearnedVolume, GroupAction, "Learned volume",
             "Sets the volume Volume memory learned for what plays now, capped at the safe volume.",

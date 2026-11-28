@@ -96,7 +96,14 @@ public sealed class DenonAvrClient : IDisposable
         var sleepRaw = await TryQueryAsync(settings, "SLP?", "SLP", cancellationToken);
         // Z2? answers with several Z2 lines (power, source, volume) in any order: look at all of them.
         var zone2Lines = await TryQueryAllMatchingAsync(settings, "Z2?", "Z2", cancellationToken);
+        var zone2 = ParseZone2Lines(zone2Lines);
 
+        // Z2? does not say mute. Ask only while Zone 2 is on: off, mute does not matter, and the question costs time.
+        if (zone2.IsZone2On == true &&
+            await TryQueryAsync(settings, "Z2MU?", "Z2MU", cancellationToken) is { } zone2Mute)
+        {
+            zone2 = zone2.Apply(zone2Mute);
+        }
         var (volume, volumeExact, maxVolume) = ParseVolumeLines(volumeLines);
 
         return new AvrDeviceStatus(
@@ -108,10 +115,21 @@ public sealed class DenonAvrClient : IDisposable
             SoundMode: ParsePrefixValue(soundMode, "MS"),
             EcoMode: ParsePrefixValue(ecoMode, "ECO"),
             SleepTimerMinutes: ParseSleepTimer(sleepRaw),
-            IsZone2On: IsZone2OnReply(zone2Lines),
+            IsZone2On: zone2.IsZone2On ?? false,
             MaxVolume: maxVolume,
-            VolumeExact: volumeExact);
+            VolumeExact: volumeExact,
+            Zone2Volume: zone2.Zone2Volume,
+            Zone2Source: zone2.Zone2Source ?? string.Empty,
+            IsZone2Muted: zone2.IsZone2Muted ?? false);
     }
+
+    /// <summary>
+    /// The Zone 2 state in the lines of a Z2? and a Z2MU? reply (power, source, volume and mute, in any order). The
+    /// same parser as for the lines the receiver pushes, so a read and a push never disagree.
+    /// </summary>
+    public static AvrLiveState ParseZone2Lines(IEnumerable<string> lines) =>
+        lines.Where(static l => l.TrimStart().StartsWith("Z2", StringComparison.OrdinalIgnoreCase))
+            .Aggregate(AvrLiveState.Empty, static (state, line) => state.Apply(line));
 
     /// <summary>The current input (for example "TV"), or null when the receiver does not answer SI?.</summary>
     public async Task<string?> TryGetInputSourceAsync(ReceiverSettings settings, CancellationToken cancellationToken)
@@ -150,6 +168,41 @@ public sealed class DenonAvrClient : IDisposable
 
     public Task SetZone2PowerAsync(ReceiverSettings settings, bool on, CancellationToken cancellationToken) =>
         SendCommandAsync(settings, on ? "Z2ON" : "Z2OFF", cancellationToken);
+
+    /// <summary>Zone 2 volume on the receiver's 0–98 scale. The caller applies the safe-volume limit.</summary>
+    public Task SetZone2VolumeAsync(ReceiverSettings settings, int level, CancellationToken cancellationToken) =>
+        SendCommandAsync(settings, Zone2VolumeCommand(level), cancellationToken);
+
+    /// <summary>One step up (Z2UP) or down (Z2DOWN).</summary>
+    public Task StepZone2VolumeAsync(ReceiverSettings settings, bool up, CancellationToken cancellationToken) =>
+        SendCommandAsync(settings, up ? "Z2UP" : "Z2DOWN", cancellationToken);
+
+    public Task SetZone2MuteAsync(ReceiverSettings settings, bool isMuted, CancellationToken cancellationToken) =>
+        SendCommandAsync(settings, isMuted ? "Z2MUON" : "Z2MUOFF", cancellationToken);
+
+    public Task SetZone2SourceAsync(ReceiverSettings settings, string sourceCode, CancellationToken cancellationToken) =>
+        SendCommandAsync(settings, Zone2SourceCommand(sourceCode), cancellationToken);
+
+    /// <summary>"Z2" and two digits (Z205, Z240). 98 is the top of the scale.</summary>
+    internal static string Zone2VolumeCommand(int level)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(level);
+        return $"Z2{Math.Min(level, DenonVolumeMath.MaxAbsoluteVolume):00}";
+    }
+
+    /// <summary>
+    /// "Z2" and a known source code. Any other text is refused: "Z250" would set the volume past the safe-volume
+    /// limit, and "Z2MUON" is a mute command.
+    /// </summary>
+    internal static string Zone2SourceCommand(string sourceCode)
+    {
+        if (!DenonCatalog.IsZone2SourceCode(sourceCode))
+        {
+            throw new ArgumentException($"'{sourceCode}' is not a Zone 2 source.", nameof(sourceCode));
+        }
+
+        return $"Z2{sourceCode.Trim().ToUpperInvariant()}";
+    }
 
     public Task SetVolumeAsync(ReceiverSettings settings, int level, CancellationToken cancellationToken)
     {
@@ -445,10 +498,6 @@ public sealed class DenonAvrClient : IDisposable
             return [];
         }
     }
-
-    /// <summary>True when one of the Z2? reply lines is exactly "Z2ON" (the other lines are source and volume).</summary>
-    public static bool IsZone2OnReply(IEnumerable<string> lines) =>
-        lines.Any(static line => string.Equals(line.Trim(), "Z2ON", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>MV? answers "MV45" and then "MVMAX 98". The reply is complete when both lines are in.</summary>
     internal static bool IsCompleteVolumeReply(IReadOnlyList<string> lines) =>

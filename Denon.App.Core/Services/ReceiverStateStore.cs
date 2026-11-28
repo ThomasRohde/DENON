@@ -105,6 +105,55 @@ public sealed class ReceiverStateStore
         return kept;
     }
 
+    /// <summary>Keeps a full read of the HEOS players and groups. Nothing is raised when nothing changed.</summary>
+    public void UpdateHeosGroups(HeosGroupsState groups)
+    {
+        var changed = false;
+        lock (_syncRoot)
+        {
+            if (!Equals(_current.HeosGroups, groups))
+            {
+                _current = _current with { HeosGroups = groups };
+                _version++;
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            Deliver();
+        }
+    }
+
+    /// <summary>
+    /// Applies an event/group_volume_changed: the volume (0–100) and mute of one group. An unknown group changes
+    /// nothing (the groups_changed read that follows brings it).
+    /// </summary>
+    public void PatchGroupVolume(int groupId, int? volume, bool? isMuted)
+    {
+        var changed = false;
+        lock (_syncRoot)
+        {
+            if (_current.HeosGroups is { } state &&
+                state.Groups.FirstOrDefault(g => g.GroupId == groupId) is { } group)
+            {
+                var patched = group with { Volume = volume ?? group.Volume, IsMuted = isMuted ?? group.IsMuted };
+                if (!patched.Equals(group))
+                {
+                    var groups = state.Groups.Select(g => g.GroupId == groupId ? patched : g).ToList();
+                    _current = _current with { HeosGroups = state with { Groups = groups, RetrievedAt = DateTimeOffset.Now } };
+                    _version++;
+                    changed = true;
+                }
+            }
+        }
+
+        if (changed)
+        {
+            Deliver();
+        }
+    }
+
     public void UpdateError(string message)
     {
         Update(snapshot => snapshot with
