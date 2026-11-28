@@ -2,7 +2,7 @@
 
 Released separately from Denon Desktop with tags `appletv-vX.Y.Z`.
 
-## [Unreleased]
+## [0.6.0] - 2026-11-28
 
 ### Security
 - **Bad network data can no longer crash Denon Desktop or stall the link** (#35). The OPACK reader stops at 64

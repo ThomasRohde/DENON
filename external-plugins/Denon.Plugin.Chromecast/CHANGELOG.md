@@ -2,7 +2,7 @@
 
 Released separately from Denon Desktop with tags `chromecast-vX.Y.Z`.
 
-## [Unreleased]
+## [0.7.0] - 2026-11-28
 
 ### Fixed
 - **A device added by IP stays connected when discovery finds it** (#49). mDNS gives it the device's own id; the
