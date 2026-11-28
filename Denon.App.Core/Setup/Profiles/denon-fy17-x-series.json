@@ -1,0 +1,413 @@
+{
+  "id": "denon-fy17-x-series",
+  "name": "Denon FY17 X-series (AVR-X2400H and family)",
+  "description": "Recommended Audyssey and sound settings for the Denon 2017 receivers that share one control protocol. Written from the X2400H owner's manual and the manufacturer's protocol file. Settings the protocol cannot read or set are listed as advice.",
+  "models": ["AVR-X2400H", "AVR-X1400H", "AVR-X3400H", "AVR-S930H", "AVR-S730H"],
+  "settings": [
+    {
+      "id": "multEq",
+      "label": "Audyssey MultEQ",
+      "group": "Audyssey",
+      "scope": "perInput",
+      "tier": "confirm",
+      "read": "PSMULTEQ: ?",
+      "readParse": "^PSMULTEQ:(\\S+)$",
+      "write": "PSMULTEQ:{value}",
+      "values": [
+        { "token": "AUDYSSEY", "label": "Reference" },
+        { "token": "BYP.LR", "label": "L/R Bypass" },
+        { "token": "FLAT", "label": "Flat" },
+        { "token": "OFF", "label": "Off" }
+      ],
+      "blockedWhen": { "soundModes": ["DIRECT", "PURE DIRECT"] },
+      "recommend": { "films": "AUDYSSEY", "music": "AUDYSSEY", "lateNight": "AUDYSSEY", "tv": "AUDYSSEY" },
+      "why": "Reference is the full room correction from your Audyssey measurement. Flat and L/R Bypass leave the front speakers uncorrected; they suit a deliberate comparison, not everyday listening.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: Audyssey MultEQ",
+        "http://assets.denon.com/DocumentMaster/us/AVR-X6400H_X4400H_X3400H_X2400H_X1400H_S930H_S730H_PROTOCOL_V01.xlsx"
+      ]
+    },
+    {
+      "id": "dynamicEq",
+      "label": "Dynamic EQ",
+      "group": "Audyssey",
+      "scope": "perInput",
+      "tier": "apply",
+      "read": "PSDYNEQ ?",
+      "readParse": "^PSDYNEQ (ON|OFF)$",
+      "write": "PSDYNEQ {value}",
+      "values": [
+        { "token": "ON", "label": "On" },
+        { "token": "OFF", "label": "Off" }
+      ],
+      "blockedWhen": { "soundModes": ["DIRECT", "PURE DIRECT"] },
+      "recommend": { "films": "ON", "music": "ON", "lateNight": "ON", "tv": "ON" },
+      "why": "Dynamic EQ keeps bass and treble in balance when you listen below the loudness the film was mixed at. It is also needed for the Reference Level Offset to work.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: Dynamic EQ",
+        "http://assets.denon.com/DocumentMaster/us/AVR-X6400H_X4400H_X3400H_X2400H_X1400H_S930H_S730H_PROTOCOL_V01.xlsx"
+      ]
+    },
+    {
+      "id": "refLevel",
+      "label": "Reference Level Offset",
+      "group": "Audyssey",
+      "scope": "perInput",
+      "tier": "confirm",
+      "requires": { "dynamicEq": "ON" },
+      "read": "PSREFLEV ?",
+      "readParse": "^PSREFLEV (\\d+)$",
+      "write": "PSREFLEV {value}",
+      "values": [
+        { "token": "0", "label": "0 dB (film reference)" },
+        { "token": "5", "label": "5 dB" },
+        { "token": "10", "label": "10 dB" },
+        { "token": "15", "label": "15 dB" }
+      ],
+      "blockedWhen": { "soundModes": ["DIRECT", "PURE DIRECT"] },
+      "recommend": { "films": "0", "music": "10", "lateNight": "0", "tv": "10" },
+      "why": "0 dB is right for films mixed at reference level. Music and TV are mixed quieter, so 10 dB keeps their bass and treble from thinning out; pop and rock are often set to 15 dB, classical to 5 dB.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: Reference Level Offset",
+        "http://assets.denon.com/DocumentMaster/us/AVR-X6400H_X4400H_X3400H_X2400H_X1400H_S930H_S730H_PROTOCOL_V01.xlsx"
+      ]
+    },
+    {
+      "id": "dynamicVolume",
+      "label": "Dynamic Volume",
+      "group": "Dynamics",
+      "scope": "perInput",
+      "tier": "confirm",
+      "read": "PSDYNVOL ?",
+      "readParse": "^PSDYNVOL (\\w+)$",
+      "write": "PSDYNVOL {value}",
+      "values": [
+        { "token": "OFF", "label": "Off" },
+        { "token": "LIT", "label": "Light" },
+        { "token": "MED", "label": "Medium" },
+        { "token": "HEV", "label": "Heavy" }
+      ],
+      "blockedWhen": { "soundModes": ["DIRECT", "PURE DIRECT"] },
+      "recommend": { "films": "OFF", "music": "OFF", "lateNight": ["LIT", "MED"], "tv": ["OFF", "LIT"] },
+      "why": "Dynamic Volume evens out loud and quiet passages. Off keeps the mix as made; Light or Medium helps at night and with TV adverts. Heavy squeezes the sound hard.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: Dynamic Volume",
+        "http://assets.denon.com/DocumentMaster/us/AVR-X6400H_X4400H_X3400H_X2400H_X1400H_S930H_S730H_PROTOCOL_V01.xlsx"
+      ]
+    },
+    {
+      "id": "cinemaEq",
+      "label": "Cinema EQ",
+      "group": "Audyssey",
+      "scope": "perInput",
+      "tier": "apply",
+      "read": "PSCINEMA EQ. ?",
+      "readParse": "^PSCINEMA EQ\\.(ON|OFF)$",
+      "write": "PSCINEMA EQ.{value}",
+      "values": [
+        { "token": "ON", "label": "On" },
+        { "token": "OFF", "label": "Off" }
+      ],
+      "blockedWhen": { "soundModes": ["DIRECT", "PURE DIRECT"] },
+      "recommend": { "films": "OFF", "music": "OFF", "lateNight": "OFF", "tv": "OFF" },
+      "why": "Cinema EQ softens harsh treble on film soundtracks. Audyssey already corrects the room, so the extra filter usually just dulls the sound.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: Cinema EQ",
+        "http://assets.denon.com/DocumentMaster/us/AVR-X6400H_X4400H_X3400H_X2400H_X1400H_S930H_S730H_PROTOCOL_V01.xlsx"
+      ]
+    },
+    {
+      "id": "restorer",
+      "label": "Audio Restorer",
+      "group": "Sound",
+      "scope": "perInput",
+      "tier": "confirm",
+      "read": "PSRSTR ?",
+      "readParse": "^PSRSTR (\\w+)$",
+      "write": "PSRSTR {value}",
+      "values": [
+        { "token": "OFF", "label": "Off" },
+        { "token": "LOW", "label": "Low" },
+        { "token": "MED", "label": "Medium" },
+        { "token": "HI", "label": "High" }
+      ],
+      "recommend": { "films": "OFF", "music": "OFF", "lateNight": "OFF", "tv": ["OFF", "LOW"] },
+      "why": "The Restorer adds back what compression took out of MP3 and low-bit-rate streams. For lossless music and films Off is right; Low to High only helps compressed sources.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: Audio Restorer",
+        "http://assets.denon.com/DocumentMaster/us/AVR-X6400H_X4400H_X3400H_X2400H_X1400H_S930H_S730H_PROTOCOL_V01.xlsx"
+      ]
+    },
+    {
+      "id": "tone",
+      "label": "Tone control",
+      "group": "Sound",
+      "scope": "perInput",
+      "tier": "confirm",
+      "read": "PSTONE CTRL ?",
+      "readParse": "^PSTONE CTRL (ON|OFF)$",
+      "write": "PSTONE CTRL {value}",
+      "values": [
+        { "token": "ON", "label": "On" },
+        { "token": "OFF", "label": "Off" }
+      ],
+      "recommend": { "films": "OFF", "music": "OFF", "lateNight": "OFF", "tv": "OFF" },
+      "why": "With the room corrected by Audyssey, the bass and treble knobs only undo that correction. Off gives the sound the measurement aimed for. Leave it on if you set it on purpose.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: Tone",
+        "http://assets.denon.com/DocumentMaster/us/AVR-X6400H_X4400H_X3400H_X2400H_X1400H_S930H_S730H_PROTOCOL_V01.xlsx"
+      ]
+    },
+    {
+      "id": "drc",
+      "label": "Dynamic range compression",
+      "group": "Dynamics",
+      "scope": "perInput",
+      "tier": "confirm",
+      "read": "PSDRC ?",
+      "readParse": "^PSDRC (\\w+)$",
+      "write": "PSDRC {value}",
+      "values": [
+        { "token": "AUTO", "label": "Auto" },
+        { "token": "LOW", "label": "Low" },
+        { "token": "MID", "label": "Medium" },
+        { "token": "HI", "label": "High" },
+        { "token": "OFF", "label": "Off" }
+      ],
+      "recommend": { "films": ["OFF", "AUTO"], "music": "OFF", "lateNight": ["LOW", "MID"], "tv": "OFF" },
+      "why": "Compression narrows the gap between loud and quiet. Off keeps the full range; Auto follows the stream's own setting (TrueHD, Atmos). Low or Medium lets you keep the volume down at night and still hear the dialogue.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: Dynamic Range Compression",
+        "http://assets.denon.com/DocumentMaster/us/AVR-X6400H_X4400H_X3400H_X2400H_X1400H_S930H_S730H_PROTOCOL_V01.xlsx"
+      ]
+    },
+    {
+      "id": "loudnessManagement",
+      "label": "Loudness Management",
+      "group": "Dynamics",
+      "scope": "perInput",
+      "tier": "apply",
+      "read": "PSLOM ?",
+      "readParse": "^PSLOM (ON|OFF)$",
+      "write": "PSLOM {value}",
+      "values": [
+        { "token": "ON", "label": "On" },
+        { "token": "OFF", "label": "Off" }
+      ],
+      "recommend": { "films": "ON", "music": "ON", "lateNight": "ON", "tv": "ON" },
+      "why": "Loudness Management follows the dialogue-normalization level that Dolby streams carry, so one film does not play louder than the next at the same volume setting.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: Loudness Management",
+        "http://assets.denon.com/DocumentMaster/us/AVR-X6400H_X4400H_X3400H_X2400H_X1400H_S930H_S730H_PROTOCOL_V01.xlsx"
+      ]
+    },
+    {
+      "id": "lfeLevel",
+      "label": "LFE level",
+      "group": "Sound",
+      "scope": "perInput",
+      "tier": "confirm",
+      "read": "PSLFE ?",
+      "readParse": "^PSLFE (\\d\\d)$",
+      "write": "PSLFE {value}",
+      "values": [
+        { "token": "00", "label": "0 dB" },
+        { "token": "01", "label": "-1 dB" },
+        { "token": "02", "label": "-2 dB" },
+        { "token": "03", "label": "-3 dB" },
+        { "token": "04", "label": "-4 dB" },
+        { "token": "05", "label": "-5 dB" },
+        { "token": "06", "label": "-6 dB" },
+        { "token": "07", "label": "-7 dB" },
+        { "token": "08", "label": "-8 dB" },
+        { "token": "09", "label": "-9 dB" },
+        { "token": "10", "label": "-10 dB" }
+      ],
+      "recommend": { "films": "00" },
+      "why": "0 dB plays the film's bass effects channel at the level the mixer intended. Turn the subwoofer level down with the subwoofer trim, not with this setting.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: LFE",
+        "http://assets.denon.com/DocumentMaster/us/AVR-X6400H_X4400H_X3400H_X2400H_X1400H_S930H_S730H_PROTOCOL_V01.xlsx"
+      ]
+    },
+    {
+      "id": "eco",
+      "label": "ECO mode",
+      "group": "Power and display",
+      "scope": "global",
+      "tier": "confirm",
+      "read": "ECO?",
+      "readParse": "^ECO(ON|OFF|AUTO)$",
+      "write": "ECO{value}",
+      "values": [
+        { "token": "ON", "label": "On" },
+        { "token": "AUTO", "label": "Auto" },
+        { "token": "OFF", "label": "Off" }
+      ],
+      "recommend": { "films": "OFF", "music": "OFF", "lateNight": "OFF", "tv": "OFF" },
+      "why": "ECO mode limits the power the amplifier can deliver. With it off, loud film peaks are not clipped. It costs a little more power when the receiver idles.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: ECO mode",
+        "http://assets.denon.com/DocumentMaster/us/AVR-X6400H_X4400H_X3400H_X2400H_X1400H_S930H_S730H_PROTOCOL_V01.xlsx"
+      ]
+    },
+    {
+      "id": "subTrim",
+      "label": "Subwoofer trim",
+      "group": "Speakers",
+      "scope": "perInput",
+      "tier": "advice",
+      "read": "PSSWL ?",
+      "readParse": "^PSSWL (\\d\\d)\\d?$",
+      "decode": "offset50",
+      "unit": "dB",
+      "warnWhen": {
+        "atLimits": { "min": -12, "max": 12 },
+        "message": "The subwoofer trim is at the end of its range. That usually means the sub level or the distance needs a look, not a larger trim. Run Audyssey again or adjust the subwoofer's own volume."
+      },
+      "advice": "A trim is a taste setting. This check only warns when it sits at -12 or +12 dB; it does not tell you a target.",
+      "why": "A trim at the limit has no room left to adjust, and often hides a level mismatch between the subwoofer and the speakers.",
+      "sources": [
+        "http://assets.denon.com/DocumentMaster/us/AVR-X6400H_X4400H_X3400H_X2400H_X1400H_S930H_S730H_PROTOCOL_V01.xlsx"
+      ]
+    },
+    {
+      "id": "soundMode",
+      "label": "Sound mode",
+      "group": "Sound",
+      "scope": "perInput",
+      "tier": "advice",
+      "read": "MS?",
+      "readParse": "^MS(.+)$",
+      "warnWhen": {
+        "values": ["DIRECT", "PURE DIRECT"],
+        "message": "Direct and Pure Direct skip Audyssey room correction and Dynamic EQ. Use Stereo for music to keep them, and Auto for films."
+      },
+      "advice": "Auto for films, Stereo for music. The app does not change the sound mode here.",
+      "why": "In Direct and Pure Direct the receiver turns off MultEQ, Dynamic EQ and the level trims, so the room correction you measured does nothing.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: Sound modes",
+        "http://assets.denon.com/DocumentMaster/us/AVR-X6400H_X4400H_X3400H_X2400H_X1400H_S930H_S730H_PROTOCOL_V01.xlsx"
+      ]
+    },
+    {
+      "id": "audioDelay",
+      "label": "Audio delay",
+      "group": "Sound",
+      "scope": "perInput",
+      "tier": "advice",
+      "read": "PSDELAY ?",
+      "readParse": "^PSDELAY (\\d+)$",
+      "unit": "ms",
+      "advice": "Audio delay is for lip sync and depends on your TV and source. Zero is normal when the picture and the sound already match. The app only shows the value.",
+      "why": "A delay set for one source is wrong for the next, so there is no single recommended value.",
+      "sources": [
+        "http://assets.denon.com/DocumentMaster/us/AVR-X6400H_X4400H_X3400H_X2400H_X1400H_S930H_S730H_PROTOCOL_V01.xlsx"
+      ]
+    },
+    {
+      "id": "speakerSize",
+      "label": "Speaker size",
+      "group": "Speakers",
+      "scope": "global",
+      "tier": "advice",
+      "advice": "Set the speakers to Small and the subwoofer to Yes, then check the result in the receiver's speaker setup. Audyssey proposes the sizes after a measurement.",
+      "why": "Small sends the deep bass to the subwoofer, which has the power and the size to play it. Large on a small speaker strains the speaker and the amplifier.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: Speaker configuration",
+        "The protocol file has no setup (SS) commands, so the app cannot read or set it"
+      ]
+    },
+    {
+      "id": "crossover",
+      "label": "Crossover frequency",
+      "group": "Speakers",
+      "scope": "global",
+      "tier": "advice",
+      "advice": "80 Hz or higher for small speakers. Audyssey proposes a value after a measurement; check it in the receiver's speaker setup.",
+      "why": "The crossover is the point where bass moves from the speakers to the subwoofer. Too low leaves small speakers struggling; too high makes the subwoofer audible as a separate source.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: Crossover frequency",
+        "The protocol file has no setup (SS) commands, so the app cannot read or set it"
+      ]
+    },
+    {
+      "id": "lpfForLfe",
+      "label": "LPF for LFE",
+      "group": "Speakers",
+      "scope": "global",
+      "tier": "advice",
+      "advice": "Set it to 120 Hz. Set it in the receiver's speaker setup under the bass settings.",
+      "why": "The LFE channel carries effects up to 120 Hz. A lower filter cuts off part of the effects.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: Bass settings",
+        "The protocol file has no setup (SS) commands, so the app cannot read or set it"
+      ]
+    },
+    {
+      "id": "subwooferMode",
+      "label": "Subwoofer mode",
+      "group": "Speakers",
+      "scope": "global",
+      "tier": "advice",
+      "advice": "Use LFE. Set it in the receiver's speaker setup under the bass settings.",
+      "why": "In LFE mode the subwoofer plays the effects channel and the bass of every Small speaker, and nothing is played twice.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: Subwoofer mode",
+        "The protocol file has no setup (SS) commands, so the app cannot read or set it"
+      ]
+    },
+    {
+      "id": "distances",
+      "label": "Speaker distances",
+      "group": "Speakers",
+      "scope": "global",
+      "tier": "advice",
+      "advice": "Let Audyssey measure them, then compare them with a tape measure: a distance far off means a speaker was mis-detected. Check them in the receiver's speaker setup.",
+      "why": "The distances time the speakers so their sound reaches you together. A wrong distance blurs the sound and the imaging.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: Distance",
+        "The protocol file has no setup (SS) commands, so the app cannot read or set it"
+      ]
+    },
+    {
+      "id": "hdmiControl",
+      "label": "HDMI Control and ARC",
+      "group": "HDMI",
+      "scope": "global",
+      "tier": "advice",
+      "advice": "Turn HDMI Control on if you want the TV remote to control the receiver or the receiver to follow the TV; turn it off if the receiver switches on or changes input on its own. For TV sound over one cable, connect the TV's ARC input to the receiver's ARC-capable HDMI output.",
+      "why": "HDMI Control (CEC) is convenient but is also the usual cause of a receiver that wakes up or changes input by itself.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: HDMI Setup",
+        "The protocol file has no setup (SS) commands, so the app cannot read or set it"
+      ]
+    },
+    {
+      "id": "signalFormat",
+      "label": "4K signal format",
+      "group": "HDMI",
+      "scope": "global",
+      "tier": "advice",
+      "advice": "Choose Enhanced for 4K HDR sources on an input whose cable and device support it. If the picture drops out or sparkles, go back to Standard or use a certified Premium High Speed cable.",
+      "why": "Enhanced lets the input carry the extra bandwidth that 4K HDR needs. A cable that cannot manage it shows as black screens or sparkles.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: Video format",
+        "The protocol file has no setup (SS) commands, so the app cannot read or set it"
+      ]
+    },
+    {
+      "id": "volumeLimit",
+      "label": "Volume limit",
+      "group": "Safety",
+      "scope": "global",
+      "tier": "advice",
+      "advice": "Set a volume limit in the receiver's setup menu so a mistaken turn of the knob cannot play at full volume. The app can read the limit the receiver reports but cannot set it.",
+      "why": "A limit on the receiver stops every source and every controller, including this app, from going above it.",
+      "sources": [
+        "Denon AVR-X2400H owner's manual: Volume limit",
+        "The protocol file has no setup (SS) commands, so the app cannot read or set it"
+      ]
+    }
+  ]
+}

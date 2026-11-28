@@ -4,6 +4,24 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Receiver setup check** (Scenes & Acoustics → Setup check, and Ctrl+K → "Receiver setup check"). The app reads the
+  receiver, compares it with a profile of recommended settings for its model, and lists what differs with the reason.
+  Choose Films, Music, Late night or TV. A check only reads. Tick the rows to change and press Apply: the app asks,
+  saves the old values first, and **Undo last apply** puts them back. Safe rows are ticked by default; rows that change
+  how the sound feels (Reference Level Offset, Dynamic Volume, Restorer, tone, LFE, ECO) wait for your tick. It also
+  warns when the subwoofer trim is at -12 or +12 dB or the sound mode is Direct / Pure Direct, and shows advice for
+  what the network protocol cannot read or set (speaker sizes, crossover, LPF for LFE, distances, HDMI, volume limit).
+  Per-input settings are read and set for the input selected now (the app never switches input to do it).
+- **Receiver profiles** are JSON files, one per receiver family with per-model overrides, validated with a JSON Schema.
+  The app ships one for the Denon FY17 X-series (AVR-X2400H, X1400H, X3400H, S930H, S730H); drop your own into
+  `%LocalAppData%\DenonDesktop\profiles` (a profile with the same id replaces the bundled one). See
+  `docs/receiver-profiles.md`.
+- The receiver link learned the Denon commands `PSREFLEV`, `PSCINEMA EQ.`, `PSDRC`, `PSLOM`, `PSLFE` and `PSDELAY` (read
+  and write, through the profiles only), and refuses any command over Denon's 135-byte limit.
+
 ## [2.10.36] - 2026-11-28
 
 ### Fixed

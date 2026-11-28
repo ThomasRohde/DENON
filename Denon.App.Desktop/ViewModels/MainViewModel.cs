@@ -10,6 +10,7 @@ using Denon.App.Core.Infrastructure;
 using Denon.App.Core.Mcp;
 using Denon.App.Core.Models;
 using Denon.App.Core.Plugins;
+using Denon.App.Core.Setup;
 using Denon.App.Core.Services;
 using Denon.App.Core.Services.Metering;
 using Denon.App.Desktop.Infrastructure;
@@ -164,7 +165,8 @@ public sealed partial class MainViewModel : ObservableObject
         AcousticSyncCalibrationService calibrationService,
         RoomIntelligenceService roomIntelligenceService,
         DenonMcpServer mcpServer,
-        EventTelemetryLog telemetryLog)
+        EventTelemetryLog telemetryLog,
+        ReceiverSetupService setupService)
     {
         _receiverController = receiverController;
         _settingsStore = settingsStore;
@@ -317,6 +319,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         InitializeYouTube(youtubeService, relayServer, youtubeQueueService, cinemaWindow);
         InitializeScenesAcoustics();
+        InitializeSetupCheck(setupService);
         InitializeCastRemoteRadio(radioBrowserService, localJukeboxService, pcAudioCastService, heosEventListener);
         InitializeShortcuts(globalHotkeyService);
         InitializePlugins(pluginHostService);
@@ -1132,6 +1135,7 @@ public sealed partial class MainViewModel : ObservableObject
     private void NotifyCommandStateChanged()
     {
         RefreshCommand.NotifyCanExecuteChanged();
+        NotifySetupCommands();
         TogglePowerCommand.NotifyCanExecuteChanged();
         ToggleZone2Command.NotifyCanExecuteChanged();
         NotifyZone2GroupCommands();
@@ -1159,6 +1163,11 @@ public sealed partial class MainViewModel : ObservableObject
         PlayFavoriteCommand.NotifyCanExecuteChanged();
         FixSilentAudioCommand.NotifyCanExecuteChanged();
         ResetConnectionsCommand.NotifyCanExecuteChanged();
+
+        // The setup check's buttons also wait for the receiver: enable them again when it is no longer busy.
+        RunSetupCheckCommand?.NotifyCanExecuteChanged();
+        ApplySetupCommand?.NotifyCanExecuteChanged();
+        UndoSetupCommand?.NotifyCanExecuteChanged();
 
         PlayYouTubeTrackCommand?.NotifyCanExecuteChanged();
         PlayYouTubeTrackAndWatchCommand?.NotifyCanExecuteChanged();

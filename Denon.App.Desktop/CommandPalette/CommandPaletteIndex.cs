@@ -14,6 +14,14 @@ public static class CommandPaletteIndex
         ArgumentNullException.ThrowIfNull(main);
         var entries = new List<CommandPaletteEntry>(CommandPalettePages.Entries());
 
+        entries.Add(new CommandPaletteEntry(
+            "tool:receiver-setup-check",
+            CommandPaletteCategory.Tool,
+            "Receiver setup check",
+            "Compare the receiver with recommended settings (reads only until you apply)",
+            ["setup", "audyssey", "reference level", "dynamic eq", "recommended", "profile", "best settings", "check"],
+            CommandPaletteTool.ReceiverSetupCheck));
+
         foreach (var scene in main.ScenePresets)
         {
             if (string.IsNullOrWhiteSpace(scene.Name))
@@ -101,3 +109,10 @@ public static class CommandPaletteIndex
 
 /// <summary>The payload of a plugin action row.</summary>
 public sealed record CommandPalettePluginAction(PluginCardViewModel Plugin, Denon.App.PluginSdk.PluginActionDescriptor Action);
+
+/// <summary>The payload of a tool row: a page area of its own that the palette only opens.</summary>
+public sealed record CommandPaletteTool(string Name, Action<MainViewModel> Open)
+{
+    /// <summary>Scenes &amp; Acoustics → Setup check. Opening it reads nothing from the receiver.</summary>
+    public static CommandPaletteTool ReceiverSetupCheck { get; } = new("receiver-setup-check", static main => main.OpenReceiverSetupCheck());
+}

@@ -47,6 +47,15 @@
                             Margin="{skin:Space 8,0,0,0}"
                             Style="{StaticResource ChipButton}"
                             infra:Chip.IsActive="{Binding AcousticsSubTab, Converter={StaticResource EqualityConverter}, ConverterParameter=VolumeMemory}" />
+
+                    <Button Content="Setup check"
+                            Command="{Binding SetAcousticsSubTabCommand}"
+                            CommandParameter="Setup"
+                            Padding="{skin:Space 12,6}"
+                            FontSize="{DynamicResource FontSize06}"
+                            Margin="{skin:Space 8,0,0,0}"
+                            Style="{StaticResource ChipButton}"
+                            infra:Chip.IsActive="{Binding AcousticsSubTab, Converter={StaticResource EqualityConverter}, ConverterParameter=Setup}" />
                 </StackPanel>
 
                 <TextBlock Text="Chain plugin actions onto Smart Scenes, and run them on app launches, schedules, room events or webhooks"
@@ -897,6 +906,142 @@
                         </ItemsControl>
                     </ScrollViewer>
                 </Grid>
+            </Grid>
+        </Border>
+        <!-- Sub-View 4: Receiver setup check (the receiver against a profile of recommended settings) -->
+        <Border Grid.Row="1" Style="{StaticResource SurfaceCard}" Visibility="{Binding AcousticsSubTab, Converter={StaticResource EqualityToVis}, ConverterParameter=Setup}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Margin="{skin:Space 0,0,0,10}">
+                    <TextBlock Text="RECEIVER SETUP CHECK" Style="{StaticResource SectionLabelStyle}" />
+                    <TextBlock FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="{skin:Space 0,3,0,0}"
+                               Text="Compares the receiver with the recommended settings for its model. A check only reads. Settings that belong to one input are read and set for the input that is selected now: the app never switches input, so check each input you care about. Speaker sizes, crossover, distances and HDMI settings cannot be read or set over the network, so they are listed as advice only." />
+                    <TextBlock Text="{Binding SetupProfileText}" FontSize="{DynamicResource FontSize05}" FontWeight="SemiBold" Foreground="{DynamicResource AccentCyanBrightBrush}" TextWrapping="Wrap" Margin="{skin:Space 0,8,0,0}" />
+                </StackPanel>
+
+                <DockPanel Grid.Row="1" Margin="{skin:Space 0,0,0,10}" LastChildFill="False">
+                    <ItemsControl DockPanel.Dock="Left" ItemsSource="{Binding SetupUses}" VerticalAlignment="Center">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Content="{Binding Label}" Style="{StaticResource ChipButton}" Padding="{skin:Space 12,6}" Margin="{skin:Space 0,0,8,0}"
+                                        FontSize="{DynamicResource FontSize06}"
+                                        Command="{Binding DataContext.SelectSetupUseCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding Use}"
+                                        infra:Chip.IsActive="{Binding IsActive}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Content="Profiles folder" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 12,6}" Margin="{skin:Space 0,0,8,0}"
+                                Command="{Binding OpenSetupProfilesFolderCommand}"
+                                ToolTip="Drop your own profile JSON here. A profile with the same id as a bundled one replaces it." />
+                        <Button Content="Reload profiles" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 12,6}" Margin="{skin:Space 0,0,8,0}"
+                                Command="{Binding ReloadSetupProfilesCommand}" />
+                        <Button Content="Check receiver" Style="{StaticResource PrimaryButton}" Padding="{skin:Space 14,6}" Margin="{skin:Space 0,0,8,0}"
+                                Command="{Binding RunSetupCheckCommand}"
+                                ToolTip="Reads the settings. Changes nothing." />
+                        <Button Content="Apply ticked" Style="{StaticResource PrimaryButton}" Padding="{skin:Space 14,6}"
+                                Command="{Binding ApplySetupCommand}"
+                                ToolTip="Asks first, saves the old values, then sets the ticked rows." />
+                    </StackPanel>
+                </DockPanel>
+
+                <StackPanel Grid.Row="2">
+                    <TextBlock Text="{Binding SetupStatusText}" FontSize="{DynamicResource FontSize05}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap" Margin="{skin:Space 0,0,0,8}"
+                               AutomationProperties.LiveSetting="Polite" />
+                    <Border Background="{DynamicResource AccentAmberSubtleBgBrush}" BorderBrush="{DynamicResource AccentAmberBrush}" BorderThickness="1" CornerRadius="{DynamicResource Radius04}" Padding="{skin:Space 12,8}" Margin="{skin:Space 0,0,0,8}"
+                            Visibility="{Binding HasSetupNotice, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="{Binding SetupNoticeText}" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource AccentAmberTextBrush}" TextWrapping="Wrap" />
+                    </Border>
+                    <Border Background="{DynamicResource AccentCrimsonBgBrush}" BorderBrush="{DynamicResource AccentCrimsonBorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource Radius04}" Padding="{skin:Space 12,8}" Margin="{skin:Space 0,0,0,8}"
+                            Visibility="{Binding HasSetupProblems, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
+                            <TextBlock Text="Profile files that were not used" FontSize="{DynamicResource FontSize04}" FontWeight="Bold" Foreground="{DynamicResource AccentCrimsonTextBrush}" />
+                            <TextBlock Text="{Binding SetupProblemsText}" FontSize="{DynamicResource FontSize03}" Foreground="{DynamicResource AccentCrimsonTextBrush}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <Grid Grid.Row="3">
+                    <TextBlock Text="No check yet. Press Check receiver: it reads the receiver and changes nothing."
+                               FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"
+                               Visibility="{Binding HasSetupRows, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding SetupRows}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource CardElevatedBrush}" BorderBrush="{DynamicResource Ink11Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius04}" Padding="{skin:Space 12,8}" Margin="{skin:Space 0,0,0,6}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="{skin:Size 28}" />
+                                                <ColumnDefinition Width="{skin:Size 210}" />
+                                                <ColumnDefinition Width="{skin:Size 130}" />
+                                                <ColumnDefinition Width="{skin:Size 150}" />
+                                                <ColumnDefinition Width="{skin:Size 170}" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalAlignment="Top" Margin="{skin:Space 0,2,0,0}"
+                                                      Visibility="{Binding CanApply, Converter={StaticResource BoolToVis}}"
+                                                      AutomationProperties.Name="{Binding AccessibleName}"
+                                                      ToolTip="Tick to apply this row" />
+                                            <StackPanel Grid.Column="1" Margin="{skin:Space 0,0,8,0}">
+                                                <TextBlock Text="{Binding Label}" FontSize="{DynamicResource FontSize06}" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap" />
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Group}" FontSize="{DynamicResource FontSize00}" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" />
+                                                    <TextBlock Text="{Binding ScopeText, StringFormat=' · {0}'}" FontSize="{DynamicResource FontSize00}" Foreground="{DynamicResource TextMutedBrush}"
+                                                               Visibility="{Binding HasScope, Converter={StaticResource BoolToVis}}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <Border Grid.Column="2" Background="{DynamicResource Ink11Brush}" BorderBrush="{DynamicResource Ink14Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 6,1.5}" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                                <TextBlock Text="{Binding StateText}" FontSize="{DynamicResource FontSize00}" FontWeight="Bold">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding StateKind}" Value="ok"><Setter Property="Foreground" Value="{DynamicResource AccentEmeraldBrush}" /></DataTrigger>
+                                                                <DataTrigger Binding="{Binding StateKind}" Value="differs"><Setter Property="Foreground" Value="{DynamicResource AccentAmberBrush}" /></DataTrigger>
+                                                                <DataTrigger Binding="{Binding StateKind}" Value="warn"><Setter Property="Foreground" Value="{DynamicResource AccentAmberBrush}" /></DataTrigger>
+                                                                <DataTrigger Binding="{Binding StateKind}" Value="error"><Setter Property="Foreground" Value="{DynamicResource AccentCrimsonBrush}" /></DataTrigger>
+                                                                <DataTrigger Binding="{Binding StateKind}" Value="blocked"><Setter Property="Foreground" Value="{DynamicResource AccentVioletBrush}" /></DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Border>
+                                            <StackPanel Grid.Column="3" Margin="{skin:Space 0,0,8,0}">
+                                                <TextBlock Text="NOW" FontSize="{DynamicResource FontSize00}" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" />
+                                                <TextBlock Text="{Binding CurrentText}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize05}" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="4" Margin="{skin:Space 0,0,8,0}">
+                                                <TextBlock Text="RECOMMENDED" FontSize="{DynamicResource FontSize00}" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" />
+                                                <TextBlock Text="{Binding RecommendedText}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize05}" Foreground="{DynamicResource AccentEmeraldBrush}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="5" Text="{Binding Reason}" FontSize="{DynamicResource FontSize03}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+
+                <DockPanel Grid.Row="4" Margin="{skin:Space 0,10,0,0}" LastChildFill="True">
+                    <Button DockPanel.Dock="Right" Content="Undo last apply" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 12,6}"
+                            Command="{Binding UndoSetupCommand}" ToolTip="Puts the saved old values back (on the same input)" />
+                    <TextBlock Text="{Binding SetupUndoText}" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                </DockPanel>
             </Grid>
         </Border>
     </Grid>

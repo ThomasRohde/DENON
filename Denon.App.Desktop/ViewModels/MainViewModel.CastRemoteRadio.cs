@@ -983,6 +983,7 @@ public sealed partial class MainViewModel
         IsVuLiveSignal = true;
 
         // Populate Acoustics showcase
+        LoadShowcaseSetupCheck();
         ApplyAcousticStatus(new AcousticStatus(
             MultEq: "AUDYSSEY",
             DynamicEq: true,
