@@ -59,7 +59,13 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
 - [ ] Verify PR 11 in the app (needs the user): Tab through the main window in Dark and Light and check the ring
       shows; Narrator reads "Previous track", "Master volume", "Move up in the queue" and so on; YouTube duration
       badges read well in Light. The other pages (Settings, Scenes, Stations, Cast, plugins) have no names yet.
-- [ ] PR 12: Apple TV and HomePod plugins: #35, #50, #70, the HomePod part of #49 (plugin release only when asked).
+- [x] PR 12: Apple TV and HomePod plugins. #35 and #50 closed; the Apple TV and HomePod parts of #70 and the
+      HomePod part of #49 (old-id re-keying, pairs dedupe). Left out: keep a known pair when one follower misses an
+      mDNS reply (#49), partial _companion-link discovery duplicates and atomic artwork writes off the MRP read
+      loop (#70), and a test seam for MrpClient's pending-request failure. No plugin release yet (only when asked).
+- [ ] Verify PR 12 live (needs the user): pair an Apple TV again (the M6 signature is now enforced; a wrong PIN
+      must refresh the page), check Apple TV now playing and artwork after wake and sleep, a wake automation that
+      is cut short by sleep, and that both HomePods (and the stereo pair) link and show what plays.
 - [x] PR 13: Chromecast plugin and first tests: the Chromecast parts of #49, #59 and #70 (111 tests, run in CI and
       the release workflow). Left out: tests of the plugin's actions (they need a fake host and no live clients),
       and moving the small wake and playback maps to a new id on discovery (they only age out). The #70 TXT item was

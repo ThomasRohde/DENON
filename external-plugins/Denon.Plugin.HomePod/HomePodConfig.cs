@@ -33,8 +33,11 @@ internal sealed class HomePodSpeakerConfig
 
     public string? OsVersion { get; set; }
 
-    /// <summary>The HomePods in this speaker (two for a stereo pair).</summary>
+    /// <summary>The names of the HomePods in this speaker (two for a stereo pair), for display.</summary>
     public List<string> Members { get; set; } = [];
+
+    /// <summary>The device ids of the HomePods in this speaker: discovery matches and merges speakers by these.</summary>
+    public List<string> MemberIds { get; set; } = [];
 
     public bool Enabled { get; set; } = true;
 

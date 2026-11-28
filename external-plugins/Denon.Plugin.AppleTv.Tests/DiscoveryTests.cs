@@ -70,6 +70,32 @@ public sealed class DiscoveryTests
     }
 
     [Fact]
+    public void Txt_empty_strings_do_not_hide_the_entries_after_them()
+    {
+        // RFC 6763: a zero-length string is valid; parsing must go on past it.
+        var data = new DnsPacketBuilder().TxtRdata("da=true", "", "osvers=26.6.1");
+        var txt = MdnsBrowser.ParseTxt(data, 0, data.Length);
+        Assert.Equal("true", txt["da"]);
+        Assert.Equal("26.6.1", txt["osvers"]);
+    }
+
+    [Theory]
+    [InlineData(0x40)]
+    [InlineData(0x80)]
+    [InlineData(0x7F)]
+    public void Reserved_label_types_fail_the_packet_instead_of_drifting(byte label)
+    {
+        var packet = new DnsPacketBuilder()
+            .Ptr(AppleServiceTypes.Companion, "Living Room." + AppleServiceTypes.Companion)
+            .Build();
+        packet[12] = label; // the first answer's name now starts with a reserved label type
+
+        var records = new MdnsBrowser.RecordSet(AppleServiceTypes.All);
+        Assert.Throws<FormatException>(() => MdnsBrowser.ParsePacket(packet, IPAddress.Parse("192.168.50.99"), records));
+        Assert.Empty(records.Build());
+    }
+
+    [Fact]
     public void Services_group_into_one_apple_tv_with_model_os_and_id()
     {
         var device = Assert.Single(AppleDeviceDiscovery.Group(AppleTvServices()));

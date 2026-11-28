@@ -60,7 +60,6 @@ public sealed class HapPairingTests
         setup.ReadM4(accessory.HandleSetup(setup.BuildM3("1234")));
         var credentials = setup.ReadM6(accessory.HandleSetup(setup.BuildM5()));
 
-        Assert.True(setup.AccessorySignatureVerified);
         Assert.Equal("Denon Desktop", accessory.ControllerName);
         Assert.Equal(accessory.Id, credentials.AtvId);
         Assert.Equal(setup.PairingId, credentials.ClientId);

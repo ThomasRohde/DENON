@@ -96,7 +96,13 @@ public sealed class PluginHostLifecycleTests : IDisposable
     public async Task Volume_steps_reach_plugins_as_one_volume_changed_event_with_the_last_level()
     {
         var plugin = new FakePlugin("volume");
-        var (_, state) = await CreateHostAsync(plugin);
+        var (host, state) = await CreateHostAsync(plugin);
+
+        // A wide rest window: a busy test machine can stretch the 10 ms steps, and each gap must stay inside it.
+        host.VolumeEventDelay = TimeSpan.FromMilliseconds(600);
+        await Task.Delay(800); // Whatever the start-up state sent has arrived.
+        int VolumeEvents() => plugin.Events.ToArray().Count(e => e == PluginReceiverEventType.VolumeChanged);
+        var before = VolumeEvents();
 
         foreach (var level in new[] { 31, 32, 33, 34, 35 })
         {
@@ -104,9 +110,9 @@ public sealed class PluginHostLifecycleTests : IDisposable
             await Task.Delay(10);
         }
 
-        await WaitUntilAsync(() => plugin.Events.Contains(PluginReceiverEventType.VolumeChanged));
-        await Task.Delay(250); // No second one comes.
-        Assert.Single(plugin.Events, e => e == PluginReceiverEventType.VolumeChanged);
+        await WaitUntilAsync(() => VolumeEvents() > before);
+        await Task.Delay(800); // No second one comes.
+        Assert.Equal(before + 1, VolumeEvents());
         Assert.Equal(35, plugin.LastSnapshot?.Volume);
     }
 

@@ -49,14 +49,20 @@ internal sealed class CompanionConnection : IAsyncDisposable
 
     private const int HeaderLength = 4;
 
+    /// <summary>The header holds a 24-bit length, so no frame payload can be larger.</summary>
+    public const int MaxFrameLength = 0xFFFFFF;
+
+    private static readonly TimeSpan AuthGateTimeout = TimeSpan.FromSeconds(10);
+
     private readonly TcpClient _tcp;
     private readonly NetworkStream _stream;
     private readonly CancellationTokenSource _cts = new();
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private readonly ConcurrentDictionary<string, TaskCompletionSource<Dictionary<object, object?>>> _pending = new();
     private readonly Task _readLoop;
-    private byte[]? _outKey;
-    private byte[]? _inKey;
+    private volatile byte[]? _outKey;
+    private volatile byte[]? _inKey;
+    private TaskCompletionSource? _authGate;
     private ulong _outCounter;
     private ulong _inCounter;
     private long _xid = Random.Shared.Next(0, 65536);
@@ -96,14 +102,21 @@ internal sealed class CompanionConnection : IAsyncDisposable
         }
     }
 
-    /// <summary>Encrypts all following frames (keys from pair-verify).</summary>
+    /// <summary>
+    /// Encrypts all following frames (keys from pair-verify). The read loop waits after each auth reply until
+    /// this runs (or the next frame is sent), so the first encrypted frame is never read as plaintext.
+    /// </summary>
     public void EnableEncryption(byte[] outputKey, byte[] inputKey)
     {
-        _outKey = outputKey;
-        _inKey = inputKey;
         _outCounter = 0;
         _inCounter = 0;
+        _outKey = outputKey;
+        _inKey = inputKey;
+        ReleaseAuthGate();
     }
+
+    /// <summary>Lets the read loop go on after an auth reply.</summary>
+    private void ReleaseAuthGate() => Volatile.Read(ref _authGate)?.TrySetResult();
 
     /// <summary>Sends a PS_*/PV_* frame and waits for the matching auth reply (Start is answered with Next).</summary>
     public Task<Dictionary<object, object?>> ExchangeAuthAsync(
@@ -146,13 +159,22 @@ internal sealed class CompanionConnection : IAsyncDisposable
             throw new CompanionProtocolException("Not connected to the Apple TV.");
         }
 
+        // The caller has handled the last auth reply and moves on, so the read loop may read the answer.
+        ReleaseAuthGate();
         await _sendLock.WaitAsync(cancellationToken);
         try
         {
-            var encrypt = _outKey is not null && payload.Length > 0;
+            var outKey = _outKey;
+            var encrypt = outKey is not null && payload.Length > 0;
             var length = payload.Length + (encrypt ? HapCrypto.TagLength : 0);
+            if (length > MaxFrameLength)
+            {
+                // A larger length would be cut to 24 bits and break the stream.
+                throw new CompanionProtocolException($"The Companion frame is too large ({length} bytes).");
+            }
+
             byte[] header = [(byte)frameType, (byte)(length >> 16), (byte)(length >> 8), (byte)length];
-            var body = encrypt ? HapCrypto.Encrypt(_outKey!, CounterNonce(_outCounter++), payload, header) : payload;
+            var body = encrypt ? HapCrypto.Encrypt(outKey!, CounterNonce(_outCounter++), payload, header) : payload;
 
             await _stream.WriteAsync(header, cancellationToken);
             await _stream.WriteAsync(body, cancellationToken);
@@ -219,12 +241,13 @@ internal sealed class CompanionConnection : IAsyncDisposable
                     await _stream.ReadExactlyAsync(payload, _cts.Token);
                 }
 
-                if (_inKey is not null && length > 0)
+                if (_inKey is { } inKey && length > 0)
                 {
-                    payload = HapCrypto.Decrypt(_inKey, CounterNonce(_inCounter++), payload, header);
+                    payload = HapCrypto.Decrypt(inKey, CounterNonce(_inCounter++), payload, header);
                 }
 
                 Dispatch((CompanionFrameType)header[0], payload);
+                await WaitForAuthHandledAsync();
             }
         }
         catch (OperationCanceledException) when (_cts.IsCancellationRequested)
@@ -240,6 +263,29 @@ internal sealed class CompanionConnection : IAsyncDisposable
         }
 
         Shutdown(failure);
+    }
+
+    /// <summary>
+    /// After an auth reply, waits until the caller has handled it: the reply to the last pair-verify step is
+    /// followed by encrypted frames, and those must not be read before the keys are set.
+    /// </summary>
+    private async Task WaitForAuthHandledAsync()
+    {
+        if (Volatile.Read(ref _authGate) is not { } gate)
+        {
+            return;
+        }
+
+        try
+        {
+            await gate.Task.WaitAsync(AuthGateTimeout, _cts.Token);
+        }
+        catch (TimeoutException)
+        {
+            // The caller gave up on the reply; go on reading.
+        }
+
+        Interlocked.CompareExchange(ref _authGate, null, gate);
     }
 
     private void Dispatch(CompanionFrameType frameType, byte[] payload)
@@ -264,6 +310,8 @@ internal sealed class CompanionConnection : IAsyncDisposable
         {
             if (_pending.TryRemove(AuthKey(frameType), out var auth))
             {
+                // The gate is set before the caller can see the reply, so its EnableEncryption always opens it.
+                Volatile.Write(ref _authGate, new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
                 auth.TrySetResult(message);
             }
 
@@ -310,6 +358,7 @@ internal sealed class CompanionConnection : IAsyncDisposable
         }
 
         _pending.Clear();
+        ReleaseAuthGate();
         try
         {
             _tcp.Dispose();
@@ -344,6 +393,8 @@ internal sealed class CompanionConnection : IAsyncDisposable
         }
 
         _cts.Dispose();
-        _sendLock.Dispose();
+
+        // The send lock is not disposed: a send still in flight releases it when its write fails, and releasing
+        // a disposed SemaphoreSlim throws. It holds no unmanaged handle, so nothing leaks.
     }
 }

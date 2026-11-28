@@ -162,6 +162,11 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
                 {
                     var closed = new TaskCompletionSource<Exception?>(TaskCreationOptions.RunContinuationsAsynchronously);
                     companion.Closed += ex => closed.TrySetResult(ex);
+                    if (!companion.IsConnected)
+                    {
+                        closed.TrySetResult(null); // it closed before we subscribed
+                    }
+
                     companion.EventReceived += OnCompanionEvent;
                     _companion = companion;
                     backoff = TimeSpan.FromSeconds(5);
@@ -276,18 +281,27 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
         try
         {
             var mrp = await MrpClient.ConnectAsync(_host, _airPlayPort, _credentials, _identity, ct);
+            if (!State.IsAwake)
+            {
+                // It fell asleep while we connected: do not ask a sleeping Apple TV for its queue or artwork.
+                await mrp.DisposeAsync();
+                return;
+            }
+
+            _mrpDead = false;
             mrp.NowPlayingChanged += snapshot =>
             {
                 SetState(s => s with { NowPlaying = snapshot, AppName = NameFor(snapshot) });
                 RequestArtwork(mrp, snapshot);
             };
-            mrp.Closed += _ =>
-            {
-                _mrpDead = true;
-                _poke.Release();
-            };
+            mrp.Closed += _ => MarkNowPlayingDead();
             _mrp = mrp;
-            _mrpDead = false;
+            if (mrp.IsClosed)
+            {
+                MarkNowPlayingDead(); // it closed before we subscribed
+                return;
+            }
+
             var now = mrp.NowPlaying.Current;
             SetState(s => s with { NowPlayingLinked = true, NowPlaying = now, AppName = NameFor(now) });
             Diagnostic?.Invoke("Now-playing link open.");
@@ -302,6 +316,13 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
             _mrpRetryAt = DateTimeOffset.UtcNow + NowPlayingRetry;
             Diagnostic?.Invoke($"Now-playing link failed (retry in {NowPlayingRetry.TotalSeconds:0} s): {ex.Message}");
         }
+    }
+
+    /// <summary>The now-playing link closed: the loop closes it and retries in a moment.</summary>
+    private void MarkNowPlayingDead()
+    {
+        _mrpDead = true;
+        _poke.Release();
     }
 
     /// <summary>
