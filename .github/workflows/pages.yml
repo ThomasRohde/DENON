@@ -13,7 +13,11 @@ on:
       - "Denon.App.Desktop/ViewModels/MainViewModel.Help.cs"
       - "Denon.App.Desktop/Denon.App.Desktop.csproj"
       - "external-plugins/*/*.csproj"
+      - "Denon.App.Desktop/denon_icon.png"
       - ".github/workflows/pages.yml"
+  # The download page links to release files: build again once a release (app or plugin) is published.
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:

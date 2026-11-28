@@ -28,6 +28,9 @@ if (-not $iscc) { throw "Inno Setup 6 (ISCC.exe) not found. Install it: winget i
 
 [xml]$csproj = Get-Content .\Denon.App.Desktop\Denon.App.Desktop.csproj
 $version = ($csproj.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1).Trim()
+# VersionInfoVersion in the installer takes numbers only (X.Y.Z); drop a suffix such as "-beta".
+if ($version -notmatch '^\d+\.\d+\.\d+') { throw "<Version>$version</Version> does not start with X.Y.Z." }
+$version = $Matches[0]
 $srcExe = Join-Path $outDir "Denon.App.Desktop-win-x64.exe"
 & $iscc "/DMyAppVersion=$version" "/DMySourceExe=$srcExe" "/DMyOutputDir=$outDir" .\installer\DenonDesktop.iss
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE." }

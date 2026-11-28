@@ -51,7 +51,7 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
     public PluginManifest Manifest { get; } = new(
         Id: "philips-hue",
         Name: "Philips Hue Lighting",
-        Version: "1.2.0",
+        Version: typeof(PhilipsHuePlugin).Assembly.GetName().Version!.ToString(3),
         Author: "Denon Desktop",
         Description: "Control Philips Hue rooms, lights, colors, and scenes over your LAN — with real-time FFT Music Sync, Album-Art Ambient colors, and automatic Denon AVR Smart Scene lighting.",
         Category: "Smart Lighting",

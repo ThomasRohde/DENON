@@ -42,7 +42,14 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
 - [ ] PR 8: YouTube and Cinema: #33, #51, #52, #56, the Cinema parts of #53 and #71. Add a Cinema guard too: open
       and navigate only http/https (defense in depth for #29).
 - [ ] PR 9: desktop shell: #53, #54, #55 (tray shows dB; show the 0–98 number), #71.
-- [ ] PR 10: release, CI, installer, docs: #58, #59, #60, #62, #72, #73.
+- [x] PR 10a: release, CI, installer, updater: #58, #60 and #62 closed; parts of #59 and #72. Left out: a signed
+      SHA256SUMS (#62, needs a signing key and a release step), central package versions and the BouncyCastle
+      version split (#72, with the Apple TV and HomePod plugins in PR 12), and the larger #59 test items (Chromecast
+      tests in PR 13, the Apple TV clock in PR 12, loopback tests for the editor and Insights servers).
+- [ ] Verify PR 10a (needs the user): uninstall with "Launch at Windows startup" turned on in Settings and check
+      that the startup entry is gone; the next in-app update downloads, starts and shows notes without the
+      download list.
+- [ ] PR 10b: docs and notices: #73.
 - [ ] PR 11: accessibility (after PR 9): #57.
 - [ ] PR 12: Apple TV and HomePod plugins: #35, #50, #70, the HomePod part of #49 (plugin release only when asked).
 - [ ] PR 13: Chromecast plugin and first tests: #49, the Chromecast parts of #59 and #70 (release only when asked).

@@ -1,6 +1,6 @@
 ; Denon Desktop — Unsigned Windows x64 Installer (Inno Setup 6)
 ; Build in CI or locally via:
-;   iscc /DMyAppVersion=2.10.26/DMySourceExe=..\release-out\Denon.App.Desktop-win-x64.exe /DMyOutputDir=..\release-out .\installer\DenonDesktop.iss
+;   iscc /DMyAppVersion=2.10.26 /DMySourceExe=..\release-out\Denon.App.Desktop-win-x64.exe /DMyOutputDir=..\release-out .\installer\DenonDesktop.iss
 
 #ifndef MyAppVersion
   #define MyAppVersion "2.10.26"
@@ -95,6 +95,21 @@ Filename: "{app}\{#MyAppExeName}"; Parameters: "--show"; Flags: nowait runasorig
 function IsInAppUpdate(): Boolean;
 begin
   Result := ExpandConstant('{param:LAUNCHAFTER|0}') = '1';
+end;
+
+// The startup entry can also come from the app's Settings ("Launch at Windows startup"), and then the [Registry]
+// line above never recorded it. Remove it on uninstall when it starts this copy of the app, so Windows does not try
+// to start a deleted file at the next sign-in.
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  RunKey, Value, AppExe: String;
+begin
+  if CurUninstallStep <> usPostUninstall then
+    Exit;
+  RunKey := 'Software\Microsoft\Windows\CurrentVersion\Run';
+  AppExe := Lowercase(ExpandConstant('{app}\{#MyAppExeName}'));
+  if RegQueryStringValue(HKCU, RunKey, 'DenonDesktop', Value) and (Pos(AppExe, Lowercase(Value)) > 0) then
+    RegDeleteValue(HKCU, RunKey, 'DenonDesktop');
 end;
 
 const
