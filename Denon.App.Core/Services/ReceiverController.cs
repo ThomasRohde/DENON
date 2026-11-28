@@ -214,10 +214,9 @@ public sealed class ReceiverController
                 await SetVolumeWithHeosFallbackAsync(settings, level, token);
                 if (!refreshStatus &&
                     _stateStore.Snapshot.Status is { } known &&
-                    await InputIsUnchangedAsync(settings, known, token))
+                    await TryReadFadeStepAsync(settings, known, token) is { } step)
                 {
-                    var sent = Math.Clamp(level, 0, known.MaxVolume > 0 ? known.MaxVolume : 98);
-                    return known with { Volume = sent, VolumeExact = sent };
+                    return step;
                 }
 
                 return await GetMergedStatusAsync(settings, token);
@@ -1018,19 +1017,28 @@ public sealed class ReceiverController
     }
 
     /// <summary>
-    /// For a fade step: asks the receiver for its input only (one query, not a full status read). A changed input
-    /// means a full read, so Volume Memory sees the new source and stops the fade. A HEOS-only speaker has no
-    /// input to change; its push events refresh the status when what plays changes.
+    /// For a fade step: reads the input and the real volume only (two queries, not a full status read), so Volume
+    /// Memory still sees a turn of the knob or a new source and stops the fade. Null when the input changed or a
+    /// query got no answer: then the caller does the full read. A HEOS-only speaker has no input; HEOS gives the
+    /// volume and mute.
     /// </summary>
-    private async Task<bool> InputIsUnchangedAsync(ReceiverSettings settings, ReceiverStatus known, CancellationToken cancellationToken)
+    private async Task<ReceiverStatus?> TryReadFadeStepAsync(ReceiverSettings settings, ReceiverStatus known, CancellationToken cancellationToken)
     {
         if (!_avrProtocolAvailable)
         {
-            return true;
+            var heos = await _heosClient.GetStatusAsync(settings, cancellationToken);
+            return known with { Volume = heos.Volume, VolumeExact = heos.Volume, IsMuted = heos.IsMuted };
         }
 
         var input = await _avrClient.TryGetInputSourceAsync(settings, cancellationToken);
-        return input is not null && string.Equals(input, known.InputSource, StringComparison.OrdinalIgnoreCase);
+        if (input is null || !string.Equals(input, known.InputSource, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return await _avrClient.TryGetVolumeAsync(settings, cancellationToken) is { } volume
+            ? known with { Volume = volume.Volume, VolumeExact = volume.VolumeExact, MaxVolume = volume.MaxVolume }
+            : null;
     }
 
     private async Task SetVolumeWithHeosFallbackAsync(ReceiverSettings settings, int level, CancellationToken cancellationToken)

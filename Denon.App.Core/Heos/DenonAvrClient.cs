@@ -72,6 +72,24 @@ public sealed class DenonAvrClient : IDisposable
         return reply is null ? null : ParsePrefixValue(reply, "SI");
     }
 
+    /// <summary>The current volume (MV? with MVMAX), or null when the receiver does not answer.</summary>
+    public async Task<(int Volume, double VolumeExact, int MaxVolume)?> TryGetVolumeAsync(ReceiverSettings settings, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var lines = (await ExchangeLinesAsync(settings.Host, "MV?", TimeSpan.FromMilliseconds(550), IsCompleteVolumeReply, cancellationToken))
+                .Where(static line => line.StartsWith("MV", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            return lines.Any(static line => !line.StartsWith("MVMAX", StringComparison.OrdinalIgnoreCase))
+                ? ParseVolumeLines(lines)
+                : null;
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+    }
+
     public Task SetPowerAsync(ReceiverSettings settings, bool powerOn, CancellationToken cancellationToken) =>
         SendCommandAsync(settings, powerOn ? "PWON" : "PWSTANDBY", cancellationToken);
 

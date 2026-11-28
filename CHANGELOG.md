@@ -29,9 +29,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   query now ends as soon as its answer is in (MV? waits for MVMAX), not 120 ms after every answer. On a real
   receiver a status read went from about 2.2 s to about 1.2 s; most of what is left is the receiver's own reply
   time (about 90 ms per query).
-  Commands still keep the 50 ms gap that Denon asks for. A fade step sets the volume and reads only the input, not
-  the full status; a changed input gets a full read, so the fade stops for the new source. The last step reads
-  the full status, and the 5 s poll still sees a turn of the knob.
+  Commands still keep the 50 ms gap that Denon asks for. A fade step sets the volume and then reads only the input
+  and the real volume, not the full status. So the fade still stops when someone turns the knob or picks another
+  source. The last step reads the full status.
 
 ### Security
 - **A source, sound mode or stream URL with a line break is refused** (#30). An MCP client could send

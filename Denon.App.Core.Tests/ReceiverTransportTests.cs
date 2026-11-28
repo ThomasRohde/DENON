@@ -244,8 +244,8 @@ public sealed class ReceiverTransportTests : IDisposable
 
         var step = await controller.SetVolumeAsync(40, logSuccess: false, refreshStatus: false);
 
-        // The volume, and the input only (so a fade sees a source change), not a full status read.
-        Assert.Equal(["MV40", "SI?"], avr.Commands.ToArray());
+        // The volume, then the input and the real volume (so a fade sees a new source or a turned knob), not a full read.
+        Assert.Equal(["MV40", "SI?", "MV?"], avr.Commands.ToArray());
         Assert.Equal(40, step.Volume);
         Assert.Equal("TV", step.InputSource);
 
@@ -270,6 +270,22 @@ public sealed class ReceiverTransportTests : IDisposable
 
         Assert.Equal("GAME", step.InputSource);
         Assert.Contains("PW?", avr.Commands);
+
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A_fade_step_reports_the_real_volume_when_the_knob_was_turned()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        var (controller, _, telemetry) = await CreateControllerAsync(avr, heos);
+        await controller.RefreshAsync();
+
+        avr.KeepVolume = 30; // Someone turned the volume down to 30 right after the step.
+        var step = await controller.SetVolumeAsync(40, logSuccess: false, refreshStatus: false);
+
+        Assert.Equal(30, step.Volume); // Not the 40 that was sent: Volume Memory stops the fade.
 
         await telemetry.DisposeAsync();
     }
@@ -592,12 +608,27 @@ public sealed class ReceiverTransportTests : IDisposable
             ["Z2?"] = "Z2OFF\rZ2TV\rZ240\r",
         };
 
+        /// <summary>When set, MV? answers this volume whatever was set (someone turns the knob).</summary>
+        public volatile object? KeepVolume;
+
         protected override string LineEnd => "\r";
 
-        protected override string? Answer(string command) =>
-            Replies.TryGetValue(command, out var reply) ? reply
-            : command.EndsWith('?') ? null
-            : command + "\r";
+        protected override string? Answer(string command)
+        {
+            if (command.Equals("MV?", StringComparison.OrdinalIgnoreCase) && KeepVolume is int kept)
+            {
+                return $"MV{kept:00}\rMVMAX 98\r";
+            }
+
+            if (command.Length is 4 && command.StartsWith("MV", StringComparison.Ordinal) && int.TryParse(command[2..], out var level))
+            {
+                Replies["MV?"] = $"MV{level:00}\rMVMAX 98\r"; // The receiver now has this volume.
+            }
+
+            return Replies.TryGetValue(command, out var reply) ? reply
+                : command.EndsWith('?') ? null
+                : command + "\r";
+        }
     }
 
     /// <summary>A HEOS speaker: one player (pid 1), volume and mute, and an empty now-playing.</summary>
