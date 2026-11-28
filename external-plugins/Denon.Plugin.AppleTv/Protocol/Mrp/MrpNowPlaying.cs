@@ -43,10 +43,12 @@ internal sealed record NowPlayingSnapshot(
 /// active app comes from SET_NOW_PLAYING_CLIENT, its active player from SET_NOW_PLAYING_PLAYER; SET_STATE and
 /// UPDATE_CONTENT_ITEM update the player in their player path.
 /// </summary>
-internal sealed class MrpNowPlayingTracker
+internal sealed class MrpNowPlayingTracker(TimeProvider? time = null)
 {
     public const string DefaultPlayerId = "MediaRemote-DefaultPlayer";
 
+    /// <summary>The clock for "which player changed last" (tests pass their own).</summary>
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
     private readonly object _sync = new();
     private readonly Dictionary<string, ClientState> _clients = new(StringComparer.Ordinal);
     private string? _activeBundle;
@@ -140,7 +142,7 @@ internal sealed class MrpNowPlayingTracker
                     }
                     else
                     {
-                        _clientClearedUtc = DateTimeOffset.UtcNow;
+                        _clientClearedUtc = _time.GetUtcNow();
                     }
 
                     return true;
@@ -236,14 +238,14 @@ internal sealed class MrpNowPlayingTracker
     {
         if (!_clients.TryGetValue(bundle, out var client))
         {
-            client = new ClientState();
+            client = new ClientState(_time);
             _clients[bundle] = client;
         }
 
         return client;
     }
 
-    private sealed class ClientState
+    private sealed class ClientState(TimeProvider time)
     {
         private readonly Dictionary<string, PlayerState> _players = new(StringComparer.Ordinal);
 
@@ -265,7 +267,7 @@ internal sealed class MrpNowPlayingTracker
         {
             if (!_players.TryGetValue(id, out var player))
             {
-                player = new PlayerState();
+                player = new PlayerState(time);
                 _players[id] = player;
             }
 
@@ -288,7 +290,7 @@ internal sealed class MrpNowPlayingTracker
         }
     }
 
-    private sealed class PlayerState
+    private sealed class PlayerState(TimeProvider time)
     {
         private string? _itemId;
         private string? _title;
@@ -313,7 +315,7 @@ internal sealed class MrpNowPlayingTracker
             set
             {
                 _state = value;
-                Updated = DateTimeOffset.UtcNow;
+                Updated = time.GetUtcNow();
             }
         }
 
@@ -331,7 +333,7 @@ internal sealed class MrpNowPlayingTracker
             _album = info.String(1) ?? _album;
             _duration = info.Double(3) ?? _duration;
             _elapsed = info.Double(4) ?? _elapsed;
-            Updated = DateTimeOffset.UtcNow;
+            Updated = time.GetUtcNow();
         }
 
         /// <summary>ContentItem: identifier (1), metadata (2), artworkData (3). False for an update to another item.</summary>
@@ -374,7 +376,7 @@ internal sealed class MrpNowPlayingTracker
                 _artworkAvailable = true;
             }
 
-            Updated = DateTimeOffset.UtcNow;
+            Updated = time.GetUtcNow();
             return true;
         }
 
