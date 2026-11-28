@@ -981,6 +981,13 @@ public sealed class ReceiverController
         }
     }
 
+    /// <summary>Runs a step that must work: a failure goes to the caller.</summary>
+    private static async Task<bool> RunRequiredStepAsync(Func<Task> step)
+    {
+        await step();
+        return true;
+    }
+
     private static bool HasZone2Steps(ScenePreset scene) =>
         scene.Zone2On is not null || scene.Zone2Volume is not null || scene.Zone2Muted is not null ||
         !string.IsNullOrWhiteSpace(scene.Zone2Source);
@@ -1018,7 +1025,7 @@ public sealed class ReceiverController
         return ExecuteZone2Async(
             "Set Zone 2",
             (settings, token) => RunZone2StepsAsync(
-                settings, on, string.IsNullOrWhiteSpace(source) ? null : source, volume, muted, static step => step(), token),
+                settings, on, string.IsNullOrWhiteSpace(source) ? null : source, volume, muted, RunRequiredStepAsync, token),
             cancellationToken);
     }
 
@@ -1027,14 +1034,17 @@ public sealed class ReceiverController
     /// With a target volume, the zone is muted before it turns on or gets a new source, the volume is set, and only
     /// then does the mute go to what was asked (or back to what it was): a zone left loud never plays loud first.
     /// </summary>
-    /// <param name="run">Runs one step: a scene skips a failed step, MCP lets it fail.</param>
+    /// <param name="run">
+    /// Runs one step and says if it worked: a scene skips a failed step, MCP lets it fail. When the volume step fails in
+    /// a guarded sequence, the source and the mute release are skipped: the zone stays muted rather than play loud.
+    /// </param>
     private async Task RunZone2StepsAsync(
         ReceiverSettings settings,
         bool? on,
         string? source,
         int? volume,
         bool? muted,
-        Func<Func<Task>, Task> run,
+        Func<Func<Task>, Task<bool>> run,
         CancellationToken token)
     {
         var guard = volume is not null && (on == true || source is not null);
@@ -1055,9 +1065,17 @@ public sealed class ReceiverController
             }
         }
 
-        if (volume is int level)
+        if (volume is int level &&
+            !await run(() => _avrClient.SetZone2VolumeAsync(settings, Math.Clamp(level, 0, DenonVolumeMath.MaxAbsoluteVolume), token)) &&
+            guard)
         {
-            await run(() => _avrClient.SetZone2VolumeAsync(settings, Math.Clamp(level, 0, DenonVolumeMath.MaxAbsoluteVolume), token));
+            _logStore.Warning("Zone 2 stays muted: its volume could not be set, so the source and mute steps were skipped.");
+            if (on == false)
+            {
+                await run(() => _avrClient.SetZone2PowerAsync(settings, false, token));
+            }
+
+            return;
         }
 
         if (source is not null)
@@ -1163,15 +1181,18 @@ public sealed class ReceiverController
         }
     }
 
-    private async Task TryRunSceneStepAsync(Func<Task> step)
+    /// <summary>Runs an optional scene step. False when it failed (logged, and the scene goes on).</summary>
+    private async Task<bool> TryRunSceneStepAsync(Func<Task> step)
     {
         try
         {
             await step();
+            return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logStore.Warning($"Optional scene step skipped: {ex.Message}");
+            return false;
         }
     }
 

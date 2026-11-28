@@ -965,6 +965,9 @@ public sealed partial class ReceiverTransportTests : IDisposable
         /// <summary>Close each connection at once (port busy or not there).</summary>
         public volatile bool HangUp;
 
+        /// <summary>Drops the link when a command matches (a write that fails); other commands work.</summary>
+        public volatile Func<string, bool>? DropOn;
+
         public void ClearCommands() => _commands.Clear();
 
         private readonly ConcurrentDictionary<TcpClient, NetworkStream> _open = new();
@@ -1083,7 +1086,7 @@ public sealed partial class ReceiverTransportTests : IDisposable
 
                             _commands.Enqueue(command);
                             CommandTimes.Enqueue(DateTimeOffset.UtcNow);
-                            if (HangUp)
+                            if (HangUp || DropOn?.Invoke(command) == true)
                             {
                                 return; // Drops this link too.
                             }

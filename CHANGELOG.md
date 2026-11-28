@@ -27,6 +27,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `heos_get_groups` (read-only) lists the players and groups; `heos_set_group_volume` (SafeControl, capped); and
   `heos_set_group` (FullOrchestration, because it changes what other rooms play). `get_room_state` shows Zone 2 and
   the groups, and `create_or_update_scene` takes the Zone 2 and group fields.
+- **Pick the Hue Entertainment area for Music Sync** (#79). The Music Sync panel has an "Entertainment area" list
+  with each area and its channel count. A pick is saved, and a running 50 Hz stream moves to the new area. Before,
+  Music Sync always used the first area. When the saved area is gone, the panel says which area it uses instead;
+  with no area, it says to create one in the Hue app.
 
 ### Changed
 - Automation run messages say the receiver volume as its 0–98 number ("Receiver volume 40"), not in dB.

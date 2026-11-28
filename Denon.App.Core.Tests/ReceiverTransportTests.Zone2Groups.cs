@@ -136,6 +136,30 @@ public sealed partial class ReceiverTransportTests
     }
 
     [Fact]
+    public async Task A_scene_keeps_zone_2_muted_when_its_volume_step_fails()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        var (controller, _, telemetry) = await CreateControllerAsync(avr, heos);
+        avr.ClearCommands();
+
+        avr.DropOn = static c => c == "Z230"; // the link drops on the volume write (and on its one retry)
+        await controller.ApplySceneAsync(new ScenePreset
+        {
+            Name = "Patio",
+            PowerOn = false,
+            Unmute = false,
+            Zone2On = true,
+            Zone2Source = "TV",
+            Zone2Volume = 30,
+            Zone2Muted = false,
+        });
+
+        Assert.Equal(["Z2MUON", "Z2ON", "Z2MUON", "Z230", "Z230"], Zone2Commands(avr)); // no source, no unmute
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
     public async Task A_zone_2_sequence_without_a_volume_needs_no_mute_and_turns_off_last()
     {
         using var avr = new FakeAvr();
