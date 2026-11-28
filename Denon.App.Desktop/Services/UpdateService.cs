@@ -4,12 +4,16 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Denon.App.Core.Infrastructure;
 using Denon.App.Core.Plugins;
 using Denon.App.Core.Services;
 using Denon.App.Desktop.Infrastructure;
 using Microsoft.Win32;
 
 namespace Denon.App.Desktop.Services;
+
+/// <summary>A downloaded installer whose SHA-256 matched the release's checksums.</summary>
+public sealed record VerifiedInstaller(string Path, string Sha256);
 
 /// <summary>An app release on GitHub: its version, notes (the CHANGELOG section) and download links.</summary>
 public sealed record AppRelease(Version Version, string Tag, string Notes, string PageUrl, string? InstallerUrl, string? ChecksumsUrl)
@@ -66,14 +70,22 @@ public sealed partial class UpdateService : IDisposable
     /// <summary>The release list, read when "latest" is not an app release.</summary>
     public const string ReleasesApi = "https://api.github.com/repos/ThomasRohde/DENON/releases?per_page=100";
 
+    /// <summary>The releases page, opened when a release has no trusted page address of its own.</summary>
+    public const string ReleasesPageUrl = "https://github.com/ThomasRohde/DENON/releases";
+
+    private const string RepositoryPath = "/ThomasRohde/DENON/";
+
     /// <summary>The installer's AppId (installer/DenonDesktop.iss) and the uninstall key Inno Setup writes for it.</summary>
     public const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\{B48C17F1-4D83-4C5C-9E3A-9D5E6B2C140A}_is1";
 
     /// <summary>A download that receives nothing for this long has stalled.</summary>
     public static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(30);
 
-    /// <summary>Where installers are downloaded; emptied at the next start (Setup has exited by then).</summary>
-    public static string DownloadFolder => Path.Combine(Path.GetTempPath(), "DenonDesktop-Update");
+    /// <summary>
+    /// Where installers are downloaded, each in a new folder of its own; emptied at the next start (Setup has exited
+    /// by then). Under the app's own data folder, not the shared temp folder.
+    /// </summary>
+    public static string DownloadFolder => Path.Combine(AppDataPaths.RootDirectory, "updates");
     public const string InstallerName = "DenonDesktop-Setup-win-x64.exe";
     public const string ChecksumsName = "SHA256SUMS.txt";
 
@@ -135,11 +147,11 @@ public sealed partial class UpdateService : IDisposable
         {
             if (Directory.Exists(DownloadFolder))
             {
-                foreach (var file in Directory.EnumerateFiles(DownloadFolder, "*.exe"))
+                foreach (var folder in Directory.EnumerateDirectories(DownloadFolder))
                 {
                     try
                     {
-                        File.Delete(file);
+                        Directory.Delete(folder, recursive: true);
                     }
                     catch (Exception)
                     {
@@ -278,7 +290,7 @@ public sealed partial class UpdateService : IDisposable
                 version,
                 tag,
                 release.TryGetProperty("body", out var body) ? body.GetString() ?? string.Empty : string.Empty,
-                release.TryGetProperty("html_url", out var page) ? page.GetString() ?? string.Empty : string.Empty,
+                PageUrl(release),
                 AssetUrl(release, InstallerName),
                 AssetUrl(release, ChecksumsName));
         }
@@ -312,7 +324,7 @@ public sealed partial class UpdateService : IDisposable
                 version,
                 tag,
                 release.TryGetProperty("body", out var body) ? body.GetString() ?? string.Empty : string.Empty,
-                release.TryGetProperty("html_url", out var page) ? page.GetString() ?? string.Empty : string.Empty,
+                PageUrl(release),
                 AssetUrlEndingWith(release, ".zip"),
                 AssetUrl(release, ChecksumsName));
         }
@@ -388,10 +400,27 @@ public sealed partial class UpdateService : IDisposable
         return null;
     }
 
-    /// <summary>Release notes as plain text: Markdown marks removed, headings and bullets kept readable.</summary>
+    /// <summary>
+    /// True for an https address on github.com in this app's repository: the only place release pages and files
+    /// come from. Anything else in the release feed is ignored (never downloaded, never opened).
+    /// </summary>
+    public static bool IsTrustedGitHubUrl(string? url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+        uri.Scheme == Uri.UriSchemeHttps &&
+        uri.IsDefaultPort &&
+        string.IsNullOrEmpty(uri.UserInfo) &&
+        string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase) &&
+        uri.AbsolutePath.StartsWith(RepositoryPath, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Release notes as plain text: Markdown marks removed, headings and bullets kept readable. The release page's
+    /// download list and checksums (after a "---" line) are left out: the update window has its own buttons.
+    /// </summary>
     public static string PlainNotes(string markdown)
     {
-        var lines = markdown.Replace("\r\n", "\n").Split('\n').Select(line =>
+        var all = markdown.Replace("\r\n", "\n").Split('\n');
+        var end = Array.FindIndex(all, line => line.Trim() == "---");
+        var lines = (end >= 0 ? all[..end] : all).Select(line =>
         {
             var text = line.TrimEnd();
             text = Heading().Replace(text, string.Empty);
@@ -404,22 +433,28 @@ public sealed partial class UpdateService : IDisposable
     }
 
     /// <summary>
-    /// Downloads the release's installer to a temporary folder and checks its SHA-256 against the release's
-    /// SHA256SUMS.txt. Returns the installer path; throws when a file is missing or the check fails.
+    /// Downloads the release's installer to a new folder and checks its SHA-256 against the release's
+    /// SHA256SUMS.txt. Returns the installer and its checksum; throws when a file is missing or the check fails.
     /// </summary>
-    public async Task<string> DownloadVerifiedAsync(AppRelease release, IProgress<double>? progress, CancellationToken cancellationToken = default)
+    public async Task<VerifiedInstaller> DownloadVerifiedAsync(AppRelease release, IProgress<double>? progress, CancellationToken cancellationToken = default)
     {
         if (release.InstallerUrl is null || release.ChecksumsUrl is null)
         {
             throw new InvalidOperationException($"Release {release.Label} has no installer or no checksums.");
         }
 
+        if (!IsTrustedGitHubUrl(release.InstallerUrl) || !IsTrustedGitHubUrl(release.ChecksumsUrl))
+        {
+            throw new InvalidOperationException($"Release {release.Label} links to files outside the app's GitHub releases.");
+        }
+
         var sums = await _http.GetStringAsync(release.ChecksumsUrl, cancellationToken);
         var expected = ChecksumFor(sums, InstallerName)
             ?? throw new InvalidOperationException($"{ChecksumsName} of release {release.Label} has no line for {InstallerName}.");
 
-        Directory.CreateDirectory(DownloadFolder);
-        var path = Path.Combine(DownloadFolder, $"DenonDesktop-Setup-{release.Label}.exe");
+        // A new folder per download: nothing can be waiting at a known path.
+        var folder = Directory.CreateDirectory(Path.Combine(DownloadFolder, Guid.NewGuid().ToString("N"))).FullName;
+        var path = Path.Combine(folder, $"DenonDesktop-Setup-{release.Label}.exe");
 
         // The HTTP timeout ends with the headers; after that, a read that gets nothing for StallTimeout stops the download.
         using var stall = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -466,22 +501,36 @@ public sealed partial class UpdateService : IDisposable
         }
 
         _log.Info($"Update {release.Label} downloaded and verified (SHA-256 {actual}).");
-        return path;
+        return new VerifiedInstaller(path, actual);
     }
 
     /// <summary>
     /// Starts the installer with a progress window and no questions. It closes this app (Restart Manager), installs
     /// over it, and starts the new version (/LAUNCHAFTER=1). The caller then exits the app.
+    /// The file is checked again right before the start, and held open so it cannot be changed or replaced until
+    /// Setup runs.
     /// </summary>
-    public void StartInstaller(string installerPath)
+    public void StartInstaller(VerifiedInstaller installer)
     {
-        var log = Path.Combine(Path.GetDirectoryName(installerPath)!, "install.log");
-        Process.Start(new ProcessStartInfo(installerPath)
+        using (var hold = new FileStream(installer.Path, FileMode.Open, FileAccess.Read, FileShare.Read))
         {
-            Arguments = $"/SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /LAUNCHAFTER=1 \"/LOG={log}\"",
-            UseShellExecute = true,
-        });
-        _log.Info($"Update installer started: {installerPath}");
+            var actual = Convert.ToHexString(SHA256.HashData(hold)).ToLowerInvariant();
+            if (!string.Equals(actual, installer.Sha256, StringComparison.Ordinal))
+            {
+                hold.Dispose();
+                TryDelete(installer.Path);
+                throw new InvalidOperationException("The installer changed after its check, so it was deleted.");
+            }
+
+            var log = Path.Combine(Path.GetDirectoryName(installer.Path)!, "install.log");
+            Process.Start(new ProcessStartInfo(installer.Path)
+            {
+                Arguments = $"/SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /LAUNCHAFTER=1 \"/LOG={log}\"",
+                UseShellExecute = true,
+            });
+        }
+
+        _log.Info($"Update installer started: {installer.Path}");
     }
 
     public void Dispose() => _http.Dispose();
@@ -499,6 +548,11 @@ public sealed partial class UpdateService : IDisposable
 
     private static bool Bool(JsonElement e, string name) => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.True;
 
+    private static string PageUrl(JsonElement release) =>
+        release.TryGetProperty("html_url", out var page) && page.GetString() is { } url && IsTrustedGitHubUrl(url)
+            ? url
+            : string.Empty;
+
     private static string? AssetUrl(JsonElement release, string name)
     {
         if (!release.TryGetProperty("assets", out var assets) || assets.ValueKind != JsonValueKind.Array)
@@ -513,7 +567,7 @@ public sealed partial class UpdateService : IDisposable
                 string.Equals(n.GetString(), name, StringComparison.OrdinalIgnoreCase) &&
                 asset.TryGetProperty("browser_download_url", out var url))
             {
-                return url.GetString();
+                return IsTrustedGitHubUrl(url.GetString()) ? url.GetString() : null;
             }
         }
 
@@ -535,7 +589,7 @@ public sealed partial class UpdateService : IDisposable
                 fileName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) &&
                 asset.TryGetProperty("browser_download_url", out var url))
             {
-                return url.GetString();
+                return IsTrustedGitHubUrl(url.GetString()) ? url.GetString() : null;
             }
         }
 

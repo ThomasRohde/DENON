@@ -57,7 +57,7 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
     public PluginManifest Manifest { get; } = new(
         Id: "home-assistant",
         Name: "Home Assistant Bridge",
-        Version: "1.3.0",
+        Version: typeof(HomeAssistantPlugin).Assembly.GetName().Version!.ToString(3),
         Author: "Denon Desktop",
         Description: "Connect Denon Desktop to your Home Assistant server over REST & Webhooks: trigger HA scenes/scripts/switches and push real-time Denon AVR telemetry sensors.",
         Category: "Smart Home Hub",

@@ -44,7 +44,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
     public PluginManifest Manifest { get; } = new(
         Id: "smart-tv",
         Name: "Smart TV Control (LG webOS)",
-        Version: "2.4.1",
+        Version: typeof(SmartTvPlugin).Assembly.GetName().Version!.ToString(3),
         Author: "Denon Desktop",
         Description: "Full persistent LG webOS SSAP (wss://:3001) controller: live TV state subscriptions, auto-discovered apps & HDMI inputs, Magic Remote D-Pad & keyboard, OLED Screen Off, eARC Audio Output switching, YouTube deep-link casting, SSDP/ARP auto-discovery, Wake-on-LAN, and Denon AVR coordination.",
         Category: "Home Theater TV",
