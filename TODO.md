@@ -120,8 +120,10 @@ holds and the HEOS events are connected.
 Done: Zone 2 volume, source and mute (Core, the Control deck, scenes, automations, MCP) and HEOS multi-room groups
 (get_groups, set_group, group volume and mute, the groups_changed, players_changed and group_volume_changed events).
 
-- [ ] Live check with the user (ask first): read the Zone 2 state, and one Zone 2 volume change at or below 20.
-      Group a second HEOS player only with the user there (it plays in another room).
+- [x] Live check in v2.10.30 (2026-11-28, AVR-X2400H, with the user): the Control deck read Zone 2 right (on, 26,
+      FM / AM, not muted), and one − step went to 25 and showed at once from the receiver's echo.
+- [ ] HEOS groups not checked live: the card said "Plays alone" with no other players listed. Check with a second
+      HEOS player and the user there (grouping plays in another room).
 - [ ] The command palette has Zone 2 power only; add Zone 2 volume, source and mute and the group actions there
       (after #76, which changes the palette).
 - [ ] The scene editor takes Zone 2 and the group as text fields, like the other scene fields. Pickers (a source
