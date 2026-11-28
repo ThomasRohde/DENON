@@ -880,6 +880,12 @@ public sealed partial class DenonMcpServer
                     s.Name.Equals(target, StringComparison.OrdinalIgnoreCase))
                     ?? throw new McpInvalidParamsException($"Smart Scene '{target}' not found.");
 
+                if (scene.HeosGroupMembers.Count > 0 || scene.HeosUngroup)
+                {
+                    // The same rule as heos_set_group: grouping changes what other rooms play.
+                    EnsureFullOrchestration(cfg, $"{toolName} (scene '{scene.Name}' groups HEOS players)");
+                }
+
                 var safeScene = scene.Clone();
                 if (safeScene.TargetVolume.HasValue)
                 {
@@ -1395,39 +1401,36 @@ public sealed partial class DenonMcpServer
                 $"'{source}' is not a Zone 2 source. Use one of: {string.Join(", ", DenonCatalog.Zone2Sources.Select(static s => s.Code))}.");
         }
 
+        int? level = null;
         var applied = new List<string>();
         if (on == true)
         {
-            await _receiverController.SetZone2PowerAsync(true, ct);
             applied.Add("on");
         }
 
         if (!string.IsNullOrWhiteSpace(source))
         {
-            await _receiverController.SetZone2SourceAsync(source, ct);
             applied.Add($"source {DenonCatalog.GetFriendlyZone2SourceName(source)}");
         }
 
         if (volume is int requested)
         {
-            var level = ApplyVolumeCeiling(requested, cfg.MaxSafeVolume, out var capped);
-            await _receiverController.SetZone2VolumeAsync(level, ct);
+            level = ApplyVolumeCeiling(requested, cfg.MaxSafeVolume, out var capped);
             applied.Add(capped ? $"volume {level} (capped from {requested} by MaxSafeVolume {cfg.MaxSafeVolume})" : $"volume {level}");
         }
 
         if (muted is bool mute)
         {
-            await _receiverController.SetZone2MuteAsync(mute, ct);
             applied.Add(mute ? "muted" : "unmuted");
         }
 
-        // Off last: a source command can turn Zone 2 on again.
         if (on == false)
         {
-            await _receiverController.SetZone2PowerAsync(false, ct);
             applied.Add("off");
         }
 
+        // One sequence: muted while it turns on, the volume before the sound, and off last.
+        await _receiverController.ApplyZone2Async(on, source, level, muted, ct);
         return BuildToolText($"Zone 2: {string.Join(", ", applied)}.");
     }
 

@@ -16,8 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   receiver (the receiver leads and the others play what it plays), tap it again to take it out. With a group the
   card shows the group's volume (− and +), mute and Leave group. The app reads the groups at start and again on
   the speaker's groups_changed and players_changed events, and group_volume_changed updates the volume at once.
-- **Smart Scenes can set Zone 2 and a HEOS group** (#75): Zone 2 on or off, source, volume and mute (mute last, after
-  the volume), and HEOS players to group with this receiver (or leave the group). The scene editor has the fields.
+- **Smart Scenes can set Zone 2 and a HEOS group** (#75): Zone 2 on or off, source, volume and mute, and HEOS players
+  to group with this receiver (or leave the group). The scene editor has the fields. With a target volume, Zone 2 is
+  muted while it turns on or changes source, and the mute goes back only after the volume is set, so a zone left
+  loud never plays loud first. An MCP agent can run a scene that groups players only in FullOrchestration.
 - **Automations** (#75): `action.receiver` has `zone2_on`, `zone2_off`, `zone2_volume`, `zone2_source`,
   `zone2_mute`, `zone2_unmute`, `group_with`, `ungroup` and `group_volume`. Zone 2 and group volumes are capped at
   the safe volume, as the main volume is. See docs/automation-graphs.md.

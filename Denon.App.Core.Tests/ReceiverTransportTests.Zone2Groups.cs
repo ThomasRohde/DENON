@@ -130,7 +130,43 @@ public sealed partial class ReceiverTransportTests
             Zone2Muted = false,
         });
 
-        Assert.Equal(["Z2ON", "Z2TV", "Z225", "Z2MUOFF"], Zone2Commands(avr));
+        // Muted before it turns on, the volume before the source, and the mute released last.
+        Assert.Equal(["Z2MUON", "Z2ON", "Z2MUON", "Z225", "Z2TV", "Z2MUOFF"], Zone2Commands(avr));
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A_zone_2_sequence_without_a_volume_needs_no_mute_and_turns_off_last()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        var (controller, _, telemetry) = await CreateControllerAsync(avr, heos);
+        await controller.RefreshAsync();
+        avr.ClearCommands();
+
+        await controller.ApplyZone2Async(on: true, source: "NET", volume: null, muted: null);
+        await controller.ApplyZone2Async(on: false, source: "TV", volume: null, muted: true);
+
+        Assert.Equal(["Z2ON", "Z2NET", "Z2TV", "Z2MUON", "Z2OFF"], Zone2Commands(avr));
+        await Assert.ThrowsAsync<ArgumentException>(() => controller.ApplyZone2Async(on: null, source: "50", volume: null, muted: null));
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A_new_source_with_a_lower_volume_keeps_the_zone_muted_until_the_volume_is_set()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        avr.Replies["Z2?"] = "Z2ON\rZ2TV\rZ270\r";
+        avr.Replies["Z2MU?"] = "Z2MUOFF\r";
+        var (controller, _, telemetry) = await CreateControllerAsync(avr, heos);
+        await controller.RefreshAsync();
+        avr.ClearCommands();
+
+        await controller.ApplyZone2Async(on: null, source: "NET", volume: 20, muted: null);
+
+        // Mute goes back to what it was (off) only after the lower volume.
+        Assert.Equal(["Z2MUON", "Z220", "Z2NET", "Z2MUOFF"], Zone2Commands(avr));
         await telemetry.DisposeAsync();
     }
 

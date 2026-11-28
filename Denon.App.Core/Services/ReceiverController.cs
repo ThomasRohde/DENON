@@ -989,33 +989,90 @@ public sealed class ReceiverController
     /// Zone 2: off alone, or on, then source, then volume, and mute last, so a muted zone never plays loud before the
     /// volume is down. Each step is optional: a model without Zone 2 does not stop the scene.
     /// </summary>
-    private async Task ApplySceneZone2StepsAsync(ReceiverSettings settings, ScenePreset scene, CancellationToken token)
+    private Task ApplySceneZone2StepsAsync(ReceiverSettings settings, ScenePreset scene, CancellationToken token) =>
+        RunZone2StepsAsync(
+            settings,
+            scene.Zone2On,
+            DenonCatalog.IsZone2SourceCode(scene.Zone2Source) ? scene.Zone2Source : null,
+            scene.Zone2Volume,
+            scene.Zone2Muted,
+            TryRunSceneStepAsync,
+            token);
+
+    /// <summary>
+    /// Zone 2 power, source, volume and mute in one go (MCP avr_set_zone2). The volume is the caller's, already capped
+    /// at the safe volume. The order is that of <see cref="RunZone2StepsAsync"/>.
+    /// </summary>
+    public Task<ReceiverStatus> ApplyZone2Async(
+        bool? on,
+        string? source,
+        int? volume,
+        bool? muted,
+        CancellationToken cancellationToken = default)
     {
-        if (scene.Zone2On == false)
+        if (!string.IsNullOrWhiteSpace(source) && !DenonCatalog.IsZone2SourceCode(source))
         {
-            await TryRunSceneStepAsync(() => _avrClient.SetZone2PowerAsync(settings, false, token));
-            return;
+            throw new ArgumentException($"'{source}' is not a Zone 2 source.", nameof(source));
         }
 
-        if (scene.Zone2On == true)
+        return ExecuteZone2Async(
+            "Set Zone 2",
+            (settings, token) => RunZone2StepsAsync(
+                settings, on, string.IsNullOrWhiteSpace(source) ? null : source, volume, muted, static step => step(), token),
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// The Zone 2 steps in a safe order. Off: the other steps first (a source command can turn the zone on), then off.
+    /// With a target volume, the zone is muted before it turns on or gets a new source, the volume is set, and only
+    /// then does the mute go to what was asked (or back to what it was): a zone left loud never plays loud first.
+    /// </summary>
+    /// <param name="run">Runs one step: a scene skips a failed step, MCP lets it fail.</param>
+    private async Task RunZone2StepsAsync(
+        ReceiverSettings settings,
+        bool? on,
+        string? source,
+        int? volume,
+        bool? muted,
+        Func<Func<Task>, Task> run,
+        CancellationToken token)
+    {
+        var guard = volume is not null && (on == true || source is not null);
+        var finalMute = muted ?? (guard ? _stateStore.Snapshot.Status?.IsZone2Muted ?? false : null);
+
+        if (guard)
         {
-            await TryRunSceneStepAsync(() => _avrClient.SetZone2PowerAsync(settings, true, token));
-            await Task.Delay(250, token);
+            await run(() => _avrClient.SetZone2MuteAsync(settings, true, token));
         }
 
-        if (DenonCatalog.IsZone2SourceCode(scene.Zone2Source))
+        if (on == true)
         {
-            await TryRunSceneStepAsync(() => _avrClient.SetZone2SourceAsync(settings, scene.Zone2Source!, token));
+            await run(() => _avrClient.SetZone2PowerAsync(settings, true, token));
+            if (guard)
+            {
+                // Mute again: a zone that was off may not take the first mute.
+                await run(() => _avrClient.SetZone2MuteAsync(settings, true, token));
+            }
         }
 
-        if (scene.Zone2Volume is int zone2Volume)
+        if (volume is int level)
         {
-            await TryRunSceneStepAsync(() => _avrClient.SetZone2VolumeAsync(settings, Math.Clamp(zone2Volume, 0, 98), token));
+            await run(() => _avrClient.SetZone2VolumeAsync(settings, Math.Clamp(level, 0, DenonVolumeMath.MaxAbsoluteVolume), token));
         }
 
-        if (scene.Zone2Muted is bool zone2Muted)
+        if (source is not null)
         {
-            await TryRunSceneStepAsync(() => _avrClient.SetZone2MuteAsync(settings, zone2Muted, token));
+            await run(() => _avrClient.SetZone2SourceAsync(settings, source, token));
+        }
+
+        if (finalMute is bool mute)
+        {
+            await run(() => _avrClient.SetZone2MuteAsync(settings, mute, token));
+        }
+
+        if (on == false)
+        {
+            await run(() => _avrClient.SetZone2PowerAsync(settings, false, token));
         }
     }
 
