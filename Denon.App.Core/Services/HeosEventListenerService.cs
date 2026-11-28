@@ -190,9 +190,9 @@ public sealed class HeosEventListenerService : BackgroundService
             socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, 5);
             socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, 3);
         }
-        catch (SocketException)
+        catch (Exception ex) when (ex is SocketException or PlatformNotSupportedException or NotSupportedException or ArgumentException)
         {
-            // The heartbeat still finds a dead link.
+            // Some systems do not take these options. The heartbeat still finds a dead link.
         }
     }
 

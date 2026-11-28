@@ -65,6 +65,13 @@ public sealed class DenonAvrClient : IDisposable
             VolumeExact: volumeExact);
     }
 
+    /// <summary>The current input (for example "TV"), or null when the receiver does not answer SI?.</summary>
+    public async Task<string?> TryGetInputSourceAsync(ReceiverSettings settings, CancellationToken cancellationToken)
+    {
+        var reply = await TryQueryAsync(settings, "SI?", "SI", cancellationToken);
+        return reply is null ? null : ParsePrefixValue(reply, "SI");
+    }
+
     public Task SetPowerAsync(ReceiverSettings settings, bool powerOn, CancellationToken cancellationToken) =>
         SendCommandAsync(settings, powerOn ? "PWON" : "PWSTANDBY", cancellationToken);
 

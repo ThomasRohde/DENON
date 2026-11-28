@@ -21,6 +21,9 @@ public sealed class ReceiverController
     /// <summary>The last merged status with a real AVR answer. The grace window keeps its power, input and mode.</summary>
     private ReceiverStatus? _lastConfirmedStatus;
 
+    /// <summary>The receiver <see cref="_lastConfirmedStatus"/> came from: another receiver gets no grace window.</summary>
+    private string? _lastConfirmedHost;
+
     public ReceiverController(
         HeosClient heosClient,
         DenonAvrClient avrClient,
@@ -209,7 +212,9 @@ public sealed class ReceiverController
             async (settings, token) =>
             {
                 await SetVolumeWithHeosFallbackAsync(settings, level, token);
-                if (!refreshStatus && _stateStore.Snapshot.Status is { } known)
+                if (!refreshStatus &&
+                    _stateStore.Snapshot.Status is { } known &&
+                    await InputIsUnchangedAsync(settings, known, token))
                 {
                     var sent = Math.Clamp(level, 0, known.MaxVolume > 0 ? known.MaxVolume : 98);
                     return known with { Volume = sent, VolumeExact = sent };
@@ -913,7 +918,8 @@ public sealed class ReceiverController
             // TV/HDMI with synthetic "NET / HEOS"!
             if (_hasConfirmedAvrOnce &&
                 _consecutiveAvrFailures <= 2 &&
-                _lastConfirmedStatus is { } prevConfirmed)
+                _lastConfirmedStatus is { } prevConfirmed &&
+                string.Equals(_lastConfirmedHost, settings.Host, StringComparison.OrdinalIgnoreCase))
             {
                 return heosStatus with
                 {
@@ -974,6 +980,7 @@ public sealed class ReceiverController
             IsAvrConfirmed = true,
         };
         _lastConfirmedStatus = confirmed;
+        _lastConfirmedHost = settings.Host;
         return confirmed;
     }
 
@@ -988,6 +995,22 @@ public sealed class ReceiverController
         {
             _avrProtocolAvailable = false;
         }
+    }
+
+    /// <summary>
+    /// For a fade step: asks the receiver for its input only (one query, not a full status read). A changed input
+    /// means a full read, so Volume Memory sees the new source and stops the fade. A HEOS-only speaker has no
+    /// input to change; its push events refresh the status when what plays changes.
+    /// </summary>
+    private async Task<bool> InputIsUnchangedAsync(ReceiverSettings settings, ReceiverStatus known, CancellationToken cancellationToken)
+    {
+        if (!_avrProtocolAvailable)
+        {
+            return true;
+        }
+
+        var input = await _avrClient.TryGetInputSourceAsync(settings, cancellationToken);
+        return input is not null && string.Equals(input, known.InputSource, StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task SetVolumeWithHeosFallbackAsync(ReceiverSettings settings, int level, CancellationToken cancellationToken)

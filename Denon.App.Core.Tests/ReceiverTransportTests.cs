@@ -244,13 +244,60 @@ public sealed class ReceiverTransportTests : IDisposable
 
         var step = await controller.SetVolumeAsync(40, logSuccess: false, refreshStatus: false);
 
-        Assert.Equal(["MV40"], avr.Commands.ToArray());
+        // The volume, and the input only (so a fade sees a source change), not a full status read.
+        Assert.Equal(["MV40", "SI?"], avr.Commands.ToArray());
         Assert.Equal(40, step.Volume);
         Assert.Equal("TV", step.InputSource);
 
         avr.ClearCommands();
         await controller.SetVolumeAsync(42);
         Assert.Contains("PW?", avr.Commands);
+
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A_fade_step_reads_the_full_status_when_the_input_changed()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        var (controller, _, telemetry) = await CreateControllerAsync(avr, heos);
+        await controller.RefreshAsync();
+
+        avr.Replies["SI?"] = "SIGAME\r"; // Someone switched the input with the remote during the fade.
+        avr.ClearCommands();
+        var step = await controller.SetVolumeAsync(40, logSuccess: false, refreshStatus: false);
+
+        Assert.Equal("GAME", step.InputSource);
+        Assert.Contains("PW?", avr.Commands);
+
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Another_receiver_address_gets_no_grace_window()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        var log = new AppLogStore(Path.Combine(_tempDir, "grace.log"));
+        var store = new AppSettingsStore(log, Path.Combine(_tempDir, "grace.json"));
+        await store.InitializeAsync();
+        await store.UpdateAsync(s =>
+        {
+            s.Receiver.Host = "127.0.0.1";
+            s.Receiver.Port = heos.Port;
+        });
+        var telemetry = new EventTelemetryLog(store, log, new RoomEventBus(log), Path.Combine(_tempDir, "grace-events"));
+        var controller = new ReceiverController(new HeosClient(), new DenonAvrClient(avr.Port), store, new ReceiverStateStore(), telemetry, log);
+
+        Assert.Equal("TV", (await controller.RefreshAsync()).InputSource);
+
+        // The settings now name another receiver (here the same fakes under another name), and its port 23 is busy.
+        await store.UpdateAsync(s => s.Receiver.Host = "localhost");
+        avr.HangUp = true;
+
+        var next = await controller.RefreshAsync();
+        Assert.Equal("NET", next.InputSource); // Not the first receiver's TV input.
 
         await telemetry.DisposeAsync();
     }
