@@ -163,7 +163,12 @@ public static class WindowFitter
         if (growOnly && fit.Height <= window.ActualHeight + 1)
         {
             // Measure arranged the content at trial sizes: lay it out again at the window's own size.
-            (window.Content as UIElement)?.InvalidateMeasure();
+            if (window.Content is UIElement content)
+            {
+                content.InvalidateMeasure();
+                content.InvalidateArrange();
+            }
+
             return;
         }
 
