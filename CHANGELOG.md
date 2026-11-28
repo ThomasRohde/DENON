@@ -4,6 +4,14 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **A scene no longer switches the main input while Zone 2 may be loud** (#75 follow-up). When a scene's Zone 2
+  volume step fails and the scene also changes the main input, Zone 2 is muted first (a Zone 2 that follows the main
+  zone would play the new input at its old volume). When the mute fails too, the input step is skipped and the log
+  says why.
+
 ## [2.10.30] - 2026-11-28
 
 ### Added

@@ -855,9 +855,17 @@ public sealed class ReceiverController
         }
 
         // Zone 2 before the main input: a Zone 2 that follows the main zone (SOURCE) must be at its volume first.
-        await ApplySceneZone2StepsAsync(settings, scene, token);
+        var zone2Ready = await ApplySceneZone2StepsAsync(settings, scene, token);
+        var skipInput = false;
+        if (!zone2Ready && !string.IsNullOrWhiteSpace(scene.InputSource) &&
+            !await TryRunSceneStepAsync(() => _avrClient.SetZone2MuteAsync(settings, true, token)))
+        {
+            // Zone 2 is at its old volume and not muted: a new main input would play there loud.
+            _logStore.Warning($"Scene '{scene.Name}': input {scene.InputSource} skipped (Zone 2 volume and mute could not be set).");
+            skipInput = true;
+        }
 
-        if (!string.IsNullOrWhiteSpace(scene.InputSource))
+        if (!skipInput && !string.IsNullOrWhiteSpace(scene.InputSource))
         {
             if (DenonCatalog.InputMatches(scene.InputSource, "NET"))
             {
@@ -1036,7 +1044,8 @@ public sealed class ReceiverController
     /// Zone 2: off alone, or on, then source, then volume, and mute last, so a muted zone never plays loud before the
     /// volume is down. Each step is optional: a model without Zone 2 does not stop the scene.
     /// </summary>
-    private Task ApplySceneZone2StepsAsync(ReceiverSettings settings, ScenePreset scene, CancellationToken token) =>
+    /// <returns>False when the scene's Zone 2 volume could not be set (the zone may still be at its old volume).</returns>
+    private Task<bool> ApplySceneZone2StepsAsync(ReceiverSettings settings, ScenePreset scene, CancellationToken token) =>
         RunZone2StepsAsync(
             settings,
             scene.Zone2On,
@@ -1078,7 +1087,8 @@ public sealed class ReceiverController
     /// Runs one step and says if it worked: a scene skips a failed step, MCP lets it fail. When the volume step fails in
     /// a guarded sequence, the source and the mute release are skipped: the zone stays muted rather than play loud.
     /// </param>
-    private async Task RunZone2StepsAsync(
+    /// <returns>True when the target volume was set, or none was asked for.</returns>
+    private async Task<bool> RunZone2StepsAsync(
         ReceiverSettings settings,
         bool? on,
         string? source,
@@ -1105,7 +1115,7 @@ public sealed class ReceiverController
                 await run(() => _avrClient.SetZone2PowerAsync(settings, false, token));
             }
 
-            return;
+            return false;
         }
 
         if (on == true)
@@ -1133,7 +1143,7 @@ public sealed class ReceiverController
                 await run(() => _avrClient.SetZone2PowerAsync(settings, false, token));
             }
 
-            return;
+            return false;
         }
 
         if (source is not null)
@@ -1150,6 +1160,8 @@ public sealed class ReceiverController
         {
             await run(() => _avrClient.SetZone2PowerAsync(settings, false, token));
         }
+
+        return true;
     }
 
     /// <summary>The scene's HEOS group: this app's player leads, the named players join. Optional, as the Zone 2 steps.</summary>
