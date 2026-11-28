@@ -126,9 +126,7 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
         _isStarted = false;
         StopDemoBeatSimulator();
 
-        // End the startup sync first: if it is starting the stream now, the stop below must come after it.
-        _lifetimeCts?.Cancel();
-        try { await _startupSync; } catch { /* already logged, or cancelled */ }
+        await EndStartupSyncAsync();
 
         if (_entertainmentClient is not null)
         {
@@ -467,8 +465,19 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
         }
     }
 
+    /// <summary>
+    /// Cancels the startup sync and waits for it. When it is starting the stream right now, a stop (or an unlink
+    /// that clears the keys) must come after it, or the bridge area stays active.
+    /// </summary>
+    private async Task EndStartupSyncAsync()
+    {
+        _lifetimeCts?.Cancel();
+        try { await _startupSync; } catch { /* already logged, or cancelled */ }
+    }
+
     internal async Task DisconnectBridgeAsync(CancellationToken cancellationToken = default)
     {
+        await EndStartupSyncAsync();
         StopDemoBeatSimulator();
         if (_entertainmentClient is not null)
         {
