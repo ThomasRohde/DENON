@@ -44,8 +44,9 @@ Each one needs the real devices, and most change them or play media, so they wai
 - [ ] Hue Music Sync on, restart the app: the log says "Started 50 Hz Hue Entertainment DTLS stream", and Hue moves
       to the station that plays on.
 - [ ] Hue Entertainment area picker: with two areas, pick the other one while Music Sync streams.
-- [ ] Home Assistant live updates against a real server: a light switched in HA changes its tile at once; a wrong
-      token shows "Home Assistant rejected the token" with no retry loop; a restarted HA server is picked up again.
+- [ ] Home Assistant against a real server: the Input Booleans pill filters the tiles; a light switched in HA
+      changes its tile at once (live updates); a wrong token shows "Home Assistant rejected the token" with no
+      retry loop; a restarted HA server is picked up again.
 
 **The app on the PC**
 - [ ] YouTube and Cinema: Watch a track (Cinema opens once, after the cast), nudge the sync and check the next track
