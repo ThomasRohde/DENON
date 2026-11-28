@@ -4,7 +4,7 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.10.28] - 2026-11-28
 
 ### Fixed
 - **Keyboard focus is visible** (#57): Tab now shows a 2 px accent ring around buttons, chips, rail items, toggles,
