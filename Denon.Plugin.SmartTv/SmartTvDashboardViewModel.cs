@@ -63,6 +63,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     private bool _screenOffOnMusicScene;
     private string _cecWakeCastDevice = string.Empty;
     private bool _isLoadingCastDevices;
+    private IReadOnlyList<CastDeviceOption> _castDeviceOptions = [new(string.Empty, "Automatic")];
 
     private bool _isLiveConnected;
     private string _connectionBadgeText = "STANDBY / OFFLINE";
@@ -128,8 +129,15 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     public ObservableCollection<LgTvInputInfo> Inputs { get; } = [];
     public ObservableCollection<LgTvAppInfo> FilteredApps { get; } = [];
 
-    /// <summary>"Automatic" and the Cast devices the Chromecast plugin knows, for "Chromecast on this TV".</summary>
-    public ObservableCollection<CastDeviceOption> CastDeviceOptions { get; } = [new(string.Empty, "Automatic")];
+    /// <summary>
+    /// "Automatic" and the Cast devices the Chromecast plugin knows, for "Chromecast on this TV". A load replaces the
+    /// whole list (not Clear and Add), so the box resets at once and then shows the choice again.
+    /// </summary>
+    public IReadOnlyList<CastDeviceOption> CastDeviceOptions
+    {
+        get => _castDeviceOptions;
+        private set => Set(ref _castDeviceOptions, value);
+    }
 
     public ICommand DiscoverCommand { get; }
     public ICommand AutoMacCommand { get; }
@@ -215,23 +223,22 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// The Chromecast that wakes the TV over HDMI-CEC (its id); empty is "Automatic". A null from the list while
-    /// it reloads is not a choice, so it changes nothing.
+    /// The entry of the Chromecast that wakes the TV over HDMI-CEC; the empty id is "Automatic". A null from the box
+    /// while the list reloads is not a choice, so it changes nothing.
     /// </summary>
-    public string? CecWakeCastDevice
+    public CastDeviceOption? SelectedCastDevice
     {
-        get => _cecWakeCastDevice;
+        get => _castDeviceOptions.FirstOrDefault(o => o.Id.Equals(_cecWakeCastDevice, StringComparison.OrdinalIgnoreCase));
         set
         {
-            if (value is null || _isLoadingCastDevices)
+            if (value is null || _isLoadingCastDevices || value.Id.Equals(_cecWakeCastDevice, StringComparison.Ordinal))
             {
                 return;
             }
 
-            if (Set(ref _cecWakeCastDevice, value))
-            {
-                TriggerAutoSave();
-            }
+            _cecWakeCastDevice = value.Id;
+            Raise(nameof(SelectedCastDevice));
+            TriggerAutoSave();
         }
     }
 
@@ -413,7 +420,17 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
                 new(string.Empty, autoName is null ? "Automatic" : $"Automatic ({autoName})"),
             };
             options.AddRange((devices ?? []).Select(d => new CastDeviceOption(d.Id, d.IsConnected ? d.Name : $"{d.Name} (offline)")));
-            if (chosen.Length > 0 && options.All(o => !o.Id.Equals(chosen, StringComparison.OrdinalIgnoreCase)))
+
+            // The setting may hold a name or an IP (the plugin takes those too): it shows as its device.
+            var device = chosen.Length == 0
+                ? null
+                : devices?.FirstOrDefault(d => d.Id.Equals(chosen, StringComparison.OrdinalIgnoreCase)) ??
+                  devices?.FirstOrDefault(d => d.Name.Equals(chosen, StringComparison.OrdinalIgnoreCase));
+            if (device is not null)
+            {
+                chosen = device.Id;
+            }
+            else if (chosen.Length > 0)
             {
                 options.Add(new CastDeviceOption(chosen, $"{chosen} (not found)"));
             }
@@ -421,22 +438,15 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
             _isLoadingCastDevices = true;
             try
             {
-                CastDeviceOptions.Clear();
-                foreach (var option in options)
-                {
-                    CastDeviceOptions.Add(option);
-                }
+                CastDeviceOptions = options;
             }
             finally
             {
                 _isLoadingCastDevices = false;
             }
 
-            // A chosen name (typed before this list existed) shows as its device.
-            var match = options.FirstOrDefault(o => o.Id.Equals(chosen, StringComparison.OrdinalIgnoreCase)) ??
-                        options.FirstOrDefault(o => o.Id.Length > 0 && devices?.Any(d => d.Id == o.Id && d.Name.Equals(chosen, StringComparison.OrdinalIgnoreCase)) == true);
-            _cecWakeCastDevice = match?.Id ?? chosen;
-            Raise(nameof(CecWakeCastDevice));
+            _cecWakeCastDevice = chosen;
+            Raise(nameof(SelectedCastDevice));
         });
     }
 
@@ -460,7 +470,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
                 ScreenOffOnMusicScene = cfg.ScreenOffOnMusicScene;
                 AutoRefreshPreview = cfg.AutoRefreshPreview;
                 _cecWakeCastDevice = cfg.CecWakeCastDevice.Trim();
-                Raise(nameof(CecWakeCastDevice));
+                Raise(nameof(SelectedCastDevice));
 
                 var isConfigured = cfg.DemoMode || (!string.IsNullOrWhiteSpace(cfg.TvIp) && !string.IsNullOrWhiteSpace(cfg.ClientKey));
                 IsSetupExpanded = !isConfigured;
