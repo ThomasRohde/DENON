@@ -517,6 +517,13 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
 
         if (await _entertainmentClient.StartAsync(_config, area, cancellationToken))
         {
+            // The start takes a moment. When the plugin stopped or Music Sync went off meanwhile, release the area.
+            if (!_isStarted || !_musicSyncActive || _config.DemoMode || string.IsNullOrWhiteSpace(_config.ClientKey))
+            {
+                await _entertainmentClient.StopAsync();
+                return;
+            }
+
             _context?.Logger.Info($"Started 50 Hz Hue Entertainment DTLS stream on '{area.Name}' ({area.ChannelCount} ch).");
         }
         else
@@ -550,6 +557,7 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
         _config.MusicSync.Enabled = enabled;
         if (!enabled)
         {
+            await EndStartupSyncAsync();
             StopDemoBeatSimulator();
             if (_entertainmentClient is not null)
             {
