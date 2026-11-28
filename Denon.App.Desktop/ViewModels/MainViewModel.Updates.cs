@@ -242,7 +242,7 @@ public sealed partial class MainViewModel
 
     public ICommand InstallUpdateCommand => _installUpdateCommand ??= new RelayCommand(_ => _ = InstallUpdateAsync());
 
-    public ICommand CheckForUpdatesNowCommand => _checkForUpdatesNowCommand ??= new RelayCommand(_ => _ = CheckForUpdatesAsync(manual: true));
+    public ICommand CheckForUpdatesNowCommand => _checkForUpdatesNowCommand ??= new AsyncRelayCommand(_ => CheckForUpdatesAsync(manual: true));
 
     private void OpenReleaseUrl(string url)
     {

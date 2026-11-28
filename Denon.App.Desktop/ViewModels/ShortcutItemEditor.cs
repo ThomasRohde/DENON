@@ -75,6 +75,11 @@ public sealed class ShortcutItemEditor : ObservableObject
 
     public string RecordButtonText => IsRecording ? "Cancel" : "Record";
 
+    /// <summary>A row the user added for a Smart Scene or a plugin action: it can be removed, not only cleared.</summary>
+    public bool IsCustom =>
+        ActionId.StartsWith("scene:", StringComparison.OrdinalIgnoreCase) ||
+        ActionId.StartsWith("plugin:", StringComparison.OrdinalIgnoreCase);
+
     public bool HasCollision
     {
         get => _hasCollision;

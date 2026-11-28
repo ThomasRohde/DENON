@@ -316,19 +316,14 @@ function switchTab(id, btn) {
   if (btn) { btn.classList.add('active'); btn.setAttribute('aria-selected', 'true'); }
 }
 
-function fmtDb(v) {
-  if (v <= 0) return '--- dB';
-  const d = (v - 80).toFixed(1);
-  return (Number(d) > 0 ? '+' : '') + d + ' dB';
-}
-
 function applyVolumeDisplay(v, maxVol) {
+  // The receiver's own 0-98 number, as on its display (no decibels).
   const slider = document.getElementById('volSlider');
   slider.max = maxVol || 98;
   slider.value = v;
-  slider.setAttribute('aria-valuetext', `${v} (${fmtDb(v)})`);
-  document.getElementById('volDb').textContent = Number(v).toFixed(1);
-  document.getElementById('volAbs').textContent = `${fmtDb(v)}  •  MAX ${maxVol || 98}`;
+  slider.setAttribute('aria-valuetext', `Volume ${v} of ${maxVol || 98}`);
+  document.getElementById('volDb').textContent = String(Math.round(Number(v) || 0));
+  document.getElementById('volAbs').textContent = `MAX ${maxVol || 98}`;
 }
 
 function onSlide(v) {
