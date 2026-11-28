@@ -27,6 +27,12 @@ public static class AppDataPaths
 
     public static string LogFilePath => Path.Combine(LogsDirectory, "app.log");
 
+    /// <summary>The saved Jukebox and YouTube queues.</summary>
+    public static string QueuesDirectory => Path.Combine(RootDirectory, "queues");
+
+    /// <summary>Cover art read from local audio files (Jukebox).</summary>
+    public static string JukeboxArtDirectory => Path.Combine(RootDirectory, "jukebox-art");
+
     /// <summary>Moves all app data to <paramref name="rootDirectory"/>. Call before any service starts.</summary>
     public static void UseRootDirectory(string rootDirectory)
     {

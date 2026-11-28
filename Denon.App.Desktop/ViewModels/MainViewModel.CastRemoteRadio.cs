@@ -30,11 +30,13 @@ public sealed class LocalTrackItemViewModel : ObservableObject
 
     public string Title => Track.Title;
 
-    public string Artist => Track.Artist;
+    /// <summary>"Artist • Album" from the tags (the artist alone without an album).</summary>
+    public string Artist => Track.ArtistAlbumDisplay;
 
     public string CodecBadge => Track.CodecBadge;
 
-    public string SizeDisplay => Track.SizeDisplay;
+    /// <summary>"4:05 • 32.4 MB" when the length is known, else the size alone.</summary>
+    public string SizeDisplay => Track.DurationDisplay.Length > 0 ? $"{Track.DurationDisplay} • {Track.SizeDisplay}" : Track.SizeDisplay;
 
     public string PositionLabel => IsCurrent ? "▶" : $"{_position:00}";
 

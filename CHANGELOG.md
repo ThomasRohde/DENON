@@ -4,6 +4,22 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **The Jukebox reads the tags of your files** (#79): the title, artist, album, length and cover art come from the
+  FLAC, MP3 and M4A tags, not from the file name. Now Playing shows the cover and "Artist • Album", the list shows
+  the album and the length, and Hue Album-Art Ambient takes its colours from the cover. The next track starts at the
+  real end of the track, because the length is known before it plays. The names from the file paths show at once;
+  the tags replace them a moment later. Cover art is kept in `jukebox-art` (one file per picture, no picture larger
+  than 4 MB).
+- **The Jukebox and YouTube queues come back after a restart** (#79), with shuffle, repeat and the YouTube history.
+  Only the queue comes back: nothing starts to play by itself. The queues are in the `queues` folder.
+
+### Fixed
+- The phone remote gets only web artwork. Before, it got a file path on this PC (a TV channel logo), which a phone
+  cannot load.
+
 ## [2.10.28] - 2026-11-28
 
 ### Fixed

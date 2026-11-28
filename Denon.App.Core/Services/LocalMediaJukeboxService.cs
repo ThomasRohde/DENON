@@ -1,3 +1,4 @@
+using Denon.App.Core.Media;
 using Denon.App.Core.Models;
 using Denon.App.Core.Services.Metering;
 
@@ -61,21 +62,51 @@ public sealed class LocalMediaJukeboxService : IDisposable
     // Media-time clock for synced meters (same model as the YouTube queue clock).
     private readonly PlaybackClock _clock = new();
 
+    // Tags and cover art are read off the caller's thread, one file at a time (see EnqueueTagReads).
+    private readonly MediaQueueStore? _queueStore;
+    private readonly LocalCoverArtCache? _coverArtCache;
+    private readonly object _tagSync = new();
+    private readonly Queue<string> _tagQueue = new();
+    private readonly HashSet<string> _tagQueued = new(StringComparer.Ordinal);
+    private bool _tagWorkerRunning;
+    private Task _tagWorker = Task.CompletedTask;
+    private bool _disposed;
+
+    /// <summary>The worker sends one change for many tracks: at most one per this interval.</summary>
+    private static readonly TimeSpan TagNotifyInterval = TimeSpan.FromMilliseconds(500);
+
+    /// <param name="queueStore">Saves the queue between app runs. Null: the queue is not saved.</param>
+    /// <param name="coverArtCache">Keeps the cover art of the files. Null: no cover art.</param>
     public LocalMediaJukeboxService(
         LocalAudioRelayServer relayServer,
         ReceiverController receiverController,
         ReceiverStateStore stateStore,
-        AppLogStore logStore)
+        AppLogStore logStore,
+        MediaQueueStore? queueStore = null,
+        LocalCoverArtCache? coverArtCache = null)
     {
         _relayServer = relayServer;
         _receiverController = receiverController;
         _stateStore = stateStore;
         _logStore = logStore;
+        _queueStore = queueStore;
+        _coverArtCache = coverArtCache;
+
+        RestoreSavedQueue();
 
         _relayServer.LocalTrackStreamCompleted += OnLocalTrackCompleted;
         _relayServer.LocalTrackPlaybackStarted += OnLocalTrackPlaybackStarted;
         _receiverController.NonRelaySourceActivated += OnExternalSourceActivated;
         _stateStore.StateChanged += OnReceiverStateChanged;
+    }
+
+    /// <summary>Completes when the tag worker has no more files to read (for tests).</summary>
+    internal Task WhenTagsReadAsync()
+    {
+        lock (_tagSync)
+        {
+            return _tagWorker;
+        }
     }
 
     /// <summary>File path of the track the jukebox plays now, or null.</summary>
@@ -182,6 +213,7 @@ public sealed class LocalMediaJukeboxService : IDisposable
 
         var added = 0;
         var duplicates = 0;
+        var addedIds = new List<string>();
         lock (_sync)
         {
             var existingPaths = new HashSet<string>(_tracks.Select(static t => t.FilePath), StringComparer.OrdinalIgnoreCase);
@@ -195,14 +227,16 @@ public sealed class LocalMediaJukeboxService : IDisposable
 
                 var info = new FileInfo(file);
                 var (artist, title) = ParseMetadataFromPath(file);
+                var trackId = NewTrackId();
                 _tracks.Add(new LocalAudioTrackItem(
-                    TrackId: Guid.NewGuid().ToString("N")[..10],
+                    TrackId: trackId,
                     FilePath: file,
                     FileName: info.Name,
                     Title: title,
                     Artist: artist,
                     Extension: info.Extension,
                     FileSizeBytes: info.Exists ? info.Length : 0));
+                addedIds.Add(trackId);
                 added++;
             }
         }
@@ -211,6 +245,9 @@ public sealed class LocalMediaJukeboxService : IDisposable
         {
             _logStore.Info($"Added {added} local audio track(s) to Hi-Res Jukebox{(duplicates > 0 ? $" ({duplicates} duplicate(s) skipped)" : string.Empty)}.");
             NotifyChanged();
+
+            // The names from the file paths show at once; the tags replace them when the worker has read them.
+            EnqueueTagReads(addedIds);
         }
 
         return (added, duplicates, skipped);
@@ -421,6 +458,20 @@ public sealed class LocalMediaJukeboxService : IDisposable
             prevActive = _isActive;
             prevToken = _activeRelayToken;
             track = _tracks[index];
+        }
+
+        // Read the tags first when the worker has not come to this file yet: the title, cover and length must be
+        // right before the track starts (Now Playing, the Hue colours and the auto-advance wait use them).
+        if (!track.TagsRead)
+        {
+            var trackId = track.TrackId;
+            if (await Task.Run(() => ReadTagsInto(trackId), cancellationToken))
+            {
+                lock (_sync)
+                {
+                    track = _tracks.Find(t => string.Equals(t.TrackId, trackId, StringComparison.Ordinal)) ?? track;
+                }
+            }
         }
 
         try
@@ -650,17 +701,225 @@ public sealed class LocalMediaJukeboxService : IDisposable
 
     private static double DrainLimitSeconds(LocalAudioTrackItem track, double playedSeconds)
     {
-        TimeSpan? length = null;
-        try
+        // The length comes from the tags read before the track started. Only a track that started before its
+        // tags could be read (a missing file) reads them here.
+        var length = track.TagsRead
+            ? track.Duration
+            : AudioTagReader.Read(track.FilePath, includeCoverArt: false).Duration;
+        return DrainLimitSeconds(length, playedSeconds);
+    }
+
+    private static string NewTrackId() => Guid.NewGuid().ToString("N")[..10];
+
+    /// <summary>Puts tracks in the line for the tag worker and starts it when it does not run.</summary>
+    private void EnqueueTagReads(IEnumerable<string> trackIds)
+    {
+        lock (_tagSync)
         {
-            length = Denon.App.Core.Media.AudioTagReader.Read(track.FilePath, includeCoverArt: false).Duration;
+            if (_disposed)
+            {
+                return;
+            }
+
+            foreach (var id in trackIds)
+            {
+                if (_tagQueued.Add(id))
+                {
+                    _tagQueue.Enqueue(id);
+                }
+            }
+
+            if (!_tagWorkerRunning && _tagQueue.Count > 0)
+            {
+                _tagWorkerRunning = true;
+                _tagWorker = Task.Run(RunTagWorker);
+            }
         }
-        catch
+    }
+
+    private void RunTagWorker()
+    {
+        var changed = false;
+        var lastNotify = System.Diagnostics.Stopwatch.StartNew();
+        while (true)
         {
-            // The reader does not throw for bad files; a missing file is the same as no length.
+            string? id;
+            lock (_tagSync)
+            {
+                if (_disposed || !_tagQueue.TryDequeue(out id))
+                {
+                    _tagQueue.Clear();
+                    _tagQueued.Clear();
+                    _tagWorkerRunning = false;
+                    break;
+                }
+
+                _tagQueued.Remove(id);
+            }
+
+            try
+            {
+                changed |= ReadTagsInto(id);
+            }
+            catch (Exception ex)
+            {
+                _logStore.Warning($"Could not read the tags of a Jukebox track: {ex.Message}");
+            }
+
+            if (changed && lastNotify.Elapsed >= TagNotifyInterval)
+            {
+                changed = false;
+                lastNotify.Restart();
+                NotifyChanged();
+            }
         }
 
-        return DrainLimitSeconds(length, playedSeconds);
+        if (changed)
+        {
+            NotifyChanged();
+        }
+    }
+
+    /// <summary>
+    /// Reads the tags and cover art of one track and puts them in the list. False when there is nothing to do: the
+    /// track is gone, its tags and cover are already there, or its file is missing (it is read again next time).
+    /// </summary>
+    private bool ReadTagsInto(string trackId)
+    {
+        LocalAudioTrackItem? track;
+        lock (_sync)
+        {
+            track = _tracks.Find(t => string.Equals(t.TrackId, trackId, StringComparison.Ordinal));
+        }
+
+        if (track is null || !NeedsTagRead(track) || !File.Exists(track.FilePath))
+        {
+            return false;
+        }
+
+        var updated = WithTags(track, AudioTagReader.Read(track.FilePath, includeCoverArt: _coverArtCache is not null), _coverArtCache);
+        lock (_sync)
+        {
+            var index = _tracks.FindIndex(t => string.Equals(t.TrackId, trackId, StringComparison.Ordinal));
+            if (index < 0 || !string.Equals(_tracks[index].FilePath, track.FilePath, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            _tracks[index] = updated;
+        }
+
+        return true;
+    }
+
+    private bool NeedsTagRead(LocalAudioTrackItem track) =>
+        !track.TagsRead || (track.CoverArtPath is not null && _coverArtCache?.Contains(track.CoverArtPath) != true);
+
+    /// <summary>
+    /// The track with the title, artist, album, number, length and cover from its tags. A missing title or artist
+    /// keeps the name from the file path.
+    /// </summary>
+    internal static LocalAudioTrackItem WithTags(LocalAudioTrackItem track, AudioTags tags, LocalCoverArtCache? coverArtCache)
+    {
+        var (pathArtist, pathTitle) = ParseMetadataFromPath(track.FilePath);
+        return track with
+        {
+            Title = tags.Title ?? pathTitle,
+            Artist = tags.Artist ?? pathArtist,
+            Album = tags.Album,
+            Duration = tags.Duration,
+            TrackNumber = tags.TrackNumber,
+            CoverArtPath = coverArtCache?.Store(tags.CoverArt),
+            TagsRead = true,
+        };
+    }
+
+    /// <summary>
+    /// Loads the queue saved by the last run. It never starts playback: the tracks are there, nothing plays. The
+    /// tags of tracks that were not read (or whose cover file is gone) are read again in the background.
+    /// </summary>
+    private void RestoreSavedQueue()
+    {
+        var saved = _queueStore?.LoadJukebox();
+        if (saved?.Tracks is not { Count: > 0 } savedTracks)
+        {
+            return;
+        }
+
+        var restored = new List<LocalAudioTrackItem>();
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in savedTracks)
+        {
+            if (restored.Count >= MediaQueueStore.MaxEntries)
+            {
+                break;
+            }
+
+            if (item is null || string.IsNullOrWhiteSpace(item.FilePath) || !Path.IsPathFullyQualified(item.FilePath) ||
+                !IsSupportedAudioFile(item.FilePath) || !paths.Add(item.FilePath))
+            {
+                continue;
+            }
+
+            var id = !string.IsNullOrWhiteSpace(item.TrackId) && ids.Add(item.TrackId) ? item.TrackId : NewTrackId();
+            ids.Add(id);
+            var (pathArtist, pathTitle) = ParseMetadataFromPath(item.FilePath);
+            var cover = _coverArtCache?.IsInCacheFolder(item.CoverArtPath) == true ? item.CoverArtPath : null;
+            var duration = item.DurationSeconds is { } seconds && double.IsFinite(seconds) && seconds > 0 && seconds < TimeSpan.FromDays(7).TotalSeconds
+                ? TimeSpan.FromSeconds(seconds)
+                : (TimeSpan?)null;
+            restored.Add(new LocalAudioTrackItem(
+                TrackId: id,
+                FilePath: item.FilePath,
+                FileName: Path.GetFileName(item.FilePath),
+                Title: string.IsNullOrWhiteSpace(item.Title) ? pathTitle : item.Title.Trim(),
+                Artist: string.IsNullOrWhiteSpace(item.Artist) ? pathArtist : item.Artist.Trim(),
+                Extension: Path.GetExtension(item.FilePath),
+                FileSizeBytes: Math.Max(0, item.FileSizeBytes),
+                Album: string.IsNullOrWhiteSpace(item.Album) ? null : item.Album.Trim(),
+                Duration: duration,
+                TrackNumber: item.TrackNumber is > 0 ? item.TrackNumber : null,
+                // A saved cover outside the cache folder is dropped; the worker reads the file again.
+                CoverArtPath: cover,
+                TagsRead: item.TagsRead && (item.CoverArtPath is null || cover is not null)));
+        }
+
+        lock (_sync)
+        {
+            _tracks.AddRange(restored);
+            _isShuffleEnabled = saved.IsShuffleEnabled;
+            _repeatMode = Enum.IsDefined(saved.RepeatMode) ? saved.RepeatMode : YouTubeRepeatMode.Off;
+        }
+
+        if (restored.Count > 0)
+        {
+            _logStore.Info($"Restored {restored.Count} track(s) to the Hi-Res Jukebox from the last run.");
+            EnqueueTagReads(restored.Select(static t => t.TrackId));
+        }
+    }
+
+    private void SaveQueue(LocalJukeboxSnapshot snapshot)
+    {
+        if (_queueStore is null)
+        {
+            return;
+        }
+
+        _queueStore.SaveJukebox(new SavedJukeboxQueue(
+            [.. snapshot.Tracks.Select(static t => new SavedLocalTrack(
+                t.TrackId,
+                t.FilePath,
+                t.Title,
+                t.Artist,
+                t.FileSizeBytes,
+                t.Album,
+                t.Duration?.TotalSeconds,
+                t.TrackNumber,
+                t.CoverArtPath,
+                t.TagsRead))],
+            snapshot.IsShuffleEnabled,
+            snapshot.RepeatMode));
     }
 
     private static (string Artist, string Title) ParseMetadataFromPath(string filePath)
@@ -748,10 +1007,20 @@ public sealed class LocalMediaJukeboxService : IDisposable
         }
     }
 
-    private void NotifyChanged() => JukeboxChanged?.Invoke(Snapshot);
+    private void NotifyChanged()
+    {
+        var snapshot = Snapshot;
+        SaveQueue(snapshot);
+        JukeboxChanged?.Invoke(snapshot);
+    }
 
     public void Dispose()
     {
+        lock (_tagSync)
+        {
+            _disposed = true;
+        }
+
         CancelPendingAutoAdvance();
         _relayServer.LocalTrackStreamCompleted -= OnLocalTrackCompleted;
         _relayServer.LocalTrackPlaybackStarted -= OnLocalTrackPlaybackStarted;

@@ -64,16 +64,26 @@ public sealed class YouTubeQueueService : IDisposable
     private bool _clockPaused;
     private DateTimeOffset _sessionStartedUtc = DateTimeOffset.MinValue;
 
+    private readonly MediaQueueStore? _queueStore;
+
+    /// <summary>The history keeps this many tracks.</summary>
+    internal const int MaxHistory = 20;
+
+    /// <param name="queueStore">Saves the queue and history between app runs. Null: they are not saved.</param>
     public YouTubeQueueService(
         LocalAudioRelayServer relayServer,
         ReceiverController receiverController,
         ReceiverStateStore stateStore,
-        AppLogStore logStore)
+        AppLogStore logStore,
+        MediaQueueStore? queueStore = null)
     {
         _relayServer = relayServer;
         _receiverController = receiverController;
         _stateStore = stateStore;
         _logStore = logStore;
+        _queueStore = queueStore;
+
+        RestoreSavedQueue();
 
         _relayServer.TrackPlaybackStarted += OnRelayTrackPlaybackStarted;
         _relayServer.TrackStreamCompleted += OnRelayTrackStreamCompleted;
@@ -518,7 +528,7 @@ public sealed class YouTubeQueueService : IDisposable
 
             _history.RemoveAll(t => string.Equals(t.VideoId, track.VideoId, StringComparison.Ordinal));
             _history.Insert(0, track);
-            if (_history.Count > 20)
+            if (_history.Count > MaxHistory)
             {
                 _history.RemoveAt(_history.Count - 1);
             }
@@ -796,7 +806,116 @@ public sealed class YouTubeQueueService : IDisposable
     private YouTubeQueueSnapshot BuildSnapshotLocked() =>
         new([.. _queue], _currentIndex, _isActive, _isShuffleEnabled, _repeatMode, [.. _history]);
 
-    private void NotifyChanged() => QueueChanged?.Invoke(Snapshot);
+    private void NotifyChanged()
+    {
+        var snapshot = Snapshot;
+        SaveQueue(snapshot);
+        QueueChanged?.Invoke(snapshot);
+    }
+
+    /// <summary>
+    /// Loads the queue and history saved by the last run. It never starts playback. Only the video id, title, author,
+    /// length and an https thumbnail come from the file: the watch address is made again from the id (Cinema opens it).
+    /// </summary>
+    private void RestoreSavedQueue()
+    {
+        var saved = _queueStore?.LoadYouTube();
+        if (saved is null)
+        {
+            return;
+        }
+
+        var queue = RestoreTracks(saved.Queue, MediaQueueStore.MaxEntries);
+        var history = RestoreTracks(saved.History, MaxHistory);
+        lock (_sync)
+        {
+            _queue.AddRange(queue);
+            _history.AddRange(history);
+            _isShuffleEnabled = saved.IsShuffleEnabled;
+            _repeatMode = Enum.IsDefined(saved.RepeatMode) ? saved.RepeatMode : YouTubeRepeatMode.Off;
+        }
+
+        if (queue.Count > 0)
+        {
+            _logStore.Info($"Restored {queue.Count} track(s) to the YouTube queue from the last run.");
+        }
+    }
+
+    internal static List<YouTubeTrackItem> RestoreTracks(IReadOnlyList<SavedYouTubeTrack>? saved, int max)
+    {
+        var tracks = new List<YouTubeTrackItem>();
+        if (saved is null)
+        {
+            return tracks;
+        }
+
+        var entryIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in saved)
+        {
+            if (tracks.Count >= max)
+            {
+                break;
+            }
+
+            var videoId = item?.VideoId?.Trim();
+            if (item is null || videoId is null || !IsYouTubeVideoId(videoId))
+            {
+                continue;
+            }
+
+            var duration = item.DurationSeconds is { } seconds && double.IsFinite(seconds) && seconds > 0 && seconds <= TimeSpan.FromHours(24).TotalSeconds
+                ? TimeSpan.FromSeconds(seconds)
+                : (TimeSpan?)null;
+            var thumbnail = Uri.TryCreate(item.ThumbnailUrl, UriKind.Absolute, out var thumbUri) && thumbUri.Scheme == Uri.UriSchemeHttps
+                ? thumbUri.AbsoluteUri
+                : $"https://i.ytimg.com/vi/{videoId}/hqdefault.jpg";
+            var track = new YouTubeTrackItem(
+                VideoId: videoId,
+                Title: CleanText(item.Title, "YouTube track"),
+                Author: CleanText(item.Author, string.Empty),
+                Duration: duration,
+                ThumbnailUrl: thumbnail,
+                WatchUrl: $"https://www.youtube.com/watch?v={videoId}");
+            var entryId = item.QueueEntryId?.Trim();
+            track = string.IsNullOrEmpty(entryId) || entryId.Length > 32 || !entryIds.Add(entryId)
+                ? track.WithNewQueueEntryId()
+                : track with { QueueEntryId = entryId };
+            tracks.Add(track);
+        }
+
+        return tracks;
+    }
+
+    private static bool IsYouTubeVideoId(string id) =>
+        id.Length == 11 && id.All(static c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
+
+    private static string CleanText(string? text, string fallback)
+    {
+        var cleaned = new string((text ?? string.Empty).Where(static c => !char.IsControl(c)).ToArray()).Trim();
+        if (cleaned.Length > 300)
+        {
+            cleaned = cleaned[..300];
+        }
+
+        return cleaned.Length == 0 ? fallback : cleaned;
+    }
+
+    private void SaveQueue(YouTubeQueueSnapshot snapshot)
+    {
+        if (_queueStore is null)
+        {
+            return;
+        }
+
+        _queueStore.SaveYouTube(new SavedYouTubeQueue(
+            [.. snapshot.Queue.Select(ToSaved)],
+            [.. snapshot.History.Select(ToSaved)],
+            snapshot.IsShuffleEnabled,
+            snapshot.RepeatMode));
+
+        static SavedYouTubeTrack ToSaved(YouTubeTrackItem t) =>
+            new(t.VideoId, t.Title, t.Author, t.Duration?.TotalSeconds, t.ThumbnailUrl, t.QueueEntryId);
+    }
 
     public void Dispose()
     {
