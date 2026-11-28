@@ -245,7 +245,7 @@ public sealed class ReceiverTransportTests : IDisposable
         var step = await controller.SetVolumeAsync(40, logSuccess: false, refreshStatus: false);
 
         // The volume, then the input and the real volume (so a fade sees a new source or a turned knob), not a full read.
-        Assert.Equal(["MV40", "SI?", "MV?"], avr.Commands.ToArray());
+        Assert.Equal(["MV40", "ZM?", "SI?", "MV?"], avr.Commands.ToArray());
         Assert.Equal(40, step.Volume);
         Assert.Equal("TV", step.InputSource);
 
@@ -269,6 +269,24 @@ public sealed class ReceiverTransportTests : IDisposable
         var step = await controller.SetVolumeAsync(40, logSuccess: false, refreshStatus: false);
 
         Assert.Equal("GAME", step.InputSource);
+        Assert.Contains("PW?", avr.Commands);
+
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A_fade_step_reads_the_full_status_when_the_zone_went_to_standby()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        var (controller, _, telemetry) = await CreateControllerAsync(avr, heos);
+        await controller.RefreshAsync();
+
+        avr.Replies["ZM?"] = "ZMOFF\r"; // Someone put the receiver in standby during the fade.
+        avr.ClearCommands();
+        var step = await controller.SetVolumeAsync(40, logSuccess: false, refreshStatus: false);
+
+        Assert.False(step.IsMainZoneOn);
         Assert.Contains("PW?", avr.Commands);
 
         await telemetry.DisposeAsync();

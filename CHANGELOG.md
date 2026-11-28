@@ -29,8 +29,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   query now ends as soon as its answer is in (MV? waits for MVMAX), not 120 ms after every answer. On a real
   receiver a status read went from about 2.2 s to about 1.2 s; most of what is left is the receiver's own reply
   time (about 90 ms per query).
-  Commands still keep the 50 ms gap that Denon asks for. A fade step sets the volume and then reads only the input
-  and the real volume, not the full status. So the fade still stops when someone turns the knob or picks another
+  Commands still keep the 50 ms gap that Denon asks for. A fade step sets the volume and then reads only the zone power, the input
+  and the real volume, not the full status. So the fade still stops on standby, a turn of the knob or another
   source. The last step reads the full status.
 
 ### Security

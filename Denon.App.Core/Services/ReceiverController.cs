@@ -1017,10 +1017,10 @@ public sealed class ReceiverController
     }
 
     /// <summary>
-    /// For a fade step: reads the input and the real volume only (two queries, not a full status read), so Volume
-    /// Memory still sees a turn of the knob or a new source and stops the fade. Null when the input changed or a
-    /// query got no answer: then the caller does the full read. A HEOS-only speaker has no input; HEOS gives the
-    /// volume and mute.
+    /// For a fade step: reads the main zone power, the input and the real volume only (three queries, not a full
+    /// status read), so Volume Memory still sees standby, a new source or a turn of the knob and stops the fade.
+    /// Null when the zone is not on, the input changed or a query got no answer: then the caller does the full
+    /// read. A HEOS-only speaker has no zone or input; HEOS gives the volume and mute.
     /// </summary>
     private async Task<ReceiverStatus?> TryReadFadeStepAsync(ReceiverSettings settings, ReceiverStatus known, CancellationToken cancellationToken)
     {
@@ -1028,6 +1028,11 @@ public sealed class ReceiverController
         {
             var heos = await _heosClient.GetStatusAsync(settings, cancellationToken);
             return known with { Volume = heos.Volume, VolumeExact = heos.Volume, IsMuted = heos.IsMuted };
+        }
+
+        if (!await _avrClient.IsMainZoneOnAsync(settings, cancellationToken))
+        {
+            return null; // Standby (or no answer): the full read shows it.
         }
 
         var input = await _avrClient.TryGetInputSourceAsync(settings, cancellationToken);

@@ -72,6 +72,10 @@ public sealed class DenonAvrClient : IDisposable
         return reply is null ? null : ParsePrefixValue(reply, "SI");
     }
 
+    /// <summary>True only when ZM? answers ZMON; false for standby and for no answer.</summary>
+    public async Task<bool> IsMainZoneOnAsync(ReceiverSettings settings, CancellationToken cancellationToken) =>
+        string.Equals(await TryQueryAsync(settings, "ZM?", "ZM", cancellationToken), "ZMON", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>The current volume (MV? with MVMAX), or null when the receiver does not answer.</summary>
     public async Task<(int Volume, double VolumeExact, int MaxVolume)?> TryGetVolumeAsync(ReceiverSettings settings, CancellationToken cancellationToken)
     {
