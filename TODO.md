@@ -25,6 +25,9 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
       Assistant rejected the token" and no retry loop, and a restarted HA server is picked up again. Open choices:
       a slow REST poll while the socket is down, and the host status line after a rejected token (a failing REST
       read can overwrite it).
+- [ ] Verify the Hue Entertainment area picker live (#79, needs the user's OK, it changes the lights): with two
+      areas, pick the other one while Music Sync streams and check the lights of the new area follow the music.
+      A saved area that was deleted cannot be confirmed by picking it again (pick another area first).
 - [ ] Verify PR 3 live: Hue Music Sync on, restart the app, and check the log says "Started 50 Hz Hue Entertainment
       DTLS stream". Needs the user's OK (it changes the lights).
 - [x] PR 4: MCP tiers and limits. #66 closed; the MCP side of #61 and #65, and the /health Host check of #64.

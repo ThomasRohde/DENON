@@ -14,6 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   connects again after a lost connection (2 s, up to 60 s between tries) and stops when Home Assistant rejects the
   token, with a clear message. The token never goes to the log. Turn it off with "Live updates" in the plugin's
   settings. Not tested against a real Home Assistant server yet.
+- **Pick the Hue Entertainment area for Music Sync** (#79). The Music Sync panel has an "Entertainment area" list
+  with each area and its channel count. A pick is saved, and a running 50 Hz stream moves to the new area. Before,
+  Music Sync always used the first area. When the saved area is gone, the panel says which area it uses instead;
+  with no area, it says to create one in the Hue app.
 
 ## [2.10.29] - 2026-11-28
 

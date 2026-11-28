@@ -48,6 +48,9 @@ public sealed class HueEntertainmentStreamClient : IAsyncDisposable
 
     public int ActiveChannelCount => _channelCount;
 
+    /// <summary>The id of the area that streams now, or null when no stream runs.</summary>
+    public string? StreamingAreaId => _isStreaming ? Volatile.Read(ref _activeAreaId) : null;
+
     public async Task<bool> StartAsync(
         HuePluginConfig config,
         HueEntertainmentArea area,
