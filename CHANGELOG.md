@@ -9,8 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 - **A scene no longer switches the main input while Zone 2 may be loud** (#75 follow-up). When a scene's Zone 2
   volume step fails and the scene also changes the main input, Zone 2 is muted first (a Zone 2 that follows the main
-  zone would play the new input at its old volume). When the mute fails too, the input step is skipped and the log
-  says why.
+  zone would play the new input at its old volume). A scene's stream counts too (it switches to NET). When the mute
+  fails too, the input and stream steps are skipped and the log says why.
 
 ## [2.10.30] - 2026-11-28
 

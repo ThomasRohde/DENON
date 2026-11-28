@@ -857,11 +857,13 @@ public sealed class ReceiverController
         // Zone 2 before the main input: a Zone 2 that follows the main zone (SOURCE) must be at its volume first.
         var zone2Ready = await ApplySceneZone2StepsAsync(settings, scene, token);
         var skipInput = false;
-        if (!zone2Ready && !string.IsNullOrWhiteSpace(scene.InputSource) &&
+        // A stream switches the main input too (to NET).
+        var changesMainInput = !string.IsNullOrWhiteSpace(scene.InputSource) || !string.IsNullOrWhiteSpace(scene.StreamUrl);
+        if (!zone2Ready && changesMainInput &&
             !await TryRunSceneStepAsync(() => _avrClient.SetZone2MuteAsync(settings, true, token)))
         {
             // Zone 2 is at its old volume and not muted: a new main input would play there loud.
-            _logStore.Warning($"Scene '{scene.Name}': input {scene.InputSource} skipped (Zone 2 volume and mute could not be set).");
+            _logStore.Warning($"Scene '{scene.Name}': input and stream skipped (Zone 2 volume and mute could not be set).");
             skipInput = true;
         }
 
@@ -954,7 +956,7 @@ public sealed class ReceiverController
 
         await ApplySceneGroupStepsAsync(settings, scene, token);
 
-        if (!string.IsNullOrWhiteSpace(scene.StreamUrl))
+        if (!skipInput && !string.IsNullOrWhiteSpace(scene.StreamUrl))
         {
             var streamUrl = scene.StreamUrl.Trim();
             await _avrClient.EnsureMainZoneNetAsync(settings, token);

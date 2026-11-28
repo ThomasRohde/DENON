@@ -213,6 +213,25 @@ public sealed partial class ReceiverTransportTests
     }
 
     [Fact]
+    public async Task With_zone_2_neither_set_nor_muted_a_stream_does_not_switch_the_main_input()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        var (controller, _, telemetry) = await CreateControllerAsync(avr, heos);
+        avr.ClearCommands();
+
+        avr.DropOn = static c => c is "Z220" or "Z2MUON";
+        await controller.ApplySceneAsync(new ScenePreset
+        {
+            Name = "Radio", PowerOn = false, Unmute = false, StreamUrl = "http://127.0.0.1:9/radio.mp3", Zone2Volume = 20,
+        });
+
+        Assert.DoesNotContain("SINET", avr.Commands); // the receiver is on TV
+        Assert.DoesNotContain(heos.Commands, c => c.StartsWith("browse/play_stream", StringComparison.Ordinal));
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
     public async Task A_scene_does_not_turn_zone_2_on_when_the_first_mute_fails()
     {
         using var avr = new FakeAvr();
