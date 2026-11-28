@@ -813,6 +813,7 @@ public sealed class PluginHostService : IAsyncDisposable
         finally
         {
             entry.IsStarted = false;
+            Interlocked.Increment(ref entry.Run);
             if (!entry.IsEnabled)
             {
                 entry.Health = PluginHealthState.Disabled;
@@ -971,7 +972,7 @@ public sealed class PluginHostService : IAsyncDisposable
             }
 
             var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            if (!EventQueueOf(entry).Writer.TryWrite((evt, done, cancellationToken)))
+            if (!EventQueueOf(entry).Writer.TryWrite((evt, done, cancellationToken, Volatile.Read(ref entry.Run))))
             {
                 done.TrySetResult();
             }
@@ -982,13 +983,13 @@ public sealed class PluginHostService : IAsyncDisposable
         return handled;
     }
 
-    private Channel<(PluginReceiverEvent Event, TaskCompletionSource Done, CancellationToken Token)> EventQueueOf(ManagedPluginEntry entry)
+    private Channel<(PluginReceiverEvent Event, TaskCompletionSource Done, CancellationToken Token, int Run)> EventQueueOf(ManagedPluginEntry entry)
     {
         lock (entry)
         {
             if (entry.Events is null)
             {
-                entry.Events = Channel.CreateUnbounded<(PluginReceiverEvent, TaskCompletionSource, CancellationToken)>(new UnboundedChannelOptions { SingleReader = true });
+                entry.Events = Channel.CreateUnbounded<(PluginReceiverEvent, TaskCompletionSource, CancellationToken, int)>(new UnboundedChannelOptions { SingleReader = true });
                 var reader = entry.Events.Reader;
                 _ = Task.Run(() => PumpReceiverEventsAsync(entry, reader));
             }
@@ -997,14 +998,15 @@ public sealed class PluginHostService : IAsyncDisposable
         }
     }
 
-    private async Task PumpReceiverEventsAsync(ManagedPluginEntry entry, ChannelReader<(PluginReceiverEvent Event, TaskCompletionSource Done, CancellationToken Token)> reader)
+    private async Task PumpReceiverEventsAsync(ManagedPluginEntry entry, ChannelReader<(PluginReceiverEvent Event, TaskCompletionSource Done, CancellationToken Token, int Run)> reader)
     {
-        await foreach (var (evt, done, token) in reader.ReadAllAsync())
+        await foreach (var (evt, done, token, run) in reader.ReadAllAsync())
         {
             try
             {
-                // A cancelled event (a scene that was called off) is skipped, not run late.
-                if (entry.IsEnabled && entry.IsStarted && !token.IsCancellationRequested)
+                // A cancelled event (a scene that was called off) is skipped, not run late. So is one queued before
+                // the plugin was stopped: a restart must not replay automation from its previous run.
+                if (entry.IsEnabled && entry.IsStarted && !token.IsCancellationRequested && run == Volatile.Read(ref entry.Run))
                 {
                     await entry.Plugin.OnReceiverEventAsync(evt, token);
                 }
@@ -1113,8 +1115,11 @@ public sealed class PluginHostService : IAsyncDisposable
 
         public IReadOnlyList<PluginActionDescriptor> Actions { get; set; } = [];
 
+        /// <summary>Counts the plugin's stops: events queued in an earlier run are skipped.</summary>
+        public int Run;
+
         /// <summary>This plugin's receiver events, handled one at a time in order (created on first use).</summary>
-        public Channel<(PluginReceiverEvent Event, TaskCompletionSource Done, CancellationToken Token)>? Events { get; set; }
+        public Channel<(PluginReceiverEvent Event, TaskCompletionSource Done, CancellationToken Token, int Run)>? Events { get; set; }
     }
 
     private sealed class PluginAssemblyLoadContext : AssemblyLoadContext
