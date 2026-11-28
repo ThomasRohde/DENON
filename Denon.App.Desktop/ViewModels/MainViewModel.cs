@@ -1692,7 +1692,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         // The receiver may pick its mode a moment later; the status updates refresh the note until then.
-        UpdateSoundModeNote(SoundMode, InputSourceCode);
+        UpdateSoundModeNote(SoundMode == "—" ? null : SoundMode, InputSourceCode); // "—": no mode reported yet
     }
 
     /// <summary>
