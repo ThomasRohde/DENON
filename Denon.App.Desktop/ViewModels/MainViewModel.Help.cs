@@ -359,6 +359,7 @@ public sealed partial class MainViewModel
         HelpShortcutsReference.Clear();
         HelpShortcutsReference.Add(new("F1", "Main window", "Open Help for the page or plugin you are on"));
         HelpShortcutsReference.Add(new("Ctrl + 1 .. 9", "Main window", "Go to a page: 1 Deck, 2 Music, 3 Scenes, 4 Cast, 5 Stations, 6 Plugins, 7 Settings, 8 Health, 9 Help (Brain has no number)"));
+        HelpShortcutsReference.Add(new("Ctrl + K", "Main window", "Open the command palette: type to find a page, Smart Scene, station, input, sound mode or plugin action"));
         HelpShortcutsReference.Add(new("Ctrl + R", "Main window", "Refresh the receiver state (fixed key)"));
         HelpShortcutsReference.Add(new("F5", "Main window", "Refresh the receiver state (you can change this key)"));
         HelpShortcutsReference.Add(new("Space", "Main window", "Play / pause (not while a text box, button or list has focus)"));
@@ -741,31 +742,32 @@ public sealed partial class MainViewModel
             category: "Plugins",
             title: "LG webOS TV & Virtual Magic Remote",
             subtitle: "Pair the TV, switch inputs and apps, cast YouTube links, turn the screen off, and link the TV to the receiver.",
-            overview: "The built-in Smart TV plugin keeps a WebSocket connection to your LG webOS TV (secure port 3001, then 3000). It shows the real inputs and installed apps, has a virtual Magic Remote, a live screen preview, PC-to-TV typing and Screen Off, and can follow the receiver.",
+            overview: "The built-in Smart TV plugin keeps a WebSocket connection to your LG webOS TV (secure port 3001, then 3000). Its page has four tabs: Watch (power, inputs, sound and volume), Remote (the virtual Magic Remote, typing, a live screen preview and a trackpad), Apps (installed apps and YouTube links) and Settings (the TV connection, receiver sync and the Chromecast on this TV).",
             steps:
             [
                 new("01", "Prepare the TV", "On the TV, turn on 'Turn on via Wi-Fi' (often in Settings → General → External Devices → TV On With Mobile) and LG Connect Apps. The menu names change with the webOS version."),
-                new("02", "Find the TV", "Open Plugins → LG webOS TV. Click Setup ▾ and then Auto-Discover TV, or type the TV LAN IP ADDRESS."),
+                new("02", "Find the TV", "Open Plugins → LG webOS TV and the Settings tab. Click Auto-Discover TV, or type the TV LAN IP ADDRESS."),
                 new("03", "Get the MAC address", "With the TV on, click Auto-MAC. Wake-on-LAN needs the MAC address."),
                 new("04", "Pair", "Click Pair with LG TV. On the TV, accept the 'Denon Desktop' prompt."),
-                new("05", "Use inputs and apps", "When the badge shows LIVE • WSS :3001, the HDMI & EXTERNAL INPUTS and INSTALLED TV APPS load. A green dot shows an input with a signal."),
-                new("06", "Cast a YouTube link", "Paste a YouTube link or video ID in CAST YOUTUBE URL / VIDEO ID TO TV and press Enter."),
-                new("07", "Turn the screen off", "Click Screen Off to turn off the picture while the sound plays. Click Wake Screen to turn it on."),
-                new("08", "Choose the TV audio output", "In AUDIO OUTPUT, click HDMI ARC / eARC, TV Speakers, Optical Out or Bluetooth."),
-                new("09", "Link the TV to the receiver", "In DENON AVR COORDINATION, tick the actions you want, for example 'Wake TV (WoL) when Denon powers ON'. Changes save automatically."),
-                new("10", "See the program and channel logo", "On Live TV, the now-playing hero shows the program from the TV's guide as the title, the channel and the program times below it, and the channel logo. Insights counts Live TV per channel and per program."),
+                new("05", "Watch", "When the badge shows LIVE, the Watch tab has Power On / Off, Screen Off and Wake Screen, the TV AUDIO OUTPUT (HDMI ARC / eARC, TV Speakers, Optical Out, Bluetooth), the volume, and the HDMI & EXTERNAL INPUTS. A green dot shows an input with a signal."),
+                new("06", "Use the remote", "The Remote tab has the D-pad and the TV buttons, a keyboard that types on the TV, the TV SCREEN preview and a trackpad."),
+                new("07", "Start an app or a YouTube link", "The Apps tab lists the INSTALLED TV APPS. Paste a YouTube link or video ID in CAST YOUTUBE URL / VIDEO ID TO TV and press Enter."),
+                new("08", "Link the TV to the receiver", "In Settings → DENON AVR COORDINATION, tick the actions you want, for example 'Wake TV (WoL) when Denon powers ON'. Changes save automatically."),
+                new("09", "See the program and channel logo", "On Live TV, the now-playing hero shows the program from the TV's guide as the title, the channel and the program times below it, and the channel logo. Insights counts Live TV per channel and per program."),
             ],
             proTips:
             [
-                "Channel logos come from the open tv-logos collection on GitHub. The plugin fetches the logos of your whole channel list once, so GitHub never sees which channel you watch. Turn it off with 'Show channel logos' in DENON AVR COORDINATION.",
-                "In LIVE TV SCREEN & VIRTUAL TRACKPAD, click Snap Now or Auto-Refresh to see the TV screen. Click on the image to click on the TV.",
+                "Channel logos come from the open tv-logos collection on GitHub. The plugin fetches the logos of your whole channel list once, so GitHub never sees which channel you watch. Turn it off with 'Show channel logos' in Settings → DENON AVR COORDINATION.",
+                "In the Remote tab, click Snap Now or Auto-Refresh to see the TV screen. Click on the image to click on the TV.",
+                "No MAC address, or the TV does not answer Wake-on-LAN? Choose the Chromecast plugged into the TV in Settings → CHROMECAST ON THIS TV: it turns the TV on over HDMI-CEC.",
                 "Press Enter in the YouTube, keyboard, toast or URL box to send without a click.",
-                "If remote buttons or apps fail with '401 insufficient permissions', open Setup ▾ and click Re-Pair (Full Permissions).",
+                "If remote buttons or apps fail with '401 insufficient permissions', click Re-Pair (Full Permissions) in the Settings tab.",
             ],
             troubleshooting:
             [
-                new("Wake TV (WoL) does not turn the TV on?", "Check that the MAC ADDRESS is filled in (click Auto-MAC while the TV is on). Check that 'Turn on via Wi-Fi' is on in the TV."),
-                new("The badge shows PAIRED • STANDBY after the TV turns off?", "This is normal. The TV closes the connection in standby. Click Wake TV (WoL). The plugin connects again when webOS has started."),
+                new("Power On does not turn the TV on?", "Check that the MAC ADDRESS is filled in (click Auto-MAC while the TV is on) and that 'Turn on via Wi-Fi' is on in the TV. Or choose the TV's Chromecast in CHROMECAST ON THIS TV."),
+                new("The badge shows PAIRED • STANDBY after the TV turns off?", "This is normal. The TV closes the connection in standby. Click Power On. The plugin connects again when webOS has started."),
+                new("The card says 'The TV asks to pair again'?", "The TV no longer accepts the saved key. The plugin stops connecting so the TV does not show its prompt again and again. Click Pair with LG TV and accept the prompt on the TV."),
                 new("Pairing fails with 'Could not connect'?", "Turn the TV on (not standby). Check that it is on the same subnet and that LG Connect Apps is on."),
                 new("A channel shows letters instead of its logo?", "The collection has no logo with that channel's name. To pin one, add the channel name and an https address or image file to ChannelLogoOverrides in the plugin's config.json (\"none\" shows no logo), then reconnect the TV."),
                 new("The hero shows the channel but no program?", "The TV has no guide data for this channel. The plugin asks again every 2 minutes and after each program."),
@@ -896,7 +898,7 @@ public sealed partial class MainViewModel
             category: "Plugins",
             title: "HomePod Plugin",
             subtitle: "Separate download. See what each HomePod plays, play, pause and skip, and count listening time in Insights.",
-            overview: "The HomePod plugin is not part of the app. You install it separately. It finds the HomePods on the LAN and treats a stereo pair as one speaker. It shows what each speaker plays: the app (Apple Music, Podcasts, or the app that sends AirPlay), the title, the artist and the play state. It can play, pause and skip tracks, and it logs listening time, which Insights shows next to your TV time. There is no PIN: HomePods accept a short-lived pairing on each connection, and the plugin stores no keys. HomePods are not connected to the receiver, so the Control Deck now-playing card does not show them.",
+            overview: "The HomePod plugin is not part of the app. You install it separately. It finds the HomePods on the LAN and treats a stereo pair as one speaker. It shows what each speaker plays: the app (Apple Music, Podcasts, or the app that sends AirPlay), the title, the artist and the play state. It can play, pause and skip tracks, and it logs listening time, which Insights shows next to your TV time. There is no PIN: HomePods accept a short-lived pairing on each connection, and the plugin stores no keys. While the receiver sleeps, the Control Deck now-playing card shows the HomePod that plays (title, artist, app, speaker and artwork), and its Play / Pause, Previous and Next buttons control that HomePod.",
             steps:
             [
                 new("01", "Download the plugin", "Download Denon.Plugin.HomePod-<version>.zip from the homepod-v* release that matches your Denon Desktop release."),
@@ -1017,7 +1019,7 @@ public sealed partial class MainViewModel
             ],
             proTips:
             [
-                "Ctrl + 1 .. 9, Ctrl + R and F1 are fixed. They are not in the editor.",
+                "Ctrl + 1 .. 9, Ctrl + K, Ctrl + R and F1 are fixed. They are not in the editor, and a custom shortcut cannot use them.",
                 "Global hotkeys keep working while the window is in the tray.",
             ],
             troubleshooting:
@@ -1037,7 +1039,7 @@ public sealed partial class MainViewModel
             category: "Troubleshooting",
             title: "Network Ports, Firewall & Troubleshooting",
             subtitle: "The ports that Denon Desktop uses, the Health Check, the AVR / HEOS console and common fixes.",
-            overview: "Device control runs on your local network. Some features use the internet: YouTube, the Radio Browser directory, LRCLIB lyrics, Hue cloud discovery and the daily update check on GitHub (you can turn it off in Settings). The table below lists the ports. The Health page tests the receiver and has tools for common problems.",
+            overview: "Device control runs on your local network. Some features use the internet: YouTube, the Radio Browser directory, LRCLIB lyrics, Hue cloud discovery, the TV channel logos (GitHub, you can turn them off in the LG TV plugin) and the daily update check on GitHub (you can turn it off in Settings). The table below lists the ports. The Health page tests the receiver and has tools for common problems.",
             steps:
             [
                 new("01", "Run the Health Check", "In Health, click Run Health Check. It tests the network connection, the AVR control port (23), the HEOS engine (1255), the audio output and the radio stream."),

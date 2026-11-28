@@ -4,6 +4,20 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Help, README and plugin docs match the app again** (#73). The LG TV topic describes the Watch, Remote, Apps and
+  Settings tabs (not the old Setup menu and button names), and says how the TV's Chromecast wakes it without a MAC
+  address. The HomePod topic says the Control Deck shows the HomePod that plays while the receiver sleeps. Help
+  lists Ctrl+K (the command palette) and that the TV channel logos come from the internet; so does the website.
+  The README names Plugin SDK 2.2, says a plugin for a newer SDK is not loaded, gives the TV's secure port, and
+  links to the releases with full addresses. The Chromecast README no longer says the installer adds an mDNS
+  firewall rule (nothing adds one).
+- **Third-party notices are complete** (#73): the app's notices list every package inside the exe with its
+  copyright and license text (MIT, Apache-2.0 for the MCP SDK, and WebView2's license). The Apple TV and HomePod
+  notices give pyatv's copyright line as in its license and include BouncyCastle's MIT license.
+
 ## [2.10.27] - 2026-11-28
 
 ### Fixed
