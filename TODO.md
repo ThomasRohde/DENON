@@ -54,7 +54,11 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
       download list.
 - [x] PR 10b: docs and notices, part of #73. Left out: refreshed website screenshots and the new guides
       (docs/plugin-development.md, CONTRIBUTING.md, SECURITY.md), which are new documents rather than fixes.
-- [ ] PR 11: accessibility (after PR 9): #57.
+- [x] PR 11: accessibility, #57 closed. A focus ring on the shared styles, names on the symbol buttons of the main
+      window, Control Deck, tray flyout and YouTube page, and light text on the scrim.
+- [ ] Verify PR 11 in the app (needs the user): Tab through the main window in Dark and Light and check the ring
+      shows; Narrator reads "Previous track", "Master volume", "Move up in the queue" and so on; YouTube duration
+      badges read well in Light. The other pages (Settings, Scenes, Stations, Cast, plugins) have no names yet.
 - [ ] PR 12: Apple TV and HomePod plugins: #35, #50, #70, the HomePod part of #49 (plugin release only when asked).
 - [ ] PR 13: Chromecast plugin and first tests: #49, the Chromecast parts of #59 and #70 (release only when asked).
 
