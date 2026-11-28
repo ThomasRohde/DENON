@@ -234,7 +234,12 @@ public sealed partial class MainViewModel
                 OnPropertyChanged(nameof(LyricsToggleLabel));
                 if (value)
                 {
+                    _lyricsSyncTimer?.Start();
                     _ = RefreshLyricsForCurrentTrackAsync(force: true);
+                }
+                else
+                {
+                    _lyricsSyncTimer?.Stop();
                 }
             }
         }
@@ -324,7 +329,10 @@ public sealed partial class MainViewModel
             Interval = TimeSpan.FromMilliseconds(350),
         };
         _lyricsSyncTimer.Tick += (_, _) => UpdateSyncedLyricLine();
-        _lyricsSyncTimer.Start();
+        if (ShowLiveLyrics)
+        {
+            _lyricsSyncTimer.Start();
+        }
     }
 
     public AudioMeterSource StepSpectrumFrame(double[] bandsBuffer, double deltaSeconds)

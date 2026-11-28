@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Interop;
 using Denon.App.Core.Infrastructure;
 using Denon.App.Core.Models;
+using Denon.App.Desktop.Infrastructure.Theming;
 using Microsoft.Web.WebView2.Core;
 
 namespace Denon.App.Desktop;
@@ -336,10 +337,16 @@ public partial class YouTubeCinemaWindow : Window
                     window.__denonCinemaObserverInstalled = true;
                     injectStyle();
                     dismissOverlays();
+                    let pending = false;
                     const observer = new MutationObserver(() => {
-                        injectStyle();
-                        dismissOverlays();
-                        ensureFloatingHud();
+                        if (pending) return;
+                        pending = true;
+                        requestAnimationFrame(() => {
+                            pending = false;
+                            injectStyle();
+                            dismissOverlays();
+                            ensureFloatingHud();
+                        });
                     });
                     observer.observe(document.documentElement, { childList: true, subtree: true });
                 };
@@ -390,6 +397,15 @@ public partial class YouTubeCinemaWindow : Window
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
     private bool _isInitialized;
+
+    /// <summary>The one WebView2 start: a second caller during the first start waits for it (no second environment).</summary>
+    private Task? _initTask;
+
+    /// <summary>A sync nudge (the +/- buttons): the new HEOS offset in ms, so the next track keeps it.</summary>
+    public event Action<int>? SyncOffsetChanged;
+
+    /// <summary>The title bar height in the current skin (42 in the Default skin).</summary>
+    private static double TitleBarHeight => SkinMetrics.Scale(42, SkinMetrics.Current.SizeScale);
     private bool _allowClose;
     private bool _keepVideoMuted = true;
     private bool _isFullscreen;
@@ -408,6 +424,14 @@ public partial class YouTubeCinemaWindow : Window
     {
         InitializeComponent();
         ApplyDwmStyling();
+        CinemaWindowChrome.CaptionHeight = TitleBarHeight;
+        SkinMetrics.Current.PropertyChanged += (_, _) =>
+        {
+            if (!_barsHidden && !_isFullscreen)
+            {
+                CinemaWindowChrome.CaptionHeight = TitleBarHeight;
+            }
+        };
     }
 
     public async Task LoadTrackAsync(
@@ -420,9 +444,8 @@ public partial class YouTubeCinemaWindow : Window
         _syncOffsetMs = Math.Clamp(syncOffsetMs, 0, 8000);
 
         var initialSeconds = positionProvider is not null ? Math.Max(0, (int)Math.Floor(positionProvider(_syncOffsetMs))) : 0;
-        var baseUrl = string.IsNullOrWhiteSpace(track.WatchUrl)
-            ? $"https://www.youtube.com/watch?v={track.VideoId}"
-            : track.WatchUrl;
+        // Built from the video id, never the track's own address: a track can come from a phone.
+        var baseUrl = $"https://www.youtube.com/watch?v={Uri.EscapeDataString(track.VideoId)}";
 
         _currentWatchUrl = baseUrl;
         var navUrl = initialSeconds > 1
@@ -489,6 +512,16 @@ public partial class YouTubeCinemaWindow : Window
             return;
         }
 
+        _initTask ??= InitializeWebViewAsync();
+        await _initTask;
+        if (!_isInitialized)
+        {
+            _initTask = null; // It failed: the next call tries again.
+        }
+    }
+
+    private async Task InitializeWebViewAsync()
+    {
         try
         {
             var userDataDir = Path.Combine(AppDataPaths.RootDirectory, "webview2");
@@ -503,6 +536,8 @@ public partial class YouTubeCinemaWindow : Window
             VideoWebView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
             VideoWebView.CoreWebView2.SourceChanged += OnWebSourceChanged;
             VideoWebView.CoreWebView2.ContainsFullScreenElementChanged += OnContainsFullScreenElementChanged;
+            VideoWebView.CoreWebView2.NavigationStarting += OnNavigationStarting;
+            VideoWebView.CoreWebView2.NewWindowRequested += OnNewWindowRequested;
             VideoWebView.NavigationCompleted += OnNavigationCompleted;
             _isInitialized = true;
         }
@@ -510,6 +545,29 @@ public partial class YouTubeCinemaWindow : Window
         {
             LoadingOverlay.Text = $"WebView2 initialization failed: {ex.Message}\nClick 'Open Browser' to watch externally.";
             LoadingOverlay.Visibility = Visibility.Visible;
+        }
+    }
+
+    /// <summary>Only web pages: a file, a network share or an app link (ms-*, search-ms) is never opened here.</summary>
+    internal static bool IsWebAddress(string? uri) =>
+        uri is not null &&
+        (uri.Equals("about:blank", StringComparison.OrdinalIgnoreCase) ||
+         (Uri.TryCreate(uri, UriKind.Absolute, out var parsed) &&
+          (parsed.Scheme == Uri.UriSchemeHttps || parsed.Scheme == Uri.UriSchemeHttp)));
+
+    private static void OnNavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs e)
+    {
+        if (!IsWebAddress(e.Uri))
+        {
+            e.Cancel = true;
+        }
+    }
+
+    private static void OnNewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
+    {
+        if (!IsWebAddress(e.Uri))
+        {
+            e.Handled = true; // Blocked.
         }
     }
 
@@ -688,6 +746,7 @@ public partial class YouTubeCinemaWindow : Window
 
         // Remember offset adjustment so future Re-Syncs & next tracks inherit the dialed-in sync
         _syncOffsetMs = Math.Clamp(_syncOffsetMs - (int)Math.Round(deltaSeconds * 1000), 0, 8000);
+        SyncOffsetChanged?.Invoke(_syncOffsetMs);
 
         var deltaStr = deltaSeconds.ToString("0.###", CultureInfo.InvariantCulture);
         try
@@ -840,7 +899,7 @@ public partial class YouTubeCinemaWindow : Window
             WindowState = WindowState.Normal;
             WindowStyle = WindowStyle.SingleBorderWindow;
             ResizeMode = ResizeMode.CanResize;
-            CinemaWindowChrome.CaptionHeight = 42;
+            CinemaWindowChrome.CaptionHeight = TitleBarHeight;
             CinemaWindowChrome.ResizeBorderThickness = new Thickness(6);
             RootBorder.BorderThickness = new Thickness(1);
             Width = _restoreWidth > 200 ? _restoreWidth : 960;
@@ -858,9 +917,17 @@ public partial class YouTubeCinemaWindow : Window
     {
         _barsHidden = hidden;
         TitleBarBorder.Visibility = hidden ? Visibility.Collapsed : Visibility.Visible;
-        TitleBarRow.Height = hidden ? new GridLength(0) : new GridLength(42);
+        if (hidden)
+        {
+            TitleBarRow.Height = new GridLength(0);
+        }
+        else
+        {
+            SkinBinding.Size(TitleBarRow, System.Windows.Controls.RowDefinition.HeightProperty, 42);
+        }
+
         BottomSyncBar.Visibility = hidden ? Visibility.Collapsed : Visibility.Visible;
-        CinemaWindowChrome.CaptionHeight = (hidden || _isFullscreen) ? 0 : 42;
+        CinemaWindowChrome.CaptionHeight = (hidden || _isFullscreen) ? 0 : TitleBarHeight;
         HideBarsButton.Content = hidden ? "Show Bars (H)" : "Hide Bars (H)";
 
         if (_isInitialized && VideoWebView.CoreWebView2 is not null)
@@ -885,7 +952,7 @@ public partial class YouTubeCinemaWindow : Window
 
     private void OpenInBrowser_Click(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(_currentWatchUrl))
+        if (string.IsNullOrWhiteSpace(_currentWatchUrl) || !IsWebAddress(_currentWatchUrl))
         {
             return;
         }
