@@ -60,7 +60,13 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
       shows; Narrator reads "Previous track", "Master volume", "Move up in the queue" and so on; YouTube duration
       badges read well in Light. The other pages (Settings, Scenes, Stations, Cast, plugins) have no names yet.
 - [ ] PR 12: Apple TV and HomePod plugins: #35, #50, #70, the HomePod part of #49 (plugin release only when asked).
-- [ ] PR 13: Chromecast plugin and first tests: #49, the Chromecast parts of #59 and #70 (release only when asked).
+- [x] PR 13: Chromecast plugin and first tests: the Chromecast parts of #49, #59 and #70 (111 tests, run in CI and
+      the release workflow). Left out: tests of the plugin's actions (they need a fake host and no live clients),
+      and moving the small wake and playback maps to a new id on discovery (they only age out). The #70 TXT item was
+      already right in this parser (a zero-length string never stopped it). No plugin release yet.
+- [ ] Verify PR 13 live (needs the user): add a Chromecast by IP with Auto-Discover on, run Discover, and check the
+      card stays connected and play/pause works; stop an app to Backdrop and check a media command says no app takes
+      it; check now-playing still shows artwork (YouTube, and a LAN server such as Plex if there is one).
 
 ## Live receiver updates on port 23 (#74)
 

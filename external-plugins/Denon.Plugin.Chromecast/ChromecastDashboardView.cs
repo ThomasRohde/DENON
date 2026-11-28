@@ -32,7 +32,7 @@ internal sealed class ChromecastDashboardView : UserControl
     private readonly ChromecastPlugin _plugin;
     private readonly StackPanel _deviceList = new();
     private readonly TextBlock _status = new() { Foreground = MutedBrush, Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap };
-    private readonly Dictionary<string, DeviceCard> _cards = new();
+    private readonly Dictionary<string, DeviceCard> _cards = new(StringComparer.OrdinalIgnoreCase);
 
     public ChromecastDashboardView(ChromecastPlugin plugin)
     {

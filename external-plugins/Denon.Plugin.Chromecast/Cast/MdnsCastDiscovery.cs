@@ -96,6 +96,18 @@ internal static class MdnsCastDiscovery
 
     internal static void ParsePacket(byte[] packet, IPAddress sender, RecordSet records)
     {
+        try
+        {
+            ParseRecords(packet, sender, records);
+        }
+        catch (InvalidDataException)
+        {
+            // A malformed name: drop the rest of the packet. Records read before it stay.
+        }
+    }
+
+    private static void ParseRecords(byte[] packet, IPAddress sender, RecordSet records)
+    {
         if (packet.Length < 12)
         {
             return;
@@ -235,7 +247,7 @@ internal static class MdnsCastDiscovery
     private static int ReadUInt16(byte[] data, int offset) =>
         offset + 1 < data.Length ? (data[offset] << 8) | data[offset + 1] : 0;
 
-    private static string ReadName(byte[] data, ref int pos)
+    internal static string ReadName(byte[] data, ref int pos)
     {
         var labels = new List<string>();
         var cursor = pos;
@@ -265,6 +277,12 @@ internal static class MdnsCastDiscovery
                 jumped = true;
                 cursor = target;
                 continue;
+            }
+
+            if ((len & 0xC0) != 0)
+            {
+                // Label types 01 and 10 (first bits) are reserved (RFC 1035 4.1.4): not a valid name.
+                throw new InvalidDataException($"Reserved DNS label type 0x{len:X2}.");
             }
 
             cursor++;

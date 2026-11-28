@@ -2,6 +2,35 @@
 
 Released separately from Denon Desktop with tags `chromecast-vX.Y.Z`.
 
+## [Unreleased]
+
+### Fixed
+- **A device added by IP stays connected when discovery finds it** (#49). mDNS gives it the device's own id; the
+  plugin now stops the old connection and closes its watch session under the old id, then connects under the new
+  one. Before, the card showed the device as disconnected for good, commands said "The device is not active", and the
+  old connection stayed open.
+- **A paused program is not logged as watched** (#70). One second of play and then a pause no longer becomes a watch
+  session after 15 s; a paused program needs 15 s of play first. A session for a device id in other letter case now
+  ends too, and the dashboard finds its card in any case.
+- **Media commands after the idle screen** (#70): when the device goes back to Backdrop, the plugin forgets the media
+  channel of the app that ran before.
+- **Cleaner disconnects and stops** (#70). Closing a half-open connection waits at most 1 s for the CLOSE message; a
+  connect that fails half-way frees its socket, TLS stream and timers. Stopping the plugin cancels pending playback
+  events, and a restart frees the old stop signal.
+- **mDNS parsing** (#70): a name with a reserved label type (first bits 01 or 10) is refused and the rest of that
+  packet is skipped.
+
+### Security
+- **Artwork from a Cast device is checked** (#70). `now-playing` fetches the image only over http or https, never from
+  this PC (loopback) or a link-local address such as the 169.254.169.254 metadata service, also not by a redirect or
+  a name that resolves there. It stops reading at 2 MB instead of loading the whole body first, and the whole fetch
+  times out after 5 s.
+
+### Added
+- **A test project for the plugin** (#59): `Denon.Plugin.Chromecast.Tests` covers the Cast message codec, the mDNS
+  parser (with malformed packets), the private-LAN check, the watch log, app names, the id change on discovery and the
+  artwork checks. CI and the release workflow run it.
+
 ## [0.6.0] - 2026-11-27
 
 Use it with Denon Desktop **2.10.12** or later: the LG TV plugin there calls `wake-tv`.
