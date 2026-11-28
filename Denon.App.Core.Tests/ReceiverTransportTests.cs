@@ -325,6 +325,27 @@ public sealed class ReceiverTransportTests : IDisposable
     }
 
     [Fact]
+    public async Task A_scene_uses_the_avr_steps_when_port_23_is_back_after_a_failed_poll()
+    {
+        using var avr = new FakeAvr { HangUp = true }; // Port 23 busy during the last poll.
+        using var heos = new FakeHeos();
+        var (controller, _, telemetry) = await CreateControllerAsync(avr, heos);
+        await controller.RefreshAsync();
+        Assert.False(controller.IsAvrProtocolAvailable);
+
+        avr.HangUp = false; // Free again before the scene starts.
+        avr.ClearCommands();
+        var scene = new ScenePreset { Name = "Movie", PowerOn = false, Unmute = false, InputSource = "BD", SmoothVolumeRamp = false, TargetVolume = 20 };
+        await controller.ApplySceneAsync(scene);
+
+        Assert.True(controller.IsAvrProtocolAvailable);
+        Assert.Contains("SIBD", avr.Commands);
+        Assert.Contains("MV20", avr.Commands);
+
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
     public async Task Fix_silent_audio_on_a_heos_only_speaker_raises_the_volume_and_unmutes()
     {
         using var avr = new FakeAvr { HangUp = true };

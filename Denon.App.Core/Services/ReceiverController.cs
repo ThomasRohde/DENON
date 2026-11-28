@@ -570,7 +570,7 @@ public sealed class ReceiverController
             $"Activate scene '{scene.Name}'",
             async (settings, token) =>
             {
-                if (_avrProtocolAvailable)
+                if (await AvrAnswersAsync(settings, token))
                 {
                     await ApplySceneAvrStepsAsync(settings, scene, token);
                 }
@@ -807,7 +807,7 @@ public sealed class ReceiverController
             "Fix silent audio",
             async (settings, token) =>
             {
-                if (_avrProtocolAvailable)
+                if (await AvrAnswersAsync(settings, token))
                 {
                     await _avrClient.EnsureMainZoneNetAsync(settings, token);
                     await _avrClient.SetMuteAsync(settings, false, token);
@@ -995,6 +995,26 @@ public sealed class ReceiverController
         {
             _avrProtocolAvailable = false;
         }
+    }
+
+    /// <summary>
+    /// True when the receiver answers on port 23. A failed poll can be short (another app held the port), so when the
+    /// last check failed, ask once more (SI?) before a scene or a fix skips the AVR steps.
+    /// </summary>
+    private async Task<bool> AvrAnswersAsync(ReceiverSettings settings, CancellationToken cancellationToken)
+    {
+        if (_avrProtocolAvailable)
+        {
+            return true;
+        }
+
+        if (await _avrClient.TryGetInputSourceAsync(settings, cancellationToken) is null)
+        {
+            return false;
+        }
+
+        _avrProtocolAvailable = true;
+        return true;
     }
 
     /// <summary>
