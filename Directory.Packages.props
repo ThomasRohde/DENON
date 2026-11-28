@@ -1,0 +1,24 @@
+<Project>
+  <!--
+    Central package versions for every project in this repository: the app, the built-in plugins, the external
+    plugins and all test projects. A project names the package only (<PackageReference Include="..." />); the
+    version is set here, once. The external plugins share BouncyCastle with the Hue plugin, so all use one version.
+  -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageVersion Include="BouncyCastle.Cryptography" Version="2.7.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
+    <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+    <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.4.0" />
+    <PackageVersion Include="ModelContextProtocol.Extensions.Apps" Version="2.4.0" />
+    <PackageVersion Include="NAudio" Version="3.3.0" />
+    <PackageVersion Include="QRCoder" Version="1.9.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.0.2" />
+    <PackageVersion Include="YoutubeExplode" Version="6.6.3" />
+  </ItemGroup>
+</Project>

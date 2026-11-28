@@ -54,11 +54,22 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
       SHA256SUMS (#62, needs a signing key and a release step), central package versions and the BouncyCastle
       version split (#72, with the Apple TV and HomePod plugins in PR 12), and the larger #59 test items (Chromecast
       tests in PR 13, the Apple TV clock in PR 12, loopback tests for the editor and Insights servers).
+- [x] PR 10a follow-up: central package versions in Directory.Packages.props, one BouncyCastle (2.7.0) for Hue,
+      Apple TV and HomePod, and a global.json that CI and the release workflows read (#72). Still on .NET 10;
+      the TargetFramework stays in each project (the SDK and the external plugins must stay on net10.0 when the
+      app moves).
 - [ ] Verify PR 10a (needs the user): uninstall with "Launch at Windows startup" turned on in Settings and check
       that the startup entry is gone; the next in-app update downloads, starts and shows notes without the
       download list.
+- [x] PR 10a follow-up: loopback tests for the Insights server and its automation editor API (key cookie, Host,
+      editor header, Origin, body cap, the happy path), #59. The editor API has no listener of its own. The
+      server's icon and font addresses now name the app assembly, so they also resolve outside the app.
 - [x] PR 10b: docs and notices, part of #73. Left out: refreshed website screenshots and the new guides
       (docs/plugin-development.md, CONTRIBUTING.md, SECURITY.md), which are new documents rather than fixes.
+- [x] PR 10b follow-up: docs/plugin-development.md, CONTRIBUTING.md and SECURITY.md (#73).
+- [ ] Refresh the website screenshots (#73; 02-youtube-music and 13-plugin-smart-tv are stale, and Health, Help and
+      Appearance have none). Needs the real app with the user's devices, so it waits for the user.
+- [ ] Check that GitHub private vulnerability reporting is on for the repository (SECURITY.md points to it).
 - [x] PR 11: accessibility, #57 closed. A focus ring on the shared styles, names on the symbol buttons of the main
       window, Control Deck, tray flyout and YouTube page, and light text on the scrim.
 - [ ] Verify PR 11 in the app (needs the user): Tab through the main window in Dark and Light and check the ring
@@ -71,6 +82,11 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
 - [ ] Verify PR 12 live (needs the user): pair an Apple TV again (the M6 signature is now enforced; a wrong PIN
       must refresh the page), check Apple TV now playing and artwork after wake and sleep, a wake automation that
       is cut short by sleep, and that both HomePods (and the stereo pair) link and show what plays.
+- [x] PR 12 follow-up: a known HomePod stereo pair stays when one HomePod misses a discovery reply (#49); a
+      partial `_companion-link` reply adds no second Apple TV, and artwork is written whole off the MRP read loop
+      (#70); the MRP tracker takes a clock, so its test needs no sleep (#59). Not released yet (appletv, homepod).
+- [ ] Verify the PR 12 follow-up live (needs the user): unplug one HomePod of the pair for one discovery pass, then
+      check that the pair keeps its name and link.
 - [x] PR 13: Chromecast plugin and first tests: the Chromecast parts of #49, #59 and #70 (111 tests, run in CI and
       the release workflow). Left out: tests of the plugin's actions (they need a fake host and no live clients),
       and moving the small wake and playback maps to a new id on discovery (they only age out). The #70 TXT item was
@@ -78,6 +94,8 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
 - [ ] Verify PR 13 live (needs the user): add a Chromecast by IP with Auto-Discover on, run Discover, and check the
       card stays connected and play/pause works; stop an app to Backdrop and check a media command says no app takes
       it; check now-playing still shows artwork (YouTube, and a LAN server such as Plex if there is one).
+- [x] PR 13 follow-up: the wake-tv maps and the automated-session keys move to a device's new id when discovery
+      re-keys it; a held playback change under the old id is dropped (#70). Not released yet (chromecast).
 
 ## Live receiver updates on port 23 (#74)
 
