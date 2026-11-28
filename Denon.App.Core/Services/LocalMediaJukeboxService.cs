@@ -1012,8 +1012,16 @@ public sealed class LocalMediaJukeboxService : IDisposable
 
     private void NotifyChanged()
     {
-        var snapshot = Snapshot;
-        SaveQueue(snapshot);
+        LocalJukeboxSnapshot snapshot;
+
+        // Take the snapshot and schedule its save under one lock: a save that waits is never replaced by an older
+        // snapshot from another thread (the tag worker, an auto-advance).
+        lock (_sync)
+        {
+            snapshot = Snapshot;
+            SaveQueue(snapshot);
+        }
+
         JukeboxChanged?.Invoke(snapshot);
     }
 
