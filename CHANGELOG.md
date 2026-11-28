@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- **Pick the Hue Entertainment area for Music Sync** (#79). The Music Sync panel has an "Entertainment area" list
+  with each area and its channel count. A pick is saved, and a running 50 Hz stream moves to the new area. Before,
+  Music Sync always used the first area. When the saved area is gone, the panel says which area it uses instead;
+  with no area, it says to create one in the Hue app.
+
 ### Fixed
 - **Old runtime folders in %TEMP% are deleted.** Each app version and each local build left about 9 MB of native
   DLLs in `%TEMP%\.net\<exe name>\` (or in `DOTNET_BUNDLE_EXTRACT_BASE_DIR`), and .NET never deletes them: over
@@ -13,11 +19,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   It keeps the folder it runs from, the folder of any other copy that runs, and folders less than 10 minutes old.
   A folder with a file in use is left whole, and the cleanup stops when another copy of the app is starting.
 
+## [2.10.29] - 2026-11-28
+
+### Added
+- **Developer guides** (#73): `docs/plugin-development.md` (how to write, install, test and release an external
+  plugin), `CONTRIBUTING.md` (build, tests, CI, pull requests) and `SECURITY.md` (supported versions, private
+  reports, the app's local servers and the update check).
+
 ### Changed
+- The Insights server reads its icon and font by an address that names the app assembly, so the resources
+  are also found outside the app (in the tests). The app serves the same files.
 - **One place for package versions** (#72). `Directory.Packages.props` sets the version of each NuGet package
   for every project, and the projects name only the package. The Hue, Apple TV and HomePod plugins now use the
   same BouncyCastle (2.7.0; Apple TV and HomePod had 2.5.1). A `global.json` names the .NET 10 SDK, and CI and
   the release workflows install the SDK from it. The app's packages and output do not change.
+
+### Fixed
+- **The automation editor's 512 KB body limit counts bytes** (#59). A chunked body without a length was
+  limited in characters, so text with letters such as æ, ø, å or € could be up to three times larger.
+
+### Tests
+- Loopback tests for the Insights server and its automation editor API: the key cookie, Host, editor header,
+  Origin and body-size checks, and a save, list and delete (#59).
 
 ## [2.10.28] - 2026-11-28
 

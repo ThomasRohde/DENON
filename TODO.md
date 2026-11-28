@@ -20,6 +20,9 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
       does not wait 550 ms for each. Needs care: some models do not answer in standby.
 - [x] PR 3: Home Assistant and Hue. #32, #46 and #48 closed; the HA part of #68, the Hue part of #64 (no HTTP
       fallback with HTTPS on, error answers on reads).
+- [ ] Verify the Hue Entertainment area picker live (#79, needs the user's OK, it changes the lights): with two
+      areas, pick the other one while Music Sync streams and check the lights of the new area follow the music.
+      A saved area that was deleted cannot be confirmed by picking it again (pick another area first).
 - [ ] Verify PR 3 live: Hue Music Sync on, restart the app, and check the log says "Started 50 Hz Hue Entertainment
       DTLS stream". Needs the user's OK (it changes the lights).
 - [x] PR 4: MCP tiers and limits. #66 closed; the MCP side of #61 and #65, and the /health Host check of #64.
@@ -56,8 +59,15 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
 - [ ] Verify PR 10a (needs the user): uninstall with "Launch at Windows startup" turned on in Settings and check
       that the startup entry is gone; the next in-app update downloads, starts and shows notes without the
       download list.
+- [x] PR 10a follow-up: loopback tests for the Insights server and its automation editor API (key cookie, Host,
+      editor header, Origin, body cap, the happy path), #59. The editor API has no listener of its own. The
+      server's icon and font addresses now name the app assembly, so they also resolve outside the app.
 - [x] PR 10b: docs and notices, part of #73. Left out: refreshed website screenshots and the new guides
       (docs/plugin-development.md, CONTRIBUTING.md, SECURITY.md), which are new documents rather than fixes.
+- [x] PR 10b follow-up: docs/plugin-development.md, CONTRIBUTING.md and SECURITY.md (#73).
+- [ ] Refresh the website screenshots (#73; 02-youtube-music and 13-plugin-smart-tv are stale, and Health, Help and
+      Appearance have none). Needs the real app with the user's devices, so it waits for the user.
+- [ ] Check that GitHub private vulnerability reporting is on for the repository (SECURITY.md points to it).
 - [x] PR 11: accessibility, #57 closed. A focus ring on the shared styles, names on the symbol buttons of the main
       window, Control Deck, tray flyout and YouTube page, and light text on the scrim.
 - [ ] Verify PR 11 in the app (needs the user): Tab through the main window in Dark and Light and check the ring
