@@ -40,7 +40,7 @@ public sealed class PhoneRemoteFixesTests
         var html = RemoteWebUiHtml.PageHtml;
         // "Add to Home Screen" saves the address; iOS gives the icon its own storage.
         Assert.Contains("params.set('pair', token)", html);
-        Assert.DoesNotContain("params.delete('pair');\n      params.delete('token');", html);
+        Assert.Matches(@"if \(token\)\s*params\.set\('pair', token\)", html); // only a missing token clears it
         Assert.Contains("post('/api/power', { on: !state.isAwake })", html);
         Assert.Contains("⏻ Turn off", html);
     }

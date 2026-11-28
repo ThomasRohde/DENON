@@ -173,19 +173,27 @@ writeFileSync(
 
 // ---------------------------------------------------------------- versions
 const version = (path) => /<Version>([^<]+)<\/Version>/.exec(readFileSync(path, "utf8"))?.[1];
-writeFileSync(
-  join(out, "versions.json"),
-  JSON.stringify(
-    {
-      app: version(join(app, "Denon.App.Desktop.csproj")),
-      chromecast: version(join(repo, "external-plugins", "Denon.Plugin.Chromecast", "Denon.Plugin.Chromecast.csproj")),
-      appleTv: version(join(repo, "external-plugins", "Denon.Plugin.AppleTv", "Denon.Plugin.AppleTv.csproj")),
-      homePod: version(join(repo, "external-plugins", "Denon.Plugin.HomePod", "Denon.Plugin.HomePod.csproj")),
-    },
-    null,
-    2,
-  ),
-);
+const versions = {
+  app: version(join(app, "Denon.App.Desktop.csproj")),
+  chromecast: version(join(repo, "external-plugins", "Denon.Plugin.Chromecast", "Denon.Plugin.Chromecast.csproj")),
+  appleTv: version(join(repo, "external-plugins", "Denon.Plugin.AppleTv", "Denon.Plugin.AppleTv.csproj")),
+  homePod: version(join(repo, "external-plugins", "Denon.Plugin.HomePod", "Denon.Plugin.HomePod.csproj")),
+};
+writeFileSync(join(out, "versions.json"), JSON.stringify(versions, null, 2));
+
+// ---------------------------------------------------------------- checks
+// The parsing above reads C# and XAML with regular expressions. If their shape changes, fail the build instead of
+// shipping a site with no Help topics or "chromecast-vundefined" download links.
+const problems = [];
+if (topics.length === 0) problems.push("no Help topics were found in MainViewModel.Help.cs");
+if (Object.keys(icons).length === 0) problems.push("no icons were found");
+for (const [name, value] of Object.entries(versions)) {
+  if (!value) problems.push(`no <Version> for ${name}`);
+}
+if (problems.length > 0) {
+  console.error(`sync-from-app failed: ${problems.join("; ")}`);
+  process.exit(1);
+}
 
 // ---------------------------------------------------------------- assets
 copyFileSync(join(app, "denon_icon.png"), join(pub, "denon_icon.png"));
