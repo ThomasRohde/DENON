@@ -224,6 +224,7 @@ public partial class App : System.Windows.Application
                 });
 
                 _host.Services.GetRequiredService<AppLogStore>().Info("Denon Desktop started.");
+                CleanUpOldExtractionFolders(_host.Services.GetRequiredService<AppLogStore>());
             }
 
             WatchForInstallerClose();
@@ -592,6 +593,29 @@ public partial class App : System.Windows.Application
             await using var fs = System.IO.File.Create(System.IO.Path.Combine(outputDir, fileName));
             encoder.Save(fs);
         }
+    }
+
+    /// <summary>
+    /// Deletes the native-DLL folders that older builds of this single-file app left in %TEMP%\.net (about 9 MB
+    /// each, never deleted by .NET). Off the UI thread and best effort.
+    /// </summary>
+    private static void CleanUpOldExtractionFolders(AppLogStore log)
+    {
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                var result = BundleExtractionCleanupService.RunForCurrentProcess();
+                if (result.Deleted > 0)
+                {
+                    log.Info($"Deleted {result.Deleted} old runtime extraction folders ({result.FreedBytes / (1024 * 1024)} MB).");
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Warning($"Old runtime extraction folders not deleted: {ex.Message}");
+            }
+        });
     }
 
     private void StartActivationSignalListener()

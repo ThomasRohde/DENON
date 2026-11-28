@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Fixed
+- **Old runtime folders in %TEMP% are deleted.** Each app version and each local build left about 9 MB of native
+  DLLs in `%TEMP%\.net\<exe name>\` (or in `DOTNET_BUNDLE_EXTRACT_BASE_DIR`), and .NET never deletes them: over
+  100 folders, 1.2 GB, on a test PC. On start the app now deletes the old folders of its own exe in the background.
+  It keeps the folder it runs from, the folder of any other copy that runs, and folders less than 10 minutes old.
+  A folder with a file in use is left whole.
 - **Live lyrics find the new song** (#51). On every track change the app looked up the new title with the previous
   artist, and often found nothing. Now it looks up after both are set.
 - **Cinema opens only when the cast started** (#52). After a failed cast it used to open a silent video. With
