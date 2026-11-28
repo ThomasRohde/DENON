@@ -36,6 +36,9 @@ public partial class MainWindow : Window
     public MainWindow(MainViewModel viewModel)
     {
         InitializeComponent();
+        MainWindowChrome.CaptionHeight = Infrastructure.Theming.SkinMetrics.Scale(46, Infrastructure.Theming.SkinMetrics.Current.SizeScale);
+        Infrastructure.Theming.SkinMetrics.Current.PropertyChanged += (_, _) =>
+            MainWindowChrome.CaptionHeight = Infrastructure.Theming.SkinMetrics.Scale(46, Infrastructure.Theming.SkinMetrics.Current.SizeScale);
         _viewModel = viewModel;
         DataContext = viewModel;
 
@@ -66,6 +69,7 @@ public partial class MainWindow : Window
         };
         IsVisibleChanged += (_, _) => UpdateAnimations();
         ApplyDwmStyling();
+        Infrastructure.Theming.ThemeManager.ThemeChanged += (_, _) => ApplyDwmStyling();
     }
 
     private bool IsShownOnScreen => IsLoaded && IsVisible && WindowState != WindowState.Minimized;
@@ -154,7 +158,7 @@ public partial class MainWindow : Window
         try
         {
             var hwnd = new WindowInteropHelper(this).EnsureHandle();
-            var dark = 1;
+            var dark = Infrastructure.Theming.ThemeManager.Current.IsDark ? 1 : 0;
             _ = DwmSetWindowAttribute(hwnd, DwmwaUseImmersiveDarkMode, ref dark, sizeof(int));
 
             var round = DwmwcpRound;

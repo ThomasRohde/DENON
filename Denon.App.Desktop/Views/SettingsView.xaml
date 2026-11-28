@@ -511,6 +511,15 @@
                                                             Padding="{skin:Space 6,4}"
                                                             FontSize="{DynamicResource FontSize03}"
                                                             ToolTip="Clear shortcut" />
+                                                    <Button Content="Remove"
+                                                            Command="{Binding DataContext.RemoveCustomShortcutCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding}"
+                                                            Style="{StaticResource DangerButton}"
+                                                            Padding="{skin:Space 6,4}"
+                                                            Margin="{skin:Space 4,0,0,0}"
+                                                            FontSize="{DynamicResource FontSize03}"
+                                                            ToolTip="Remove this Scene or plugin shortcut row"
+                                                            Visibility="{Binding IsCustom, Converter={StaticResource BoolToVis}}" />
                                                 </StackPanel>
                                             </Grid>
 

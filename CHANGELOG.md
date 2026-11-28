@@ -4,6 +4,25 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Custom Scene and plugin shortcuts can be removed** (#54): their rows have a Remove button (the command was
+  there, but no button used it). Esc during recording, or starting another row, no longer leaves a row on
+  LISTENING. Ctrl+8, Ctrl+9, F1 and Ctrl+K (the command palette) are now refused for in-app shortcuts, because the
+  main window takes them first.
+- **The tray keeps its receiver status after a settings save** (#55), instead of "connecting..." until the next
+  poll, and shows the volume as the receiver's number. The quick-control flyout opens on the monitor and in the
+  corner of the tray you clicked, and its width follows the skin. The tray menu no longer makes a new font on
+  every rebuild.
+- **The main window's drag area matches its title bar in every skin** (#53), and a fit that ends early no longer
+  leaves the content laid out at a trial size.
+- **The automation editor follows a theme switch** (#71): its page reloads the theme and its Windows title bar
+  turns dark or light, as does the main window's frame. A run shown during a drag waits until the drag ends. A
+  Volume Memory switch whose save fails goes back to the saved value, and "Check now" for updates runs once at a
+  time.
+- **The Phone Remote shows the volume as the receiver's 0–98 number**, not dB.
+
 ## [2.10.26] - 2026-11-28
 
 ### Fixed

@@ -54,6 +54,7 @@ public sealed partial class MainViewModel
         if (key == Key.Escape && modifiers == ModifierKeys.None)
         {
             CancelRecordingShortcut();
+            ValidateShortcutCollisions(reportClean: false); // Puts the row's badge back (it said LISTENING).
             ShortcutSummaryText = "Shortcut recording canceled.";
             return true;
         }
@@ -188,6 +189,7 @@ public sealed partial class MainViewModel
         }
 
         CancelRecordingShortcut();
+        ValidateShortcutCollisions(reportClean: false); // The row that was listening gets its badge back.
         _recordingShortcut = editor;
         editor.IsRecording = true;
         ShortcutSummaryText = $"Listening for '{editor.Label}' — press your desired key combination (Esc to cancel, Backspace to clear)...";
