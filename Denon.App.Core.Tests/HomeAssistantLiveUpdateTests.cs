@@ -404,7 +404,7 @@ public sealed class HomeAssistantLiveUpdateTests
     public async Task The_socket_authenticates_subscribes_reads_a_multi_frame_event_and_answers_ping()
     {
         // The server holds the socket long enough for five pings on a slow CI runner, then closes it.
-        await using var server = new FakeHaServer { HoldOpen = TimeSpan.FromMilliseconds(5000) };
+        await using var server = new FakeHaServer { HoldOpen = TimeSpan.FromSeconds(5) };
         server.AfterSubscribe = async (ws, subId) =>
         {
             var json = EventJson(subId, "input_boolean.guest_mode", "Guest Mode", "on");
