@@ -73,22 +73,72 @@ public sealed class AutomationGraph
     ];
 
     /// <summary>
-    /// The TV came on away from Live TV (it resumes the last input, often HDMI) → Live TV. Not when a cast or the
-    /// Apple TV woke it: those turn the TV on over HDMI-CEC to show their own picture. The wait lets their events
-    /// arrive first; origin=external leaves out the app's own HDMI-CEC wake (that one goes to Live TV itself).
+    /// The TV came on away from Live TV (it resumes the last input, often HDMI) → Live TV, with the receiver on the
+    /// TV input. Not when a cast or the Apple TV woke it: those turn the TV on over HDMI-CEC to show their own
+    /// picture, and keep it (the receiver still goes to the TV input). The first wait lets their events arrive;
+    /// origin=external leaves out the app's own HDMI-CEC wake (that one goes to Live TV itself).
+    /// <para>
+    /// While the TV and the receiver start, HDMI-CEC can pull the TV back to the Chromecast's input a few seconds
+    /// after the switch (seen on 2026-11-28: 6 s later, as the receiver came on). So after 10 s the run looks again:
+    /// if the TV left Live TV and no cast started, it switches once more.
+    /// </para>
     /// </summary>
     private static AutomationGraph LiveTvOnPowerOn()
     {
-        var graph = Chain("auto-tv-live", "TV on → Live TV", 60,
+        const string Casts = "cast.app_started, appletv.woke";
+        AutomationNode[] nodes =
+        [
             Node("t", AutomationNodeTypes.TriggerEvent, ("event", "app.changed"),
                 ("filter", "stream=tv, fromAppId=, toAppId!=com.webos.app.livetv")),
             Node("w", AutomationNodeTypes.ActionDelay, ("seconds", "4")),
-            Node("c", AutomationNodeTypes.ConditionRecentEvent,
-                ("event", "cast.app_started, appletv.woke"), ("seconds", "30"), ("filter", "origin=external")),
-            Node("a1", AutomationNodeTypes.ActionPlugin, ("pluginId", "smart-tv"), ("actionId", "tv.livetv")));
-        // No recent cast: switch. Chain wires a condition's "yes"; this one acts on "no".
-        graph.Edges.Single(e => e.From == "c").Port = AutomationNodeTypes.PortNo;
-        return graph;
+            Node("c", AutomationNodeTypes.ConditionRecentEvent, ("event", Casts), ("seconds", "30"), ("filter", "origin=external")),
+            Node("a1", AutomationNodeTypes.ActionPlugin, ("pluginId", "smart-tv"), ("actionId", "tv.livetv")),
+            Node("w2", AutomationNodeTypes.ActionDelay, ("seconds", "10")),
+            Node("c2", AutomationNodeTypes.ConditionRecentEvent, ("event", "app.changed"), ("seconds", "10"),
+                ("filter", "stream=tv, fromAppId=com.webos.app.livetv")),
+            Node("c3", AutomationNodeTypes.ConditionRecentEvent, ("event", Casts), ("seconds", "30"), ("filter", "origin=external")),
+            Node("a2", AutomationNodeTypes.ActionPlugin, ("pluginId", "smart-tv"), ("actionId", "tv.livetv")),
+            Node("r", AutomationNodeTypes.ConditionReceiver, ("power", "on"), ("input", "TV"), ("muted", "any")),
+            Node("a3", AutomationNodeTypes.ActionReceiver, ("command", "power_on"), ("value", "")),
+            Node("a4", AutomationNodeTypes.ActionReceiver, ("command", "input"), ("value", "TV")),
+        ];
+        (string Id, double X, double Y)[] layout =
+        [
+            ("t", 60, 120), ("w", 320, 120), ("c", 580, 120), ("a1", 840, 120), ("w2", 1100, 120), ("c2", 1360, 120),
+            ("c3", 1620, 120), ("a2", 1880, 120), ("r", 2140, 320), ("a3", 2400, 320), ("a4", 2660, 320),
+        ];
+        foreach (var (id, x, y) in layout)
+        {
+            var node = nodes.Single(n => n.Id == id);
+            node.X = x;
+            node.Y = y;
+        }
+
+        AutomationEdge Edge(string from, string port, string to) => new() { From = from, Port = port, To = to };
+        return new AutomationGraph
+        {
+            Id = "auto-tv-live",
+            Name = "TV on → Live TV",
+            Enabled = false,
+            CooldownSeconds = 60,
+            Nodes = [.. nodes],
+            Edges =
+            [
+                Edge("t", AutomationNodeTypes.PortOut, "w"),
+                Edge("w", AutomationNodeTypes.PortOut, "c"),
+                Edge("c", AutomationNodeTypes.PortNo, "a1"),
+                Edge("c", AutomationNodeTypes.PortYes, "r"),
+                Edge("a1", AutomationNodeTypes.PortOut, "w2"),
+                Edge("w2", AutomationNodeTypes.PortOut, "c2"),
+                Edge("c2", AutomationNodeTypes.PortYes, "c3"),
+                Edge("c2", AutomationNodeTypes.PortNo, "r"),
+                Edge("c3", AutomationNodeTypes.PortNo, "a2"),
+                Edge("c3", AutomationNodeTypes.PortYes, "r"),
+                Edge("a2", AutomationNodeTypes.PortOut, "r"),
+                Edge("r", AutomationNodeTypes.PortNo, "a3"),
+                Edge("a3", AutomationNodeTypes.PortOut, "a4"),
+            ],
+        };
     }
 
     private static AutomationNode Node(string id, string type, params (string Key, string Value)[] config) =>
