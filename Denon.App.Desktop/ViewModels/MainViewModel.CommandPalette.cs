@@ -5,9 +5,21 @@ namespace Denon.App.Desktop.ViewModels;
 
 public sealed partial class MainViewModel
 {
+    private RelayCommand? _openCommandPaletteCommand;
+
     /// <summary>
-    /// Opens the Ctrl+K command palette. Creating it also registers the Ctrl+K key in the main window.
-    /// TODO(#76): bind Ctrl+K to this command in MainWindow after the desktop shell PR merges.
+    /// Opens the command palette. MainWindow binds Ctrl+K to it. It does nothing while the shortcut recorder or the
+    /// update panel owns the keyboard.
     /// </summary>
-    public RelayCommand OpenCommandPaletteCommand { get; } = CommandPaletteHotkey.CreateOpenCommand();
+    public RelayCommand OpenCommandPaletteCommand => _openCommandPaletteCommand ??= new RelayCommand(
+        _ => OpenCommandPalette(),
+        _ => !IsRecordingAnyShortcut && !IsUpdatePanelOpen);
+
+    private void OpenCommandPalette()
+    {
+        if (System.Windows.Application.Current?.Windows.OfType<MainWindow>().FirstOrDefault() is { } window)
+        {
+            CommandPaletteWindow.Open(window, this);
+        }
+    }
 }

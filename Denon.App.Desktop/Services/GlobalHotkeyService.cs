@@ -57,10 +57,10 @@ public sealed class GlobalHotkeyService : IDisposable
     /// Keys the main window handles before custom shortcuts (the pages, Help, the command palette): an in-app binding
     /// on one of them would never fire, so the checker refuses it.
     /// </summary>
-    internal static readonly HashSet<string> ReservedNavigationGestures = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "Ctrl+1", "Ctrl+2", "Ctrl+3", "Ctrl+4", "Ctrl+5", "Ctrl+6", "Ctrl+7", "Ctrl+8", "Ctrl+9", "Ctrl+R", "Ctrl+K", "F1",
-    };
+    /// <remarks>The page keys (Ctrl+1–9, Ctrl+0) come from <see cref="CommandPalette.PageShortcuts"/>, so they follow the rail.</remarks>
+    internal static readonly HashSet<string> ReservedNavigationGestures = new(
+        [.. CommandPalette.PageShortcuts.All.Select(shortcut => shortcut.Gesture), "Ctrl+R", "Ctrl+K", "F1"],
+        StringComparer.OrdinalIgnoreCase);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);

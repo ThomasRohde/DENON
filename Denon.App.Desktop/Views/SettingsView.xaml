@@ -11,9 +11,21 @@
             <ColumnDefinition Width="{skin:Size 16}" />
             <ColumnDefinition Width="0.95*" />
         </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Unsaved changes in the fields below (#76); it hides itself when there are none. -->
+        <controls:UnsavedChangesBanner Grid.Row="0"
+                                       Grid.ColumnSpan="3"
+                                       Message="{Binding SettingsDirtyText}"
+                                       Area="Settings"
+                                       SaveLabel="Save &amp; Sync"
+                                       Margin="{skin:Space 0,0,0,12}" />
 
         <!-- Left: Hardware & Auto-Discovery -->
-        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="{skin:Space 0,0,4,0}">
+        <ScrollViewer Grid.Row="1" Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="{skin:Space 0,0,4,0}">
             <StackPanel>
                 <!-- Appearance: the theme and the skin apply live and are saved at once (docs/theming.md) -->
                 <Border Style="{StaticResource SurfaceCard}" Margin="{skin:Space 0,0,0,18}">
@@ -209,7 +221,7 @@
         </ScrollViewer>
 
         <!-- Right: Behavior, Relay & Dedicated Scrollable Shortcut Editor -->
-        <Grid Grid.Column="2">
+        <Grid Grid.Row="1" Grid.Column="2">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -573,7 +585,7 @@
                                         FontSize="{DynamicResource FontSize03}" />
                             </Grid>
                         </Border>
-                        <TextBlock Text="Built-in: Ctrl+1..9 switches views • Ctrl+R refreshes • Mouse wheel over Volume adjusts ±2 steps"
+                        <TextBlock Text="Built-in: Ctrl+1..0 opens the pages in nav rail order • Ctrl+K opens the command palette • Ctrl+R refreshes • Mouse wheel over Volume adjusts ±2 steps"
                                    FontSize="{DynamicResource FontSize03}"
                                    Foreground="{DynamicResource TextMutedBrush}" />
                     </StackPanel>
