@@ -593,6 +593,25 @@ public sealed class ReceiverSetupCheckTests : IDisposable
         Assert.True(undo.Snapshot!.HasWrittenEntries);
     }
 
+    [Fact]
+    public void The_summary_counts_only_confirmed_writes_and_names_the_unconfirmed_and_undone_ones()
+    {
+        var result = new SetupApplyResult(
+            [
+                new SetupOutcome("a", "Dynamic EQ", SetupOutcomeKind.Applied, "Set to On."),
+                new SetupOutcome("b", "ECO mode", SetupOutcomeKind.Unconfirmed, "Sent, but the receiver did not confirm the new value."),
+                new SetupOutcome("c", "Tone control", SetupOutcomeKind.Skipped, "The input changed."),
+            ],
+            null);
+
+        var text = result.Summarize("Applied");
+
+        Assert.StartsWith("Applied 1.", text, StringComparison.Ordinal);
+        Assert.Contains("Not confirmed: ECO mode: Sent, but the receiver did not confirm", text, StringComparison.Ordinal);
+        Assert.Contains("Not done: Tone control: The input changed.", text, StringComparison.Ordinal);
+        Assert.Equal("Applied 0.", new SetupApplyResult([], null).Summarize("Applied"));
+    }
+
     // ---- Which receiver ------------------------------------------------------------------------------------------
 
     [Fact]

@@ -394,14 +394,14 @@ public sealed partial class MainViewModel
         try
         {
             var result = await _setup.ApplyAsync(_setupCheck, selected.Select(static r => r.Id).ToList(), CancellationToken.None);
-            SetupStatusText = SummarizeOutcomes("Applied", result);
+            SetupStatusText = result.Summarize("Applied");
             RefreshSetupUndo();
 
             // Read again, so the list shows what the receiver has now.
             if (_setupProfile is not null)
             {
                 ShowSetupCheck(await _setup.CheckAsync(_setupProfile, _setupUse, CancellationToken.None));
-                SetupStatusText = SummarizeOutcomes("Applied", result) + " " + SetupStatusText;
+                SetupStatusText = result.Summarize("Applied") + " " + SetupStatusText;
             }
         }
         catch (Exception ex)
@@ -427,12 +427,12 @@ public sealed partial class MainViewModel
         try
         {
             var result = await _setup.UndoAsync(CancellationToken.None);
-            SetupStatusText = SummarizeOutcomes("Restored", result);
+            SetupStatusText = result.Summarize("Restored");
             RefreshSetupUndo();
             if (_setupProfile is not null && _setupCheck is not null)
             {
                 ShowSetupCheck(await _setup.CheckAsync(_setupProfile, _setupUse, CancellationToken.None));
-                SetupStatusText = SummarizeOutcomes("Restored", result) + " " + SetupStatusText;
+                SetupStatusText = result.Summarize("Restored") + " " + SetupStatusText;
             }
         }
         catch (Exception ex)
@@ -443,18 +443,6 @@ public sealed partial class MainViewModel
         {
             IsSetupBusy = false;
         }
-    }
-
-    private static string SummarizeOutcomes(string verb, SetupApplyResult result)
-    {
-        var done = result.Outcomes.Count(static o => o.Kind is SetupOutcomeKind.Applied or SetupOutcomeKind.Unconfirmed);
-        var problems = result.Outcomes
-            .Where(static o => o.Kind is SetupOutcomeKind.NotTaken or SetupOutcomeKind.Skipped or SetupOutcomeKind.Failed)
-            .Select(static o => $"{o.Label}: {o.Message}")
-            .ToList();
-        return problems.Count == 0
-            ? $"{verb} {done}."
-            : $"{verb} {done}. Not done: {string.Join(" ", problems)}";
     }
 
     private void RefreshSetupUndo()

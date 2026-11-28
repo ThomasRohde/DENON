@@ -125,6 +125,33 @@ public sealed record SetupApplyResult(IReadOnlyList<SetupOutcome> Outcomes, Setu
 {
     public int AppliedCount => Outcomes.Count(static o => o.Kind is SetupOutcomeKind.Applied or SetupOutcomeKind.Unconfirmed);
 
+    /// <summary>
+    /// One line for the status bar: how many rows were confirmed, then the rows the receiver did not confirm and the
+    /// rows that were not done, each with its message. A write that was sent but not confirmed is never counted as done.
+    /// </summary>
+    public string Summarize(string verb)
+    {
+        var confirmed = Outcomes.Count(static o => o.Kind == SetupOutcomeKind.Applied);
+        var parts = new List<string> { $"{verb} {confirmed}." };
+
+        var unconfirmed = Outcomes.Where(static o => o.Kind == SetupOutcomeKind.Unconfirmed).Select(static o => $"{o.Label}: {o.Message}").ToList();
+        if (unconfirmed.Count > 0)
+        {
+            parts.Add($"Not confirmed: {string.Join(" ", unconfirmed)}");
+        }
+
+        var notDone = Outcomes
+            .Where(static o => o.Kind is SetupOutcomeKind.NotTaken or SetupOutcomeKind.Skipped or SetupOutcomeKind.Failed)
+            .Select(static o => $"{o.Label}: {o.Message}")
+            .ToList();
+        if (notDone.Count > 0)
+        {
+            parts.Add($"Not done: {string.Join(" ", notDone)}");
+        }
+
+        return string.Join(' ', parts);
+    }
+
     public bool HasProblems => Outcomes.Any(static o => o.Kind is SetupOutcomeKind.NotTaken or SetupOutcomeKind.Failed or SetupOutcomeKind.Skipped);
 }
 
