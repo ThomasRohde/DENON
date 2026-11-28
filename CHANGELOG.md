@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- **Unsaved changes banner on Settings, Scenes and Stations** (#76). When you edit a field, a scene or a station
+  and do not save yet, the page shows "Unsaved changes" with Save and Discard. A settings change from somewhere
+  else (an automation, Volume Memory, the MCP server, a plugin) no longer overwrites your edits: the app loads again
+  only the parts that changed and have no edits. If the part you edit also changed, your edits stay and the banner
+  and the status line say so; Save replaces that change and Discard loads it. Factory Reset shows the defaults as
+  unsaved changes until you save them.
+
+### Changed
+- **Ctrl+1 to Ctrl+9 and Ctrl+0 follow the nav rail** (#76): 1 Deck, 2 Music, 3 Stations, 4 Cast, 5 Scenes,
+  6 Plugins, 7 Brain, 8 Settings, 9 Health, 0 Help. Brain has a key now. The keys come from the same list as the
+  rail and the command palette, which shows each page's key. Help, Settings and the README list them; Ctrl+0 is
+  refused for in-app shortcuts like the other page keys.
+- Ctrl+K is a normal key binding of the main window now (it was a temporary class handler). It does nothing while
+  the shortcut recorder or the update panel is open.
+
 ### Fixed
 - **A scene no longer switches the main input while Zone 2 may be loud** (#75 follow-up). When a scene's Zone 2
   volume step fails and the scene also changes the main input, Zone 2 is muted first (a Zone 2 that follows the main

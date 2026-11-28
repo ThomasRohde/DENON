@@ -113,14 +113,20 @@
                         </StackPanel>
                     </DockPanel>
 
-                    <!-- Why the last save did not save (shortcut collision, error); also in the log and the status line. -->
-                    <TextBlock Grid.Row="1"
-                               Text="{Binding SettingsSaveProblem}"
-                               Foreground="{DynamicResource AccentCrimsonBrush}"
-                               FontSize="{DynamicResource FontSize05}"
-                               TextWrapping="Wrap"
-                               Margin="{skin:Space 0,0,0,10}"
-                               Visibility="{Binding SettingsSaveProblem, Converter={StaticResource StringToVis}}" />
+                    <StackPanel Grid.Row="1">
+                        <!-- Why the last save did not save (shortcut collision, error); also in the log and the status line. -->
+                        <TextBlock Text="{Binding SettingsSaveProblem}"
+                                   Foreground="{DynamicResource AccentCrimsonBrush}"
+                                   FontSize="{DynamicResource FontSize05}"
+                                   TextWrapping="Wrap"
+                                   Margin="{skin:Space 0,0,0,10}"
+                                   Visibility="{Binding SettingsSaveProblem, Converter={StaticResource StringToVis}}" />
+                        <!-- Unsaved station edits (#76); it hides itself when there are none. -->
+                        <controls:UnsavedChangesBanner Message="{Binding StationsDirtyText}"
+                                                       Area="Stations"
+                                                       SaveLabel="Save Changes"
+                                                       Margin="{skin:Space 0,0,0,10}" />
+                    </StackPanel>
 
                     <ScrollViewer Grid.Row="2"
                                   VerticalScrollBarVisibility="Auto"
