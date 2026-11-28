@@ -783,6 +783,19 @@
                         <CheckBox Content="Show channel logos (downloaded once from tv-logos on GitHub)" IsChecked="{Binding ChannelLogos}" Foreground="{DynamicResource TextStrongBrush}" Margin="{skin:Space 0,0,0,10}"
                                   ToolTip="Live TV shows the channel's logo in the now-playing hero and in Insights. The logos of the whole channel list are fetched in one go, so GitHub never sees which channel you watch." />
 
+                        <TextBlock Text="CHROMECAST ON THIS TV" FontSize="{DynamicResource FontSize02}" FontWeight="Bold" Foreground="{DynamicResource TextFaintBrush}" Margin="{skin:Space 0,0,0,4}" />
+                        <ComboBox ItemsSource="{Binding CastDeviceOptions}"
+                                  SelectedValuePath="Id"
+                                  DisplayMemberPath="Label"
+                                  SelectedValue="{Binding CecWakeCastDevice}"
+                                  AutomationProperties.Name="Chromecast on this TV"
+                                  Margin="{skin:Space 0,0,0,4}" />
+                        <TextBlock Text="When Wake-on-LAN gets no answer, this Chromecast turns the TV on over HDMI-CEC (SimpLink). Automatic uses the only Chromecast online."
+                                   FontSize="{DynamicResource FontSize04}"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="{skin:Space 0,0,0,10}" />
+
                         <TextBlock Text="Changes save automatically. All 24 Smart TV actions (Screen Off, eARC, HDMI 1–4, YouTube, Netflix, Plex, Play/Pause, Toasts) are also available in Smart Scenes 2.0, Global Hotkeys &amp; Couch Phone Remote!"
                                    FontSize="{DynamicResource FontSize04}"
                                    Foreground="{DynamicResource TextMutedBrush}"
