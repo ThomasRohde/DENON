@@ -22,6 +22,12 @@ public sealed class HomeAssistantConfig
     public bool DemoMode { get; set; }
 
     public bool PushReceiverEventsToHa { get; set; } = true;
+
+    /// <summary>
+    /// Keep a WebSocket open to Home Assistant, so tiles change when an entity changes. REST stays the way to read
+    /// the full list (at start, on Refresh and when the socket connects again).
+    /// </summary>
+    public bool LiveUpdates { get; set; } = true;
 }
 
 public sealed record HaEntityItem(string EntityId, string FriendlyName, string Domain, string State)
@@ -53,6 +59,11 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
     private HomeAssistantConfig _config = new();
     private HomeAssistantViewModel? _viewModel;
     private bool _isStarted;
+    private readonly SemaphoreSlim _liveGate = new(1, 1);
+    private HomeAssistantLiveSocket? _live;
+    private int _liveGeneration;
+    private string? _rejectedToken;
+    private string? _lastLoggedLive = "off";
 
     public PluginManifest Manifest { get; } = new(
         Id: "home-assistant",
@@ -71,6 +82,13 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
 
     internal HomeAssistantConfig Config => _config;
 
+    internal HomeAssistantViewModel? ViewModel => _viewModel;
+
+    /// <summary>Timing for the WebSocket. Tests set short times.</summary>
+    internal HomeAssistantLiveSocketOptions LiveOptions { get; set; } = new();
+
+    internal HaLiveState LiveState => _live?.State ?? HaLiveState.Off;
+
     public async Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default)
     {
         _context = context;
@@ -80,7 +98,7 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
         _viewModel.SyncFromConfig(_config);
     }
 
-    public Task StartAsync(CancellationToken cancellationToken = default)
+    public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         _isStarted = true;
         if (_config.DemoMode || IsConfigured)
@@ -104,14 +122,14 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
             _context?.ReportStatus("Enter Home Assistant URL & Long-Lived Token (or Demo Mode)", PluginHealthState.Idle);
         }
 
-        return Task.CompletedTask;
+        await RestartLiveSocketAsync();
     }
 
-    public Task StopAsync(CancellationToken cancellationToken = default)
+    public async Task StopAsync(CancellationToken cancellationToken = default)
     {
         _isStarted = false;
+        await RestartLiveSocketAsync();
         _context?.ReportStatus("Stopped", PluginHealthState.Disabled);
-        return Task.CompletedTask;
     }
 
     public object? CreateDashboardView()
@@ -209,11 +227,12 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
         }
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
+        _isStarted = false;
+        await RestartLiveSocketAsync();
         _http?.Dispose();
         _http = null;
-        return ValueTask.CompletedTask;
     }
 
     internal async Task<IReadOnlyList<HaEntityItem>> FetchEntitiesAsync(CancellationToken ct = default)
@@ -227,6 +246,8 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
                 new("script.close_theater_curtains", "Close Theater Curtains", "script", "off"),
                 new("switch.subwoofer_smart_plug", "Subwoofer Smart Plug", "switch", "on"),
                 new("switch.amp_bias_strip", "Amplifier Cooling Fan", "switch", "on"),
+                new("input_boolean.guest_mode", "Guest Mode", "input_boolean", "off"),
+                new("input_boolean.vacation_mode", "Vacation Mode", "input_boolean", "on"),
             ];
             _viewModel?.ApplyEntities(demo);
             _context?.ReportStatus($"Demo HA • {demo.Count} controllable entities", PluginHealthState.Connected);
@@ -234,6 +255,8 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
         }
 
         EnsureHttp();
+        // Take the ticket before the request: live changes after this point win over this read.
+        var ticket = _viewModel?.BeginSnapshot();
         using var req = BuildRequest(HttpMethod.Get, "/api/states");
         using var resp = await _http!.SendAsync(req, ct);
         resp.EnsureSuccessStatusCode();
@@ -245,33 +268,18 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
         {
             foreach (var item in doc.RootElement.EnumerateArray())
             {
-                var id = item.TryGetProperty("entity_id", out var idEl) ? idEl.GetString() ?? string.Empty : string.Empty;
-                var dot = id.IndexOf('.');
-                if (dot <= 0) continue;
-                var domain = id[..dot].ToLowerInvariant();
-                if (domain is not ("scene" or "script" or "switch" or "light" or "input_boolean"))
+                if (HomeAssistantWebSocketProtocol.ParseState(item) is { } entity && IsListedDomain(entity.Domain))
                 {
-                    continue;
+                    list.Add(entity);
                 }
-
-                var state = item.TryGetProperty("state", out var stEl) ? stEl.GetString() ?? string.Empty : string.Empty;
-                var friendly = item.TryGetProperty("attributes", out var attrEl) &&
-                               attrEl.TryGetProperty("friendly_name", out var fnEl)
-                    ? fnEl.GetString() ?? id
-                    : id;
-
-                list.Add(new HaEntityItem(id, friendly, domain, state));
             }
         }
 
-        // Keep scenes, scripts and switches when there are many lights and helpers: a cap after an
-        // alphabetical sort used to drop every scene.
-        var ordered = list
-            .OrderBy(static e => DomainRank(e.Domain))
-            .ThenBy(static e => e.FriendlyName, StringComparer.CurrentCultureIgnoreCase)
-            .Take(MaxEntities)
-            .ToList();
-        _viewModel?.ApplyEntities(ordered);
+        var ordered = OrderForDashboard(list).Take(MaxEntities).ToList();
+        if (ticket is { } t)
+        {
+            _viewModel!.ApplySnapshot(ordered, t);
+        }
         var countText = list.Count > MaxEntities ? $"{ordered.Count} of {list.Count}" : $"{ordered.Count}";
         _context?.ReportStatus($"Connected • {countText} entities synced", PluginHealthState.Connected);
         return ordered;
@@ -306,6 +314,12 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
         using var resp = await _http!.SendAsync(req, ct);
         resp.EnsureSuccessStatusCode();
         _viewModel?.SetStatus($"Called {domain}.{service} on {entityId}.");
+        if (IsLive)
+        {
+            // The state_changed event updates the tile. No REST read is needed.
+            return;
+        }
+
         _ = Task.Run(async () =>
         {
             try
@@ -325,13 +339,26 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
     /// <summary>Most entities the dashboard lists. Scenes, scripts and switches come first.</summary>
     internal const int MaxEntities = 300;
 
+    /// <summary>The entity domains the dashboard lists and can trigger.</summary>
+    internal static bool IsListedDomain(string? domain) =>
+        domain is "scene" or "script" or "switch" or "light" or "input_boolean";
+
+    /// <summary>
+    /// Scenes, scripts and switches first, then by name. This keeps scenes when there are many lights and helpers:
+    /// a cap after an alphabetical sort used to drop every scene.
+    /// </summary>
+    internal static IEnumerable<HaEntityItem> OrderForDashboard(IEnumerable<HaEntityItem> items) => items
+        .OrderBy(static e => DomainRank(e.Domain))
+        .ThenBy(static e => e.FriendlyName, StringComparer.CurrentCultureIgnoreCase);
+
     private static int DomainRank(string domain) => domain switch
     {
         "scene" => 0,
         "script" => 1,
         "switch" => 2,
         "light" => 3,
-        _ => 4,
+        "input_boolean" => 4,
+        _ => 5,
     };
 
     /// <summary>
@@ -351,7 +378,7 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
         }
 
         var candidate = id[..dot];
-        if (candidate is not ("scene" or "script" or "switch" or "light" or "input_boolean"))
+        if (!IsListedDomain(candidate))
         {
             return false;
         }
@@ -371,10 +398,19 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
     /// </returns>
     internal async Task<string?> SaveConfigAsync(HomeAssistantConfig updated)
     {
+        var previous = _config;
         _config = updated;
         if (_context is not null)
         {
             await _context.Storage.SaveConfigAsync(_config);
+        }
+
+        // A change that the socket uses, or a save while it is not live (a retry), starts it again.
+        var liveSettingsChanged = previous.BaseUrl != updated.BaseUrl || previous.AccessToken != updated.AccessToken ||
+                                  previous.DemoMode != updated.DemoMode || previous.LiveUpdates != updated.LiveUpdates;
+        if (liveSettingsChanged || _live?.State is null or HaLiveState.Disconnected or HaLiveState.AuthRejected or HaLiveState.Off)
+        {
+            await RestartLiveSocketAsync();
         }
 
         if (_config.DemoMode || IsConfigured)
@@ -396,6 +432,139 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
         }
 
         return null;
+    }
+
+    /// <summary>True while the WebSocket is subscribed to state changes.</summary>
+    internal bool IsLive => _live?.State == HaLiveState.Live;
+
+    /// <summary>
+    /// Stops the current socket and starts a new one when the plugin runs, is not in Demo Mode, has a URL and a
+    /// token, and has live updates on. A token that Home Assistant rejected is not used again until it changes.
+    /// </summary>
+    private async Task RestartLiveSocketAsync()
+    {
+        await _liveGate.WaitAsync();
+        try
+        {
+            var old = _live;
+            _live = null;
+            var generation = ++_liveGeneration;
+            if (old is not null)
+            {
+                await old.DisposeAsync();
+            }
+
+            var token = _config.AccessToken.Trim();
+            string? offText = !_isStarted ? "Live updates: off"
+                : _config.DemoMode ? "Live updates: not used in Demo Mode"
+                : !_config.LiveUpdates ? "Live updates: off"
+                : !IsConfigured || _http is null ? "Live updates: not connected"
+                : null;
+            var uri = offText is null ? HomeAssistantWebSocketProtocol.TryBuildWebSocketUri(_config.BaseUrl) : null;
+            if (offText is null && uri is null)
+            {
+                offText = "Live updates: the URL must start with http:// or https://";
+            }
+
+            if (offText is null && token == _rejectedToken)
+            {
+                _viewModel?.SetLiveStatus(RejectedText);
+                return;
+            }
+
+            if (offText is not null || uri is null)
+            {
+                LogLive("off", "Home Assistant live updates: off");
+                _viewModel?.SetLiveStatus(offText ?? "Live updates: off");
+                return;
+            }
+
+            _rejectedToken = null;
+            _live = new HomeAssistantLiveSocket(
+                uri,
+                token,
+                _http,
+                ct => generation == _liveGeneration ? OnLiveSubscribedAsync(ct) : Task.CompletedTask,
+                (entityId, state) =>
+                {
+                    if (generation == _liveGeneration)
+                    {
+                        _viewModel?.ApplyStateChange(entityId, state);
+                    }
+                },
+                (state, reason) => OnLiveStateChanged(generation, token, state, reason),
+                LiveOptions);
+            _live.Start();
+        }
+        finally
+        {
+            _liveGate.Release();
+        }
+    }
+
+    private const string RejectedText = "Home Assistant rejected the token. Live updates stopped. Enter a new token.";
+
+    private async Task OnLiveSubscribedAsync(CancellationToken ct)
+    {
+        try
+        {
+            await FetchEntitiesAsync(ct);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            _context?.ReportStatus($"HA unreachable: {ex.Message}", PluginHealthState.Warning);
+        }
+    }
+
+    private void OnLiveStateChanged(int generation, string token, HaLiveState state, string? reason)
+    {
+        if (generation != _liveGeneration)
+        {
+            return;
+        }
+
+        switch (state)
+        {
+            case HaLiveState.Connecting:
+                _viewModel?.SetLiveStatus("Live updates: connecting...");
+                break;
+            case HaLiveState.Live:
+                LogLive("live", "Home Assistant live updates: connected");
+                _viewModel?.SetLiveStatus("Live updates: on");
+                break;
+            case HaLiveState.Disconnected:
+                LogLive("down", $"Home Assistant live updates: lost ({reason})");
+                _viewModel?.SetLiveStatus($"Live updates: lost ({reason}). Trying again...");
+                break;
+            case HaLiveState.AuthRejected:
+                _rejectedToken = token;
+                LogLive("rejected", "Home Assistant live updates: token rejected");
+                _viewModel?.SetLiveStatus(RejectedText);
+                _context?.ReportStatus("Home Assistant rejected the token", PluginHealthState.Error);
+                break;
+            case HaLiveState.Off:
+                LogLive("off", "Home Assistant live updates: off");
+                break;
+        }
+    }
+
+    /// <summary>Writes one short line when the live state moves to a new kind, so a retry loop does not fill the log.</summary>
+    private void LogLive(string kind, string line)
+    {
+        if (_lastLoggedLive == kind)
+        {
+            return;
+        }
+
+        _lastLoggedLive = kind;
+        if (kind == "down" || kind == "rejected")
+        {
+            _context?.Logger.Warning(line);
+        }
+        else
+        {
+            _context?.Logger.Info(line);
+        }
     }
 
     private async Task PushSensorStateAsync(PluginReceiverSnapshot snap, string? sceneName, CancellationToken ct)
@@ -481,15 +650,25 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
     }
 }
 
+/// <summary>Marks when a full REST read started: its order, and the last live change before it.</summary>
+internal readonly record struct SnapshotTicket(long Seq, long LiveVersion);
+
 public sealed class HomeAssistantViewModel : INotifyPropertyChanged
 {
     private readonly HomeAssistantPlugin _plugin;
     private readonly List<HaEntityItem> _allEntities = [];
+    private readonly object _snapshotSync = new();
+    private readonly Dictionary<string, (long Version, HaEntityItem? State)> _liveChanges = new(StringComparer.OrdinalIgnoreCase);
+    private long _liveVersion;
+    private long _snapshotSeq;
+    private long _lastAppliedSnapshotSeq;
     private string _baseUrl = "http://homeassistant.local:8123";
     private string _accessToken = string.Empty;
     private string _webhookId = string.Empty;
     private bool _demoMode;
     private bool _pushEvents = true;
+    private bool _liveUpdates = true;
+    private string _liveStatusText = string.Empty;
     private bool _isSetupExpanded = true;
     private bool _suppressAutoSave;
     private string _selectedDomainFilter = "all";
@@ -551,6 +730,22 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
             }
         }
     }
+
+    /// <summary>Keep a WebSocket open so tiles change when Home Assistant changes. Saved at once, like <see cref="PushEvents"/>.</summary>
+    public bool LiveUpdates
+    {
+        get => _liveUpdates;
+        set
+        {
+            if (Set(ref _liveUpdates, value) && !_suppressAutoSave)
+            {
+                _ = SaveAsync(quiet: true);
+            }
+        }
+    }
+
+    /// <summary>The state of the WebSocket in short words, for example "Live updates: on".</summary>
+    public string LiveStatusText { get => _liveStatusText; private set => Set(ref _liveStatusText, value); }
 
     public bool DemoMode
     {
@@ -637,6 +832,7 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
             WebhookId = cfg.WebhookId;
             DemoMode = cfg.DemoMode;
             PushEvents = cfg.PushReceiverEventsToHa;
+            LiveUpdates = cfg.LiveUpdates;
             IsSetupExpanded = !(cfg.DemoMode || (!string.IsNullOrWhiteSpace(cfg.BaseUrl) && !string.IsNullOrWhiteSpace(cfg.AccessToken)));
             Raise(nameof(TelemetryPreviewText));
         }
@@ -649,9 +845,8 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
     public HaEntityItem? GetEntity(string entityId) =>
         _allEntities.FirstOrDefault(e => e.EntityId.Equals(entityId, StringComparison.OrdinalIgnoreCase));
 
-    public void UpdateEntityState(string entityId, string newState)
-    {
-        Application.Current?.Dispatcher.InvokeAsync(() =>
+    public void UpdateEntityState(string entityId, string newState) =>
+        RunOnUi(() =>
         {
             var idx = _allEntities.FindIndex(e => e.EntityId.Equals(entityId, StringComparison.OrdinalIgnoreCase));
             if (idx >= 0)
@@ -660,13 +855,146 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
                 RebuildFilteredEntities();
             }
         });
+
+    /// <summary>
+    /// Applies one state_changed event from the WebSocket: a known entity gets its new state, a new entity of a
+    /// listed domain is added, and a null state removes the entity.
+    /// </summary>
+    public void ApplyStateChange(string entityId, HaEntityItem? newState)
+    {
+        var dot = entityId.IndexOf('.');
+        var domain = newState?.Domain ?? (dot > 0 ? entityId[..dot].ToLowerInvariant() : string.Empty);
+        if (!HomeAssistantPlugin.IsListedDomain(domain))
+        {
+            return;
+        }
+
+        // Note the change now, on the receiving thread, so a REST read that started before it cannot undo it.
+        lock (_snapshotSync)
+        {
+            _liveChanges[entityId] = (++_liveVersion, newState);
+        }
+
+        RunOnUi(() => ApplyLiveChangeOnUi(entityId, newState));
     }
 
-    public void ApplyEntities(IReadOnlyList<HaEntityItem> items) =>
-        Application.Current?.Dispatcher.InvokeAsync(() =>
+    private void ApplyLiveChangeOnUi(string entityId, HaEntityItem? newState)
+    {
+        var idx = _allEntities.FindIndex(e => e.EntityId.Equals(entityId, StringComparison.OrdinalIgnoreCase));
+        if (newState is null)
         {
+            if (idx < 0)
+            {
+                return;
+            }
+
+            _allEntities.RemoveAt(idx);
+        }
+        else if (idx >= 0)
+        {
+            var old = _allEntities[idx];
+            if (old == newState)
+            {
+                return; // Only an attribute changed (for example the brightness of a light).
+            }
+
+            _allEntities[idx] = newState;
+            if (old.FriendlyName == newState.FriendlyName)
+            {
+                // Same name: the filter keeps the same tiles, so replace the one tile in place.
+                var shown = Entities.IndexOf(old);
+                if (shown >= 0)
+                {
+                    Entities[shown] = newState;
+                }
+
+                return;
+            }
+        }
+        else
+        {
+            // The same rule as a REST read: rank by domain, then cut to the cap. A new scene can push out the
+            // lowest-ranked entity. A new entity that ranks last when the list is full is not shown.
+            _allEntities.Add(newState);
+            var ordered = HomeAssistantPlugin.OrderForDashboard(_allEntities).Take(HomeAssistantPlugin.MaxEntities).ToList();
+            if (!ordered.Contains(newState))
+            {
+                _allEntities.Remove(newState);
+                return;
+            }
+
             _allEntities.Clear();
-            _allEntities.AddRange(items);
+            _allEntities.AddRange(ordered);
+        }
+
+        RebuildFilteredEntities();
+        Raise(nameof(ConnectionBadgeText));
+        Raise(nameof(IsConnectedOrDemo));
+        Raise(nameof(EntitiesCountLabel));
+    }
+
+    public void SetLiveStatus(string text) => RunOnUi(() => LiveStatusText = text);
+
+    /// <summary>A full list that is not a REST read (Demo Mode, tests). It counts as the newest read.</summary>
+    public void ApplyEntities(IReadOnlyList<HaEntityItem> items) => ApplySnapshot(items, BeginSnapshot());
+
+    /// <summary>
+    /// Call when a full REST read starts. The ticket orders the reads and marks which live changes are newer.
+    /// </summary>
+    internal SnapshotTicket BeginSnapshot()
+    {
+        lock (_snapshotSync)
+        {
+            return new SnapshotTicket(++_snapshotSeq, _liveVersion);
+        }
+    }
+
+    /// <summary>
+    /// Applies a full list from a read that started at <paramref name="ticket"/>. A read older than one already
+    /// applied is dropped. A live change that came after the read started wins over the read's value for that
+    /// entity, so a slow REST answer cannot turn back a newer WebSocket state.
+    /// </summary>
+    internal void ApplySnapshot(IReadOnlyList<HaEntityItem> items, SnapshotTicket ticket) =>
+        RunOnUi(() =>
+        {
+            List<(string EntityId, HaEntityItem? State)> newer;
+            lock (_snapshotSync)
+            {
+                if (ticket.Seq < _lastAppliedSnapshotSeq)
+                {
+                    return;
+                }
+
+                _lastAppliedSnapshotSeq = ticket.Seq;
+                newer = _liveChanges
+                    .Where(c => c.Value.Version > ticket.LiveVersion)
+                    .Select(c => (c.Key, c.Value.State))
+                    .ToList();
+
+                // This read already has the older changes, and every later read starts after it: forget them.
+                foreach (var key in _liveChanges.Where(c => c.Value.Version <= ticket.LiveVersion).Select(c => c.Key).ToList())
+                {
+                    _liveChanges.Remove(key);
+                }
+            }
+
+            var merged = items.ToList();
+            foreach (var (entityId, state) in newer)
+            {
+                merged.RemoveAll(e => e.EntityId.Equals(entityId, StringComparison.OrdinalIgnoreCase));
+                if (state is not null)
+                {
+                    merged.Add(state);
+                }
+            }
+
+            if (newer.Count > 0)
+            {
+                merged = HomeAssistantPlugin.OrderForDashboard(merged).Take(HomeAssistantPlugin.MaxEntities).ToList();
+            }
+
+            _allEntities.Clear();
+            _allEntities.AddRange(merged);
             RebuildFilteredEntities();
             if (_allEntities.Count > 0)
             {
@@ -680,7 +1008,21 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
         });
 
     public void SetStatus(string msg) =>
-        Application.Current?.Dispatcher.InvokeAsync(() => StatusMessage = $"{DateTime.Now:HH:mm:ss} • {msg}");
+        RunOnUi(() => StatusMessage = $"{DateTime.Now:HH:mm:ss} • {msg}");
+
+    /// <summary>Runs on the UI thread, the same way for REST reads and WebSocket events. Without an app (tests) it runs at once.</summary>
+    private static void RunOnUi(Action action)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            action();
+        }
+        else
+        {
+            _ = dispatcher.InvokeAsync(action);
+        }
+    }
 
     private void RebuildFilteredEntities()
     {
@@ -711,13 +1053,14 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
             WebhookId = WebhookId.Trim(),
             DemoMode = DemoMode,
             PushReceiverEventsToHa = PushEvents,
+            LiveUpdates = LiveUpdates,
         });
         StatusMessage = error == HomeAssistantPlugin.NotConfiguredMessage
             ? $"✓ Saved. {error}"
             : error is not null
             ? $"⚠ Saved, but connection check failed: {error}"
             : quiet
-                ? "✓ Home Assistant event push setting saved."
+                ? "✓ Home Assistant setting saved."
                 : "✓ Saved Home Assistant configuration & synced entities.";
     }
 
