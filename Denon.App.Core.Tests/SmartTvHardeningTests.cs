@@ -41,6 +41,14 @@ public sealed class SmartTvHardeningTests
         Assert.Equal(lan, LgWebOsClient.IsLanAddress(host));
 
     [Theory]
+    [InlineData("192.168.1.28", 1)]
+    [InlineData("127.0.0.1", 0)] // This PC, not the TV.
+    [InlineData("8.8.8.8", 0)]
+    [InlineData("localhost", 0)] // Resolves to loopback only.
+    public async Task Only_lan_addresses_are_connected_to_after_dns(string host, int lanCount) =>
+        Assert.Equal(lanCount, (await LgWebOsClient.ResolveLanAddressesAsync(host, CancellationToken.None)).Length);
+
+    [Theory]
     [InlineData("http://192.168.1.28:1914/", "192.168.1.28", true)]
     [InlineData("http://192.168.1.99:1914/", "192.168.1.28", false)] // Points at another device.
     [InlineData("http://127.0.0.1:18925/api/power", "192.168.1.28", false)] // At this PC.

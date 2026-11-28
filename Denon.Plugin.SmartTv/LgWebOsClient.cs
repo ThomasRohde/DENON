@@ -76,18 +76,60 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
 
     private static readonly HttpClient SnapshotHttpClient = CreateSnapshotClient();
 
-    /// <summary>The TV's own certificate is self-signed: accept that only from a LAN address. At most 10 MB.</summary>
+    /// <summary>
+    /// Connects only to LAN IP addresses (checked after DNS, so a TV set up by host name works and a name that points
+    /// at the internet does not). On such a connection the TV's self-signed certificate is accepted. At most 10 MB.
+    /// </summary>
     private static HttpClient CreateSnapshotClient()
     {
-        var handler = new SocketsHttpHandler();
-        handler.SslOptions.RemoteCertificateValidationCallback = (sender, _, _, errors) =>
-            errors == System.Net.Security.SslPolicyErrors.None ||
-            (sender is System.Net.Security.SslStream stream && IsLanAddress(stream.TargetHostName));
+        var handler = new SocketsHttpHandler
+        {
+            ConnectCallback = async (context, ct) =>
+            {
+                var lan = await ResolveLanAddressesAsync(context.DnsEndPoint.Host, ct);
+                if (lan.Length == 0)
+                {
+                    throw new HttpRequestException($"'{context.DnsEndPoint.Host}' is not a LAN address.");
+                }
+
+                var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+                try
+                {
+                    await socket.ConnectAsync(lan, context.DnsEndPoint.Port, ct);
+                    return new NetworkStream(socket, ownsSocket: true);
+                }
+                catch
+                {
+                    socket.Dispose();
+                    throw;
+                }
+            },
+        };
+        handler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true; // The connection is to the LAN only.
         return new HttpClient(handler)
         {
             Timeout = TimeSpan.FromSeconds(8),
             MaxResponseContentBufferSize = 10 * 1024 * 1024,
         };
+    }
+
+    /// <summary>The LAN IP addresses of a host: the literal itself, or the DNS answers that are on the LAN.</summary>
+    internal static async Task<IPAddress[]> ResolveLanAddressesAsync(string host, CancellationToken ct)
+    {
+        if (IPAddress.TryParse(host.Trim('[', ']'), out var literal))
+        {
+            return IsLanAddress(literal.ToString()) ? [literal] : [];
+        }
+
+        try
+        {
+            var addresses = await Dns.GetHostAddressesAsync(host, ct);
+            return addresses.Where(static a => IsLanAddress(a.ToString())).ToArray();
+        }
+        catch (SocketException)
+        {
+            return [];
+        }
     }
 
     /// <summary>An IP address on the LAN (IPv4 private or link-local, IPv6 unique-local or link-local).</summary>
@@ -113,8 +155,9 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
     }
 
     /// <summary>
-    /// An address the TV sent (a screenshot or the pointer socket) must point at a LAN address with one of the
-    /// given schemes. The TV gives its own address; anything else (the internet, this PC) is refused.
+    /// An address the TV sent (a screenshot or the pointer socket) must use one of the given schemes and name the TV:
+    /// a LAN IP, or the configured TV host. A host name is checked again after DNS when connecting (it must resolve to
+    /// the LAN), so a configured name that points at the internet is still refused.
     /// </summary>
     internal static bool IsTvLanUri(string? value, string tvHost, params string[] schemes)
     {
@@ -2175,7 +2218,8 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
             throw new InvalidOperationException("LG TV did not return a pointer input socketPath. Try clicking 'Re-Pair (Full Permissions)'.");
         }
 
-        if (!IsTvLanUri(socketPath, _configuredIp, "ws", "wss"))
+        if (!IsTvLanUri(socketPath, _configuredIp, "ws", "wss") ||
+            (await ResolveLanAddressesAsync(new Uri(socketPath).Host, ct)).Length == 0)
         {
             throw new InvalidOperationException($"The TV returned an unexpected pointer socket address ({socketPath}).");
         }
