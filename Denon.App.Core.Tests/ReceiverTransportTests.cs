@@ -668,6 +668,38 @@ public sealed class ReceiverTransportTests : IDisposable
     }
 
     [Fact]
+    public async Task An_acoustic_push_during_the_full_acoustic_read_is_kept()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        avr.Replies["PSDYNEQ ?"] = "PSDYNEQ ON\r";
+        // Dynamic EQ is turned off on the remote after PSDYNEQ ? answered, while the read asks for the treble.
+        avr.Replies["PSTRE ?"] = "PSDYNEQ OFF\rPSTRE 50\r";
+        var (controller, state, telemetry, _, _) = await CreateRigAsync(avr, heos);
+        await controller.RefreshAsync();
+
+        var read = await controller.GetAcousticStatusAsync();
+
+        Assert.False(read.DynamicEq);
+        Assert.False(state.Snapshot.Acoustics!.DynamicEq);
+        await Task.Delay(100); // The event task has the lines too: it must not bring back the older answer.
+        Assert.False(state.Snapshot.Acoustics!.DynamicEq);
+
+        await telemetry.DisposeAsync();
+    }
+
+    [Theory]
+    [InlineData("PSDYNEQ ON", "PSDYNEQ")]
+    [InlineData("PSSWL ON", "PSSWL:ONOFF")]
+    [InlineData("PSSWL 52", "PSSWL:LEVEL")]
+    [InlineData("DIM BRI", "DIM")]
+    [InlineData("PSSWL2 50", null)] // a second subwoofer: not read
+    [InlineData("PSBAS UP", null)]
+    [InlineData("MV45", null)]
+    public void An_acoustic_line_is_kept_per_setting(string line, string? key) =>
+        Assert.Equal(key, AvrLiveState.AcousticKey(line));
+
+    [Fact]
     public async Task A_refused_command_sends_nothing_and_the_link_keeps_listening()
     {
         using var avr = new FakeAvr();

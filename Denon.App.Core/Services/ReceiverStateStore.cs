@@ -84,7 +84,17 @@ public sealed class ReceiverStateStore
         }
     }
 
-    public void UpdateAcoustics(AcousticStatus acoustics) => Update(snapshot => snapshot with { Acoustics = acoustics });
+    /// <param name="overlay">Runs inside the store's lock, as for <see cref="UpdateStatus"/>. The acoustics kept are returned.</param>
+    public AcousticStatus UpdateAcoustics(AcousticStatus acoustics, Func<AcousticStatus, AcousticStatus>? overlay = null)
+    {
+        var kept = acoustics;
+        Update(snapshot =>
+        {
+            kept = overlay?.Invoke(acoustics) ?? acoustics;
+            return snapshot with { Acoustics = kept };
+        });
+        return kept;
+    }
 
     public void UpdateError(string message)
     {

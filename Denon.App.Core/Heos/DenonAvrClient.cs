@@ -728,7 +728,7 @@ public sealed class DenonAvrClient : IDisposable
                     link.EndReply(reply);
                 }
             }
-            catch (Exception exception) when (exception is IOException or SocketException or ObjectDisposedException && attempt == 0)
+            catch (Exception exception) when (exception is (IOException or SocketException or ObjectDisposedException) && attempt == 0)
             {
                 lastException = exception;
                 ResetConnectionLocked();
@@ -1027,8 +1027,15 @@ public sealed class DenonAvrClient : IDisposable
         }
     }
 
-    /// <summary>The gate holds no OS handle, so it is not disposed: a command in flight may still release it.</summary>
-    public void Dispose() => Disconnect();
+    /// <summary>
+    /// Drops the link and ends the event task (no events after this). The gate holds no OS handle, so it is not
+    /// disposed: a command in flight may still release it.
+    /// </summary>
+    public void Dispose()
+    {
+        Disconnect();
+        _events.Writer.TryComplete();
+    }
 
     private sealed record LinkEvent(string Host, long Generation, IReadOnlyList<string>? Lines);
 

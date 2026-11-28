@@ -536,7 +536,7 @@ public sealed class ReceiverController
             var settings = _settingsStore.Current.Receiver;
             // No log line: the Brain reads this every 90 s while the receiver is on.
             var status = await _avrClient.GetAcousticStatusAsync(settings, cancellationToken);
-            _stateStore.UpdateAcoustics(status);
+            status = _stateStore.UpdateAcoustics(status, read => _avrClient.GetLiveState(settings.Host).ApplyAcousticsTo(read));
             return status;
         }
         finally
@@ -789,7 +789,7 @@ public sealed class ReceiverController
             await operation(settings, cancellationToken);
             await Task.Delay(180, cancellationToken);
             var status = await _avrClient.GetAcousticStatusAsync(settings, cancellationToken);
-            _stateStore.UpdateAcoustics(status);
+            status = _stateStore.UpdateAcoustics(status, read => _avrClient.GetLiveState(settings.Host).ApplyAcousticsTo(read));
             _logStore.Info($"{actionDescription} completed.");
             return status;
         }
@@ -933,11 +933,10 @@ public sealed class ReceiverController
             return;
         }
 
-        var acousticLines = received.Lines.Where(AvrLiveState.IsAcousticLine).ToList();
         var before = _stateStore.Snapshot.Status;
         _stateStore.PatchFromReceiver(
             status => WithLiveAvrState(host, status),
-            acousticLines.Count == 0 ? null : acoustics => acousticLines.Aggregate(acoustics, AvrLiveState.ApplyAcoustic));
+            received.Lines.Any(AvrLiveState.IsAcousticLine) ? acoustics => _avrClient.GetLiveState(host).ApplyAcousticsTo(acoustics) : null);
 
         if (before is { IsAvrConfirmed: true } &&
             _stateStore.Snapshot.Status is { } after &&

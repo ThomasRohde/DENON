@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Denon.App.Core.Models;
 
 namespace Denon.App.Core.Heos;
@@ -36,6 +37,12 @@ public sealed record AvrLiveState
 
     public bool? IsZone2On { get; init; }
 
+    /// <summary>
+    /// The newest acoustic line (PS* and DIM) for each setting, for example "PSDYNEQ" → "PSDYNEQ OFF". The newest line
+    /// for a setting is its real value, so <see cref="ApplyAcousticsTo"/> can apply them in any order.
+    /// </summary>
+    public ImmutableDictionary<string, string> AcousticLines { get; init; } = ImmutableDictionary<string, string>.Empty;
+
     /// <summary>Reads one line. A line it does not know (or a value it cannot read) leaves the state as it is.</summary>
     public AvrLiveState Apply(string rawLine)
     {
@@ -43,6 +50,11 @@ public sealed record AvrLiveState
         if (line.Length < 3)
         {
             return this;
+        }
+
+        if (AcousticKey(line) is { } key)
+        {
+            return this with { AcousticLines = AcousticLines.SetItem(key, line) };
         }
 
         if (line.StartsWith("PW", StringComparison.OrdinalIgnoreCase))
@@ -206,6 +218,42 @@ public sealed record AvrLiveState
     /// <summary>True for a line <see cref="ApplyAcoustic"/> reads.</summary>
     public static bool IsAcousticLine(string line) =>
         line.StartsWith("PS", StringComparison.OrdinalIgnoreCase) || line.StartsWith("DIM", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// <paramref name="acoustics"/> with the newest acoustic line of each setting on this link. A full acoustic read
+    /// takes about a second; a setting changed on the remote after its query answered is newer than the read.
+    /// </summary>
+    public AcousticStatus ApplyAcousticsTo(AcousticStatus acoustics) =>
+        AcousticLines.Values.Aggregate(acoustics, ApplyAcoustic);
+
+    /// <summary>
+    /// The setting an acoustic line sets, or null when <see cref="ApplyAcoustic"/> cannot read it. The trims have
+    /// two: on/off and the level ("PSSWL ON" and "PSSWL 52" are both kept).
+    /// </summary>
+    internal static string? AcousticKey(string line)
+    {
+        if (!IsAcousticLine(line) || ReferenceEquals(ApplyAcoustic(AcousticStatus.Empty, line), AcousticStatus.Empty))
+        {
+            return null;
+        }
+
+        foreach (var prefix in AcousticPrefixes)
+        {
+            if (!line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return prefix is "PSSWL" or "PSDIL"
+                ? prefix + (DenonAvrClient.ParseOnOff(line[prefix.Length..]) is null ? ":LEVEL" : ":ONOFF")
+                : prefix;
+        }
+
+        return null;
+    }
+
+    private static readonly string[] AcousticPrefixes =
+        ["PSMULTEQ:", "PSDYNEQ", "PSDYNVOL", "PSRSTR", "DIM", "PSSWL", "PSDIL", "PSTONE CTRL", "PSBAS", "PSTRE"];
 
     private static bool? OnOff(string line, string on, string off) =>
         string.Equals(line, on, StringComparison.OrdinalIgnoreCase) ? true
