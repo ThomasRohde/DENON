@@ -2358,8 +2358,21 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
 
         // Take each socket out first, so a pointer send in flight sees null, not a disposed socket. A close on a
         // half-open link (the TV unplugged) waits for TCP to give up: at most 1 s here.
-        await CloseQuietlyAsync(Interlocked.Exchange(ref _pointerWs, null));
-        await CloseQuietlyAsync(Interlocked.Exchange(ref _ws, null));
+        var pointer = Interlocked.Exchange(ref _pointerWs, null);
+        var main = Interlocked.Exchange(ref _ws, null);
+        await CloseQuietlyAsync(pointer);
+        await CloseQuietlyAsync(main);
+
+        // The receive loop no longer owns this socket, so it will not publish the drop: do it here.
+        if (main is not null || pointer is not null)
+        {
+            UpdateState(s => s with
+            {
+                IsConnected = s.IsDemo && s.IsConnected,
+                IsPointerConnected = false,
+                TransportLabel = s.IsDemo ? s.TransportLabel : "OFFLINE",
+            });
+        }
     }
 
     private static async Task CloseQuietlyAsync(ClientWebSocket? socket)
