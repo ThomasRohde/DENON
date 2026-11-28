@@ -4,13 +4,18 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.10.33] - 2026-11-28
 
 ### Fixed
 - **A scene no longer switches the main input while Zone 2 may be loud** (#75 follow-up). When a scene's Zone 2
   volume step fails and the scene also changes the main input, Zone 2 is muted first (a Zone 2 that follows the main
   zone would play the new input at its old volume). A scene's stream counts too (it switches to NET). When the mute
   fails too, the input and stream steps are skipped and the log says why.
+- **Old runtime folders in %TEMP% are deleted.** Each app version and each local build left about 9 MB of native
+  DLLs in `%TEMP%\.net\<exe name>\` (or in `DOTNET_BUNDLE_EXTRACT_BASE_DIR`), and .NET never deletes them: over
+  100 folders, 1.2 GB, on a test PC. On start the app now deletes the old folders of its own exe in the background.
+  It keeps the folder it runs from, the folder of any other copy that runs, and folders less than 10 minutes old.
+  A folder with a file in use is left whole, and the cleanup stops when another copy of the app is starting.
 
 ## [2.10.32] - 2026-11-28
 
@@ -54,13 +59,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   refused for in-app shortcuts like the other page keys.
 - Ctrl+K is a normal key binding of the main window now (it was a temporary class handler). It does nothing while
   the shortcut recorder or the update panel is open.
-
-### Fixed
-- **Old runtime folders in %TEMP% are deleted.** Each app version and each local build left about 9 MB of native
-  DLLs in `%TEMP%\.net\<exe name>\` (or in `DOTNET_BUNDLE_EXTRACT_BASE_DIR`), and .NET never deletes them: over
-  100 folders, 1.2 GB, on a test PC. On start the app now deletes the old folders of its own exe in the background.
-  It keeps the folder it runs from, the folder of any other copy that runs, and folders less than 10 minutes old.
-  A folder with a file in use is left whole, and the cleanup stops when another copy of the app is starting.
 
 ## [2.10.30] - 2026-11-28
 
