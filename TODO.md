@@ -357,6 +357,10 @@ Design and decisions: `docs/theming.md` (branch `theming-2.0`).
       title bar, sidebar and page wrappers.
 - [x] Built-in plugins (Hue, Smart TV, Home Assistant): use the app's card and button styles (sizes stay local).
 - [x] Hue Music Sync and the Deck meters follow internet radio that the app starts (FFmpeg decodes a copy; 2.10.10). Checked live
+- [x] After an app restart, the meters and Hue Music Sync pick up the station that still plays (the one the app
+      started last, from `last-station.txt`), once per run while nothing else started.
+- [ ] Check live: play a station, restart the app (or install an update), and see the log line "... plays on from
+      before the app started" and Hue moving to the music.
       on DR P8 Jazz: Deck meters DENON · SYNCED, Hue LIVE FFT SYNC with beats. During speech (news) the badge
       blinked to WAITING FOR AUDIO in pauses (~18% of frames below −50 dBFS); the badge now holds 2 s (2.10.11).
 - [ ] Radio meters: check the beat timing against the speakers and, if needed, a radio delay setting
