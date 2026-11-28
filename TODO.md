@@ -39,8 +39,11 @@ The reader loop is done: `DenonAvrClient` reads every line, keeps `AvrLiveState`
 patches `ReceiverStateStore` at once. `ReceiverPollingService` slows to 9 × Poll Interval (30–60 s) while the link
 holds and the HEOS events are connected.
 
-- [ ] Read-only live check on the real receiver: turn the knob and press the remote, and see the app follow within
-      ~50 ms; check the slow check line in the log ("Receiver pushes its changes: full check every 45 s").
+- [x] Read-only live check (2026-11-28, AVR-X2400H): slow check after 7 s ("full check every 45 s"); the knob,
+      mute on/off and input changes from the remote all came in as pushes, between the 45 s checks. It also showed
+      that state changes could be raised out of order from two threads; fixed (one ordered delivery).
+- [ ] Check in the released app that an input change on the remote leaves no extra input.changed (in the live check
+      TV → NET → TV was followed by one more TV → NET; not yet known if the receiver really switched).
 - [ ] #75 (HEOS groups and Zone 2 controls) builds on this: Zone 2 source and volume lines (Z2TV, Z240) are read by
       `AvrLiveState` only for power today.
 - [ ] The Brain still reads the acoustics every 90 s (`RoomIntelligenceService`). With PS/DIM pushes in
