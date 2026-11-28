@@ -46,6 +46,8 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
 - [x] PR 9: desktop shell. #53, #54, #55 and #71 closed (with PR 8). Left out of #71: an empty state for the
       YouTube, Stations and Cast pages (a feature) and full dark ContextMenu templates (cosmetic, larger).
 - [ ] PR 10: release, CI, installer, docs: #58, #59, #60, #62, #72, #73.
+- [x] PR 10b: docs and notices, part of #73. Left out: refreshed website screenshots and the new guides
+      (docs/plugin-development.md, CONTRIBUTING.md, SECURITY.md), which are new documents rather than fixes.
 - [x] PR 11: accessibility, #57 closed. A focus ring on the shared styles, names on the symbol buttons of the main
       window, Control Deck, tray flyout and YouTube page, and light text on the scrim.
 - [ ] Verify PR 11 in the app (needs the user): Tab through the main window in Dark and Light and check the ring
@@ -182,7 +184,8 @@ Learns the listening volume per source and sets it on a source change (2.10.0, `
 - [ ] Verify live: switch between the Apple TV, DR1 and TV 2 Charlie and check the volume follows; check a Smart Scene
       (Morning Jazz) keeps its own volume.
 - [ ] HEOS radio is one source ("HEOS Music") for now; stations differ in loudness too. Idea: a key per station.
-- [ ] MCP: no tool reads or sets the learned levels yet.
+- [x] MCP: `show_volume_memory` shows the learned levels; `volume_memory_set_level` and `volume_memory_forget` change
+      them (2.10.5).
 
 ## Automations
 
