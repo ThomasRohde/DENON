@@ -61,6 +61,8 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     private bool _switchToArcOnDenon;
     private bool _muteSpeakersOnDenon;
     private bool _screenOffOnMusicScene;
+    private string _cecWakeCastDevice = string.Empty;
+    private bool _isLoadingCastDevices;
 
     private bool _isLiveConnected;
     private string _connectionBadgeText = "STANDBY / OFFLINE";
@@ -125,6 +127,9 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 
     public ObservableCollection<LgTvInputInfo> Inputs { get; } = [];
     public ObservableCollection<LgTvAppInfo> FilteredApps { get; } = [];
+
+    /// <summary>"Automatic" and the Cast devices the Chromecast plugin knows, for "Chromecast on this TV".</summary>
+    public ObservableCollection<CastDeviceOption> CastDeviceOptions { get; } = [new(string.Empty, "Automatic")];
 
     public ICommand DiscoverCommand { get; }
     public ICommand AutoMacCommand { get; }
@@ -207,6 +212,27 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     {
         get => _channelLogos;
         set { if (Set(ref _channelLogos, value)) TriggerAutoSave(); }
+    }
+
+    /// <summary>
+    /// The Chromecast that wakes the TV over HDMI-CEC (its id); empty is "Automatic". A null from the list while
+    /// it reloads is not a choice, so it changes nothing.
+    /// </summary>
+    public string? CecWakeCastDevice
+    {
+        get => _cecWakeCastDevice;
+        set
+        {
+            if (value is null || _isLoadingCastDevices)
+            {
+                return;
+            }
+
+            if (Set(ref _cecWakeCastDevice, value))
+            {
+                TriggerAutoSave();
+            }
+        }
     }
 
     public bool SwitchToArcOnDenon
@@ -355,6 +381,63 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     {
         _isViewVisible = isVisible;
         UpdatePreviewLoop();
+        if (isVisible)
+        {
+            _ = LoadCastDevicesAsync();
+        }
+    }
+
+    /// <summary>
+    /// Fills "Chromecast on this TV" from the Chromecast plugin. "Automatic" names the device it picks now. A chosen
+    /// device the plugin no longer knows stays in the list, so the choice is not lost.
+    /// </summary>
+    private async Task LoadCastDevicesAsync()
+    {
+        IReadOnlyList<CastDeviceChoice>? devices;
+        try
+        {
+            devices = await _plugin.GetCastDevicesAsync();
+        }
+        catch (Exception)
+        {
+            devices = null;
+        }
+
+        RunOnUi(() =>
+        {
+            var chosen = _cecWakeCastDevice;
+            var (auto, _) = SmartTvPlugin.PickCecCastDevice(null, devices);
+            var autoName = devices?.FirstOrDefault(d => d.Id == auto)?.Name;
+            var options = new List<CastDeviceOption>
+            {
+                new(string.Empty, autoName is null ? "Automatic" : $"Automatic ({autoName})"),
+            };
+            options.AddRange((devices ?? []).Select(d => new CastDeviceOption(d.Id, d.IsConnected ? d.Name : $"{d.Name} (offline)")));
+            if (chosen.Length > 0 && options.All(o => !o.Id.Equals(chosen, StringComparison.OrdinalIgnoreCase)))
+            {
+                options.Add(new CastDeviceOption(chosen, $"{chosen} (not found)"));
+            }
+
+            _isLoadingCastDevices = true;
+            try
+            {
+                CastDeviceOptions.Clear();
+                foreach (var option in options)
+                {
+                    CastDeviceOptions.Add(option);
+                }
+            }
+            finally
+            {
+                _isLoadingCastDevices = false;
+            }
+
+            // A chosen name (typed before this list existed) shows as its device.
+            var match = options.FirstOrDefault(o => o.Id.Equals(chosen, StringComparison.OrdinalIgnoreCase)) ??
+                        options.FirstOrDefault(o => o.Id.Length > 0 && devices?.Any(d => d.Id == o.Id && d.Name.Equals(chosen, StringComparison.OrdinalIgnoreCase)) == true);
+            _cecWakeCastDevice = match?.Id ?? chosen;
+            Raise(nameof(CecWakeCastDevice));
+        });
     }
 
     public void SyncFromConfig(SmartTvConfig cfg)
@@ -376,6 +459,8 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
                 MuteSpeakersOnDenon = cfg.MuteTvSpeakersOnDenonPowerOn;
                 ScreenOffOnMusicScene = cfg.ScreenOffOnMusicScene;
                 AutoRefreshPreview = cfg.AutoRefreshPreview;
+                _cecWakeCastDevice = cfg.CecWakeCastDevice.Trim();
+                Raise(nameof(CecWakeCastDevice));
 
                 var isConfigured = cfg.DemoMode || (!string.IsNullOrWhiteSpace(cfg.TvIp) && !string.IsNullOrWhiteSpace(cfg.ClientKey));
                 IsSetupExpanded = !isConfigured;
@@ -668,7 +753,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
             MovieNightInputAppId = _plugin.Config.MovieNightInputAppId,
             LastModelName = _plugin.Config.LastModelName,
             LastWebOsVersion = _plugin.Config.LastWebOsVersion,
-            CecWakeCastDevice = _plugin.Config.CecWakeCastDevice, // Not on the dashboard: keep it.
+            CecWakeCastDevice = _cecWakeCastDevice,
         });
         StatusMessage = quiet ? "✓ Coordination setting saved automatically." : "✓ Saved Smart TV settings.";
     }

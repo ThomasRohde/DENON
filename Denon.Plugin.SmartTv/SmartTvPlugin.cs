@@ -44,7 +44,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
     public PluginManifest Manifest { get; } = new(
         Id: "smart-tv",
         Name: "Smart TV Control (LG webOS)",
-        Version: "2.4.0",
+        Version: "2.4.1",
         Author: "Denon Desktop",
         Description: "Full persistent LG webOS SSAP (wss://:3001) controller: live TV state subscriptions, auto-discovered apps & HDMI inputs, Magic Remote D-Pad & keyboard, OLED Screen Off, eARC Audio Output switching, YouTube deep-link casting, SSDP/ARP auto-discovery, Wake-on-LAN, and Denon AVR coordination.",
         Category: "Home Theater TV",
@@ -1244,12 +1244,6 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
     /// <summary>How long Wake-on-LAN packets go out before the HDMI-CEC fallback.</summary>
     internal static readonly TimeSpan WakeOnLanWindow = TimeSpan.FromSeconds(15);
 
-    /// <summary>
-    /// The device value that makes the Cast plugin use its only device and refuse when it knows several (it then
-    /// lists them), so a playing Chromecast on another TV is never picked.
-    /// </summary>
-    internal const string OnlyCastDevice = "only";
-
     /// <summary>How long the TV gets to answer after the Chromecast woke it over HDMI-CEC.</summary>
     internal static readonly TimeSpan CecWakeWindow = TimeSpan.FromSeconds(20);
 
@@ -1307,11 +1301,19 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
                 return PluginActionResult.Fail("The TV did not answer Wake-on-LAN.");
             }
 
-            // The Chromecast on this TV: the configured one, else the Cast plugin's only device. Never "the one
-            // that plays" (Cast picks that without a device), which may sit on another TV.
-            var castDevice = string.IsNullOrWhiteSpace(_config.CecWakeCastDevice) ? null : _config.CecWakeCastDevice.Trim();
+            // The Chromecast on this TV: the one chosen on the Smart TV page, else the only one known or the only one
+            // online. Never "the one that plays" (Cast picks that without a device), which may sit on another TV.
+            var (castDevice, noDevice) = PickCecCastDevice(
+                _config.CecWakeCastDevice,
+                string.IsNullOrWhiteSpace(_config.CecWakeCastDevice) ? await GetCastDevicesAsync(ct) : null);
+            if (castDevice is null)
+            {
+                return PluginActionResult.Fail(
+                    $"The TV did not answer Wake-on-LAN in {WakeOnLanWindow.TotalSeconds:0} s, and no Chromecast can wake it: {noDevice}");
+            }
+
             var wake = await _context.RunPluginActionAsync(
-                "chromecast", "wake-tv", new Dictionary<string, string> { ["device"] = castDevice ?? OnlyCastDevice }, ct);
+                "chromecast", "wake-tv", new Dictionary<string, string> { ["device"] = castDevice }, ct);
             if (!wake.Success)
             {
                 return PluginActionResult.Fail(
@@ -1323,7 +1325,7 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
             // its input: no Live TV then.
             var (launched, wakeSession) = ReadWakeResult(wake.DataJson);
             var closeWakeSession = launched && wakeSession is not null
-                ? new Dictionary<string, string> { ["sessionId"] = wakeSession, ["device"] = castDevice ?? OnlyCastDevice }
+                ? new Dictionary<string, string> { ["sessionId"] = wakeSession, ["device"] = castDevice }
                 : null;
             var cec = System.Diagnostics.Stopwatch.StartNew();
             while (cec.Elapsed < CecWakeWindow)
@@ -1375,6 +1377,98 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
         {
             _powerOnGate.Release();
         }
+    }
+
+    /// <summary>The Cast devices the Chromecast plugin knows (enabled ones only), or null when it does not run.</summary>
+    internal async Task<IReadOnlyList<CastDeviceChoice>?> GetCastDevicesAsync(CancellationToken ct = default)
+    {
+        if (_context is null)
+        {
+            return null;
+        }
+
+        var list = await _context.RunPluginActionAsync("chromecast", "list-devices", null, ct);
+        return list.Success ? ReadCastDevices(list.DataJson) : null;
+    }
+
+    /// <summary>Reads the Chromecast plugin's list-devices data. Disabled devices are left out.</summary>
+    internal static IReadOnlyList<CastDeviceChoice> ReadCastDevices(string? dataJson)
+    {
+        if (string.IsNullOrWhiteSpace(dataJson))
+        {
+            return [];
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(dataJson);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array)
+            {
+                return [];
+            }
+
+            var devices = new List<CastDeviceChoice>();
+            foreach (var d in doc.RootElement.EnumerateArray())
+            {
+                var id = d.TryGetProperty("id", out var i) && i.ValueKind == JsonValueKind.String ? i.GetString() : null;
+                if (string.IsNullOrWhiteSpace(id) ||
+                    (d.TryGetProperty("enabled", out var e) && e.ValueKind == JsonValueKind.False))
+                {
+                    continue;
+                }
+
+                var name = d.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() : null;
+                var connected = d.TryGetProperty("connection", out var c) && c.ValueKind == JsonValueKind.String &&
+                                string.Equals(c.GetString(), "Connected", StringComparison.OrdinalIgnoreCase);
+                devices.Add(new CastDeviceChoice(id, string.IsNullOrWhiteSpace(name) ? id : name, connected));
+            }
+
+            return devices;
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// The Chromecast that wakes this TV over HDMI-CEC: the one chosen on the Smart TV page; else the only one known;
+    /// else the only one online. With several online, none: the person chooses (another one may sit on another TV).
+    /// Returns the device (id, name or IP) or the reason there is none.
+    /// </summary>
+    internal static (string? Device, string? Reason) PickCecCastDevice(
+        string? chosen, IReadOnlyList<CastDeviceChoice>? devices)
+    {
+        if (!string.IsNullOrWhiteSpace(chosen))
+        {
+            return (chosen.Trim(), null);
+        }
+
+        if (devices is null)
+        {
+            return (null, "the Chromecast plugin does not run.");
+        }
+
+        if (devices.Count == 0)
+        {
+            return (null, "the Chromecast plugin knows no Cast device.");
+        }
+
+        if (devices.Count == 1)
+        {
+            return (devices[0].Id, null);
+        }
+
+        var online = devices.Where(d => d.IsConnected).ToList();
+        if (online.Count == 1)
+        {
+            return (online[0].Id, null);
+        }
+
+        return online.Count == 0
+            ? (null, $"no Chromecast is online ({string.Join(", ", devices.Select(d => d.Name))}).")
+            : (null, $"several Chromecasts are online ({string.Join(", ", online.Select(d => d.Name))}). " +
+                     "Choose the Chromecast on this TV on the Smart TV page.");
     }
 
     /// <summary>True when the Chromecast's quit-app closed the session (its data says "closed": true).</summary>

@@ -13,4 +13,8 @@
     <ProjectReference Include="..\Denon.App.PluginSdk\Denon.App.PluginSdk.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Denon.App.Core.Tests" />
+  </ItemGroup>
+
 </Project>

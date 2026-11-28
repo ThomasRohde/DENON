@@ -39,8 +39,9 @@ public sealed class SmartTvConfig
     public bool ChannelLogos { get; set; } = true;
 
     /// <summary>
-    /// The Chromecast plugged into this TV (name, id or IP), which wakes it over HDMI-CEC when Wake-on-LAN gets no
-    /// answer. Empty: the only Cast device. With several Cast devices, set it, or the fallback is skipped.
+    /// The Chromecast plugged into this TV (its id, name or IP), which wakes it over HDMI-CEC when Wake-on-LAN gets
+    /// no answer. Chosen on the Smart TV page. Empty is "Automatic": the only Cast device known, else the only one
+    /// online.
     /// </summary>
     public string CecWakeCastDevice { get; set; } = string.Empty;
 
@@ -49,6 +50,12 @@ public sealed class SmartTvConfig
     /// </summary>
     public Dictionary<string, string> ChannelLogoOverrides { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
+
+/// <summary>A Cast device the Chromecast plugin knows: its id, its name, and whether it is online now.</summary>
+internal sealed record CastDeviceChoice(string Id, string Name, bool IsConnected);
+
+/// <summary>One entry of the "Chromecast on this TV" list on the Smart TV page. An empty id is "Automatic".</summary>
+public sealed record CastDeviceOption(string Id, string Label);
 
 /// <summary>A program from the TV's guide (DVB EIT), in real time (any day shift in the TV's guide removed).</summary>
 public sealed record LgTvProgram(string Name, DateTimeOffset Start, DateTimeOffset End);
