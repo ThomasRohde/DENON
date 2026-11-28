@@ -4,6 +4,18 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Keyboard focus is visible** (#57): Tab now shows a 2 px accent ring around buttons, chips, rail items, toggles,
+  sliders, lists, combo boxes and expanders, in both themes (round on the transport buttons). Before, the focus was
+  a thin black dotted line that could not be seen on the dark chassis.
+- **Screen readers name the symbol buttons** (#57): the window buttons, the transport and volume buttons, the
+  volume sliders, the rail, the plugin badges, the scene and level chips, and the YouTube queue's ▶ ↑ ↓ ✕ buttons
+  (which also get tooltips) say what they do instead of just "Button".
+- **YouTube duration badges are readable in the Light theme** (#57): their text was dark on the dark scrim; it is
+  light now in both themes.
+
 ## [2.10.27] - 2026-11-28
 
 ### Fixed

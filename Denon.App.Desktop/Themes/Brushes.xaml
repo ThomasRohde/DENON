@@ -86,6 +86,7 @@
     <SolidColorBrush po:Freeze="True" x:Key="OverlayHighlightFaintBrush" Color="{StaticResource OverlayHighlightFaintColor}" />
     <SolidColorBrush po:Freeze="True" x:Key="OverlayHighlightSoftBrush" Color="{StaticResource OverlayHighlightSoftColor}" />
     <SolidColorBrush po:Freeze="True" x:Key="OverlayScrimBrush" Color="{StaticResource OverlayScrimColor}" />
+    <SolidColorBrush po:Freeze="True" x:Key="TextOnScrimBrush" Color="{StaticResource TextOnScrimColor}" />
     <SolidColorBrush po:Freeze="True" x:Key="AccentCyanGlowBrush" Color="{StaticResource AccentCyanGlowColor}" />
     <SolidColorBrush po:Freeze="True" x:Key="AccentEmeraldBrightBrush" Color="{StaticResource AccentEmeraldBrightColor}" />
     <SolidColorBrush po:Freeze="True" x:Key="AccentAmberBrightBrush" Color="{StaticResource AccentAmberBrightColor}" />
