@@ -4,6 +4,13 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Developer guides** (#73): `docs/plugin-development.md` (how to write, install, test and release an external
+  plugin), `CONTRIBUTING.md` (build, tests, CI, pull requests) and `SECURITY.md` (supported versions, private
+  reports, the app's local servers and the update check).
+
 ## [2.10.28] - 2026-11-28
 
 ### Fixed
