@@ -52,6 +52,9 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
 - [ ] Verify PR 10a (needs the user): uninstall with "Launch at Windows startup" turned on in Settings and check
       that the startup entry is gone; the next in-app update downloads, starts and shows notes without the
       download list.
+- [x] PR 10a follow-up: loopback tests for the Insights server and its automation editor API (key cookie, Host,
+      editor header, Origin, body cap, the happy path), #59. The editor API has no listener of its own. The
+      server's icon and font addresses now name the app assembly, so they also resolve outside the app.
 - [x] PR 10b: docs and notices, part of #73. Left out: refreshed website screenshots and the new guides
       (docs/plugin-development.md, CONTRIBUTING.md, SECURITY.md), which are new documents rather than fixes.
 - [x] PR 11: accessibility, #57 closed. A focus ring on the shared styles, names on the symbol buttons of the main

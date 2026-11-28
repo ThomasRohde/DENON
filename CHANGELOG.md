@@ -4,6 +4,16 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Tests
+- Loopback tests for the Insights server and its automation editor API: the key cookie, Host, editor header,
+  Origin and body-size checks, and a save, list and delete (#59).
+
+### Changed
+- The Insights server reads its icon and font by an address that names the app assembly, so the resources
+  are also found outside the app (in the tests). The app serves the same files.
+
 ## [2.10.28] - 2026-11-28
 
 ### Fixed
