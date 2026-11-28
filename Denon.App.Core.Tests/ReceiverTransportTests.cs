@@ -15,7 +15,7 @@ namespace Denon.App.Core.Tests;
 /// Disconnect never blocks (#28), one command is one line (#30), Zone 2 and the grace window (#39), fast replies
 /// and fades (#43), HEOS-only scenes (#66), the push listener's heartbeat (#38), and the port 23 reader with its pushes (#74).
 /// </summary>
-public sealed class ReceiverTransportTests : IDisposable
+public sealed partial class ReceiverTransportTests : IDisposable
 {
     private readonly string _tempDir = Path.Combine(Path.GetTempPath(), "denon-transport-" + Guid.NewGuid().ToString("N"));
 
@@ -145,9 +145,9 @@ public sealed class ReceiverTransportTests : IDisposable
     [InlineData("Z240", "Z2TV", "Z2ON")]
     public void Zone2_is_on_when_any_reply_line_says_Z2ON(string a, string b, string c)
     {
-        Assert.True(DenonAvrClient.IsZone2OnReply([a, b, c]));
-        Assert.False(DenonAvrClient.IsZone2OnReply(["Z2OFF", "Z2TV", "Z240"]));
-        Assert.False(DenonAvrClient.IsZone2OnReply([]));
+        Assert.True(DenonAvrClient.ParseZone2Lines([a, b, c]).IsZone2On);
+        Assert.False(DenonAvrClient.ParseZone2Lines(["Z2OFF", "Z2TV", "Z240"]).IsZone2On);
+        Assert.Null(DenonAvrClient.ParseZone2Lines([]).IsZone2On);
     }
 
     [Fact]
@@ -155,6 +155,7 @@ public sealed class ReceiverTransportTests : IDisposable
     {
         using var avr = new FakeAvr();
         avr.Replies["Z2?"] = "Z2TV\rZ2ON\rZ240\r";
+        avr.Replies["Z2MU?"] = "Z2MUOFF\r"; // asked while Zone 2 is on
         var client = new DenonAvrClient(avr.Port);
 
         await client.GetStatusAsync(Loopback(), CancellationToken.None); // Opens the link.
@@ -163,6 +164,9 @@ public sealed class ReceiverTransportTests : IDisposable
         watch.Stop();
 
         Assert.True(status.IsZone2On);
+        Assert.Equal(40, status.Zone2Volume);
+        Assert.Equal("TV", status.Zone2Source);
+        Assert.False(status.IsZone2Muted);
         Assert.True(status.IsPoweredOn);
         Assert.Equal(45, status.Volume);
         Assert.Equal(98, status.MaxVolume);
@@ -484,6 +488,9 @@ public sealed class ReceiverTransportTests : IDisposable
     [InlineData("ECOAUTO", nameof(AvrLiveState.EcoMode), "AUTO")]
     [InlineData("SLP030", nameof(AvrLiveState.SleepTimerMinutes), 30)]
     [InlineData("Z2ON", nameof(AvrLiveState.IsZone2On), true)]
+    [InlineData("Z240", nameof(AvrLiveState.Zone2Volume), 40)]
+    [InlineData("Z2TV", nameof(AvrLiveState.Zone2Source), "TV")]
+    [InlineData("Z2MUON", nameof(AvrLiveState.IsZone2Muted), true)]
     public void A_receiver_line_sets_its_field(string line, string field, object expected)
     {
         var live = AvrLiveState.Empty.Apply(line);
@@ -493,8 +500,8 @@ public sealed class ReceiverTransportTests : IDisposable
     }
 
     [Theory]
-    [InlineData("Z2TV")]       // zone 2 source, not its power
-    [InlineData("Z240")]       // zone 2 volume
+    [InlineData("Z2CS ST")]    // zone 2 channel setting
+    [InlineData("Z2QUICK1")]   // a zone 2 Quick Select memory, not a source
     [InlineData("MSQUICK1")]   // a Quick Select memory, not a sound mode
     [InlineData("MVxx")]
     [InlineData("SSINFAISFSV 441")]
@@ -958,6 +965,9 @@ public sealed class ReceiverTransportTests : IDisposable
         /// <summary>Close each connection at once (port busy or not there).</summary>
         public volatile bool HangUp;
 
+        /// <summary>Drops the link when a command matches (a write that fails); other commands work.</summary>
+        public volatile Func<string, bool>? DropOn;
+
         public void ClearCommands() => _commands.Clear();
 
         private readonly ConcurrentDictionary<TcpClient, NetworkStream> _open = new();
@@ -1076,7 +1086,7 @@ public sealed class ReceiverTransportTests : IDisposable
 
                             _commands.Enqueue(command);
                             CommandTimes.Enqueue(DateTimeOffset.UtcNow);
-                            if (HangUp)
+                            if (HangUp || DropOn?.Invoke(command) == true)
                             {
                                 return; // Drops this link too.
                             }
@@ -1156,6 +1166,13 @@ public sealed class ReceiverTransportTests : IDisposable
     {
         public volatile int Volume = 30;
 
+        /// <summary>The get_groups payload (a JSON array), and more players after pid 1 (JSON objects, each with a comma first).</summary>
+        public volatile string GroupsJson = "[]";
+        public volatile string MorePlayersJson = string.Empty;
+
+        /// <summary>When set, a set_group makes this the get_groups payload (the speaker's groups after it).</summary>
+        public volatile string? GroupsAfterSetGroup;
+
         protected override string LineEnd => "\n";
 
         protected override string? Answer(string command)
@@ -1170,7 +1187,25 @@ public sealed class ReceiverTransportTests : IDisposable
             {
                 case "player/get_players":
                     message = string.Empty;
-                    payload = ",\"payload\":[{\"name\":\"Fake\",\"pid\":1,\"model\":\"Fake AVR\",\"version\":\"1\",\"ip\":\"127.0.0.1\",\"network\":\"wired\",\"lineout\":0,\"serial\":\"\"}]";
+                    payload = ",\"payload\":[{\"name\":\"Fake\",\"pid\":1,\"model\":\"Fake AVR\",\"version\":\"1\",\"ip\":\"127.0.0.1\",\"network\":\"wired\",\"lineout\":0,\"serial\":\"\"}" + MorePlayersJson + "]";
+                    break;
+                case "group/get_groups":
+                    message = string.Empty;
+                    payload = ",\"payload\":" + GroupsJson;
+                    break;
+                case "group/get_volume":
+                    message = query + "&level=20";
+                    break;
+                case "group/set_group":
+                    if (GroupsAfterSetGroup is { } after)
+                    {
+                        GroupsJson = after;
+                    }
+
+                    message = query;
+                    break;
+                case "group/get_mute":
+                    message = query + "&state=off";
                     break;
                 case "player/get_play_state":
                     message = "pid=1&state=stop";

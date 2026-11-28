@@ -44,6 +44,27 @@ public sealed class ScenePreset
 
     public string? StreamUrl { get; set; }
 
+    /// <summary>Zone 2 power: true turns it on (then source, volume and mute apply), false turns it off. Null: no change.</summary>
+    public bool? Zone2On { get; set; }
+
+    /// <summary>Zone 2 source code (TV, NET, SOURCE for the main zone's source). Null: no change.</summary>
+    public string? Zone2Source { get; set; }
+
+    /// <summary>Zone 2 volume on the receiver's 0–98 scale. Null: no change.</summary>
+    public int? Zone2Volume { get; set; }
+
+    /// <summary>Zone 2 mute. False unmutes after the volume is set. Null: no change.</summary>
+    public bool? Zone2Muted { get; set; }
+
+    /// <summary>
+    /// HEOS players (names or ids) to group with this app's player, which leads and plays the scene's source.
+    /// Empty: no change.
+    /// </summary>
+    public List<string> HeosGroupMembers { get; set; } = [];
+
+    /// <summary>True ends the HEOS group this app's player is in (when <see cref="HeosGroupMembers"/> is empty).</summary>
+    public bool HeosUngroup { get; set; }
+
     public List<ScenePluginActionStep> PluginActions { get; set; } = [];
 
     public ScenePreset Clone() =>
@@ -70,6 +91,12 @@ public sealed class ScenePreset
             SubwooferTrimDb = SubwooferTrimDb,
             DialogTrimDb = DialogTrimDb,
             StreamUrl = StreamUrl,
+            Zone2On = Zone2On,
+            Zone2Source = Zone2Source,
+            Zone2Volume = Zone2Volume,
+            Zone2Muted = Zone2Muted,
+            HeosGroupMembers = [.. HeosGroupMembers ?? []], // null from a hand-edited settings file
+            HeosUngroup = HeosUngroup,
             PluginActions = PluginActions.Select(static s => s.Clone()).ToList(),
         };
 

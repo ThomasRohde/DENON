@@ -777,13 +777,9 @@ public sealed class AutomationEngineService : BackgroundService
                     return "Receiver unmuted";
                 case "volume":
                 {
-                    var requested = int.Parse(value, NumberStyles.Integer, CultureInfo.InvariantCulture);
-                    var ceiling = Math.Clamp(engine._settingsStore.Current.Mcp.MaxSafeVolume, 15, 98);
-                    var level = Math.Clamp(requested, 0, ceiling);
+                    var (level, note) = CapAtSafeVolume(value);
                     await receiver.SetVolumeAsync(level, ct);
-                    return level < requested
-                        ? $"Receiver volume {DenonVolumeMath.FormatDecibels(level)} (capped from {requested} at the safe volume {ceiling})"
-                        : $"Receiver volume {DenonVolumeMath.FormatDecibels(level)}";
+                    return $"Receiver volume {level}{note}";
                 }
                 case "input":
                     await receiver.SetInputSourceAsync(value, ct);
@@ -791,9 +787,62 @@ public sealed class AutomationEngineService : BackgroundService
                 case "sound_mode":
                     await receiver.SetSoundModeAsync(value, ct);
                     return $"Receiver sound mode {value}";
+                case "zone2_on":
+                    await receiver.SetZone2PowerAsync(true, ct);
+                    return "Zone 2 on";
+                case "zone2_off":
+                    await receiver.SetZone2PowerAsync(false, ct);
+                    return "Zone 2 off";
+                case "zone2_volume":
+                {
+                    var (level, note) = CapAtSafeVolume(value);
+                    await receiver.SetZone2VolumeAsync(level, ct);
+                    return $"Zone 2 volume {level}{note}";
+                }
+                case "zone2_source":
+                    await receiver.SetZone2SourceAsync(value, ct);
+                    return $"Zone 2 source {DenonCatalog.GetFriendlyZone2SourceName(value)}";
+                case "zone2_mute":
+                    await receiver.SetZone2MuteAsync(true, ct);
+                    return "Zone 2 muted";
+                case "zone2_unmute":
+                    await receiver.SetZone2MuteAsync(false, ct);
+                    return "Zone 2 unmuted";
+                case "group_with":
+                {
+                    var own = await receiver.GetOwnHeosPlayerAsync(ct);
+                    var members = await receiver.ResolveHeosPlayerIdsAsync(value.Split(','), ct);
+                    await receiver.SetHeosGroupAsync([own.PlayerId, .. members.Where(p => p != own.PlayerId)], ct);
+                    return $"HEOS group: {own.Name} with {value.Trim()}";
+                }
+                case "ungroup":
+                {
+                    var own = await receiver.GetOwnHeosPlayerAsync(ct);
+                    await receiver.LeaveHeosGroupAsync(own.PlayerId, ct);
+                    return $"{own.Name} plays alone";
+                }
+                case "group_volume":
+                {
+                    var own = await receiver.GetOwnHeosPlayerAsync(ct);
+                    var groups = await receiver.RefreshHeosGroupsAsync(ct);
+                    var group = groups.GroupOf(own.PlayerId)
+                        ?? throw new InvalidOperationException($"{own.Name} is not in a HEOS group.");
+                    var (level, note) = CapAtSafeVolume(value);
+                    await receiver.SetHeosGroupVolumeAsync(group.GroupId, level, ct);
+                    return $"HEOS group volume {level}{note}";
+                }
                 default:
                     throw new InvalidOperationException($"Unknown receiver command '{command}'.");
             }
+        }
+
+        /// <summary>The volume a node asks for, capped at the safe volume (Settings → MCP), and a note when it was capped.</summary>
+        private (int Level, string Note) CapAtSafeVolume(string value)
+        {
+            var requested = int.Parse(value, NumberStyles.Integer, CultureInfo.InvariantCulture);
+            var ceiling = Math.Clamp(engine._settingsStore.Current.Mcp.MaxSafeVolume, 15, 98);
+            var level = Math.Clamp(requested, 0, ceiling);
+            return (level, level < requested ? $" (capped from {requested} at the safe volume {ceiling})" : string.Empty);
         }
 
         public Task DelayAsync(TimeSpan delay, CancellationToken ct) => Task.Delay(delay, ct);

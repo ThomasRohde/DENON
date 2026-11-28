@@ -331,6 +331,25 @@ public sealed class McpServerIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Grouping_rooms_needs_full_orchestration_also_through_a_scene()
+    {
+        await _settings.UpdateAsync(s =>
+        {
+            s.Mcp.PermissionTier = McpPermissionTier.SafeControl;
+            s.Receiver.Scenes.Add(new ScenePreset { Id = "party", Name = "Party", HeosGroupMembers = ["Kitchen"] });
+        });
+        await using var client = await ConnectAsync();
+
+        var scene = await client.CallToolAsync("activate_smart_scene", new Dictionary<string, object?> { ["scene_id_or_name"] = "party" });
+        var group = await client.CallToolAsync("heos_set_group", new Dictionary<string, object?> { ["players"] = "Living Room, Kitchen" });
+
+        Assert.True(scene.IsError);
+        Assert.Contains("FullOrchestration", Assert.IsType<TextContentBlock>(Assert.Single(scene.Content)).Text);
+        Assert.True(group.IsError);
+        Assert.Contains("FullOrchestration", Assert.IsType<TextContentBlock>(Assert.Single(group.Content)).Text);
+    }
+
+    [Fact]
     public async Task Without_the_token_or_from_another_site_the_server_says_no()
     {
         using var http = new HttpClient();
