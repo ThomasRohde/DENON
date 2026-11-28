@@ -16,6 +16,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   A/V offset for this session only: Re-Sync and the next tracks keep it, and the status line says "not saved".
   Click Save Offset to keep it as the Cinema Offset, which also times the lyrics and the meters. Before, every
   nudge saved the offset at once, so a quick try changed the lyrics and the meters too.
+- **Home Assistant: an "Input Booleans" filter** (#79) next to Scenes, Scripts, Switches and Lights. A tile toggles
+  the helper with `input_boolean.toggle`. Demo Mode has two of them.
+- **Home Assistant: live updates** (#79). The plugin keeps a WebSocket open to Home Assistant
+  (`/api/websocket`) and updates a tile as soon as its state changes in Home Assistant, without a refresh. It
+  connects again after a lost connection (2 s, up to 60 s between tries) and stops when Home Assistant rejects the
+  token, with a clear message. The token never goes to the log. Turn it off with "Live updates" in the plugin's
+  settings. Not tested against a real Home Assistant server yet.
 - **Pick the Hue Entertainment area for Music Sync** (#79). The Music Sync panel has an "Entertainment area" list
   with each area and its channel count. A pick is saved, and a running 50 Hz stream moves to the new area. Before,
   Music Sync always used the first area. When the saved area is gone, the panel says which area it uses instead;

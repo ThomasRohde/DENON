@@ -109,6 +109,19 @@
                               Foreground="{DynamicResource TextStrongBrush}"
                               Margin="{skin:Space 0,0,0,8}" />
 
+                    <WrapPanel Margin="{skin:Space 0,0,0,8}">
+                        <CheckBox Content="Live updates: keep a WebSocket open, so tiles change when Home Assistant changes"
+                                  IsChecked="{Binding LiveUpdates}"
+                                  Foreground="{DynamicResource TextStrongBrush}"
+                                  VerticalAlignment="Center"
+                                  Margin="{skin:Space 0,0,10,0}" />
+                        <TextBlock Text="{Binding LiveStatusText}"
+                                   FontSize="{DynamicResource FontSize05}"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   VerticalAlignment="Center"
+                                   TextWrapping="Wrap" />
+                    </WrapPanel>
+
                     <Border Background="{DynamicResource SidebarBgBrush}" BorderBrush="{DynamicResource Ink11Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius03}" Padding="{skin:Space 10,7}" Margin="{skin:Space 0,0,0,8}">
                         <TextBlock Text="{Binding TelemetryPreviewText}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize03}" Foreground="{DynamicResource AccentCyanBrightBrush}" TextWrapping="Wrap" />
                     </Border>
@@ -129,7 +142,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="SCENES, SCRIPTS, SWITCHES &amp; LIGHTS" FontSize="{DynamicResource FontSize03}" FontWeight="Bold" Foreground="{DynamicResource TextFaintBrush}" VerticalAlignment="Center" />
+                            <TextBlock Text="SCENES, SCRIPTS, SWITCHES, LIGHTS &amp; INPUT BOOLEANS" FontSize="{DynamicResource FontSize03}" FontWeight="Bold" Foreground="{DynamicResource TextFaintBrush}" VerticalAlignment="Center" />
                             <Border Background="{DynamicResource Ink08Brush}" BorderBrush="{DynamicResource Ink12Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 6,1.5}" Margin="{skin:Space 8,0,0,0}">
                                 <TextBlock Text="{Binding EntitiesCountLabel}" FontSize="{DynamicResource FontSize02}" Foreground="{DynamicResource TextMutedBrush}" />
                             </Border>
@@ -202,6 +215,19 @@
                                 <Style TargetType="Button" BasedOn="{StaticResource HaFilterChip}">
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding SelectedDomainFilter}" Value="light">
+                                            <Setter Property="Background" Value="{DynamicResource AccentEmeraldSubtleBgBrush}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource AccentEmeraldBrush}" />
+                                            <Setter Property="Foreground" Value="{DynamicResource AccentEmeraldTextBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <Button Content="Input Booleans" Command="{Binding SetDomainFilterCommand}" CommandParameter="input_boolean">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource HaFilterChip}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedDomainFilter}" Value="input_boolean">
                                             <Setter Property="Background" Value="{DynamicResource AccentEmeraldSubtleBgBrush}" />
                                             <Setter Property="BorderBrush" Value="{DynamicResource AccentEmeraldBrush}" />
                                             <Setter Property="Foreground" Value="{DynamicResource AccentEmeraldTextBrush}" />
