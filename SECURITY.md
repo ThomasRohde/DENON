@@ -43,7 +43,10 @@ The app opens these servers on your PC.
 - `/health` needs no token.
 - Permission tiers limit the tools: `Observer` (read only), `SafeControl` and `FullOrchestration`. Receiver power
   off and plugin actions marked destructive need `FullOrchestration`.
-- Each MCP volume change stays at or below the safe ceiling (65 on the receiver's 0–98 scale by default).
+- The MCP volume tools `avr_set_volume`, `apply_atmosphere`, `restore_previous_state` and `fix_room_issue`
+  stay at or below the safe ceiling (65 on the receiver's 0–98 scale by default). Other paths are not limited
+  by it: a plugin action (`plugin_*` tools), or a scene or automation that it starts, can set a higher volume.
+  The plugin host only keeps a volume in 0–98.
 
 ### Audio relay and Phone Remote
 
