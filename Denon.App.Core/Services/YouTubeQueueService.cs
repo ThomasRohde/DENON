@@ -66,8 +66,28 @@ public sealed class YouTubeQueueService : IDisposable
 
     private readonly MediaQueueStore? _queueStore;
 
+    // The entry that was casting when the last run closed. The relay stream died with that run, but HEOS may still
+    // report it as playing: then the entry is cast again (once, and only within ResumeWindowMs of the start).
+    private string? _resumeEntryId;
+    private long _resumeDeadlineMs;
+
     /// <summary>The history keeps this many tracks.</summary>
     internal const int MaxHistory = 20;
+
+    /// <summary>How long after the app starts a track from the last run may be cast again.</summary>
+    internal const long ResumeWindowMs = 30_000;
+
+    /// <summary>The entry a restart may cast again, while the app waits for the receiver's state. For tests.</summary>
+    internal string? PendingResumeEntryId
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _resumeEntryId;
+            }
+        }
+    }
 
     /// <param name="queueStore">Saves the queue and history between app runs. Null: they are not saved.</param>
     public YouTubeQueueService(
@@ -88,6 +108,7 @@ public sealed class YouTubeQueueService : IDisposable
         _relayServer.TrackPlaybackStarted += OnRelayTrackPlaybackStarted;
         _relayServer.TrackStreamCompleted += OnRelayTrackStreamCompleted;
         _receiverController.NonRelaySourceActivated += OnNonRelaySourceActivated;
+        _receiverController.RelayStreamStarting += CancelPendingResume;
         _stateStore.StateChanged += OnReceiverStateChanged;
     }
 
@@ -425,6 +446,7 @@ public sealed class YouTubeQueueService : IDisposable
         string? activeToken;
         lock (_sync)
         {
+            _resumeEntryId = null; // another cast takes over: the last run's track stays stopped
             activeToken = _isActive ? _activeRelayToken : null;
             _isActive = false;
             _activeRelayToken = null;
@@ -470,6 +492,10 @@ public sealed class YouTubeQueueService : IDisposable
         CancellationToken cancellationToken)
     {
         CancelPendingAutoAdvance();
+        lock (_sync)
+        {
+            _resumeEntryId = null; // a track started in this run replaces the one from the last run
+        }
 
         YouTubeTrackItem track;
         int prevIndex;
@@ -568,6 +594,8 @@ public sealed class YouTubeQueueService : IDisposable
         {
             return;
         }
+
+        TryResumeAfterRestart(snapshot);
 
         string? externalTakeoverReason = null;
         var playState = status.PlayState;
@@ -747,8 +775,85 @@ public sealed class YouTubeQueueService : IDisposable
         }, CancellationToken.None);
     }
 
+    /// <summary>
+    /// True when the receiver still plays a URL stream that only this app's relay can explain: on, on the NET input,
+    /// playing, with HEOS's "Url Stream" placeholder (the relay gives HEOS no title), and no saved station that the
+    /// app started last (that one resumes as radio).
+    /// </summary>
+    internal static bool ShouldResumeAfterRestart(ReceiverStateSnapshot snapshot, bool lastSourceWasStation) =>
+        !lastSourceWasStation &&
+        snapshot.IsConnected &&
+        snapshot.Status is { } status &&
+        (!status.IsAvrConfirmed ||
+         (status.IsPoweredOn && status.IsMainZoneOn && DenonCatalog.InputMatches(status.InputSource, "NET"))) &&
+        string.Equals(status.PlayState, "play", StringComparison.OrdinalIgnoreCase) &&
+        status.NowPlaying.IsPlaceholderUrlStream;
+
+    /// <summary>
+    /// After an app restart (an update, a crash) the relay stream of the YouTube track that was casting is gone, but
+    /// HEOS may still report it as playing. Cast that track again from the start, so the music goes on with its title,
+    /// cover and synced meters. Once per run, within <see cref="ResumeWindowMs"/> of the start.
+    /// </summary>
+    private void TryResumeAfterRestart(ReceiverStateSnapshot snapshot)
+    {
+        int index;
+        YouTubeTrackItem track;
+        lock (_sync)
+        {
+            if (_resumeEntryId is not { } entryId)
+            {
+                return;
+            }
+
+            if (Environment.TickCount64 > _resumeDeadlineMs)
+            {
+                _resumeEntryId = null;
+                return;
+            }
+
+            if (!ShouldResumeAfterRestart(snapshot, _receiverController.LastStartedStation is not null))
+            {
+                return; // the first reads can be partial: wait for the next state until the window closes
+            }
+
+            _resumeEntryId = null;
+            index = _queue.FindIndex(t => string.Equals(t.EntryId, entryId, StringComparison.Ordinal));
+            if (index < 0)
+            {
+                return;
+            }
+
+            track = _queue[index];
+        }
+
+        var unmute = snapshot.Status?.IsMuted != true;
+        _logStore.Info($"'{track.Title}' was casting when the app closed and the receiver still plays its stream: it is cast again from the start.");
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await PlayAtIndexAsync(index, useLowVolume: false, unmute, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _logStore.Warning($"Could not cast '{track.Title}' again after the restart: {ex.Message}");
+            }
+        });
+    }
+
+    /// <summary>Anything cast or started in this run replaces the track from the last run.</summary>
+    private void CancelPendingResume()
+    {
+        lock (_sync)
+        {
+            _resumeEntryId = null;
+        }
+    }
+
     private void OnNonRelaySourceActivated()
     {
+        CancelPendingResume(); // a station or another source started: the last run's track stays stopped
+
         var wasActive = false;
         string? activeToken = null;
         lock (_sync)
@@ -841,6 +946,16 @@ public sealed class YouTubeQueueService : IDisposable
             _history.AddRange(history);
             _isShuffleEnabled = saved.IsShuffleEnabled;
             _repeatMode = Enum.IsDefined(saved.RepeatMode) ? saved.RepeatMode : YouTubeRepeatMode.Off;
+
+            var playingIndex = saved.PlayingEntryId is { Length: > 0 } playing
+                ? _queue.FindIndex(t => string.Equals(t.EntryId, playing, StringComparison.Ordinal))
+                : -1;
+            if (playingIndex >= 0)
+            {
+                _currentIndex = playingIndex;
+                _resumeEntryId = _queue[playingIndex].EntryId;
+                _resumeDeadlineMs = Environment.TickCount64 + ResumeWindowMs;
+            }
         }
 
         if (queue.Count > 0)
@@ -919,7 +1034,8 @@ public sealed class YouTubeQueueService : IDisposable
             [.. snapshot.Queue.Select(ToSaved)],
             [.. snapshot.History.Select(ToSaved)],
             snapshot.IsShuffleEnabled,
-            snapshot.RepeatMode));
+            snapshot.RepeatMode,
+            snapshot.CurrentTrack?.EntryId));
 
         static SavedYouTubeTrack ToSaved(YouTubeTrackItem t) =>
             new(t.VideoId, t.Title, t.Author, t.Duration?.TotalSeconds, t.ThumbnailUrl, t.QueueEntryId);
@@ -931,6 +1047,7 @@ public sealed class YouTubeQueueService : IDisposable
         _relayServer.TrackPlaybackStarted -= OnRelayTrackPlaybackStarted;
         _relayServer.TrackStreamCompleted -= OnRelayTrackStreamCompleted;
         _receiverController.NonRelaySourceActivated -= OnNonRelaySourceActivated;
+        _receiverController.RelayStreamStarting -= CancelPendingResume;
         _stateStore.StateChanged -= OnReceiverStateChanged;
     }
 }

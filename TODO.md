@@ -62,6 +62,8 @@ Each one needs the real devices, and most change them or play media, so they wai
       starts and shows notes without the download list.
 - [ ] Insights with the real event log on the installed app.
 - [ ] Station logos: the Deck and the phone remote show the TuneIn logo for a saved station (DR P6 Beat).
+- [ ] Update the app while a YouTube track casts: after the restart the log says "was casting when the app closed",
+      and the Deck shows the track's title and cover again.
 - [ ] Skins and windows: the first start on a small screen (1366 × 768, or 1920 × 1080 at 150 %) picks Compact; a
       second monitor with another scale opens at the right size; the tray flyout, Cinema window and the Chromecast
       and Apple TV pages in Light and in each skin; the plugin grid with six or more plugins in a narrow window.
@@ -114,6 +116,8 @@ Each one needs the real devices, and most change them or play media, so they wai
 - [ ] HEOS radio is one Volume Memory source ("HEOS Music"); stations differ in loudness. Idea: a key per station.
 
 **Meters and radio**
+- [ ] The Jukebox does not cast its track again after an app restart (the YouTube queue does). Same idea:
+      save the playing entry and cast it again when the receiver still reports the relay stream.
 - [ ] Radio meters: check the beat timing against the speakers; if needed, a radio delay setting
       (`RadioPlaybackClock.AssumedStartDelay`). A HEOS favorite, or a station another app started, has no URL for the
       app, so it stays simulated.

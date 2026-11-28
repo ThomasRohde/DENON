@@ -4,6 +4,16 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **A YouTube cast goes on after the app restarts** (an update, a crash). The app sends YouTube audio to the
+  receiver through its own relay, which stops when the app closes. HEOS could still report the stream as playing,
+  so the Deck showed "HEOS Stream" with no cover and simulated meters. The app now remembers which queue entry was
+  casting. If the receiver still plays the relay stream within 30 s of the start (on, NET input, "Url Stream"), the
+  app casts that track again from the start, with its title, cover and synced meters. A station that the app
+  started last resumes as radio, as before. Anything you start first cancels it.
+
 ## [2.10.35] - 2026-11-28
 
 ### Added
