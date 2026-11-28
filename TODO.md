@@ -25,8 +25,12 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
 - [x] PR 4: MCP tiers and limits. #66 closed; the MCP side of #61 and #65, and the /health Host check of #64.
       Kept as decided: plugin actions marked destructive still run in SafeControl (#61 F1). The plugin-host items of
       #61 (caller state, origin label, "AVR Control" capability) and #65 (SetPluginEnabledAsync) are in PR 6.
-- [ ] PR 5: media relay and Core services: #31 headers, #36, #37 Jukebox 45 s cut, #40, #41, #42, #67, :18925
-      items of #64.
+- [x] PR 5: media relay and Core services. #31, #36, #37, #40, #41, #42 and #67 closed; the :18925 items of #64.
+      Left out as negligible: #41 time block and file routing for backdated events, #67 FFT twiddle tables, Math.Pow
+      in the bands, ArrayPool in PC Cast, the radio path lookup on the UI tick (a few ms, every 15 s at most), the
+      YouTube pump teardown order (only a stray warning) and a background log writer.
+- [ ] Verify PR 5 live: a jukebox FLAC plays to its end and the next one starts. Needs the user's OK (it plays
+      media).
 - [x] PR 6: plugin host. #44, #45, #61, #64, #65 and #69 closed (the host and Plugins page parts, the MCP
       subscription cleanup). Left as is: #44 F5 (scan only DLLs with a deps.json; a third-party plugin without one
       would be skipped) and the plugin view dispose hook (#69 F3, a feature).

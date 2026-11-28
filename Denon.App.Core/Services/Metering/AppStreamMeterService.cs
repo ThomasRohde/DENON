@@ -445,6 +445,15 @@ public sealed class AppStreamMeterService : IDisposable
             psi.ArgumentList.Add("-nostdin");
         }
 
+        if (inputFile is not null &&
+            (inputFile.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || inputFile.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+        {
+            // A radio URL from a third-party catalog: network protocols only, so a playlist cannot point FFmpeg at
+            // local files.
+            psi.ArgumentList.Add("-protocol_whitelist");
+            psi.ArgumentList.Add("http,https,tcp,tls,crypto");
+        }
+
         psi.ArgumentList.Add("-i");
         psi.ArgumentList.Add(inputFile ?? "pipe:0");
         foreach (var arg in new[] { "-vn", "-ac", "2", "-ar", SampleRate.ToString(System.Globalization.CultureInfo.InvariantCulture), "-f", "f32le", "pipe:1" })

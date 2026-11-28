@@ -296,41 +296,57 @@ public sealed class YouTubeMediaService
 
     private static bool IsFfmpegRunnable(string path)
     {
-        return FfmpegRunnableCache.GetOrAdd(path, static candidate =>
+        if (FfmpegRunnableCache.TryGetValue(path, out var known))
         {
-            try
+            return known;
+        }
+
+        var (runnable, timedOut) = ProbeFfmpeg(path);
+        if (!timedOut)
+        {
+            // A timeout is not cached: the first start can be slow (an antivirus scan of a large exe), and a
+            // cached "no" would hide FFmpeg for the whole session.
+            FfmpegRunnableCache[path] = runnable;
+        }
+
+        return runnable;
+    }
+
+    private static (bool Runnable, bool TimedOut) ProbeFfmpeg(string candidate)
+    {
+        try
+        {
+            // No pipes to fill: the version text is not needed, only the exit code.
+            using var proc = new Process
             {
-                using var proc = new Process
+                StartInfo = new ProcessStartInfo
                 {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = candidate,
-                        Arguments = "-version",
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                    },
-                };
+                    FileName = candidate,
+                    Arguments = "-hide_banner -loglevel quiet -version",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = false,
+                },
+            };
 
-                if (!proc.Start())
-                {
-                    return false;
-                }
-
-                if (!proc.WaitForExit(2500))
-                {
-                    try { proc.Kill(entireProcessTree: true); } catch { }
-                    return false;
-                }
-
-                return proc.ExitCode == 0;
-            }
-            catch
+            if (!proc.Start())
             {
-                return false;
+                return (false, false);
             }
-        });
+
+            if (!proc.WaitForExit(5000))
+            {
+                try { proc.Kill(entireProcessTree: true); } catch { }
+                return (false, true);
+            }
+
+            return (proc.ExitCode == 0, false);
+        }
+        catch
+        {
+            return (false, false);
+        }
     }
 
     private static string ResolveExecutableTarget(string path)

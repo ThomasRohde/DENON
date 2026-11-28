@@ -538,7 +538,9 @@ public sealed class YouTubeQueueService : IDisposable
     {
         lock (_sync)
         {
-            if (!_isActive || !string.Equals(_activeRelayToken, token, StringComparison.Ordinal))
+            // Match on the token alone: it is set before the play call, while _isActive turns true only after it
+            // returns, so the first track from idle lost its exact start time (meters, lyrics, Hue a second late).
+            if (!string.Equals(_activeRelayToken, token, StringComparison.Ordinal))
             {
                 return;
             }
@@ -627,9 +629,16 @@ public sealed class YouTubeQueueService : IDisposable
             }
         }
 
-        CancelPendingAutoAdvance();
         var cts = new CancellationTokenSource();
-        _autoAdvanceCts = cts;
+        CancellationTokenSource? previous;
+        lock (_sync)
+        {
+            previous = _autoAdvanceCts;
+            _autoAdvanceCts = cts;
+        }
+
+        try { previous?.Cancel(); } catch { }
+        var ct = cts.Token;
 
         _ = Task.Run(async () =>
         {
@@ -649,9 +658,9 @@ public sealed class YouTubeQueueService : IDisposable
                 }
 
                 var playedWaitSec = 0.0;
-                while (playedWaitSec < expectedDrainSec && !cts.Token.IsCancellationRequested)
+                while (playedWaitSec < expectedDrainSec && !ct.IsCancellationRequested)
                 {
-                    await Task.Delay(500, cts.Token);
+                    await Task.Delay(500, ct);
 
                     var playState = _stateStore.Snapshot.Status?.PlayState;
                     if (string.Equals(playState, "pause", StringComparison.OrdinalIgnoreCase))
@@ -720,7 +729,12 @@ public sealed class YouTubeQueueService : IDisposable
             {
                 _logStore.Warning($"YouTube queue auto-advance failed: {ex.Message}");
             }
-        }, cts.Token);
+            finally
+            {
+                // The task owns its source; others only cancel it.
+                cts.Dispose();
+            }
+        }, CancellationToken.None);
     }
 
     private void OnNonRelaySourceActivated()
@@ -750,11 +764,20 @@ public sealed class YouTubeQueueService : IDisposable
         }
     }
 
+    /// <summary>
+    /// Cancel only, under the lock. The wait task captured its token, so the source is never disposed under it
+    /// (it holds no OS handle).
+    /// </summary>
     private void CancelPendingAutoAdvance()
     {
-        try { _autoAdvanceCts?.Cancel(); } catch { }
-        _autoAdvanceCts?.Dispose();
-        _autoAdvanceCts = null;
+        CancellationTokenSource? cts;
+        lock (_sync)
+        {
+            cts = _autoAdvanceCts;
+            _autoAdvanceCts = null;
+        }
+
+        try { cts?.Cancel(); } catch { }
     }
 
     private static string? ExtractTokenFromUrl(string url)
