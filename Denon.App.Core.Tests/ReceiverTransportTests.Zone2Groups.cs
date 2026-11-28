@@ -160,6 +160,28 @@ public sealed partial class ReceiverTransportTests
     }
 
     [Fact]
+    public async Task A_scene_sets_zone_2_before_it_switches_the_main_input()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        var (controller, _, telemetry) = await CreateControllerAsync(avr, heos);
+        avr.ClearCommands();
+
+        await controller.ApplySceneAsync(new ScenePreset
+        {
+            Name = "Game",
+            PowerOn = false,
+            Unmute = false,
+            InputSource = "GAME",
+            Zone2Volume = 20,                 // Zone 2 follows the main zone: it must be down before GAME plays
+        });
+
+        var commands = avr.Commands.ToList();
+        Assert.True(commands.IndexOf("Z220") < commands.IndexOf("SIGAME"), string.Join(" | ", commands));
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
     public async Task A_scene_does_not_turn_zone_2_on_when_the_first_mute_fails()
     {
         using var avr = new FakeAvr();

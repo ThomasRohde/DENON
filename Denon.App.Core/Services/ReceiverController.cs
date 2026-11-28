@@ -854,6 +854,9 @@ public sealed class ReceiverController
             volumeAppliedEarly = true;
         }
 
+        // Zone 2 before the main input: a Zone 2 that follows the main zone (SOURCE) must be at its volume first.
+        await ApplySceneZone2StepsAsync(settings, scene, token);
+
         if (!string.IsNullOrWhiteSpace(scene.InputSource))
         {
             if (DenonCatalog.InputMatches(scene.InputSource, "NET"))
@@ -941,7 +944,6 @@ public sealed class ReceiverController
             await _avrClient.SetMuteAsync(settings, false, token);
         }
 
-        await ApplySceneZone2StepsAsync(settings, scene, token);
         await ApplySceneGroupStepsAsync(settings, scene, token);
 
         if (!string.IsNullOrWhiteSpace(scene.StreamUrl))
