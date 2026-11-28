@@ -140,6 +140,7 @@ public sealed class LocalAudioRelayServer : IDisposable
         _calibrationStreamStartedCallback = onStreamStartTimestamp;
 
         var token = Guid.NewGuid().ToString("N")[..8];
+        _calibrationPath = $"/calibrate/{token}.wav";
         var lanIp = ResolveLocalLanIpForReceiver(_settingsStore.Current.Receiver.Host);
         return $"http://{lanIp}:{_boundPort}/calibrate/{token}.wav";
     }
@@ -269,8 +270,8 @@ public sealed class LocalAudioRelayServer : IDisposable
 
         if (_activeStreamTokens.TryRemove(token, out var cts))
         {
+            // Cancel only: the handler owns this source (its using disposes it) and may still read its Token.
             try { cts.Cancel(); } catch { }
-            cts.Dispose();
         }
     }
 
@@ -292,7 +293,6 @@ public sealed class LocalAudioRelayServer : IDisposable
             if (_activeStreamTokens.TryRemove(pair.Key, out var cts))
             {
                 try { cts.Cancel(); } catch { }
-                cts.Dispose();
             }
         }
     }
@@ -352,7 +352,26 @@ public sealed class LocalAudioRelayServer : IDisposable
             {
                 client = await listener.AcceptTcpClientAsync(serverToken);
                 client.NoDelay = true;
-                _ = Task.Run(() => HandleClientAsync(client, serverToken), serverToken);
+                if (!_connectionSlots.Wait(0))
+                {
+                    // Too many open connections (a flood on the LAN): answer 503 and close.
+                    var busy = client;
+                    _ = Task.Run(() => RefuseBusyAsync(busy, serverToken), serverToken);
+                    continue;
+                }
+
+                var accepted = client;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await HandleClientAsync(accepted, serverToken);
+                    }
+                    finally
+                    {
+                        _connectionSlots.Release();
+                    }
+                }, serverToken);
             }
             catch (OperationCanceledException)
             {
@@ -371,6 +390,59 @@ public sealed class LocalAudioRelayServer : IDisposable
                 await Task.Delay(250, serverToken);
             }
         }
+    }
+
+    /// <summary>Most connections open at once: the receiver's stream, casts and phones need far fewer.</summary>
+    internal const int MaxOpenConnections = 64;
+
+    private readonly SemaphoreSlim _connectionSlots = new(MaxOpenConnections, MaxOpenConnections);
+    private string? _calibrationPath;
+
+    private static async Task RefuseBusyAsync(TcpClient client, CancellationToken serverToken)
+    {
+        using (client)
+        {
+            try
+            {
+                await WriteSimpleResponseAsync(client.GetStream(), StatusLine(503), "text/plain", "Too many connections\r\n", serverToken);
+            }
+            catch
+            {
+                // The client went away.
+            }
+        }
+    }
+
+    /// <summary>The HTTP status line for a code the Phone Remote API returns.</summary>
+    internal static string StatusLine(int code) => code switch
+    {
+        200 => "200 OK",
+        400 => "400 Bad Request",
+        401 => "401 Unauthorized",
+        403 => "403 Forbidden",
+        404 => "404 Not Found",
+        405 => "405 Method Not Allowed",
+        409 => "409 Conflict",
+        413 => "413 Payload Too Large",
+        429 => "429 Too Many Requests",
+        503 => "503 Service Unavailable",
+        _ => "500 Internal Server Error",
+    };
+
+    /// <summary>
+    /// A POST from a web page on another site (CSRF) is refused: when the browser sends an Origin, its host must be
+    /// the host the request was sent to. The phone page is on this server, so its Origin matches; apps send none.
+    /// </summary>
+    internal static bool IsSameOriginOrNone(string? origin, string? host)
+    {
+        if (string.IsNullOrWhiteSpace(origin))
+        {
+            return true;
+        }
+
+        return Uri.TryCreate(origin.Trim(), UriKind.Absolute, out var uri) &&
+               !string.IsNullOrWhiteSpace(host) &&
+               string.Equals(uri.Authority, host.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task HandleClientAsync(TcpClient client, CancellationToken serverToken)
@@ -404,17 +476,21 @@ public sealed class LocalAudioRelayServer : IDisposable
                         return;
                     }
 
-                    var resp = await _webApiHandler.HandleAsync(request.Method, request.Path, request.Query, request.Body, request.AuthToken, serverToken);
-                    var statusText = resp.StatusCode switch
+                    if (request.Method.Equals("POST", StringComparison.OrdinalIgnoreCase) &&
+                        !IsSameOriginOrNone(request.Origin, request.Host))
                     {
-                        200 => "200 OK",
-                        400 => "400 Bad Request",
-                        401 => "401 Unauthorized",
-                        403 => "403 Forbidden",
-                        404 => "404 Not Found",
-                        _ => "500 Internal Server Error",
-                    };
-                    await WriteSimpleResponseAsync(networkStream, statusText, resp.ContentType, resp.Body, serverToken);
+                        await WriteSimpleResponseAsync(networkStream, StatusLine(403), "application/json; charset=utf-8", "{\"error\":\"Cross-site request refused.\"}", serverToken);
+                        return;
+                    }
+
+                    if (request.BodyTooLarge)
+                    {
+                        await WriteSimpleResponseAsync(networkStream, StatusLine(413), "application/json; charset=utf-8", "{\"error\":\"Request body too large.\"}", serverToken);
+                        return;
+                    }
+
+                    var resp = await _webApiHandler.HandleAsync(request.Method, request.Path, request.Query, request.Body, request.AuthToken, serverToken);
+                    await WriteSimpleResponseAsync(networkStream, StatusLine(resp.StatusCode), resp.ContentType, resp.Body, serverToken);
                     return;
                 }
 
@@ -435,7 +511,8 @@ public sealed class LocalAudioRelayServer : IDisposable
                 // Acoustic Lip-Sync Calibration chirp (/calibrate/{token}.wav)
                 if (request.Path.StartsWith("/calibrate/", StringComparison.OrdinalIgnoreCase))
                 {
-                    var wav = _calibrationWavBytes;
+                    // Only the registered chirp: a stray fetch must not start the calibration clock.
+                    var wav = string.Equals(request.Path, _calibrationPath, StringComparison.OrdinalIgnoreCase) ? _calibrationWavBytes : null;
                     if (wav is null || wav.Length == 0)
                     {
                         await WriteSimpleResponseAsync(networkStream, "404 Not Found", "text/plain", "No calibration chirp registered.\r\n", serverToken);
@@ -860,7 +937,8 @@ public sealed class LocalAudioRelayServer : IDisposable
         CancellationToken cancellationToken)
     {
         var bodyBytes = Encoding.UTF8.GetBytes(body);
-        var header = $"HTTP/1.1 {status}\r\nContent-Type: {contentType}\r\nContent-Length: {bodyBytes.Length}\r\nConnection: close\r\n\r\n";
+        // nosniff: no type guessing; DENY: no other site may frame the Owner page (clickjacking).
+        var header = $"HTTP/1.1 {status}\r\nContent-Type: {contentType}\r\nContent-Length: {bodyBytes.Length}\r\nX-Content-Type-Options: nosniff\r\nX-Frame-Options: DENY\r\nConnection: close\r\n\r\n";
         await stream.WriteAsync(Encoding.ASCII.GetBytes(header), cancellationToken);
         await stream.WriteAsync(bodyBytes, cancellationToken);
         await stream.FlushAsync(cancellationToken);
@@ -926,6 +1004,8 @@ public sealed class LocalAudioRelayServer : IDisposable
 
         string? rangeHeader = null;
         string? authToken = null;
+        string? origin = null;
+        string? host = null;
         var contentLength = 0;
         for (var i = 1; i < lines.Length; i++)
         {
@@ -935,7 +1015,19 @@ public sealed class LocalAudioRelayServer : IDisposable
             }
             else if (lines[i].StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
             {
-                _ = int.TryParse(lines[i]["Content-Length:".Length..].Trim(), out contentLength);
+                // An unreadable or negative length is refused like a too-large body, not read as 0.
+                if (!int.TryParse(lines[i]["Content-Length:".Length..].Trim(), out contentLength) || contentLength < 0)
+                {
+                    contentLength = int.MaxValue;
+                }
+            }
+            else if (lines[i].StartsWith("Origin:", StringComparison.OrdinalIgnoreCase))
+            {
+                origin = lines[i]["Origin:".Length..].Trim();
+            }
+            else if (lines[i].StartsWith("Host:", StringComparison.OrdinalIgnoreCase))
+            {
+                host = lines[i]["Host:".Length..].Trim();
             }
             else if (lines[i].StartsWith("X-Denon-Token:", StringComparison.OrdinalIgnoreCase))
             {
@@ -992,7 +1084,7 @@ public sealed class LocalAudioRelayServer : IDisposable
             rawPath = rawPath[..queryIndex];
         }
 
-        return new ParsedHttpRequest(parts[0], rawPath, query, rangeHeader, body, authToken);
+        return new ParsedHttpRequest(parts[0], rawPath, query, rangeHeader, body, authToken, origin, host, BodyTooLarge: contentLength > 65536);
     }
 
     private static int FindHeaderDelimiter(List<byte> bytes)
@@ -1047,7 +1139,6 @@ public sealed class LocalAudioRelayServer : IDisposable
         if (_activeStreamTokens.TryRemove(token, out var prevCts))
         {
             try { prevCts.Cancel(); } catch { }
-            prevCts.Dispose();
         }
 
         using var streamCts = CancellationTokenSource.CreateLinkedTokenSource(serverToken);
@@ -1210,18 +1301,25 @@ public sealed class LocalAudioRelayServer : IDisposable
             StartInfo = new ProcessStartInfo
             {
                 FileName = registered.FfmpegPath!,
-                Arguments = $"-hide_banner -loglevel error -i \"{registered.Track.FilePath}\" -vn -c:a libmp3lame -b:a 320k -ar 44100 -ac 2 -f mp3 pipe:1",
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
             },
         };
+        foreach (var arg in new[] { "-hide_banner", "-loglevel", "error", "-i", registered.Track.FilePath, "-vn", "-c:a", "libmp3lame", "-b:a", "320k", "-ar", "44100", "-ac", "2", "-f", "mp3", "pipe:1" })
+        {
+            ffmpeg.StartInfo.ArgumentList.Add(arg);
+        }
 
         if (!ffmpeg.Start())
         {
             throw new InvalidOperationException("Failed to start FFmpeg for local audio transcode.");
         }
+
+        // Read stderr all the time: a full pipe (a badly broken file) would stop FFmpeg mid-song.
+        var readStderrTask = ffmpeg.StandardError.ReadToEndAsync(cancellationToken);
+        var streamStartTimestamp = Stopwatch.GetTimestamp();
 
         UpdateStatus(_status with { StreamState = "Streaming Local (MP3 320k)", ActiveTrackTitle = registered.Track.Title, BytesStreamed = 0 });
 
@@ -1241,15 +1339,48 @@ public sealed class LocalAudioRelayServer : IDisposable
 
                 await networkStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
                 totalBytes += read;
+
+                // The same pacing as YouTube (the output is 320k CBR): an unpaced file lets HEOS buffer far ahead.
+                await PaceAsync(totalBytes, streamStartTimestamp, cancellationToken);
             }
 
             await networkStream.FlushAsync(cancellationToken);
             UpdateStatus(_status with { BytesStreamed = totalBytes });
+
+            var stderr = string.Empty;
+            try { stderr = await readStderrTask; } catch { }
+            if (!string.IsNullOrWhiteSpace(stderr) && !cancellationToken.IsCancellationRequested)
+            {
+                var notice = stderr.Trim();
+                _logStore.Warning($"FFmpeg notice for '{registered.Track.Title}': {(notice.Length > 600 ? notice[..600] + "..." : notice)}");
+            }
+
             return reachedEof && totalBytes > 16_000;
         }
         finally
         {
             try { if (!ffmpeg.HasExited) ffmpeg.Kill(entireProcessTree: true); } catch { }
+        }
+    }
+
+    /// <summary>A 6-second burst (240 KB at 320 kbps) so HEOS starts at once, then about 1.03x real time.</summary>
+    private const long PacingBurstBytes = 240_000;
+
+    private const double PacingBytesPerSecond = 41_200.0;
+
+    private static async Task PaceAsync(long totalBytes, long streamStartTimestamp, CancellationToken cancellationToken)
+    {
+        if (totalBytes <= PacingBurstBytes)
+        {
+            return;
+        }
+
+        var elapsedSec = Stopwatch.GetElapsedTime(streamStartTimestamp).TotalSeconds;
+        var targetElapsedSec = (totalBytes - PacingBurstBytes) / PacingBytesPerSecond;
+        var aheadMs = (int)((targetElapsedSec - elapsedSec) * 1000.0);
+        if (aheadMs > 25)
+        {
+            await Task.Delay(Math.Min(aheadMs, 500), cancellationToken);
         }
     }
 
@@ -1282,7 +1413,6 @@ public sealed class LocalAudioRelayServer : IDisposable
         if (_activeStreamTokens.TryRemove(token, out var prevCts))
         {
             try { prevCts.Cancel(); } catch { }
-            prevCts.Dispose();
         }
 
         using var streamCts = CancellationTokenSource.CreateLinkedTokenSource(serverToken);
@@ -1425,5 +1555,14 @@ public sealed class LocalAudioRelayServer : IDisposable
 
     private sealed record RegisteredLocalTrack(string Token, LocalAudioTrackItem Track, bool UseDirectNative, string? FfmpegPath);
 
-    internal sealed record ParsedHttpRequest(string Method, string Path, string? Query, string? RangeHeader, string Body, string? AuthToken = null);
+    internal sealed record ParsedHttpRequest(
+        string Method,
+        string Path,
+        string? Query,
+        string? RangeHeader,
+        string Body,
+        string? AuthToken = null,
+        string? Origin = null,
+        string? Host = null,
+        bool BodyTooLarge = false);
 }

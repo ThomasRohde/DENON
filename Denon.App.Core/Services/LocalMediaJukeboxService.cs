@@ -474,9 +474,17 @@ public sealed class LocalMediaJukeboxService : IDisposable
             }
         }
 
-        CancelPendingAutoAdvance();
         var cts = new CancellationTokenSource();
-        _autoAdvanceCts = cts;
+        CancellationTokenSource? previous;
+        lock (_sync)
+        {
+            previous = _autoAdvanceCts;
+            _autoAdvanceCts = cts;
+        }
+
+        try { previous?.Cancel(); } catch { }
+        var ct = cts.Token;
+        var playedAtTransferEnd = _clock.IsStarted ? _clock.GetPositionSeconds(DateTimeOffset.UtcNow, 0) : 0;
 
         _ = Task.Run(async () =>
         {
@@ -484,13 +492,14 @@ public sealed class LocalMediaJukeboxService : IDisposable
             {
                 // Wait for HEOS to finish draining its prefetched audio buffer; suspend the timer
                 // whenever HEOS is paused so pausing a buffered file never advances prematurely!
+                // HEOS may buffer far ahead, so wait until the track's real end (from its tags), not a fixed time.
                 var playedWaitSec = 0.0;
-                const double maxDrainSec = 45.0;
+                var maxDrainSec = DrainLimitSeconds(track, playedAtTransferEnd);
                 var sawPlaying = string.Equals(_stateStore.Snapshot.Status?.PlayState, "play", StringComparison.OrdinalIgnoreCase);
 
-                while (playedWaitSec < maxDrainSec && !cts.Token.IsCancellationRequested)
+                while (playedWaitSec < maxDrainSec && !ct.IsCancellationRequested)
                 {
-                    await Task.Delay(500, cts.Token);
+                    await Task.Delay(500, ct);
                     var state = _stateStore.Snapshot.Status?.PlayState;
                     if (string.Equals(state, "pause", StringComparison.OrdinalIgnoreCase))
                     {
@@ -564,7 +573,12 @@ public sealed class LocalMediaJukeboxService : IDisposable
             {
                 _logStore.Warning($"Local Jukebox auto-advance failed: {ex.Message}");
             }
-        }, cts.Token);
+            finally
+            {
+                // The task owns its source; others only cancel it.
+                cts.Dispose();
+            }
+        }, CancellationToken.None);
     }
 
     private void OnLocalTrackPlaybackStarted(string token, DateTimeOffset startedAtUtc)
@@ -584,11 +598,13 @@ public sealed class LocalMediaJukeboxService : IDisposable
     private void OnExternalSourceActivated()
     {
         var wasActive = false;
+        string? token = null;
         lock (_sync)
         {
             if (_isActive)
             {
                 _isActive = false;
+                token = _activeRelayToken;
                 _activeRelayToken = null;
                 wasActive = true;
             }
@@ -597,15 +613,54 @@ public sealed class LocalMediaJukeboxService : IDisposable
         if (wasActive)
         {
             CancelPendingAutoAdvance();
+            // Another source took over: drop the relay stream too, as YouTube does.
+            _relayServer.UnregisterLocalTrack(token);
             NotifyChanged();
         }
     }
 
+    /// <summary>
+    /// Cancel only, under the lock. The wait task captured its token, so the source is never disposed under it
+    /// (it holds no OS handle).
+    /// </summary>
     private void CancelPendingAutoAdvance()
     {
-        try { _autoAdvanceCts?.Cancel(); } catch { }
-        _autoAdvanceCts?.Dispose();
-        _autoAdvanceCts = null;
+        CancellationTokenSource? cts;
+        lock (_sync)
+        {
+            cts = _autoAdvanceCts;
+            _autoAdvanceCts = null;
+        }
+
+        try { cts?.Cancel(); } catch { }
+    }
+
+    /// <summary>Upper limit for the wait after the file was sent: when no "stop" comes, advance after this.</summary>
+    internal const double UnknownLengthDrainLimitSeconds = 900;
+
+    /// <summary>
+    /// How long to wait after the whole file was sent before the next track: what is left of the track (its
+    /// length from the tags minus what has played) plus 5 s. Without a length (no tags): 15 minutes. HEOS
+    /// reports "stop" at the real end, and that ends the wait sooner.
+    /// </summary>
+    internal static double DrainLimitSeconds(TimeSpan? trackLength, double playedSeconds) =>
+        trackLength is { } length && length > TimeSpan.Zero
+            ? Math.Clamp(length.TotalSeconds - Math.Max(0, playedSeconds) + 5, 10, UnknownLengthDrainLimitSeconds)
+            : UnknownLengthDrainLimitSeconds;
+
+    private static double DrainLimitSeconds(LocalAudioTrackItem track, double playedSeconds)
+    {
+        TimeSpan? length = null;
+        try
+        {
+            length = Denon.App.Core.Media.AudioTagReader.Read(track.FilePath, includeCoverArt: false).Duration;
+        }
+        catch
+        {
+            // The reader does not throw for bad files; a missing file is the same as no length.
+        }
+
+        return DrainLimitSeconds(length, playedSeconds);
     }
 
     private static (string Artist, string Title) ParseMetadataFromPath(string filePath)

@@ -216,7 +216,8 @@ public sealed class PcAudioCastService : IDisposable
             string? defaultId = null;
             try
             {
-                defaultId = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia).ID;
+                using var defaultDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                defaultId = defaultDevice.ID;
             }
             catch
             {
@@ -453,7 +454,8 @@ public sealed class PcAudioCastService : IDisposable
                 CreateNoWindow = true,
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
-                RedirectStandardError = true,
+                // Not read: a full stderr pipe would stop FFmpeg, and so the cast.
+                RedirectStandardError = false,
             },
         };
 

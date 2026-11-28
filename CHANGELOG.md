@@ -4,6 +4,33 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Local Jukebox plays each song to its end** (#37). After the file was sent, the app moved to the next track 45 s
+  later at most, but HEOS buffers far ahead, so the end of a song could be cut. Now it waits for what is left of
+  the track (its length from the file's tags, plus 5 s), or for HEOS to stop. Without a known length it waits up
+  to 15 minutes. Transcoded files (OGG, OPUS, WMA) are now paced like YouTube, so HEOS does not buffer far ahead.
+  Another source taking over now also drops the relay stream.
+- **The first YouTube track from idle is in sync** (#67). Its start time was dropped, so the meters, lyrics and
+  Hue Music Sync ran about a second late for that whole track.
+- **FFmpeg is found after a slow first start** (#36). A check that took over 2.5 s (an antivirus scan) hid FFmpeg
+  for the whole session. A local transcode and PC Cast can no longer stop on a full error pipe.
+- **One broken line in an event log no longer hides the older events in that file** (#41), for example in the MCP
+  activity history after a crash.
+- **A hand-edited settings file with an empty section loads** (#42). `"ui": null` and similar made the app treat
+  the file as corrupt. An empty token is now replaced and saved once, not on every start.
+- Stopping a stream no longer disposes a cancel source that its handler still uses (#40), which logged a PC Cast
+  stop as an error.
+
+### Security
+- **The Phone Remote server refuses POSTs from other websites** (#64). When a browser sends an Origin, it must be
+  the page's own address, so a web page cannot drive the receiver when pairing is off. A body over 64 KB gets
+  413, at most 64 connections are open at once, and the lip-sync chirp answers only its own address.
+- **The Phone Remote pages send nosniff and X-Frame-Options: DENY** (#31), so another site cannot frame the Owner
+  page.
+- Radio URLs that the meters decode may use network protocols only (#36).
+
 ## [2.10.23] - 2026-11-28
 
 ### Security
