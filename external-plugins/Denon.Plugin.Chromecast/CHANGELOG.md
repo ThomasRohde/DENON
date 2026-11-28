@@ -2,6 +2,14 @@
 
 Released separately from Denon Desktop with tags `chromecast-vX.Y.Z`.
 
+## [Unreleased]
+
+### Fixed
+- **A wake-tv and a session's automation follow a device to its new id** (#70). When discovery gives a device a new
+  id (for example a device added by IP that mDNS then finds), a wake-tv launch in progress and its session stay
+  the wake's own. A session that already ran its automation does not run it again under the new id. A held
+  playback change under the old id is dropped, and the new link records the state it connects with.
+
 ## [0.7.0] - 2026-11-28
 
 ### Fixed

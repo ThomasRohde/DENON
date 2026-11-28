@@ -7,7 +7,8 @@ See also: [docs/plugin-development.md](docs/plugin-development.md) and [SECURITY
 ## What you need
 
 - Windows 10 or Windows 11 (x64). The app is a WPF app.
-- The .NET 10 SDK. CI uses `10.0.x`.
+- The .NET 10 SDK. `global.json` names the version (10.0.100 or a newer 10.0 feature band); CI installs it from
+  there.
 - Node.js 24, only when you change the website in `site/`.
 
 ## Build
