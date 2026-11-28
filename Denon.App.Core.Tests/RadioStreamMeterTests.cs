@@ -100,6 +100,28 @@ public sealed class RadioStreamMeterTests
     };
 
     [Fact]
+    public void After_a_restart_the_meters_follow_the_station_that_still_plays()
+    {
+        var jazz = new StationPreset("p8jazz", "DR P8 Jazz", "https://live-icy.dr.dk/A/A22H.mp3");
+
+        // The app restarted while its station plays on: follow it again.
+        Assert.Same(jazz, AppStreamMeterService.StationToResume(sourceSeen: false, Snapshot(), jazz));
+
+        // Something already started in this run, or the app started no station (or another source took over).
+        Assert.Null(AppStreamMeterService.StationToResume(sourceSeen: true, Snapshot(), jazz));
+        Assert.Null(AppStreamMeterService.StationToResume(sourceSeen: false, Snapshot(), null));
+
+        // HEOS does not play the app's stream: standby, another input, paused, or a named service such as Spotify.
+        Assert.Null(AppStreamMeterService.StationToResume(false, Snapshot(on: false), jazz));
+        Assert.Null(AppStreamMeterService.StationToResume(false, Snapshot(input: "TV"), jazz));
+        Assert.Null(AppStreamMeterService.StationToResume(false, Snapshot(playState: "pause"), jazz));
+        Assert.Null(AppStreamMeterService.StationToResume(false, Snapshot(sourceId: 4, song: "Real Song"), jazz));
+
+        // Only an http(s) stream can be decoded.
+        Assert.Null(AppStreamMeterService.StationToResume(false, Snapshot(), new StationPreset("x", "X", "file:///C:/x.mp3")));
+    }
+
+    [Fact]
     public void Radio_counts_as_playing_only_on_heos_with_the_apps_stream()
     {
         Assert.True(AppStreamMeterService.IsRadioPlaying(Snapshot()));
