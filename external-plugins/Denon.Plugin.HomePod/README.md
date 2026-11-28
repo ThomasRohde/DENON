@@ -14,7 +14,8 @@ logs listening time for Insights.
   to the TV (a HomePod plays in its own room, so its time is never "covered" by the TV or the receiver).
 - **Receiver automation (off by default):** pause the HomePods that play when the Denon turns on.
 
-HomePods are not connected to the receiver, so the Control Deck's now-playing card does not show them.
+While the receiver sleeps, the Control Deck's now-playing card shows the HomePod that plays (title, artist, app,
+speaker and artwork), and its Play / Pause, Previous and Next buttons control that HomePod.
 
 ## How it connects (no PIN)
 
