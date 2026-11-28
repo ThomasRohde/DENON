@@ -104,12 +104,15 @@ the plugin, because the loaded DLL is in use.
 **Release a new version:** set `<Version>` in `Denon.Plugin.Chromecast.csproj`, then push a tag
 `chromecast-v<same version>`. The `release-chromecast-plugin.yml` workflow builds the zip and publishes the release.
 The SDK reference is compile-only (`Private=false`, `ExcludeAssets=runtime`), so the plugin uses the host's
-`Denon.App.PluginSdk.dll`.
+`Denon.App.PluginSdk.dll`. Build and test with `external-plugins/Denon.Plugin.Chromecast.slnx`; the tests are in
+`Denon.Plugin.Chromecast.Tests`.
 
 ## Security
 
 - The plugin connects only to private LAN addresses (10/8, 172.16/12, 192.168/16, 169.254/16).
   It accepts the Cast device's self-signed certificate only after this check.
+- Artwork for `now-playing` comes only over http or https, never from this PC or a link-local address (also not
+  by a redirect), and at most 2 MB is read.
 - Every receiver command is logged by the host with the plugin id.
 
 ## Limits (version 0.1)
@@ -128,6 +131,7 @@ The SDK reference is compile-only (`Private=false`, `ExcludeAssets=runtime`), so
 | `Cast/CastDeviceClient.cs` | One device: reconnect, receiver and media status, commands |
 | `Cast/MdnsCastDiscovery.cs` | Minimal mDNS browser (PTR, SRV, TXT, A) |
 | `Cast/CastAppNames.cs` | Clean app names by Cast app id (for example DR TV) |
+| `Cast/CastArtwork.cs` | Checked, size-limited artwork fetch for `now-playing` |
 | `CastWatchLog.cs` | Habit watch sessions (`session.started` / `session.ended`, `cast.app_ended`) |
 | `ChromecastConfig.cs` | Per-device settings and automation config |
 | `ChromecastPlugin.cs` | `IDenonPlugin`: actions, events, automations, config |

@@ -45,11 +45,11 @@ jobs:
           dotnet test external-plugins/Denon.Plugin.HomePod.Tests/Denon.Plugin.HomePod.Tests.csproj -c Release --nologo
           if ($LASTEXITCODE -ne 0) { throw "HomePod plugin tests failed." }
 
-      - name: Build the Chromecast plugin
+      - name: Test the Chromecast plugin
         shell: pwsh
         run: |
-          dotnet build external-plugins/Denon.Plugin.Chromecast/Denon.Plugin.Chromecast.csproj -c Release --nologo
-          if ($LASTEXITCODE -ne 0) { throw "Chromecast plugin build failed." }
+          dotnet test external-plugins/Denon.Plugin.Chromecast.Tests/Denon.Plugin.Chromecast.Tests.csproj -c Release --nologo
+          if ($LASTEXITCODE -ne 0) { throw "Chromecast plugin tests failed." }
 
   site:
     runs-on: ubuntu-latest

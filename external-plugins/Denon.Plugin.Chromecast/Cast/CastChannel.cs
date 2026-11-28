@@ -28,6 +28,7 @@ internal sealed class CastChannel : IAsyncDisposable
     private const int MaxMessageBytes = 1 << 20;
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan SilenceLimit = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan CloseTimeout = TimeSpan.FromSeconds(1);
 
     private readonly TcpClient _tcp;
     private readonly SslStream _ssl;
@@ -56,6 +57,8 @@ internal sealed class CastChannel : IAsyncDisposable
     {
         var address = await ResolvePrivateLanAddressAsync(host, cancellationToken);
         var tcp = new TcpClient(AddressFamily.InterNetwork) { NoDelay = true };
+        SslStream? ssl = null;
+        CastChannel? channel = null;
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -64,19 +67,29 @@ internal sealed class CastChannel : IAsyncDisposable
 
             // Cast devices present a self-signed device certificate. We accept it because the
             // address is checked above to be a private LAN address.
-            var ssl = new SslStream(tcp.GetStream(), leaveInnerStreamOpen: false, (_, _, _, _) => true);
+            ssl = new SslStream(tcp.GetStream(), leaveInnerStreamOpen: false, (_, _, _, _) => true);
             await ssl.AuthenticateAsClientAsync(
                 new SslClientAuthenticationOptions { TargetHost = address.ToString() },
                 timeout.Token);
 
-            var channel = new CastChannel(tcp, ssl);
+            channel = new CastChannel(tcp, ssl);
             channel.Start();
             await channel.SendAsync(CastNamespaces.Connection, ReceiverId, new JsonObject { ["type"] = "CONNECT" }, cancellationToken);
             return channel;
         }
         catch
         {
-            tcp.Dispose();
+            if (channel is not null)
+            {
+                // Stops its loops and disposes its token source, the TLS stream and the socket.
+                await channel.DisposeAsync();
+            }
+            else
+            {
+                ssl?.Dispose();
+                tcp.Dispose();
+            }
+
             throw;
         }
     }
@@ -138,7 +151,9 @@ internal sealed class CastChannel : IAsyncDisposable
         {
             try
             {
-                await SendAsync(CastNamespaces.Connection, ReceiverId, new JsonObject { ["type"] = "CLOSE" });
+                // A half-open socket can block the write: wait at most CloseTimeout.
+                using var timeout = new CancellationTokenSource(CloseTimeout);
+                await SendAsync(CastNamespaces.Connection, ReceiverId, new JsonObject { ["type"] = "CLOSE" }, timeout.Token);
             }
             catch
             {

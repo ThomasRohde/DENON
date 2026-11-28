@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="../Denon.App.PluginSdk/Denon.App.PluginSdk.csproj" />
+  <Project Path="Denon.Plugin.Chromecast/Denon.Plugin.Chromecast.csproj" />
+  <Project Path="Denon.Plugin.Chromecast.Tests/Denon.Plugin.Chromecast.Tests.csproj" />
+</Solution>

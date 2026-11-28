@@ -2,6 +2,7 @@
 
   <!--
     Standalone external plugin. It is NOT part of DenonDesktop.slnx and is NOT shipped with the app.
+    Build with Denon.Plugin.Chromecast.slnx (it has the tests too).
     Build it, then copy the output folder to %LocalAppData%\DenonDesktop\plugins\external\Chromecast\.
     The SDK reference is compile-only: the host shares its own Denon.App.PluginSdk.dll at run time.
   -->
@@ -22,6 +23,10 @@
       <Private>false</Private>
       <ExcludeAssets>runtime</ExcludeAssets>
     </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Denon.Plugin.Chromecast.Tests" />
   </ItemGroup>
 
 </Project>

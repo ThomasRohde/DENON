@@ -106,8 +106,10 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
 
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
-        _lifetime?.Cancel();
+        var previous = _lifetime;
         _lifetime = new CancellationTokenSource();
+        previous?.Cancel();
+        previous?.Dispose();
         List<CastDeviceConfig> devices;
         lock (_gate)
         {
@@ -140,6 +142,20 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
         }
 
         _idleTimers.Clear();
+
+        // A held playback change must not write an event after the stop. Each hold's own task removes and disposes it.
+        foreach (var hold in _playbackHolds.Values)
+        {
+            try
+            {
+                hold.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // It had just finished.
+            }
+        }
+
         List<CastDeviceClient> clients;
         lock (_gate)
         {
@@ -412,46 +428,14 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
     internal async Task<int> DiscoverNowAsync(CancellationToken cancellationToken = default)
     {
         var found = await MdnsCastDiscovery.DiscoverAsync(TimeSpan.FromSeconds(4), cancellationToken);
-        var added = 0;
-        var restart = new List<CastDeviceConfig>();
+        int added;
+        var restart = new List<DiscoveryRestart>();
         await _configGate.WaitAsync(cancellationToken);
         try
         {
             lock (_gate)
             {
-                foreach (var device in found)
-                {
-                    var existing = _config.Devices.FirstOrDefault(d => d.Id.Equals(device.Id, StringComparison.OrdinalIgnoreCase))
-                                   ?? _config.Devices.FirstOrDefault(d => d.Host == device.Host && d.Source == "manual");
-                    if (existing is null)
-                    {
-                        var config = new CastDeviceConfig
-                        {
-                            Id = device.Id,
-                            Name = device.Name,
-                            Host = device.Host,
-                            Port = device.Port,
-                            Model = device.Model,
-                            Source = "mdns",
-                        };
-                        _config.Devices.Add(config);
-                        restart.Add(config);
-                        added++;
-                        continue;
-                    }
-
-                    var moved = existing.Host != device.Host || existing.Port != device.Port;
-                    existing.Id = device.Id;
-                    existing.Name = device.Name;
-                    existing.Model = device.Model;
-                    existing.Host = device.Host;
-                    existing.Port = device.Port;
-                    existing.Source = "mdns";
-                    if (moved)
-                    {
-                        restart.Add(existing);
-                    }
-                }
+                added = MergeDiscovered(_config.Devices, found, restart);
             }
 
             if (found.Count > 0)
@@ -464,9 +448,9 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
             _configGate.Release();
         }
 
-        foreach (var config in restart.Where(c => c.Enabled))
+        foreach (var (config, oldId) in restart.Where(r => r.Config.Enabled))
         {
-            await RestartClientAsync(config);
+            await RestartClientAsync(config, oldId);
         }
 
         // Only a change is worth a line: discovery runs every few minutes and usually finds the same devices.
@@ -478,6 +462,58 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
         _lastDiscoveryAnswered = found.Count;
         DevicesChanged?.Invoke();
         ReportAggregateStatus();
+        return added;
+    }
+
+    /// <summary>A device whose client must (re)start after discovery. OldId is the id its client runs under now.</summary>
+    internal sealed record DiscoveryRestart(CastDeviceConfig Config, string OldId);
+
+    /// <summary>
+    /// Merges an mDNS answer into the device list. A device known by id, or a manual device on the same host, gets
+    /// the mDNS id and details. A device that is new, moved, or got another id goes into <paramref name="restart"/>
+    /// with the id it had, so its client can stop under that id. Returns the number of new devices.
+    /// </summary>
+    internal static int MergeDiscovered(
+        List<CastDeviceConfig> devices,
+        IEnumerable<DiscoveredCastDevice> found,
+        List<DiscoveryRestart> restart)
+    {
+        var added = 0;
+        foreach (var device in found)
+        {
+            var existing = devices.FirstOrDefault(d => d.Id.Equals(device.Id, StringComparison.OrdinalIgnoreCase))
+                           ?? devices.FirstOrDefault(d => d.Host == device.Host && d.Source == "manual");
+            if (existing is null)
+            {
+                var config = new CastDeviceConfig
+                {
+                    Id = device.Id,
+                    Name = device.Name,
+                    Host = device.Host,
+                    Port = device.Port,
+                    Model = device.Model,
+                    Source = "mdns",
+                };
+                devices.Add(config);
+                restart.Add(new DiscoveryRestart(config, config.Id));
+                added++;
+                continue;
+            }
+
+            var oldId = existing.Id;
+            var moved = existing.Host != device.Host || existing.Port != device.Port;
+            existing.Id = device.Id;
+            existing.Name = device.Name;
+            existing.Model = device.Model;
+            existing.Host = device.Host;
+            existing.Port = device.Port;
+            existing.Source = "mdns";
+            if (moved || !string.Equals(oldId, device.Id, StringComparison.Ordinal))
+            {
+                restart.Add(new DiscoveryRestart(existing, oldId));
+            }
+        }
+
         return added;
     }
 
@@ -603,18 +639,22 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
     private void StartClient(CastDeviceConfig config)
     {
         CastDeviceClient client;
+        string id;
         lock (_gate)
         {
-            if (_clients.ContainsKey(config.Id))
+            id = config.Id;
+            if (_clients.ContainsKey(id))
             {
                 return;
             }
 
-            client = new CastDeviceClient(config.Id, config.Host, config.Port);
-            _clients[config.Id] = client;
+            client = new CastDeviceClient(id, config.Host, config.Port);
+            _clients[id] = client;
         }
 
-        client.StateChanged += (previous, current) => OnClientStateChanged(config.Id, previous, current);
+        // The id this client runs under: when discovery gives the device a new id, the old client's last events
+        // must not land on the new id.
+        client.StateChanged += (previous, current) => OnClientStateChanged(id, previous, current);
         client.Diagnostic += message => _context?.Logger.Info($"[{config.Name}] {message}");
         client.Start();
     }
@@ -639,9 +679,10 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
         }
     }
 
-    private async Task RestartClientAsync(CastDeviceConfig config)
+    /// <summary>Stops the client under <paramref name="oldId"/> (its watch session ends there), then starts it under the config's id.</summary>
+    private async Task RestartClientAsync(CastDeviceConfig config, string oldId)
     {
-        await StopClientAsync(config.Id);
+        await StopClientAsync(oldId);
         if (_lifetime is { IsCancellationRequested: false })
         {
             StartClient(config);
@@ -1043,34 +1084,23 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
               (string.IsNullOrEmpty(state.PlayerState) ? "" : $" ({state.PlayerState.ToLowerInvariant()})");
 
         var includeImage = !string.Equals(Param(parameters, "includeImage"), "false", StringComparison.OrdinalIgnoreCase);
-        if (!includeImage || _context is null ||
+        if (!includeImage ||
             !Uri.TryCreate(state.ImageUrl, UriKind.Absolute, out var imageUri) ||
-            imageUri.Scheme is not ("http" or "https"))
+            !CastArtwork.IsAllowedImageUri(imageUri))
         {
             return PluginActionResult.OkWithData(message, json);
         }
 
         try
         {
-            using var http = _context.CreateHttpClient(timeout: TimeSpan.FromSeconds(5));
-            using var response = await http.GetAsync(imageUri, HttpCompletionOption.ResponseHeadersRead, ct);
-            response.EnsureSuccessStatusCode();
-            if (response.Content.Headers.ContentLength > MaxImageBytes)
-            {
-                return PluginActionResult.OkWithData(message, json);
-            }
-
-            var bytes = await response.Content.ReadAsByteArrayAsync(ct);
-            if (bytes.Length > MaxImageBytes)
-            {
-                return PluginActionResult.OkWithData(message, json);
-            }
-
-            var mime = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
-            return PluginActionResult.OkWithData(message, json, Convert.ToBase64String(bytes), mime);
+            // The device chose the URL: CastArtwork refuses this PC and link-local targets and stops at the size limit.
+            return await CastArtwork.FetchAsync(imageUri, MaxImageBytes, ct) is { } image
+                ? PluginActionResult.OkWithData(message, json, Convert.ToBase64String(image.Bytes), image.MediaType)
+                : PluginActionResult.OkWithData(message, json);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
+            // A slow or failing artwork server (also its own timeout) still gives the text answer.
             return PluginActionResult.OkWithData(message, json);
         }
     }
