@@ -36,7 +36,8 @@ public sealed record SetupContext(
     string InputCode,
     string SoundMode,
     bool IsPoweredOn,
-    bool IsMainZoneOn)
+    bool IsMainZoneOn,
+    string ReceiverId = "")
 {
     public bool IsAwake => IsPoweredOn && IsMainZoneOn;
 }
@@ -114,7 +115,8 @@ public sealed record SetupSnapshot(
     string Model,
     ListeningUse Use,
     DateTimeOffset CreatedAt,
-    IReadOnlyList<SnapshotEntry> Entries)
+    IReadOnlyList<SnapshotEntry> Entries,
+    string ReceiverId = "")
 {
     public bool HasWrittenEntries => Entries.Any(static e => e.Written);
 }

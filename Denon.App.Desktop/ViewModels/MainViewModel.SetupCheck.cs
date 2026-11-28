@@ -143,6 +143,7 @@ public sealed partial class MainViewModel
             if (SetProperty(ref _isSetupBusy, value))
             {
                 RunSetupCheckCommand?.NotifyCanExecuteChanged();
+                SelectSetupUseCommand?.NotifyCanExecuteChanged();
                 ApplySetupCommand?.NotifyCanExecuteChanged();
                 UndoSetupCommand?.NotifyCanExecuteChanged();
             }
@@ -230,7 +231,7 @@ public sealed partial class MainViewModel
             {
                 SelectSetupUse(use);
             }
-        });
+        }, _ => !IsSetupBusy);
         ReloadSetupProfilesCommand = new RelayCommand(_ => ReloadSetupProfiles());
         OpenSetupProfilesFolderCommand = new RelayCommand(_ => OpenFolder(_setup!.ProfilesDirectory));
 
@@ -331,6 +332,12 @@ public sealed partial class MainViewModel
 
     private void ShowSetupCheck(SetupCheckResult check)
     {
+        // A check that finished after the use was changed belongs to the old use: never show or apply it.
+        if (check.Use != _setupUse)
+        {
+            return;
+        }
+
         _setupCheck = check;
         SetupRows.Clear();
         foreach (var row in check.Rows)

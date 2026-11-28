@@ -325,7 +325,7 @@ public sealed class ReceiverSetupCheckTests : IDisposable
 
         // Each write was followed by a read of that setting.
         var order = link.Sent.Select(static c => c.Text).ToList();
-        Assert.Equal(["PSDYNEQ ON", "PSDYNEQ ?", "PSREFLEV 0", "PSREFLEV ?", "ECOOFF", "ECO?"], order);
+        Assert.Equal(["PSDYNEQ ?", "PSDYNEQ ON", "PSDYNEQ ?", "PSREFLEV ?", "PSREFLEV 0", "PSREFLEV ?", "ECO?", "ECOOFF", "ECO?"], order);
     }
 
     [Fact]
@@ -501,6 +501,116 @@ public sealed class ReceiverSetupCheckTests : IDisposable
 
         Assert.Equal(["ECOOFF"], link.Writes);
         Assert.Contains("sound mode", result.Outcomes.Single(o => o.SettingId == "cinemaEq").Message, StringComparison.Ordinal);
+    }
+
+    // ---- Things that change between the check and the write ------------------------------------------------------
+
+    [Fact]
+    public async Task A_value_that_changed_since_the_check_is_not_overwritten_and_never_enters_the_undo_list()
+    {
+        var link = SetupTestProfiles.FakeWithWrongValues(_profile);
+        var store = Store();
+        var check = await SetupCheckEngine.CheckAsync(_profile, ListeningUse.Films, link, CancellationToken.None);
+        link.Set("refLevel", "5"); // Another controller changed it after the check.
+
+        var result = await SetupCheckEngine.ApplyAsync(check, ["dynamicEq", "refLevel"], link, store, CancellationToken.None);
+
+        var skipped = result.Outcomes.Single(o => o.SettingId == "refLevel");
+        Assert.Equal(SetupOutcomeKind.Skipped, skipped.Kind);
+        Assert.Contains("changed since the check", skipped.Message, StringComparison.Ordinal);
+        Assert.Equal("5", link.Get("refLevel"));
+        Assert.Equal(["PSDYNEQ ON"], link.Writes);
+        Assert.Equal(["dynamicEq"], store.Load()!.Entries.Select(static e => e.SettingId));
+    }
+
+    [Fact]
+    public async Task The_value_saved_for_undo_is_the_one_read_right_before_the_write()
+    {
+        var link = SetupTestProfiles.FakeWithWrongValues(_profile);
+        var store = Store();
+        var check = await SetupCheckEngine.CheckAsync(_profile, ListeningUse.Films, link, CancellationToken.None);
+
+        await SetupCheckEngine.ApplyAsync(check, ["eco"], link, store, CancellationToken.None);
+
+        Assert.Equal("ON", store.Load()!.Entries.Single().OldToken);
+    }
+
+    [Fact]
+    public async Task When_the_input_changes_after_the_first_write_the_next_per_input_rows_are_not_written()
+    {
+        var link = SetupTestProfiles.FakeWithWrongValues(_profile);
+        var store = Store();
+        var check = await SetupCheckEngine.CheckAsync(_profile, ListeningUse.Films, link, CancellationToken.None);
+        link.BeforeWrite = c =>
+        {
+            if (c.Text == "PSDYNEQ ON")
+            {
+                link.Input = "GAME"; // The remote or HDMI-CEC switches input after the first write.
+            }
+        };
+
+        var result = await SetupCheckEngine.ApplyAsync(check, ["dynamicEq", "cinemaEq", "eco"], link, store, CancellationToken.None);
+
+        Assert.Equal(["PSDYNEQ ON", "ECOOFF"], link.Writes);
+        Assert.Equal(SetupOutcomeKind.Skipped, result.Outcomes.Single(o => o.SettingId == "cinemaEq").Kind);
+        Assert.Equal("ON", link.Get("cinemaEq", "TV"));
+    }
+
+    [Fact]
+    public async Task When_the_input_changes_during_undo_the_next_per_input_rows_are_kept_for_later()
+    {
+        var link = SetupTestProfiles.FakeWithWrongValues(_profile);
+        var store = Store();
+        var check = await SetupCheckEngine.CheckAsync(_profile, ListeningUse.Films, link, CancellationToken.None);
+        await SetupCheckEngine.ApplyAsync(check, ["dynamicEq", "cinemaEq", "eco"], link, store, CancellationToken.None);
+        link.Sent.Clear();
+        link.BeforeWrite = c =>
+        {
+            if (c.Text == "ECOON")
+            {
+                link.Input = "GAME";
+            }
+        };
+
+        var undo = await SetupCheckEngine.UndoAsync(store.Load()!, _profile, link, CancellationToken.None);
+
+        Assert.Equal(["ECOON"], link.Writes);
+        Assert.Equal(["dynamicEq", "cinemaEq"], undo.Snapshot!.Entries.Where(static e => e.Written).Select(static e => e.SettingId));
+    }
+
+    // ---- Which receiver ------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task The_snapshot_remembers_the_receiver_and_undo_refuses_another_one()
+    {
+        var link = SetupTestProfiles.FakeWithWrongValues(_profile);
+        var store = Store();
+        var check = await SetupCheckEngine.CheckAsync(_profile, ListeningUse.Films, link, CancellationToken.None);
+        await SetupCheckEngine.ApplyAsync(check, ["eco"], link, store, CancellationToken.None);
+        var snapshot = store.Load()!;
+        Assert.Equal("192.0.2.10", snapshot.ReceiverId);
+
+        var other = SetupTestProfiles.FakeWithWrongValues(_profile);
+        other.ReceiverId = "192.0.2.99";
+        var undo = await SetupCheckEngine.UndoAsync(snapshot, _profile, other, CancellationToken.None);
+
+        Assert.Equal(SetupOutcomeKind.Skipped, Assert.Single(undo.Outcomes).Kind);
+        Assert.Empty(other.Sent);
+        Assert.Equal(snapshot, undo.Snapshot); // Kept for the receiver it belongs to.
+    }
+
+    [Fact]
+    public async Task Apply_writes_nothing_when_the_app_is_connected_to_another_receiver_than_the_checked_one()
+    {
+        var link = SetupTestProfiles.FakeWithWrongValues(_profile);
+        var check = await SetupCheckEngine.CheckAsync(_profile, ListeningUse.Films, link, CancellationToken.None);
+        link.ReceiverId = "192.0.2.99";
+        link.Sent.Clear();
+
+        var result = await SetupCheckEngine.ApplyAsync(check, ["eco"], link, Store(), CancellationToken.None);
+
+        Assert.Empty(link.Sent);
+        Assert.All(result.Outcomes, o => Assert.Equal(SetupOutcomeKind.Skipped, o.Kind));
     }
 
     // ---- Undo ----------------------------------------------------------------------------------------------------

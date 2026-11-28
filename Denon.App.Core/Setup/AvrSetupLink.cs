@@ -9,7 +9,7 @@ public sealed class AvrSetupLink(DenonAvrClient client, ReceiverSettings setting
     public async Task<SetupContext> GetContextAsync(CancellationToken cancellationToken)
     {
         var (power, zone, input, mode) = await client.GetSetupContextAsync(settings, cancellationToken);
-        return new SetupContext(model, input, mode, power, zone);
+        return new SetupContext(model, input, mode, power, zone, settings.Host);
     }
 
     public Task<IReadOnlyList<string>> QueryAsync(AvrSetupCommand command, Func<string, bool> answerLine, CancellationToken cancellationToken) =>

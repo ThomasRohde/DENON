@@ -18,6 +18,8 @@ internal sealed class FakeSetupLink : IReceiverSetupLink
 
     public string Model { get; set; } = "Denon AVR-X2400H";
 
+    public string ReceiverId { get; set; } = "192.0.2.10";
+
     public string Input { get; set; } = "TV";
 
     public string SoundMode { get; set; } = "STEREO";
@@ -78,7 +80,7 @@ internal sealed class FakeSetupLink : IReceiverSetupLink
     }
 
     public Task<SetupContext> GetContextAsync(CancellationToken cancellationToken) =>
-        Task.FromResult(new SetupContext(Model, Input, SoundMode, IsPoweredOn, IsMainZoneOn));
+        Task.FromResult(new SetupContext(Model, Input, SoundMode, IsPoweredOn, IsMainZoneOn, ReceiverId));
 
     public Task<IReadOnlyList<string>> QueryAsync(AvrSetupCommand command, Func<string, bool> answerLine, CancellationToken cancellationToken)
     {

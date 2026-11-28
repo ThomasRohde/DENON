@@ -327,6 +327,11 @@ public static class SetupCheckEngine
             return Stopped(rows, outcomes, entries, check, "The receiver is in standby.");
         }
 
+        if (!SameReceiver(check.Context.ReceiverId, context.ReceiverId))
+        {
+            return Stopped(rows, outcomes, entries, check, "The app is connected to another receiver than the one that was checked. Check again.");
+        }
+
         // What each setting holds now, as far as this apply knows. A write updates it, so a later row can rely on it.
         var live = check.Rows.ToDictionary(static r => r.Id, static r => r.CurrentToken, StringComparer.Ordinal);
         var stop = false;
@@ -346,16 +351,37 @@ public static class SetupCheckEngine
                 continue;
             }
 
-            if (ScopeChanged(setting, check.Context, context) is { } scopeMessage)
+            // The input can change at any time (the remote, HDMI-CEC): look again before each write that depends on it.
+            var now = context;
+            if (setting.Scope != SettingScope.Global)
+            {
+                var refreshed = await TryGetContextAsync(link, cancellationToken);
+                if (refreshed is null)
+                {
+                    outcomes.Add(new SetupOutcome(row.Id, setting.Label, SetupOutcomeKind.Failed, "The receiver did not answer before the write."));
+                    stop = true;
+                    continue;
+                }
+
+                now = refreshed;
+            }
+
+            if (!now.IsAwake)
+            {
+                outcomes.Add(new SetupOutcome(row.Id, setting.Label, SetupOutcomeKind.Skipped, "The receiver went to standby."));
+                continue;
+            }
+
+            if (ScopeChanged(setting, check.Context, now) is { } scopeMessage)
             {
                 outcomes.Add(new SetupOutcome(row.Id, setting.Label, SetupOutcomeKind.Skipped, scopeMessage));
                 continue;
             }
 
-            if (IsBlockedByMode(setting, context.SoundMode))
+            if (IsBlockedByMode(setting, now.SoundMode))
             {
                 outcomes.Add(new SetupOutcome(row.Id, setting.Label, SetupOutcomeKind.Skipped,
-                    $"Not used in {FriendlyMode(context.SoundMode)}."));
+                    $"Not used in {FriendlyMode(now.SoundMode)}."));
                 continue;
             }
 
@@ -365,9 +391,26 @@ public static class SetupCheckEngine
                 continue;
             }
 
+            // The value may have changed since the check (another controller, the remote). The undo entry must hold
+            // the value that is overwritten, so read it again and stop for a row that moved.
+            var fresh = await ReadTokenAsync(setting, link, cancellationToken);
+            if (fresh is null)
+            {
+                outcomes.Add(new SetupOutcome(row.Id, setting.Label, SetupOutcomeKind.Skipped, "The receiver did not answer a read just before the write. Check again."));
+                continue;
+            }
+
+            if (!SameText(fresh, row.CurrentToken))
+            {
+                outcomes.Add(new SetupOutcome(row.Id, setting.Label, SetupOutcomeKind.Skipped,
+                    $"It changed since the check: now {SetupValueText.Format(setting, fresh)}, was {SetupValueText.Format(setting, row.CurrentToken)}. Check again."));
+                live[setting.Id] = fresh;
+                continue;
+            }
+
             var entry = new SnapshotEntry(
-                setting.Id, setting.Label, setting.Scope, context.InputCode, context.SoundMode,
-                row.CurrentToken ?? string.Empty, row.RecommendedToken, Written: true);
+                setting.Id, setting.Label, setting.Scope, now.InputCode, now.SoundMode,
+                fresh, row.RecommendedToken, Written: true);
 
             try
             {
@@ -437,6 +480,13 @@ public static class SetupCheckEngine
                 snapshot);
         }
 
+        if (!SameReceiver(snapshot.ReceiverId, context.ReceiverId))
+        {
+            return new SetupApplyResult(
+                [new SetupOutcome("undo", "Undo", SetupOutcomeKind.Skipped, "These old values belong to another receiver than the one the app is connected to now.")],
+                snapshot);
+        }
+
         var stop = false;
         for (var i = snapshot.Entries.Count - 1; i >= 0; i--)
         {
@@ -459,11 +509,25 @@ public static class SetupCheckEngine
                 continue;
             }
 
+            var now = context;
+            if (entry.Scope != SettingScope.Global)
+            {
+                var refreshed = await TryGetContextAsync(link, cancellationToken);
+                if (refreshed is null)
+                {
+                    outcomes.Add(new SetupOutcome(entry.SettingId, entry.Label, SetupOutcomeKind.Failed, "The receiver did not answer before the write."));
+                    stop = true;
+                    continue;
+                }
+
+                now = refreshed;
+            }
+
             var scopeMessage = entry.Scope switch
             {
-                SettingScope.PerInput when !SameText(entry.InputCode, context.InputCode) =>
-                    $"Switch back to input {entry.InputCode} to undo this one (it is on {context.InputCode} now).",
-                SettingScope.PerSoundMode when !SameText(entry.SoundMode, context.SoundMode) =>
+                SettingScope.PerInput when !SameText(entry.InputCode, now.InputCode) =>
+                    $"Switch back to input {entry.InputCode} to undo this one (it is on {now.InputCode} now).",
+                SettingScope.PerSoundMode when !SameText(entry.SoundMode, now.SoundMode) =>
                     $"Switch back to the {entry.SoundMode} sound mode to undo this one.",
                 _ => null,
             };
@@ -559,7 +623,7 @@ public static class SetupCheckEngine
     }
 
     private static SetupSnapshot MakeSnapshot(SetupCheckResult check, SetupContext context, IReadOnlyList<SnapshotEntry> entries) =>
-        new(check.Profile.Id, context.Model, check.Use, DateTimeOffset.Now, entries.ToList());
+        new(check.Profile.Id, context.Model, check.Use, DateTimeOffset.Now, entries.ToList(), context.ReceiverId);
 
     private static void SaveSnapshot(SetupSnapshotStore? store, SetupCheckResult check, SetupContext context, IReadOnlyList<SnapshotEntry> entries) =>
         store?.Save(MakeSnapshot(check, context, entries));
@@ -575,6 +639,10 @@ public static class SetupCheckEngine
             return null;
         }
     }
+
+    /// <summary>Two receiver addresses are the same receiver; an empty one (not recorded) matches anything.</summary>
+    private static bool SameReceiver(string? a, string? b) =>
+        string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b) || SameText(a, b);
 
     private static bool SameText(string? a, string? b) =>
         string.Equals(a?.Trim(), b?.Trim(), StringComparison.OrdinalIgnoreCase);
