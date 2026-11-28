@@ -26,8 +26,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 - **Receiver status reads are faster, and a Volume Memory fade takes a few seconds, not half a minute** (#43). A
-  query now ends as soon as its answer is in (MV? waits for MVMAX), not 120 ms after every answer: on a fake
-  receiver a status read went from over 1 s to about 0.6 s.
+  query now ends as soon as its answer is in (MV? waits for MVMAX), not 120 ms after every answer. On a real
+  receiver a status read went from about 2.2 s to about 1.2 s; most of what is left is the receiver's own reply
+  time (about 90 ms per query).
   Commands still keep the 50 ms gap that Denon asks for. A fade step sets the volume without a full status read;
   the last step reads it, and the 5 s poll still sees a turn of the knob.
 

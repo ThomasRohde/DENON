@@ -13,8 +13,9 @@ requests stay open for later: #63, #74, #75, #76, #77, #78, #79.
       Part of #64: the room-dev-deck harness checks Host and Origin and does not crash on bad JSON.
 - [x] PR 2: receiver and HEOS. #28, #30, #38, #39 and #43 closed; the receiver parts of #66 (HEOS-only scenes and
       Fix silent audio, SSDP on every interface, the Try* cancel filter, the under-process reset).
-- [ ] Verify PR 2 live on the receiver: status time, a Volume Memory fade, Zone 2 on/off, and Reset Connections
-      while the volume slider moves. Read-only checks need no media.
+- [x] PR 2 read-only live check (2026-11-28): status reads 1.1–1.25 s against 2.2–3.2 s before, same values,
+      Zone 2 on read right with main zone off.
+- [ ] Verify PR 2 in the app: a Volume Memory fade, and Reset Connections while the volume slider moves.
 - [ ] Not done in PR 2: remember optional queries (ECO?, SLP?, Z2?) that a model never answers, so a status read
       does not wait 550 ms for each. Needs care: some models do not answer in standby.
 - [ ] PR 3: Home Assistant and Hue: #32 entity path, #46 crashes, #48 DTLS, the HA part of #68, the Hue part of #64.
