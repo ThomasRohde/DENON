@@ -11,6 +11,55 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   stream's address only when it started the station, so after a restart (an update, for example) a station that
   played on gave Hue silence until you started it again. Now the app picks up the station it started last when HEOS
   still plays it and nothing else started since. Seen on 2026-11-28 after three updates during DR P8 Jazz.
+- **Help, README and plugin docs match the app again** (#73). The LG TV topic describes the Watch, Remote, Apps and
+  Settings tabs (not the old Setup menu and button names), and says how the TV's Chromecast wakes it without a MAC
+  address. The HomePod topic says the Control Deck shows the HomePod that plays while the receiver sleeps. Help
+  lists Ctrl+K (the command palette) and that the TV channel logos come from the internet; so does the website.
+  The README names Plugin SDK 2.2, says a plugin for a newer SDK is not loaded, gives the TV's secure port, and
+  links to the releases with full addresses. The Chromecast README no longer says the installer adds an mDNS
+  firewall rule (nothing adds one).
+- **Third-party notices are complete** (#73): the app's notices list every package inside the exe with its
+  copyright and license text (MIT, Apache-2.0 for the MCP SDK, and WebView2's license). The Apple TV and HomePod
+  notices give pyatv's copyright line as in its license and include BouncyCastle's MIT license.
+
+## [2.10.27] - 2026-11-28
+
+### Fixed
+- **Custom Scene and plugin shortcuts can be removed** (#54): their rows have a Remove button (the command was
+  there, but no button used it). Esc during recording, or starting another row, no longer leaves a row on
+  LISTENING. Ctrl+8, Ctrl+9, F1 and Ctrl+K (the command palette) are now refused for in-app shortcuts, because the
+  main window takes them first.
+- **The tray keeps its receiver status after a settings save** (#55), instead of "connecting..." until the next
+  poll, and shows the volume as the receiver's number. The quick-control flyout opens on the monitor and in the
+  corner of the tray you clicked, and its width follows the skin. The tray menu no longer makes a new font on
+  every rebuild.
+- **The main window's drag area matches its title bar in every skin** (#53), and a fit that ends early no longer
+  leaves the content laid out at a trial size.
+- **The automation editor follows a theme switch** (#71): its page reloads the theme and its Windows title bar
+  turns dark or light, as does the main window's frame. A run shown during a drag waits until the drag ends. A
+  Volume Memory switch whose save fails goes back to the saved value, and "Check now" for updates runs once at a
+  time.
+- **The Phone Remote shows the volume as the receiver's 0–98 number**, not dB.
+- **Live lyrics find the new song** (#51). On every track change the app looked up the new title with the previous
+  artist, and often found nothing. Now it looks up after both are set.
+- **Cinema opens only when the cast started** (#52). After a failed cast it used to open a silent video. With
+  Cinema already open, a new track loads once, not twice. Two quick opens no longer start WebView2 twice.
+- **A Cinema sync nudge is kept for the next tracks** (#52), as its tip said: the +/- buttons now save the offset.
+- **The Cinema title bar keeps its size in the Compact and Large skins** (#52, #53) after it was hidden, and the
+  drag area matches it.
+- **A busy clipboard or a locked export file no longer closes the app** (#71); the status line says what failed.
+  A new or duplicated scene, and a new station, never get an id that is already used.
+- Album art colours are read off the UI thread from a small copy of the cover, the lyrics timer runs only while
+  lyrics are on, a failed artwork download is tried again, and Cinema's page watcher runs at most once a frame
+  (#56).
+
+### Security
+- **"Allow in firewall" runs Windows' own netsh** (#33), by its full path, so a netsh.exe in the app's folder
+  cannot run elevated. The rule is limited to this program, and a second click updates the rule instead of adding
+  another one.
+- **Cinema opens only web pages, and artwork never loads from a network share** (#29, defense in depth). The
+  Cinema address is built from the video id, Open Browser opens only http(s), and file, network-share and app
+  links are blocked in Cinema. TV channel logos on this PC still load.
 
 ## [2.10.26] - 2026-11-28
 

@@ -378,7 +378,7 @@ public sealed partial class MainViewModel
     {
         var editor = new ScenePresetEditor
         {
-            Id = $"scene-{ScenePresets.Count + 1}",
+            Id = UniqueId.From($"scene-{ScenePresets.Count + 1}", ScenePresets.Select(static s => s.Id)),
             Name = "New Scene",
             Description = "Custom Denon AVR macro",
             Badge = "NEW",
@@ -401,7 +401,7 @@ public sealed partial class MainViewModel
         }
 
         var model = SelectedScene.ToModel();
-        model.Id = $"{model.Id}-copy";
+        model.Id = UniqueId.From($"{model.Id}-copy", ScenePresets.Select(static s => s.Id));
         model.Name = $"{model.Name} Copy";
         var copy = ScenePresetEditor.FromModel(model, FindPluginActionParameters);
         ScenePresets.Add(copy);

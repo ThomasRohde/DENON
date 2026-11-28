@@ -39,14 +39,18 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
       delays the other plugins).
 - [ ] Verify PR 7 live (needs the user, it uses the TV): the screen preview and the trackpad still work (they now
       check that the TV's addresses are on the LAN), and "Wake TV with the receiver" without a MAC wakes the TV.
-- [ ] PR 8: YouTube and Cinema: #33, #51, #52, #56, the Cinema parts of #53 and #71. Add a Cinema guard too: open
-      and navigate only http/https (defense in depth for #29).
-- [ ] PR 9: desktop shell: #53, #54, #55 (tray shows dB; show the 0–98 number), #71.
+- [x] PR 8: YouTube and Cinema. #33, #51, #52 and #56 closed; the Cinema part of #53 and the clipboard, export and
+      id parts of #71; the Cinema guard for #29.
+- [ ] Verify PR 8 in the app (needs the user, it plays media): Watch a YouTube track (Cinema opens once, after the
+      cast), nudge the sync and check the next track keeps it, and "Allow in firewall" twice gives one rule.
+- [x] PR 9: desktop shell. #53, #54, #55 and #71 closed (with PR 8). Left out of #71: an empty state for the
+      YouTube, Stations and Cast pages (a feature) and full dark ContextMenu templates (cosmetic, larger).
 - [ ] PR 10: release, CI, installer, docs: #58, #59, #60, #62, #72, #73.
+- [x] PR 10b: docs and notices, part of #73. Left out: refreshed website screenshots and the new guides
+      (docs/plugin-development.md, CONTRIBUTING.md, SECURITY.md), which are new documents rather than fixes.
 - [ ] PR 11: accessibility (after PR 9): #57.
 - [ ] PR 12: Apple TV and HomePod plugins: #35, #50, #70, the HomePod part of #49 (plugin release only when asked).
 - [ ] PR 13: Chromecast plugin and first tests: #49, the Chromecast parts of #59 and #70 (release only when asked).
-- [ ] Not in the review: the Phone Remote volume shows dB (`fmtDb` in `RemoteWebUiHtml.cs`). Show the 0–98 number.
 
 ## Live receiver updates on port 23 (#74)
 
@@ -71,7 +75,7 @@ MainWindow and MainViewModel), then:
 
 - [ ] Bind Ctrl+K in `MainWindow` to `OpenCommandPaletteCommand` and delete the class handler in
       `CommandPaletteHotkey` (a temporary hook so part 1 did not touch MainWindow).
-- [ ] Add Ctrl+K to the reserved gestures (the shortcut editor must refuse it) and to the Help shortcut list.
+- [ ] Add Ctrl+K to the Help shortcut list (the reserved gestures have it since PR 9).
 - [ ] Ctrl+1–0 in nav rail order (Brain included), read from `CommandPalettePages.All`, synced with the reserved
       gestures and Help.
 - [ ] Unsaved-changes banner (`IsSettingsDirty`) for Settings, Scenes and Stations, and a scoped `LoadSettings` so
@@ -176,7 +180,8 @@ Learns the listening volume per source and sets it on a source change (2.10.0, `
 - [ ] Verify live: switch between the Apple TV, DR1 and TV 2 Charlie and check the volume follows; check a Smart Scene
       (Morning Jazz) keeps its own volume.
 - [ ] HEOS radio is one source ("HEOS Music") for now; stations differ in loudness too. Idea: a key per station.
-- [ ] MCP: no tool reads or sets the learned levels yet.
+- [x] MCP: `show_volume_memory` shows the learned levels; `volume_memory_set_level` and `volume_memory_forget` change
+      them (2.10.5).
 
 ## Automations
 

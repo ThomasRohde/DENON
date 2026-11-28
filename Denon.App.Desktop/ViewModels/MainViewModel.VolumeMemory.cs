@@ -93,7 +93,7 @@ public sealed partial class MainViewModel
         {
             if (SetProperty(ref _volumeMemoryEnabled, value))
             {
-                _ = _settingsStore.UpdateAsync(s => s.VolumeMemory.Enabled = value);
+                _ = SaveVolumeMemorySwitchAsync(s => s.VolumeMemory.Enabled = value);
             }
         }
     }
@@ -105,8 +105,22 @@ public sealed partial class MainViewModel
         {
             if (SetProperty(ref _volumeMemoryOnlyLower, value))
             {
-                _ = _settingsStore.UpdateAsync(s => s.VolumeMemory.OnlyLower = value);
+                _ = SaveVolumeMemorySwitchAsync(s => s.VolumeMemory.OnlyLower = value);
             }
+        }
+    }
+
+    private async Task SaveVolumeMemorySwitchAsync(Action<AppSettings> change)
+    {
+        try
+        {
+            await _settingsStore.UpdateAsync(change);
+        }
+        catch (Exception ex)
+        {
+            _logStore.Warning($"Volume Memory setting not saved: {ex.Message}");
+            StatusMessage = $"Volume Memory setting not saved: {ex.Message}";
+            SyncVolumeMemorySwitches(_settingsStore.Current); // Back to what is saved.
         }
     }
 

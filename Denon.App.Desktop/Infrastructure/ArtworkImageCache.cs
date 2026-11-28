@@ -29,13 +29,18 @@ public static class ArtworkImageCache
     /// <summary>The picture for a web address, from memory, the disk or a new download. Null for a bad address.</summary>
     public static ImageSource? Get(Uri uri)
     {
+        if (!IsAllowedSource(uri))
+        {
+            return null;
+        }
+
         var key = uri.AbsoluteUri;
         if (Memory.TryGetValue(key, out var cached))
         {
             return cached;
         }
 
-        var image = TryLoadFile(key) ?? LoadFromWeb(uri);
+        var image = TryLoadFile(key) ?? LoadFromWeb(uri, key);
         if (image is null)
         {
             return null;
@@ -76,7 +81,16 @@ public static class ArtworkImageCache
         }
     }
 
-    private static ImageSource? LoadFromWeb(Uri uri)
+    /// <summary>
+    /// A web picture or a file on this PC. A network share (\\server\share, also as file://server/...) is refused:
+    /// loading it sends the Windows login hash to that server, and an address can come from a phone or a stream.
+    /// </summary>
+    internal static bool IsAllowedSource(Uri uri) =>
+        uri.IsAbsoluteUri &&
+        (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == "pack" ||
+         (uri.IsFile && !uri.IsUnc));
+
+    private static ImageSource? LoadFromWeb(Uri uri, string key)
     {
         try
         {
@@ -85,6 +99,12 @@ public static class ArtworkImageCache
             bitmap.UriSource = uri;
             bitmap.CacheOption = BitmapCacheOption.OnLoad;
             bitmap.EndInit();
+            if (!bitmap.IsFrozen)
+            {
+                // A failed download stays blank in memory: forget it, so the next use tries again (#56).
+                bitmap.DownloadFailed += (_, _) => Memory.Remove(key);
+            }
+
             if (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
             {
                 _ = SaveToDiskAsync(uri);
