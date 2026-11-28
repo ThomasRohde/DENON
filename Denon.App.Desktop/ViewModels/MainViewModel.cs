@@ -1163,6 +1163,11 @@ public sealed partial class MainViewModel : ObservableObject
         FixSilentAudioCommand.NotifyCanExecuteChanged();
         ResetConnectionsCommand.NotifyCanExecuteChanged();
 
+        // The setup check's buttons also wait for the receiver: enable them again when it is no longer busy.
+        RunSetupCheckCommand?.NotifyCanExecuteChanged();
+        ApplySetupCommand?.NotifyCanExecuteChanged();
+        UndoSetupCommand?.NotifyCanExecuteChanged();
+
         PlayYouTubeTrackCommand?.NotifyCanExecuteChanged();
         PlayYouTubeTrackAndWatchCommand?.NotifyCanExecuteChanged();
         PlayAllYouTubeResultsCommand?.NotifyCanExecuteChanged();
