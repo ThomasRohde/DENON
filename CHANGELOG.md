@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Added
+- **Unsaved changes banner on Settings, Scenes and Stations** (#76). When you edit a field, a scene or a station
+  and do not save yet, the page shows "Unsaved changes" with Save and Discard. A settings change from somewhere
+  else (an automation, Volume Memory, the MCP server, a plugin) no longer overwrites your edits: the app loads again
+  only the parts that changed and have no edits. If the part you edit also changed, your edits stay and the banner
+  and the status line say so; Save replaces that change and Discard loads it. Factory Reset shows the defaults as
+  unsaved changes until you save them.
 - **Receiver buttons in the Cinema window's full-screen HUD** (#79): when the bars are hidden, the floating HUD
   has Play/Pause, Vol −, Vol + and Mute next to Show Bars, Fullscreen and Close, and shows the volume as the
   receiver's number ("Vol 35", "Muted 35"). One press moves the volume 2 steps. Vol + stops at the safe volume
@@ -16,6 +22,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   A/V offset for this session only: Re-Sync and the next tracks keep it, and the status line says "not saved".
   Click Save Offset to keep it as the Cinema Offset, which also times the lyrics and the meters. Before, every
   nudge saved the offset at once, so a quick try changed the lyrics and the meters too.
+
+### Changed
+- **Ctrl+1 to Ctrl+9 and Ctrl+0 follow the nav rail** (#76): 1 Deck, 2 Music, 3 Stations, 4 Cast, 5 Scenes,
+  6 Plugins, 7 Brain, 8 Settings, 9 Health, 0 Help. Brain has a key now. The keys come from the same list as the
+  rail and the command palette, which shows each page's key. Help, Settings and the README list them; Ctrl+0 is
+  refused for in-app shortcuts like the other page keys.
+- Ctrl+K is a normal key binding of the main window now (it was a temporary class handler). It does nothing while
+  the shortcut recorder or the update panel is open.
 
 ## [2.10.30] - 2026-11-28
 

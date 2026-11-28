@@ -1,0 +1,44 @@
+<!-- A short banner over an editor with unsaved changes (#76). It hides itself when Message is empty.
+     Save runs SaveSettingsCommand and Discard runs DiscardEditorChangesCommand with Area, both on the page's
+     DataContext (MainViewModel). -->
+<UserControl x:Class="Denon.App.Desktop.Controls.UnsavedChangesBanner"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:skin="clr-namespace:Denon.App.Desktop.Infrastructure.Theming"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root">
+    <Border Background="{DynamicResource AccentAmberSubtleBgBrush}"
+            BorderBrush="{DynamicResource AccentAmberBrush}"
+            BorderThickness="1"
+            CornerRadius="{DynamicResource Radius03}"
+            Padding="{skin:Space 12,8}">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="MessageText"
+                       Grid.Column="0"
+                       Text="{Binding Message, ElementName=Root}"
+                       Foreground="{DynamicResource AccentAmberTextBrush}"
+                       FontSize="{DynamicResource FontSize05}"
+                       TextWrapping="Wrap"
+                       VerticalAlignment="Center"
+                       AutomationProperties.LiveSetting="Polite" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="{skin:Space 12,0,0,0}">
+                <Button Content="{Binding SaveLabel, ElementName=Root}"
+                        Command="{Binding SaveSettingsCommand}"
+                        Style="{StaticResource PrimaryButton}"
+                        Padding="{skin:Space 10,4}"
+                        FontSize="{DynamicResource FontSize04}"
+                        Margin="{skin:Space 0,0,6,0}" />
+                <Button Content="Discard"
+                        Command="{Binding DiscardEditorChangesCommand}"
+                        CommandParameter="{Binding Area, ElementName=Root}"
+                        Style="{StaticResource SecondaryButton}"
+                        Padding="{skin:Space 10,4}"
+                        FontSize="{DynamicResource FontSize04}"
+                        ToolTip="Load the saved values again. Your unsaved edits on this page are lost." />
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

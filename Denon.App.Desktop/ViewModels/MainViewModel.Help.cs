@@ -358,7 +358,7 @@ public sealed partial class MainViewModel
         // Keep in step with MainWindow.Window_PreviewKeyDown, ShortcutSettings.CreateDefaults and YouTubeCinemaWindow.
         HelpShortcutsReference.Clear();
         HelpShortcutsReference.Add(new("F1", "Main window", "Open Help for the page or plugin you are on"));
-        HelpShortcutsReference.Add(new("Ctrl + 1 .. 9", "Main window", "Go to a page: 1 Deck, 2 Music, 3 Scenes, 4 Cast, 5 Stations, 6 Plugins, 7 Settings, 8 Health, 9 Help (Brain has no number)"));
+        HelpShortcutsReference.Add(new(CommandPalette.PageShortcuts.KeyRange(), "Main window", $"Go to a page, in nav rail order: {CommandPalette.PageShortcuts.Summary()}"));
         HelpShortcutsReference.Add(new("Ctrl + K", "Main window", "Open the command palette: type to find a page, Smart Scene, station, input, sound mode or plugin action"));
         HelpShortcutsReference.Add(new("Ctrl + R", "Main window", "Refresh the receiver state (fixed key)"));
         HelpShortcutsReference.Add(new("F5", "Main window", "Refresh the receiver state (you can change this key)"));
@@ -428,6 +428,7 @@ public sealed partial class MainViewModel
                 "Click a device badge at the bottom of the left rail to open that plugin. The dot on the badge shows its health.",
                 "Close and Minimize send the window to the Windows tray by default. Change this in Settings → DESKTOP & TRAY BEHAVIOR. Right-click the tray icon to exit.",
                 "The tray icon changes to show playback, mute and standby.",
+                "Settings, Scenes and Stations show \"Unsaved changes\" until you save. Click Discard to load the saved values again. A change from an automation or the MCP server does not overwrite your edits.",
             ],
             troubleshooting:
             [
@@ -1019,7 +1020,7 @@ public sealed partial class MainViewModel
             ],
             proTips:
             [
-                "Ctrl + 1 .. 9, Ctrl + K, Ctrl + R and F1 are fixed. They are not in the editor, and a custom shortcut cannot use them.",
+                $"{CommandPalette.PageShortcuts.KeyRange()}, Ctrl + K, Ctrl + R and F1 are fixed. They are not in the editor, and a custom shortcut cannot use them.",
                 "Global hotkeys keep working while the window is in the tray.",
             ],
             troubleshooting:

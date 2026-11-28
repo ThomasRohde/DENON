@@ -29,6 +29,10 @@
                       UseAeroCaptionButtons="False" />
     </WindowChrome.WindowChrome>
 
+    <Window.InputBindings>
+        <KeyBinding Key="K" Modifiers="Control" Command="{Binding OpenCommandPaletteCommand}" />
+    </Window.InputBindings>
+
 
     <!-- Root Border handles maximized margin compensation cleanly -->
     <Border x:Name="WindowRootBorder"

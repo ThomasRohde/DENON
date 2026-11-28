@@ -72,7 +72,7 @@ requests stay open for later: #63, #76, #77, #78, #79 (#74 and #75 are done, see
 - [x] PR 10b follow-up: docs/plugin-development.md, CONTRIBUTING.md and SECURITY.md (#73).
 - [ ] Refresh the website screenshots (#73; 02-youtube-music and 13-plugin-smart-tv are stale, and Health, Help and
       Appearance have none). Needs the real app with the user's devices, so it waits for the user.
-- [ ] Check that GitHub private vulnerability reporting is on for the repository (SECURITY.md points to it).
+- [x] GitHub private vulnerability reporting is on for the repository (turned on 2026-11-28; SECURITY.md points to it).
 - [x] PR 11: accessibility, #57 closed. A focus ring on the shared styles, names on the symbol buttons of the main
       window, Control Deck, tray flyout and YouTube page, and light text on the scrim.
 - [ ] Verify PR 11 in the app (needs the user): Tab through the main window in Dark and Light and check the ring
@@ -131,19 +131,14 @@ Done: Zone 2 volume, source and mute (Core, the Control deck, scenes, automation
 
 ## Command palette and shortcuts (#76)
 
-Part 1 is done: the Ctrl+K palette (`Denon.App.Desktop/CommandPalette/`). It waits for PR 8 and PR 9 (they change
-MainWindow and MainViewModel), then:
+Done: the Ctrl+K palette (`Denon.App.Desktop/CommandPalette/`), Ctrl+K as a MainWindow key binding, Ctrl+1–0 in
+rail order from `PageShortcuts` (read from `CommandPalettePages.All`; the reserved gestures and Help use it too),
+and the unsaved-changes banner with scoped reloads (`SettingsEditorState`).
 
-- [ ] Bind Ctrl+K in `MainWindow` to `OpenCommandPaletteCommand` and delete the class handler in
-      `CommandPaletteHotkey` (a temporary hook so part 1 did not touch MainWindow).
-- [ ] Add Ctrl+K to the Help shortcut list (the reserved gestures have it since PR 9).
-- [ ] Ctrl+1–0 in nav rail order (Brain included), read from `CommandPalettePages.All`, synced with the reserved
-      gestures and Help.
-- [ ] Unsaved-changes banner (`IsSettingsDirty`) for Settings, Scenes and Stations, and a scoped `LoadSettings` so
-      saves of Automations or Volume Memory do not overwrite fields that are being edited.
-- [ ] PR 11 (accessibility): check the palette with Narrator (the status line is a polite live region).
-- [ ] Release after Ctrl+K is in the reserved gestures and Help. Until then a custom in-app shortcut on Ctrl+K
-      is swallowed by the palette.
+- [ ] PR 11 (accessibility): check the palette and the unsaved-changes banner with Narrator (the palette status
+      line and the banner text are polite live regions).
+- [ ] The Automations editor and the Brain page save at once and have no banner. If they get a Save button later,
+      add them as areas to `SettingsEditorAreas`.
 
 ## VU meters & RTA (follow the Denon)
 

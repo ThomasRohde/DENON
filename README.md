@@ -78,7 +78,7 @@ Auto-detect receiver IP & model name, configure LAN relay / FFmpeg / Cinema A/V 
 - **Themes & Skins**: *Dark*, *Light* or *Follow Windows*, and four skins: *Default*, *Hi-Fi* (rack-receiver look with amber-backlit VU dials and a fluorescent-display spectrum), *Compact* and *Large* (for the sofa or a touch screen). Any skin works with any theme, and both switch live in Settings → Appearance, plugin pages included. In a light theme the VU dials have cream faces and the spectrum a light screen.
 - **First Start**: A splash screen on the first start after an install, upgrade or reinstall. The window opens sized to its monitor and skin, so the Control Deck shows without scrolling (on the first start a small screen gets the *Compact* skin); it remembers your size and position. The version shows at the right of the status line.
 - **In-App Updates**: Once a day the app checks GitHub for a newer release. An **Update** button then shows in the status line: it lists what changed, downloads the installer, checks it against the release's `SHA256SUMS.txt`, and installs it silently (the app closes, updates and starts again). The portable exe opens the release page instead. Turn the check off, or check now, in Settings → Desktop & Tray Behavior.
-- **System Tray Companion & Shortcuts**: Single-click floating taskbar mini-flyout, dark-themed tray menu with Quick Scenes & Stations, single-instance guard, optional launch at Windows startup, and keyboard shortcuts (`Space`, `M`, `Ctrl+↑/↓`, `F5`, `Ctrl+1..9`).
+- **System Tray Companion & Shortcuts**: Single-click floating taskbar mini-flyout, dark-themed tray menu with Quick Scenes & Stations, single-instance guard, optional launch at Windows startup, and keyboard shortcuts (`Space`, `M`, `Ctrl+↑/↓`, `F5`, `Ctrl+1..0`, `Ctrl+K`).
 
 ---
 
@@ -188,7 +188,8 @@ All global Windows hotkeys and in-app shortcuts can be recorded, cleared, and ch
 | `M` | In-App | Toggle Receiver Mute |
 | `Ctrl + ↑` / `Ctrl + ↓` | In-App | Adjust Master Volume ±2 steps |
 | `F5` / `Ctrl + R` | In-App | Force Refresh Receiver Telemetry |
-| `Ctrl + 1..9` | In-App | Switch Navigation Views |
+| `Ctrl + 1..0` | In-App | Open the pages in nav rail order (1 Deck … 0 Help) |
+| `Ctrl + K` | In-App | Open the command palette |
 | **Mouse Wheel** (over Volume card) | In-App | Adjust Master Volume ±2 steps |
 
 ---
