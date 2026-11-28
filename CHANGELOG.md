@@ -31,6 +31,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   page.
 - Radio URLs that the meters decode may use network protocols only (#36).
 
+## [2.10.23] - 2026-11-28
+
+### Security
+- **apply_atmosphere checks its Hue and TV actions like the plugin tools** (#61). An MCP client in SafeControl
+  could pass `tv_action: "tv.power_off"` and get past the FullOrchestration check. Now the action must be one the
+  plugin declares, it gets the same tier check, and a refused action stops the call before any step runs.
+- **fix_room_issue keeps to the MCP safe volume** (#61). "Comfortable volume" (26), "Late-night comfort" (34) and
+  "Fix silent audio" (30) are now capped at the safe volume.
+- **tv_computer in Observer never moves the TV cursor** (#61). Every read action (screenshot, get_state,
+  get_settings) now runs without the cursor and without a screenshot after it.
+- **The MCP server answers only for this PC's host name** (#64). A DNS-rebinding page could read `/health`
+  (version, tier, safe volume). Now every request must name localhost, a loopback address or, with LAN access on,
+  an IP address or this PC's name.
+
+### Fixed
+- **An automation with a repeated node id gets the real error list** (#65), not "An item with the same key has
+  already been added": the graph is now checked before it is laid out.
+- **An MCP scene save no longer undoes a settings change made at the same moment** (#65): it now changes the
+  settings inside the store's lock.
+- **get_room_state and get_listening_habits describe their real fields** (#65). Their output schemas named fields
+  the results do not have (`avr`, `queue`, `summary`). A test now checks every declared field against the result.
+- **The acoustics read no longer stops half way** (#66). It waits up to 8 s (was 4 s) and skips HEOS-only
+  speakers. The listening habits file is written to a temp file first, so a crash cannot reset the habits.
+
 ## [2.10.22] - 2026-11-28
 
 ### Fixed

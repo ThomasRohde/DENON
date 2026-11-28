@@ -543,8 +543,13 @@ public sealed class RoomIntelligenceService
         return list;
     }
 
-    public async Task<(bool Success, string Message)> ExecuteInsightFixAsync(string fixActionKey, CancellationToken ct = default)
+    /// <param name="maxSafeVolume">The MCP safe volume. A fix never sets a higher volume than this (null: no limit).</param>
+    public async Task<(bool Success, string Message)> ExecuteInsightFixAsync(
+        string fixActionKey,
+        CancellationToken ct = default,
+        int? maxSafeVolume = null)
     {
+        int Safe(int level) => maxSafeVolume is int max ? Math.Min(level, max) : level;
         switch (fixActionKey.ToLowerInvariant())
         {
             case "avr.refresh":
@@ -560,16 +565,16 @@ public sealed class RoomIntelligenceService
 
             case "avr.safe_volume":
                 CaptureSnapshot("Auto-Fix: Set Comfortable Volume");
-                await _receiverController.SetVolumeAsync(26, ct);
+                await _receiverController.SetVolumeAsync(Safe(26), ct);
                 RecomputeInsights();
-                return (true, "Raised Denon AVR volume to 26 (-54.0 dB).");
+                return (true, $"Set Denon AVR volume to {Safe(26)}.");
 
             case "avr.late_night_comfort":
                 CaptureSnapshot("Auto-Fix: Late-Night Comfort");
-                await _receiverController.SetVolumeAsync(34, ct);
+                await _receiverController.SetVolumeAsync(Safe(34), ct);
                 await _receiverController.SetDynamicVolumeAsync("HEV", ct);
                 RecomputeInsights();
-                return (true, "Applied Late-Night Comfort: Volume 34 (-46.0 dB) + Audyssey Dynamic Volume Heavy.");
+                return (true, $"Applied Late-Night Comfort: Volume {Safe(34)} + Audyssey Dynamic Volume Heavy.");
 
             case "tv.screen_off":
             {
@@ -590,7 +595,7 @@ public sealed class RoomIntelligenceService
 
             case "avr.fix_silent":
                 CaptureSnapshot("Auto-Fix: Silent Audio");
-                await _receiverController.FixSilentAudioAsync(30, ct);
+                await _receiverController.FixSilentAudioAsync(Safe(30), ct);
                 RecomputeInsights();
                 return (true, "Ran Fix Silent Audio (powered ON, unmuted, set audible volume).");
 
@@ -943,14 +948,17 @@ public sealed class RoomIntelligenceService
                 RecordLiveObservation(st);
             }
 
-            if ((now - _lastAcousticsRefreshUtc) >= TimeSpan.FromSeconds(90) &&
+            // A HEOS-only speaker has no acoustics on port 23. The read is 10 queries and waits for the command
+            // gate first: 8 s, so a poll in progress does not cancel it half way (which reset the Telnet link).
+            if (_receiverController.IsAvrProtocolAvailable &&
+                (now - _lastAcousticsRefreshUtc) >= TimeSpan.FromSeconds(90) &&
                 Interlocked.CompareExchange(ref _acousticsRefreshInFlight, 1, 0) == 0)
             {
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
                         var acoustics = await _receiverController.GetAcousticStatusAsync(cts.Token);
                         UpdateCachedAcoustics(acoustics);
                     }
@@ -1063,7 +1071,10 @@ public sealed class RoomIntelligenceService
                     Directory.CreateDirectory(dir);
                 }
 
-                File.WriteAllText(_habitsFilePath, json);
+                // Write a temp file and move it over, so a crash mid-write cannot leave half a file (which reset the habits).
+                var temp = _habitsFilePath + ".tmp";
+                File.WriteAllText(temp, json);
+                File.Move(temp, _habitsFilePath, overwrite: true);
             }
             catch
             {

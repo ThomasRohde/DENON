@@ -22,8 +22,8 @@ public sealed partial class DenonMcpServer
                 readOnly: true, idempotent: true,
                 outputSchema: OutputObjSchema(
                     ("timestamp", "string"),
-                    ("avr", "object"),
-                    ("queue", "object"),
+                    ("receiver", "object"),
+                    ("mediaQueue", "object"),
                     ("plugins", "array"),
                     ("insights", "array"),
                     ("safety", "object"))),
@@ -46,9 +46,9 @@ public sealed partial class DenonMcpServer
                 title: "Get Listening Habits",
                 readOnly: true, idempotent: true,
                 outputSchema: OutputObjSchema(
-                    ("summary", "string"),
-                    ("totalSessions", "integer"),
-                    ("preferredVolumeByBucket", "object"))),
+                    ("updatedAt", "string"),
+                    ("totalObservations", "integer"),
+                    ("preferredVolumeByTimeBlock", "object"))),
             Tool("get_activity_history",
                 "Query structured habit-ready event logs (media sessions with 15s dwell filter, AVR power/input/settled-volume deltas, LG TV apps/channels, Philips Hue lighting, and control origins distinguishing app commands vs physical remotes/phone streams).",
                 ObjSchema(
@@ -587,20 +587,9 @@ public sealed partial class DenonMcpServer
                         continue;
                     }
 
-                    var (isReadOnly, _, _) = McpPluginToolBridge.ResolveHints(action);
-                    var needsFullOrchestration = action.IsDestructive == true ||
-                                                 action.ActionId.Contains("power_off", StringComparison.OrdinalIgnoreCase);
+                    var isReadOnly = EnsurePluginActionAllowed(action, cfg, toolName);
                     if (!isReadOnly)
                     {
-                        if (cfg.PermissionTier == McpPermissionTier.Observer)
-                        {
-                            throw new UnauthorizedAccessException($"MCP Permission Tier is 'Observer' (read-only). Change to SafeControl or FullOrchestration in Denon Desktop Settings to run '{toolName}'.");
-                        }
-
-                        if (needsFullOrchestration && cfg.PermissionTier < McpPermissionTier.FullOrchestration)
-                        {
-                            throw new UnauthorizedAccessException($"Running '{action.ActionId}' requires 'FullOrchestration' permission tier.");
-                        }
 
                         _telemetry.MarkOrigin("avr", "mcp_agent", "mcp.tool", new Dictionary<string, object?> { ["tool"] = toolName });
                         _telemetry.MarkOrigin("tv", "mcp_agent");
@@ -645,7 +634,7 @@ public sealed partial class DenonMcpServer
             case "fix_room_issue":
             {
                 var key = RequireString(args, "fix_action_key");
-                var (ok, msg) = await _intelligence.ExecuteInsightFixAsync(key, ct);
+                var (ok, msg) = await _intelligence.ExecuteInsightFixAsync(key, ct, maxSafeVolume: cfg.MaxSafeVolume);
                 return ok ? BuildToolText(msg) : BuildToolError(msg);
             }
 
@@ -871,16 +860,14 @@ public sealed partial class DenonMcpServer
         string payloadJson;
         if (args.ValueKind == JsonValueKind.Object)
         {
-            if (action == "screenshot" && cfg.PermissionTier == McpPermissionTier.Observer)
+            if (cfg.PermissionTier == McpPermissionTier.Observer)
             {
-                // Keep Observer mode strictly read-only (no cursor wiggle input).
-                payloadJson = JsonSerializer.Serialize(new
-                {
-                    action,
-                    show_cursor = false,
-                    width = GetInt(args, "width") ?? 960,
-                    height = GetInt(args, "height") ?? 540,
-                }, JsonOutOptions);
+                // Keep Observer mode strictly read-only for every read action: no cursor wiggle on the TV.
+                var payload = System.Text.Json.Nodes.JsonNode.Parse(args.GetRawText())!.AsObject();
+                payload["action"] = action;
+                payload["show_cursor"] = false;
+                payload["screenshot_after"] = false;
+                payloadJson = payload.ToJsonString();
             }
             else
             {
@@ -970,8 +957,62 @@ public sealed partial class DenonMcpServer
         required = new[] { "action" },
     };
 
+    /// <summary>
+    /// The tier rule for a plugin action, used by the plugin_* tools and by apply_atmosphere: read-only actions run
+    /// in every tier, others need SafeControl, and power_off or an action the plugin declares destructive needs
+    /// FullOrchestration. Returns true for a read-only action.
+    /// </summary>
+    private static bool EnsurePluginActionAllowed(Denon.App.PluginSdk.PluginActionDescriptor action, McpServerSettings cfg, string toolName)
+    {
+        var (isReadOnly, _, _) = McpPluginToolBridge.ResolveHints(action);
+        if (isReadOnly)
+        {
+            return true;
+        }
+
+        if (cfg.PermissionTier == McpPermissionTier.Observer)
+        {
+            throw new UnauthorizedAccessException($"MCP Permission Tier is 'Observer' (read-only). Change to SafeControl or FullOrchestration in Denon Desktop Settings to run '{toolName}'.");
+        }
+
+        var needsFullOrchestration = action.IsDestructive == true ||
+                                     action.ActionId.Contains("power_off", StringComparison.OrdinalIgnoreCase);
+        if (needsFullOrchestration && cfg.PermissionTier < McpPermissionTier.FullOrchestration)
+        {
+            throw new UnauthorizedAccessException($"Running '{action.ActionId}' requires 'FullOrchestration' permission tier.");
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// apply_atmosphere may name any Hue or TV action: it must be one the enabled plugin declares, and it gets the
+    /// same tier check as the plugin tools (so tv.power_off still needs FullOrchestration).
+    /// </summary>
+    private void EnsureAtmospherePluginAction(string pluginId, string actionId, McpServerSettings cfg)
+    {
+        var plugin = _pluginHost.GetPlugins().FirstOrDefault(p => string.Equals(p.Id, pluginId, StringComparison.OrdinalIgnoreCase) && p.IsEnabled)
+                     ?? throw new McpInvalidParamsException($"The plugin '{pluginId}' is not enabled.");
+        var action = plugin.Actions.FirstOrDefault(a => string.Equals(a.ActionId, actionId, StringComparison.OrdinalIgnoreCase))
+                     ?? throw new McpInvalidParamsException($"'{actionId}' is not an action of the plugin '{pluginId}'.");
+        EnsurePluginActionAllowed(action, cfg, "apply_atmosphere");
+    }
+
     private async Task<CallToolResult> ExecuteApplyAtmosphereAsync(JsonElement args, McpServerSettings cfg, CancellationToken ct)
     {
+        // Check the plugin actions before any step runs, so a refused action changes nothing.
+        var hueAction = GetString(args, "hue_action");
+        var tvAction = GetString(args, "tv_action");
+        if (!string.IsNullOrWhiteSpace(hueAction))
+        {
+            EnsureAtmospherePluginAction("philips-hue", hueAction, cfg);
+        }
+
+        if (!string.IsNullOrWhiteSpace(tvAction))
+        {
+            EnsureAtmospherePluginAction("smart-tv", tvAction, cfg);
+        }
+
         var reason = GetString(args, "reason", "AI Atmosphere");
         var captured = _intelligence.CaptureSnapshot($"MCP Atmosphere: {reason}");
 
@@ -1006,14 +1047,14 @@ public sealed partial class DenonMcpServer
             stepsTaken.Add($"Dynamic Volume → {dv.ToUpperInvariant()}");
         }
 
-        if (GetString(args, "hue_action") is { Length: > 0 } hueAct)
+        if (hueAction is { Length: > 0 } hueAct)
         {
             var res = await _pluginHost.ExecuteActionAsync("philips-hue", hueAct, null, ct);
             stepsTaken.Add($"Philips Hue ({hueAct}): {res.Message}");
             _intelligence.RecordPluginActionUsed("philips-hue", hueAct);
         }
 
-        if (GetString(args, "tv_action") is { Length: > 0 } tvAct)
+        if (tvAction is { Length: > 0 } tvAct)
         {
             var res = await _pluginHost.ExecuteActionAsync("smart-tv", tvAct, null, ct);
             stepsTaken.Add($"LG TV ({tvAct}): {res.Message}");
@@ -1116,38 +1157,42 @@ public sealed partial class DenonMcpServer
         var pluginId = GetString(args, "plugin_id");
         var pluginActionId = GetString(args, "plugin_action_id");
 
-        var updated = _settingsStore.Current.Clone();
-        var existing = updated.Receiver.Scenes.FirstOrDefault(s => s.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
-        var scene = existing ?? new ScenePreset { Id = id };
-
-        scene.Name = name;
-        scene.Description = description;
-        if (!string.IsNullOrWhiteSpace(input)) scene.InputSource = input.ToUpperInvariant();
-        if (!string.IsNullOrWhiteSpace(mode)) scene.SoundMode = mode.ToUpperInvariant();
-        if (targetVol.HasValue) scene.TargetVolume = targetVol.Value;
-        if (!string.IsNullOrWhiteSpace(dvol)) scene.DynamicVolume = dvol.ToUpperInvariant();
-
-        if (!string.IsNullOrWhiteSpace(pluginId) && !string.IsNullOrWhiteSpace(pluginActionId))
+        // Inside the store's lock: a clone saved whole would undo a settings change made at the same moment.
+        ScenePreset? saved = null;
+        await _settingsStore.UpdateAsync(settings =>
         {
-            scene.PluginActions =
-            [
-                new ScenePluginActionStep
-                {
-                    PluginId = pluginId,
-                    ActionId = pluginActionId,
-                    DisplayName = $"{pluginId}: {pluginActionId}",
-                    DelayMs = 200,
-                },
-            ];
-        }
+            var existing = settings.Receiver.Scenes.FirstOrDefault(s => s.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+            var scene = existing ?? new ScenePreset { Id = id };
 
-        if (existing is null)
-        {
-            updated.Receiver.Scenes.Add(scene);
-        }
+            scene.Name = name;
+            scene.Description = description;
+            if (!string.IsNullOrWhiteSpace(input)) scene.InputSource = input.ToUpperInvariant();
+            if (!string.IsNullOrWhiteSpace(mode)) scene.SoundMode = mode.ToUpperInvariant();
+            if (targetVol.HasValue) scene.TargetVolume = targetVol.Value;
+            if (!string.IsNullOrWhiteSpace(dvol)) scene.DynamicVolume = dvol.ToUpperInvariant();
 
-        await _settingsStore.SaveAsync(updated, ct);
-        return BuildToolJson(new { saved = true, scene });
+            if (!string.IsNullOrWhiteSpace(pluginId) && !string.IsNullOrWhiteSpace(pluginActionId))
+            {
+                scene.PluginActions =
+                [
+                    new ScenePluginActionStep
+                    {
+                        PluginId = pluginId,
+                        ActionId = pluginActionId,
+                        DisplayName = $"{pluginId}: {pluginActionId}",
+                        DelayMs = 200,
+                    },
+                ];
+            }
+
+            if (existing is null)
+            {
+                settings.Receiver.Scenes.Add(scene);
+            }
+
+            saved = scene;
+        }, ct);
+        return BuildToolJson(new { saved = true, scene = saved });
     }
 
     private async Task<CallToolResult> ExecuteCreateOrUpdateAutomationAsync(JsonElement args, CancellationToken ct)
@@ -1179,13 +1224,15 @@ public sealed partial class DenonMcpServer
 
         // An agent-made automation stays off until the user turns it on, unless the call says enabled: true.
         graph.Enabled = element.TryGetProperty("enabled", out var enabledEl) && enabledEl.ValueKind == JsonValueKind.True;
-        LayOutIfUnplaced(graph);
 
+        // Validate first: it reports duplicate or missing node ids, which the layout cannot handle.
         var problems = AutomationGraphValidator.Validate(graph);
         if (problems.Count > 0)
         {
             return BuildToolError("The automation was not saved:\n" + string.Join("\n", problems.Select(p => p.NodeId is null ? $"- {p.Message}" : $"- node {p.NodeId}: {p.Message}")));
         }
+
+        LayOutIfUnplaced(graph);
 
         // Inside the store's lock, so an editor save at the same moment is not undone.
         var replaced = false;
@@ -1196,15 +1243,23 @@ public sealed partial class DenonMcpServer
     /// <summary>Agents rarely send positions: put unplaced nodes in columns by their distance from a trigger.</summary>
     private static void LayOutIfUnplaced(AutomationGraph graph)
     {
-        if (graph.Nodes.Any(static n => n.X != 0 || n.Y != 0))
+        // Skip null nodes, nodes without an id and repeated ids: the validator reports those.
+        var nodes = (graph.Nodes ?? []).Where(static n => n is not null && !string.IsNullOrEmpty(n.Id)).ToList();
+        if (nodes.Count == 0 || nodes.Any(static n => n.X != 0 || n.Y != 0))
         {
             return;
         }
 
-        var depth = graph.Nodes.ToDictionary(static n => n.Id, static n => AutomationNodeTypes.IsTrigger(n.Type) ? 0 : -1, StringComparer.Ordinal);
-        for (var pass = 0; pass < graph.Nodes.Count; pass++)
+        var depth = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var node in nodes)
         {
-            foreach (var edge in graph.Edges)
+            depth.TryAdd(node.Id, AutomationNodeTypes.IsTrigger(node.Type ?? string.Empty) ? 0 : -1);
+        }
+
+        var edges = (graph.Edges ?? []).Where(static e => e is not null && e.From is not null && e.To is not null).ToList();
+        for (var pass = 0; pass < nodes.Count; pass++)
+        {
+            foreach (var edge in edges)
             {
                 if (depth.TryGetValue(edge.From, out var d) && d >= 0 && depth.ContainsKey(edge.To) && depth[edge.To] < d + 1)
                 {
@@ -1213,7 +1268,7 @@ public sealed partial class DenonMcpServer
             }
         }
 
-        foreach (var column in graph.Nodes.GroupBy(n => Math.Max(0, depth[n.Id])))
+        foreach (var column in nodes.GroupBy(n => Math.Max(0, depth[n.Id])))
         {
             var row = 0;
             foreach (var node in column)

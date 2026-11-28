@@ -403,11 +403,20 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
     }
 
     /// <summary>
-    /// Before the SDK: a browser page on another site may not call the server (Origin check), and every MCP request
-    /// needs the Bearer token when the settings ask for one.
+    /// Before the SDK: every request (also /health) must name this PC in its Host header, a browser page on another
+    /// site may not call the server (Origin check), and every MCP request needs the Bearer token when the settings ask
+    /// for one.
     /// </summary>
     private async Task GuardAsync(HttpContext context, RequestDelegate next)
     {
+        if (!IsAllowedHost(context.Request.Host.Host, _settingsStore.Current.Mcp.AllowLanConnections))
+        {
+            LogActivity("auth", $"{context.Request.Method} {context.Request.Path} for host {context.Request.Host}", "Blocked (403)", 0);
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(new { error = "Forbidden host. Connect to this PC by localhost, 127.0.0.1 or its LAN address." });
+            return;
+        }
+
         if (!context.Request.Path.StartsWithSegments("/mcp", StringComparison.OrdinalIgnoreCase))
         {
             await next(context);
@@ -432,6 +441,54 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
         }
 
         await next(context);
+    }
+
+    /// <summary>
+    /// The Host header must name this PC. A DNS-rebinding page reaches 127.0.0.1 under its own host name, so a name
+    /// that is not localhost, a loopback address or (with LAN access on) an IP address or this PC's name is refused.
+    /// </summary>
+    internal static bool IsAllowedHost(string? host, bool allowLan)
+    {
+        var name = (host ?? string.Empty).Trim().TrimEnd('.');
+        if (name.Length == 0)
+        {
+            return false;
+        }
+
+        if (name.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (IPAddress.TryParse(name.Trim('[', ']'), out var address))
+        {
+            return IPAddress.IsLoopback(address) || (allowLan && IsPrivateOrLinkLocal(address));
+        }
+
+        var machine = Environment.MachineName;
+        return allowLan &&
+               (name.Equals(machine, StringComparison.OrdinalIgnoreCase) ||
+                name.Equals(machine + ".local", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>A LAN address: 10/8, 172.16/12, 192.168/16, 169.254/16, or IPv6 unique-local and link-local.</summary>
+    private static bool IsPrivateOrLinkLocal(IPAddress address)
+    {
+        if (address.IsIPv4MappedToIPv6)
+        {
+            address = address.MapToIPv4();
+        }
+
+        if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+        {
+            var b = address.GetAddressBytes();
+            return b[0] == 10 ||
+                   (b[0] == 172 && b[1] is >= 16 and <= 31) ||
+                   (b[0] == 192 && b[1] == 168) ||
+                   (b[0] == 169 && b[1] == 254);
+        }
+
+        return address.IsIPv6LinkLocal || address.IsIPv6UniqueLocal;
     }
 
     /// <summary>No Origin (a native client), or a page on this PC (localhost, 127.0.0.1, [::1]).</summary>
