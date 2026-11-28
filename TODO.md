@@ -3,6 +3,30 @@
 Open work for Denon Desktop and the external plugins. Keep this file current: add items when work is found or
 left open, and remove them (with a CHANGELOG entry) when they are done.
 
+## Code review issues #28–#79 (Antigravity, 2026-11-28)
+
+All 52 issues were checked against the code. The plan is 13 PRs, one area each, done one at a time. Feature
+requests stay open for later: #63, #74, #75, #76, #77, #78, #79.
+
+- [x] PR 1: guest input security. #29 closed: a phone track gets its watch and thumbnail address from the video
+      id. Part of #31: values ride in data-* attributes (no inline JavaScript), and only hex colours go into styles.
+      Part of #64: the room-dev-deck harness checks Host and Origin and does not crash on bad JSON.
+- [ ] PR 2: receiver and HEOS: #28 UI freeze, #30 CR/LF injection, #38, #39, #43 Telnet speed, parts of #66.
+- [ ] PR 3: Home Assistant and Hue: #32 entity path, #46 crashes, #48 DTLS, the HA part of #68, the Hue part of #64.
+- [ ] PR 4: MCP tiers and limits: #61, #65, the MCP part of #66, the /health Host check in #64.
+- [ ] PR 5: media relay and Core services: #31 headers, #36, #37 Jukebox 45 s cut, #40, #41, #42, #67, :18925
+      items of #64.
+- [ ] PR 6: plugin host: #44, #45, #69, the CreateHttpClient part of #64.
+- [ ] PR 7: Smart TV plugin: #34, #47, the Smart TV part of #68.
+- [ ] PR 8: YouTube and Cinema: #33, #51, #52, #56, the Cinema parts of #53 and #71. Add a Cinema guard too: open
+      and navigate only http/https (defense in depth for #29).
+- [ ] PR 9: desktop shell: #53, #54, #55 (tray shows dB; show the 0–98 number), #71.
+- [ ] PR 10: release, CI, installer, docs: #58, #59, #60, #62, #72, #73.
+- [ ] PR 11: accessibility (after PR 9): #57.
+- [ ] PR 12: Apple TV and HomePod plugins: #35, #50, #70, the HomePod part of #49 (plugin release only when asked).
+- [ ] PR 13: Chromecast plugin and first tests: #49, the Chromecast parts of #59 and #70 (release only when asked).
+- [ ] Not in the review: the Phone Remote volume shows dB (`fmtDb` in `RemoteWebUiHtml.cs`). Show the 0–98 number.
+
 ## VU meters & RTA (follow the Denon)
 
 Phase 1 is done in 1.15.1 (source router, DENON/SIM/MUTED/PC/IDLE badge, PC Cast meters synced to the HEOS delay).

@@ -47,38 +47,54 @@ const shim = `<script>
 })();
 </script>`;
 
-let child = null;
+const children = new Set();
 const ops = {
   readFile: (p, e) => fs.readFileSync(p, e === "utf8" ? "utf8" : undefined),
   writeFile: (p, d) => { fs.writeFileSync(p, d, "utf8"); return null; },
   stat: (p) => { const s = fs.statSync(p); return { size: s.size, mtimeMs: s.mtimeMs, isFile: s.isFile(), isDirectory: s.isDirectory() }; },
   readdir: (p) => fs.readdirSync(p, { withFileTypes: true }).map((d) => ({ name: d.name, isFile: d.isFile(), isDirectory: d.isDirectory(), isSymbolicLink: false })),
   exists: (p) => fs.existsSync(p),
-  rm: (p, o) => { fs.rmSync(p, { force: !!o?.force }); return null; },
+  rm: (p, o) => { fs.rmSync(p, { force: !!o?.force, recursive: !!o?.recursive }); return null; },
   mkdir: (p, o) => { fs.mkdirSync(p, { recursive: !!o?.recursive }); return null; },
   exec: (c, o) => new Promise((res) => exec(c, { cwd: o?.cwd, timeout: o?.timeout ?? 60000, maxBuffer: 64 << 20, encoding: "utf8" },
     (err, stdout, stderr) => res({ stdout, stderr, code: err ? (typeof err.code === "number" ? err.code : 1) : 0, signal: null, truncated: false }))),
   spawn: (cmd, args, o) => new Promise((res, rej) => {
     let out = "", err = "";
-    child = spawn(cmd, args || [], { cwd: o?.cwd });
+    const child = spawn(cmd, args || [], { cwd: o?.cwd });
+    children.add(child);
     child.stdout.on("data", (d) => out += d); child.stderr.on("data", (d) => err += d);
-    child.on("error", rej); child.on("close", (code) => { child = null; res({ stdout: out, stderr: err, code }); });
+    child.on("error", (e) => { children.delete(child); rej(e); });
+    child.on("close", (code) => { children.delete(child); res({ stdout: out, stderr: err, code }); });
   }),
-  kill: () => { child?.kill(); return null; },
+  kill: () => { for (const c of children) c.kill(); return null; },
 };
 
+// Only this machine may talk to the harness. A DNS-rebinding page reaches 127.0.0.1 under its own host
+// name, so check the Host header on every request, and the Origin on /rpc.
+const localOrigins = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
+const isLocalHost = (req) => localOrigins.has(String(req.headers.host || "").toLowerCase());
+const isLocalOrigin = (req) => {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  try { return localOrigins.has(new URL(origin).host.toLowerCase()); } catch { return false; }
+};
+const sendJson = (res, payload) => { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify(payload)); };
+
 http.createServer(async (req, res) => {
+  if (!isLocalHost(req)) { res.writeHead(403); res.end(); return; }
   if (req.method === "GET" && (req.url === "/" || req.url.startsWith("/?"))) {
     const html = fs.readFileSync(page, "utf8");
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     res.end(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>${shim}${html}</body></html>`);
     return;
   }
-  if (req.method === "POST" && req.url === "/rpc" && req.headers["x-t"] === token) {
-    let body = ""; for await (const c of req) body += c;
-    const { op, args } = JSON.parse(body);
-    try { const value = await ops[op](...args); res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ value })); }
-    catch (e) { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ error: e.message })); }
+  if (req.method === "POST" && req.url === "/rpc" && req.headers["x-t"] === token && isLocalOrigin(req)) {
+    try {
+      let body = ""; for await (const c of req) body += c;
+      const { op, args } = JSON.parse(body);
+      if (!Object.hasOwn(ops, op)) throw new Error(`Unknown operation: ${op}`);
+      sendJson(res, { value: await ops[op](...(Array.isArray(args) ? args : [])) });
+    } catch (e) { sendJson(res, { error: e.message }); }
     return;
   }
   res.writeHead(404); res.end();
