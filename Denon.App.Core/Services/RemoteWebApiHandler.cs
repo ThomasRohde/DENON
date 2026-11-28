@@ -269,8 +269,8 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
                     }
 
                 case "/api/youtube/play":
-                    var playTrack = JsonSerializer.Deserialize<YouTubeTrackItem>(body, JsonOptions);
-                    if (playTrack is null || string.IsNullOrWhiteSpace(playTrack.VideoId))
+                    var playTrack = BuildRemoteTrack(JsonSerializer.Deserialize<YouTubeTrackItem>(body, JsonOptions));
+                    if (playTrack is null)
                     {
                         return JsonError(400, "Invalid track payload.");
                     }
@@ -280,8 +280,8 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
                     return JsonOk(new { message = $"Casting {playTrack.Title}" });
 
                 case "/api/youtube/queue":
-                    var queueTrack = JsonSerializer.Deserialize<YouTubeTrackItem>(body, JsonOptions);
-                    if (queueTrack is null || string.IsNullOrWhiteSpace(queueTrack.VideoId))
+                    var queueTrack = BuildRemoteTrack(JsonSerializer.Deserialize<YouTubeTrackItem>(body, JsonOptions));
+                    if (queueTrack is null)
                     {
                         return JsonError(400, "Invalid track payload.");
                     }
@@ -663,6 +663,46 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
         }
 
         return null;
+    }
+
+    private const int MaxRemoteTrackTextLength = 200;
+
+    /// <summary>
+    /// Builds a YouTube track from a phone request. The phone sends the whole track, but only the
+    /// video id is used to make the addresses: a phone must not set the watch or thumbnail address,
+    /// because Cinema opens the watch address and the app loads the thumbnail. Returns null when the
+    /// id is not an 11-character YouTube video id.
+    /// </summary>
+    internal static YouTubeTrackItem? BuildRemoteTrack(YouTubeTrackItem? sent)
+    {
+        var videoId = sent?.VideoId?.Trim();
+        if (sent is null || videoId is null || !IsYouTubeVideoId(videoId))
+        {
+            return null;
+        }
+
+        var duration = sent.Duration is { } d && d > TimeSpan.Zero && d <= TimeSpan.FromHours(24) ? d : (TimeSpan?)null;
+        return new YouTubeTrackItem(
+            VideoId: videoId,
+            Title: CleanRemoteText(sent.Title, "YouTube track"),
+            Author: CleanRemoteText(sent.Author, string.Empty),
+            Duration: duration,
+            ThumbnailUrl: $"https://i.ytimg.com/vi/{videoId}/hqdefault.jpg",
+            WatchUrl: $"https://www.youtube.com/watch?v={videoId}");
+    }
+
+    private static bool IsYouTubeVideoId(string id) =>
+        id.Length == 11 && id.All(static c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
+
+    private static string CleanRemoteText(string? text, string fallback)
+    {
+        var cleaned = new string((text ?? string.Empty).Where(static c => !char.IsControl(c)).ToArray()).Trim();
+        if (cleaned.Length > MaxRemoteTrackTextLength)
+        {
+            cleaned = cleaned[..MaxRemoteTrackTextLength].TrimEnd();
+        }
+
+        return cleaned.Length == 0 ? fallback : cleaned;
     }
 
     private static RemoteWebResponse JsonOk(object payload) =>

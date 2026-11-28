@@ -4,6 +4,21 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+- **A phone can no longer set the address of a YouTube track** (#29). When a phone (also a Guest phone) plays or
+  queues a track, the app now keeps only the video id, and builds the watch and thumbnail address from it. Before,
+  a Guest could queue a track with a file or program path: Cinema's "Open Browser" ran it, Cinema opened it, and the
+  queue loaded the thumbnail from a network share. A bad video id gets a 400 answer. Titles lose control characters
+  and stop at 200 characters.
+- **The Phone Remote page keeps setting values out of inline JavaScript** (part of #31). Scene, input, station and
+  plugin chips carry their values in data attributes, and one click listener reads them. Scene and plugin colours
+  go into the page only as hex colours.
+- **The room-dev-deck test harness answers only 127.0.0.1 and localhost** (part of #64). A DNS-rebinding page can no
+  longer read its token and run commands. Bad JSON no longer stops the harness, unknown operations are refused,
+  and `rm` passes `recursive`.
+
 ## [2.10.18] - 2026-11-28
 
 ### Changed

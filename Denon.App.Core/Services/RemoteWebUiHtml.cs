@@ -466,6 +466,26 @@ function esc(s) {
   return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// Colours come from settings and plugins. Only a plain hex colour may go into a style attribute.
+function safeColor(c) {
+  return /^#[0-9a-f]{3,8}$/i.test(String(c || '').trim()) ? String(c).trim() : 'var(--muted)';
+}
+
+// Rendered chips carry their values in data-* attributes, never inside inline JavaScript.
+// One listener reads them, so a quote in a value cannot run as code.
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const d = b.dataset;
+  switch (d.act) {
+    case 'scene': post('/api/scene', { id: d.id }); break;
+    case 'input': post('/api/input', { code: d.code }); break;
+    case 'station': post('/api/station', { alias: d.alias }); break;
+    case 'ptog': post('/api/plugins/toggle', { pluginId: d.plugin, enabled: d.enabled === 'true' }); break;
+    case 'pact': post('/api/plugins/action', { pluginId: d.plugin, actionId: d.action }); break;
+  }
+});
+
 function patchContainerPreservingFocus(el, key, html) {
   if (lastMarkup[key] === html) return;
   const activeEl = document.activeElement;
@@ -566,17 +586,17 @@ async function refreshStatus() {
     mbtn.classList.toggle('muted', !!state.isMuted);
 
     const scenesHtml = (state.scenes || []).map(sc =>
-      `<button class="chip" type="button" data-focus-key="scene:${esc(sc.id)}" onclick="post('/api/scene',{id:'${esc(sc.id)}'})"><span class="scene-tag" style="background:${esc(sc.accentHex)}">${esc(sc.badge)}</span>${esc(sc.name)}</button>`
+      `<button class="chip" type="button" data-focus-key="scene:${esc(sc.id)}" data-act="scene" data-id="${esc(sc.id)}"><span class="scene-tag" style="background:${safeColor(sc.accentHex)}">${esc(sc.badge)}</span>${esc(sc.name)}</button>`
     ).join('');
     patchContainerPreservingFocus(document.getElementById('scenesBox'), 'scenes', scenesHtml);
 
     const inputsHtml = (state.inputs || []).map(inp =>
-      `<button class="chip ${inp.isActive ? 'active' : ''}" type="button" data-focus-key="input:${esc(inp.code)}" onclick="post('/api/input',{code:'${esc(inp.code)}'})">${esc(inp.displayName)}</button>`
+      `<button class="chip ${inp.isActive ? 'active' : ''}" type="button" data-focus-key="input:${esc(inp.code)}" data-act="input" data-code="${esc(inp.code)}">${esc(inp.displayName)}</button>`
     ).join('');
     patchContainerPreservingFocus(document.getElementById('inputsBox'), 'inputs', inputsHtml);
 
     const stationsHtml = (state.stations || []).map(st =>
-      `<button class="chip ${st.isPlaying ? 'active' : ''}" type="button" data-focus-key="station:${esc(st.alias)}" onclick="post('/api/station',{alias:'${esc(st.alias)}'})">▶ ${esc(st.displayName)}</button>`
+      `<button class="chip ${st.isPlaying ? 'active' : ''}" type="button" data-focus-key="station:${esc(st.alias)}" data-act="station" data-alias="${esc(st.alias)}">▶ ${esc(st.displayName)}</button>`
     ).join('');
     patchContainerPreservingFocus(document.getElementById('stationsBox'), 'stations', stationsHtml);
 
@@ -585,13 +605,13 @@ async function refreshStatus() {
       ? plugins.map(p => `
           <div class="card">
             <div class="label">
-              <span><span class="scene-tag" style="background:${esc(p.accentHex)};margin-right:6px">${esc(p.iconGlyph)}</span>${esc(p.name)}</span>
-              <button class="pill ${p.isEnabled ? 'on' : ''}" type="button" data-focus-key="ptog:${esc(p.id)}" style="padding:2px 8px;font-size:10px" onclick="post('/api/plugins/toggle',{pluginId:'${esc(p.id)}',enabled:${!p.isEnabled}})">${p.isEnabled ? 'ACTIVE' : 'OFF'}</button>
+              <span><span class="scene-tag" style="background:${safeColor(p.accentHex)};margin-right:6px">${esc(p.iconGlyph)}</span>${esc(p.name)}</span>
+              <button class="pill ${p.isEnabled ? 'on' : ''}" type="button" data-focus-key="ptog:${esc(p.id)}" style="padding:2px 8px;font-size:10px" data-act="ptog" data-plugin="${esc(p.id)}" data-enabled="${p.isEnabled ? 'false' : 'true'}">${p.isEnabled ? 'ACTIVE' : 'OFF'}</button>
             </div>
             <div style="font-size:12px;color:var(--sub);margin-bottom:10px">${esc(p.statusText || p.category)}</div>
             <div class="chips">
               ${(p.actions || []).map(a =>
-                `<button class="chip" type="button" data-focus-key="pact:${esc(p.id)}:${esc(a.actionId)}" onclick="post('/api/plugins/action',{pluginId:'${esc(p.id)}',actionId:'${esc(a.actionId)}'})">${esc(a.displayName)}</button>`
+                `<button class="chip" type="button" data-focus-key="pact:${esc(p.id)}:${esc(a.actionId)}" data-act="pact" data-plugin="${esc(p.id)}" data-action="${esc(a.actionId)}">${esc(a.displayName)}</button>`
               ).join('')}
             </div>
           </div>`).join('')
