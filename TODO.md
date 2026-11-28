@@ -20,6 +20,11 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
       does not wait 550 ms for each. Needs care: some models do not answer in standby.
 - [x] PR 3: Home Assistant and Hue. #32, #46 and #48 closed; the HA part of #68, the Hue part of #64 (no HTTP
       fallback with HTTPS on, error answers on reads).
+- [ ] Verify Home Assistant live updates against a real server (#79; only Demo Mode and unit tests with a loopback
+      socket so far): a light switched in Home Assistant changes its tile at once, a wrong token shows "Home
+      Assistant rejected the token" and no retry loop, and a restarted HA server is picked up again. Open choices:
+      a slow REST poll while the socket is down, and the host status line after a rejected token (a failing REST
+      read can overwrite it).
 - [ ] Verify the Hue Entertainment area picker live (#79, needs the user's OK, it changes the lights): with two
       areas, pick the other one while Music Sync streams and check the lights of the new area follow the music.
       A saved area that was deleted cannot be confirmed by picking it again (pick another area first).
