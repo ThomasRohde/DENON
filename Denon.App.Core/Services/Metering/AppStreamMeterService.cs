@@ -46,6 +46,7 @@ public sealed class AppStreamMeterService : IDisposable
     private long _radioRestartAfterMs;
     private long _radioGraceUntilMs;
     private bool _radioPaused; // the decoder was stopped for a pause (not by a failure)
+    private bool _sourceSeen; // a YouTube track, a jukebox track or a stream started in this run of the app
 
     public AppStreamMeterService(
         YouTubeQueueService youtubeQueue,
@@ -138,6 +139,7 @@ public sealed class AppStreamMeterService : IDisposable
         lock (_sync)
         {
             _radio = null; // another source plays now
+            _sourceSeen = true;
         }
 
         var videoId = track.VideoId;
@@ -163,6 +165,7 @@ public sealed class AppStreamMeterService : IDisposable
         lock (_sync)
         {
             _radio = null;
+            _sourceSeen = true;
         }
 
         var path = track.FilePath;
@@ -184,6 +187,7 @@ public sealed class AppStreamMeterService : IDisposable
         lock (_sync)
         {
             _radio = new RadioSource(url, title);
+            _sourceSeen = true;
             _radioPaused = false;
             _radioGraceUntilMs = Environment.TickCount64 + (long)RadioStartGrace.TotalMilliseconds;
         }
@@ -204,6 +208,7 @@ public sealed class AppStreamMeterService : IDisposable
 
         if (radio is null)
         {
+            TryResumeStationAfterRestart(snapshot);
             return;
         }
 
@@ -269,6 +274,53 @@ public sealed class AppStreamMeterService : IDisposable
                 TryRestartRadio();
             }
         }
+    }
+
+    /// <summary>
+    /// The station HEOS still plays after the app restarted, when it is the one the app started last and nothing
+    /// else started in this run. Null otherwise. The app learns a stream's address only when it starts it, so
+    /// without this the meters and Hue Music Sync stay silent until the station is started again.
+    /// </summary>
+    internal static StationPreset? StationToResume(bool sourceSeen, ReceiverStateSnapshot snapshot, StationPreset? lastStarted)
+    {
+        if (sourceSeen || lastStarted is null || !IsRadioPlaying(snapshot))
+        {
+            return null;
+        }
+
+        // The receiver's own metadata can name another saved station (another app or a phone started it while this
+        // app was closed): then the saved hint is stale, and decoding it would drive Hue with the wrong music.
+        if (snapshot.Status?.ActiveStationAlias is { Length: > 0 } detected &&
+            !string.Equals(detected, lastStarted.Alias, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return Uri.TryCreate(lastStarted.Url, UriKind.Absolute, out var uri) &&
+               (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+            ? lastStarted
+            : null;
+    }
+
+    private void TryResumeStationAfterRestart(ReceiverStateSnapshot snapshot)
+    {
+        StationPreset? station;
+        lock (_sync)
+        {
+            station = StationToResume(_sourceSeen, snapshot, _receiver.LastStartedStation);
+            if (station is null)
+            {
+                return;
+            }
+
+            // Once per run: from now on the usual pause, resume and retry rules follow this stream.
+            _sourceSeen = true;
+            _radio = new RadioSource(station.Url, station.DisplayName);
+            _radioPaused = false;
+        }
+
+        _logStore.Info($"'{station.DisplayName}' plays on from before the app started: the synced meters and Hue Music Sync follow it again.");
+        StartRadio(station.Url, station.DisplayName, RadioPlaybackClock.PlayingSince(Environment.TickCount64), restart: true);
     }
 
     /// <summary>A radio decoder that stopped while HEOS plays on starts again (at most every <see cref="RadioRestartInterval"/>).</summary>
