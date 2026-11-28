@@ -10,6 +10,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Denon.App.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Denon.App.PluginSdk\Denon.App.PluginSdk.csproj" />
   </ItemGroup>
 
