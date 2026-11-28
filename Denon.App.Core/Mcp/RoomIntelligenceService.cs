@@ -567,7 +567,7 @@ public sealed class RoomIntelligenceService
                 CaptureSnapshot("Auto-Fix: Set Comfortable Volume");
                 await _receiverController.SetVolumeAsync(Safe(26), ct);
                 RecomputeInsights();
-                return (true, $"Raised Denon AVR volume to {Safe(26)}.");
+                return (true, $"Set Denon AVR volume to {Safe(26)}.");
 
             case "avr.late_night_comfort":
                 CaptureSnapshot("Auto-Fix: Late-Night Comfort");

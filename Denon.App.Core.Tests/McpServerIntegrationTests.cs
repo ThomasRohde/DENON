@@ -473,6 +473,9 @@ public sealed class McpServerIntegrationTests : IAsyncLifetime
     [InlineData("evil.example", true, false)]
     [InlineData("192.168.1.31", false, false)]
     [InlineData("192.168.1.31", true, true)]
+    [InlineData("10.0.0.5", true, true)]
+    [InlineData("8.8.8.8", true, false)] // Not a LAN address.
+    [InlineData("[fe80::1]", true, true)]
     [InlineData("", true, false)]
     public void The_host_header_must_name_this_pc(string host, bool allowLan, bool allowed) =>
         Assert.Equal(allowed, DenonMcpServer.IsAllowedHost(host, allowLan));
