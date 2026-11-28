@@ -465,12 +465,12 @@ public sealed class LocalMediaJukeboxService : IDisposable
         if (!track.TagsRead)
         {
             var trackId = track.TrackId;
-            if (await Task.Run(() => ReadTagsInto(trackId), cancellationToken))
+            await Task.Run(() => ReadTagsInto(trackId), cancellationToken);
+
+            // Take the list's record also when this call read nothing: the worker may have read the tags meanwhile.
+            lock (_sync)
             {
-                lock (_sync)
-                {
-                    track = _tracks.Find(t => string.Equals(t.TrackId, trackId, StringComparison.Ordinal)) ?? track;
-                }
+                track = _tracks.Find(t => string.Equals(t.TrackId, trackId, StringComparison.Ordinal)) ?? track;
             }
         }
 
