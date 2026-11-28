@@ -7,6 +7,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Fixed
+- **Custom Scene and plugin shortcuts can be removed** (#54): their rows have a Remove button (the command was
+  there, but no button used it). Esc during recording, or starting another row, no longer leaves a row on
+  LISTENING. Ctrl+8, Ctrl+9, F1 and Ctrl+K (the command palette) are now refused for in-app shortcuts, because the
+  main window takes them first.
+- **The tray keeps its receiver status after a settings save** (#55), instead of "connecting..." until the next
+  poll, and shows the volume as the receiver's number. The quick-control flyout opens on the monitor and in the
+  corner of the tray you clicked, and its width follows the skin. The tray menu no longer makes a new font on
+  every rebuild.
+- **The main window's drag area matches its title bar in every skin** (#53), and a fit that ends early no longer
+  leaves the content laid out at a trial size.
+- **The automation editor follows a theme switch** (#71): its page reloads the theme and its Windows title bar
+  turns dark or light, as does the main window's frame. A run shown during a drag waits until the drag ends. A
+  Volume Memory switch whose save fails goes back to the saved value, and "Check now" for updates runs once at a
+  time.
+- **The Phone Remote shows the volume as the receiver's 0–98 number**, not dB.
 - **Live lyrics find the new song** (#51). On every track change the app looked up the new title with the previous
   artist, and often found nothing. Now it looks up after both are set.
 - **Cinema opens only when the cast started** (#52). After a failed cast it used to open a silent video. With

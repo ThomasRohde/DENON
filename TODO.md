@@ -43,12 +43,12 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
       id parts of #71; the Cinema guard for #29.
 - [ ] Verify PR 8 in the app (needs the user, it plays media): Watch a YouTube track (Cinema opens once, after the
       cast), nudge the sync and check the next track keeps it, and "Allow in firewall" twice gives one rule.
-- [ ] PR 9: desktop shell: #53, #54, #55 (tray shows dB; show the 0–98 number), #71.
+- [x] PR 9: desktop shell. #53, #54, #55 and #71 closed (with PR 8). Left out of #71: an empty state for the
+      YouTube, Stations and Cast pages (a feature) and full dark ContextMenu templates (cosmetic, larger).
 - [ ] PR 10: release, CI, installer, docs: #58, #59, #60, #62, #72, #73.
 - [ ] PR 11: accessibility (after PR 9): #57.
 - [ ] PR 12: Apple TV and HomePod plugins: #35, #50, #70, the HomePod part of #49 (plugin release only when asked).
 - [ ] PR 13: Chromecast plugin and first tests: #49, the Chromecast parts of #59 and #70 (release only when asked).
-- [ ] Not in the review: the Phone Remote volume shows dB (`fmtDb` in `RemoteWebUiHtml.cs`). Show the 0–98 number.
 
 ## Live receiver updates on port 23 (#74)
 
@@ -73,7 +73,7 @@ MainWindow and MainViewModel), then:
 
 - [ ] Bind Ctrl+K in `MainWindow` to `OpenCommandPaletteCommand` and delete the class handler in
       `CommandPaletteHotkey` (a temporary hook so part 1 did not touch MainWindow).
-- [ ] Add Ctrl+K to the reserved gestures (the shortcut editor must refuse it) and to the Help shortcut list.
+- [ ] Add Ctrl+K to the Help shortcut list (the reserved gestures have it since PR 9).
 - [ ] Ctrl+1–0 in nav rail order (Brain included), read from `CommandPalettePages.All`, synced with the reserved
       gestures and Help.
 - [ ] Unsaved-changes banner (`IsSettingsDirty`) for Settings, Scenes and Stations, and a scoped `LoadSettings` so

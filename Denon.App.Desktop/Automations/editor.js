@@ -1084,6 +1084,11 @@ function onPointerUp(e) {
   const d = state.drag;
   if (!d || e.pointerId !== d.pointerId) return;
   state.drag = null;
+  if (state.pendingRun) {
+    const run = state.pendingRun;
+    state.pendingRun = null;
+    setTimeout(() => showRun(run), 0);
+  }
   const canvas = $("canvas");
   canvas.classList.remove("panning");
   if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
@@ -1971,6 +1976,11 @@ function clearOverlay(render = true) {
 
 function showRun(run) {
   if (!run || run.graphId && run.graphId !== state.openId) return;
+  if (state.drag) {
+    // A re-render during a drag drops the connect highlights: show the run when the drag ends.
+    state.pendingRun = run;
+    return;
+  }
   clearOverlay(false);
   state.overlay = { run, steps: new Map((run.steps ?? []).map((st) => [st.nodeId, st])) };
   renderCanvas();

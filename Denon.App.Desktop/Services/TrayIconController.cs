@@ -44,10 +44,17 @@ public sealed class TrayIconController : IDisposable
         _flyoutWindow = flyoutWindow;
         _dispatcher = System.Windows.Application.Current.Dispatcher;
         _stateChangedHandler = snapshot => _dispatcher.InvokeAsync(() => UpdateFromSnapshot(snapshot));
-        _settingsChangedHandler = _ => _dispatcher.InvokeAsync(RebuildMenu);
+        _settingsChangedHandler = _ => _dispatcher.InvokeAsync(() =>
+        {
+            RebuildMenu();
+            UpdateFromSnapshot(_stateStore.Snapshot); // Not "connecting..." until the next poll.
+        });
         _stateStore.StateChanged += _stateChangedHandler;
         _settingsStore.SettingsChanged += _settingsChangedHandler;
     }
+
+    /// <summary>One font for every menu rebuild (a new one each time was never disposed).</summary>
+    private static readonly Font MenuFont = new("Segoe UI", 9.5f);
 
     public void Initialize(MainWindow window, Func<Task> exitAsync)
     {
@@ -171,7 +178,7 @@ public sealed class TrayIconController : IDisposable
             BackColor = ThemeResources.DrawingColor("Ink04"),
             ForeColor = ThemeResources.DrawingColor("TextPrimary"),
             ShowImageMargin = false,
-            Font = new Font("Segoe UI", 9.5f),
+            Font = MenuFont,
         };
 
         _statusItem = CreateItem("Receiver: connecting...", enabled: false);
@@ -283,7 +290,7 @@ public sealed class TrayIconController : IDisposable
 
         var isAwake = snapshot.Status is { IsPoweredOn: true, IsMainZoneOn: true };
         var statusText = snapshot.IsConnected && snapshot.Status is not null
-            ? $"{snapshot.Status.Player.Name} | {(isAwake ? DenonCatalog.GetFriendlyInputName(snapshot.Status.InputSource) : "Standby")} | {DenonVolumeMath.FormatDecibels(snapshot.Status.Volume)}"
+            ? $"{snapshot.Status.Player.Name} | {(isAwake ? DenonCatalog.GetFriendlyInputName(snapshot.Status.InputSource) : "Standby")} | Volume {snapshot.Status.Volume}"
             : "Denon Receiver: Offline";
 
         if (_statusItem is not null)

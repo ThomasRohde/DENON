@@ -21,7 +21,8 @@
         PreviewKeyDown="Window_PreviewKeyDown">
 
     <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="46"
+        <WindowChrome x:Name="MainWindowChrome"
+                      CaptionHeight="46"
                       CornerRadius="{DynamicResource Radius05}"
                       GlassFrameThickness="0"
                       ResizeBorderThickness="6"
