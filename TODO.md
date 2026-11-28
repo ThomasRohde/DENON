@@ -72,7 +72,7 @@ requests stay open for later: #63, #76, #77, #78, #79 (#74 and #75 are done, see
 - [x] PR 10b follow-up: docs/plugin-development.md, CONTRIBUTING.md and SECURITY.md (#73).
 - [ ] Refresh the website screenshots (#73; 02-youtube-music and 13-plugin-smart-tv are stale, and Health, Help and
       Appearance have none). Needs the real app with the user's devices, so it waits for the user.
-- [ ] Check that GitHub private vulnerability reporting is on for the repository (SECURITY.md points to it).
+- [x] GitHub private vulnerability reporting is on for the repository (turned on 2026-11-28; SECURITY.md points to it).
 - [x] PR 11: accessibility, #57 closed. A focus ring on the shared styles, names on the symbol buttons of the main
       window, Control Deck, tray flyout and YouTube page, and light text on the scrim.
 - [ ] Verify PR 11 in the app (needs the user): Tab through the main window in Dark and Light and check the ring
