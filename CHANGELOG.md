@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Loopback tests for the Insights server and its automation editor API: the key cookie, Host, editor header,
   Origin and body-size checks, and a save, list and delete (#59).
 
+### Fixed
+- **The automation editor's 512 KB body limit counts bytes** (#59). A chunked body without a length was
+  limited in characters, so text with letters such as æ, ø, å or € could be up to three times larger.
+
 ### Changed
 - The Insights server reads its icon and font by an address that names the app assembly, so the resources
   are also found outside the app (in the tests). The app serves the same files.

@@ -277,15 +277,23 @@ public sealed class AutomationEditorApi
             throw new InvalidDataException("The request body is too large.");
         }
 
-        using var reader = new StreamReader(request.InputStream, Encoding.UTF8);
-        var buffer = new char[MaxBodyBytes + 1];
-        var read = await reader.ReadBlockAsync(buffer.AsMemory(), ct);
+        // Count bytes, not characters: a chunked body has no Content-Length, and in UTF-8 one character can be
+        // up to four bytes.
+        var buffer = new byte[MaxBodyBytes + 1];
+        var read = 0;
+        int n;
+        while (read < buffer.Length && (n = await request.InputStream.ReadAsync(buffer.AsMemory(read), ct)) > 0)
+        {
+            read += n;
+        }
+
         if (read > MaxBodyBytes)
         {
             throw new InvalidDataException("The request body is too large.");
         }
 
-        return new string(buffer, 0, read);
+        var body = buffer.AsSpan(0, read);
+        return Encoding.UTF8.GetString(body.StartsWith(Encoding.UTF8.Preamble) ? body[Encoding.UTF8.Preamble.Length..] : body);
     }
 
     private sealed class TestRequest

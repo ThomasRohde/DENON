@@ -259,12 +259,16 @@ public sealed class InsightsServerLoopbackTests : IAsyncLifetime
         Assert.Empty(_settings.Current.AutomationGraphs);
     }
 
-    [Fact]
-    public async Task A_chunked_body_over_the_cap_is_refused()
+    [Theory]
+    [InlineData('x', 1)] // ASCII: over the cap in characters and bytes
+    [InlineData('€', 3)] // three UTF-8 bytes each: under the cap in characters, over it in bytes
+    public async Task A_chunked_body_over_the_cap_is_refused(char pad, int bytesPerChar)
     {
-        // No Content-Length: the server reads at most the cap plus one character, then stops.
+        // No Content-Length: the server reads at most the cap plus one byte, then stops.
         var graph = JsonSerializer.Serialize(WebhookGraph("too-big"), WebJson);
-        var body = graph.Insert(graph.Length - 1, $",\"padding\":\"{new string('x', MaxBodyBytes)}\"");
+        var padding = new string(pad, MaxBodyBytes / bytesPerChar + 1);
+        var body = graph.Insert(graph.Length - 1, $",\"padding\":\"{padding}\"");
+        Assert.True(Encoding.UTF8.GetByteCount(body) > MaxBodyBytes);
         using var request = Request(HttpMethod.Put, "/api/automations/too-big", body);
         request.Headers.TransferEncodingChunked = true;
 
@@ -298,6 +302,25 @@ public sealed class InsightsServerLoopbackTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(type, response.Content.Headers.ContentType?.MediaType);
         Assert.NotEmpty(await response.Content.ReadAsByteArrayAsync());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_chunked_body_with_multibyte_text_is_saved_whole(bool byteOrderMark)
+    {
+        var graph = WebhookGraph("ignored-id");
+        graph.Name = "Køkken € 🎵";
+        var json = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(graph, WebJson));
+        using var request = Request(HttpMethod.Put, "/api/automations/kitchen", "{}");
+        request.Content = new ByteArrayContent(byteOrderMark ? [.. Encoding.UTF8.Preamble, .. json] : json);
+        request.Content.Headers.ContentType = new("application/json") { CharSet = "utf-8" };
+        request.Headers.TransferEncodingChunked = true;
+
+        using var response = await _http.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("Køkken € 🎵", Assert.Single(_settings.Current.AutomationGraphs).Name);
     }
 
     [Fact]
