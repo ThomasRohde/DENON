@@ -253,12 +253,34 @@ public sealed class HomePodMergeTests
 {
     private static readonly DateTimeOffset Now = new(2026, 11, 28, 12, 0, 0, TimeSpan.Zero);
 
-    // Made-up ids and addresses.
+    // Made-up ids and addresses. Each HomePod's device id is its first letter ("HomePod Left" is "L"), as in the
+    // speaker ids below.
+    private static string Key(string name) => name.StartsWith("HomePod ", StringComparison.Ordinal) ? name[8..9] : name[..1];
+
     private static DiscoveredSpeaker Found(string id, string host, params string[] members) =>
-        new(id, HomePodGroups.PairName(members), host, 7000, "HomePod mini", "27.2", members);
+        new(id, HomePodGroups.PairName(members), host, 7000, "HomePod mini", "27.2", members, members.Select(Key).ToList());
 
     private static HomePodSpeakerConfig Saved(string id, string host, params string[] members) =>
-        new() { Id = id, Name = HomePodGroups.PairName(members), Host = host, Members = [.. members] };
+        new() { Id = id, Name = HomePodGroups.PairName(members), Host = host, Members = [.. members], MemberIds = [.. members.Select(Key)] };
+
+    [Fact]
+    public void Two_speakers_with_the_same_name_stay_two_speakers()
+    {
+        // Two single HomePods both named "Kitchen": the same name, different devices.
+        var a = new HomePodSpeakerConfig { Id = "A", Name = "Kitchen", Host = "192.168.1.7", Members = ["Kitchen"], MemberIds = ["A"], Enabled = false };
+        var b = new HomePodSpeakerConfig { Id = "B", Name = "Kitchen", Host = "192.168.1.8", Members = ["Kitchen"], MemberIds = ["B"] };
+
+        var merge = HomePodGroups.Merge(
+            [a, b],
+            [new("A", "Kitchen", "192.168.1.7", 7000, "HomePod mini", "27.2", ["Kitchen"], ["A"]),
+             new("B", "Kitchen", "192.168.1.8", 7000, "HomePod mini", "27.2", ["Kitchen"], ["B"])],
+            Now);
+
+        Assert.Equal(2, merge.Speakers.Count);
+        Assert.Empty(merge.Removed);
+        Assert.Empty(merge.Restart); // nothing moved, so no client restarts
+        Assert.False(merge.Speakers.Single(s => s.Id == "A").Enabled); // its saved setting stays
+    }
 
     [Fact]
     public void A_leader_switch_restarts_the_speaker_under_its_old_id()

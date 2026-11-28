@@ -47,11 +47,15 @@ internal sealed record HttpMessage(string StartLine, Dictionary<string, string> 
     {
         consumed = 0;
         var end = buffer.IndexOf("\r\n\r\n"u8);
+        if (end > MaxHeaderBytes || (end < 0 && buffer.Length > MaxHeaderBytes))
+        {
+            // Also when the end is there: a huge header block would still be decoded and split in full.
+            throw new InvalidDataException("The HTTP header block is too large.");
+        }
+
         if (end < 0)
         {
-            return buffer.Length > MaxHeaderBytes
-                ? throw new InvalidDataException("The HTTP header block is too large.")
-                : null;
+            return null;
         }
 
         var lines = Encoding.UTF8.GetString(buffer[..end]).Split("\r\n");

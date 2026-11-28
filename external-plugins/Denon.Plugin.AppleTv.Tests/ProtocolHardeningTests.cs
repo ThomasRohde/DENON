@@ -260,6 +260,13 @@ public sealed class FramingHardeningTests
     }
 
     [Fact]
+    public void Http_headers_over_the_cap_fail_even_when_they_end()
+    {
+        var huge = Encoding.ASCII.GetBytes("RTSP/1.0 200 OK\r\nX: " + new string('a', HttpMessage.MaxHeaderBytes) + "\r\n\r\n");
+        Assert.Throws<InvalidDataException>(() => HttpMessage.TryParse(huge, out _));
+    }
+
+    [Fact]
     public void Http_message_with_a_body_still_parses()
     {
         var raw = Encoding.ASCII.GetBytes("RTSP/1.0 200 OK\r\nCSeq: 3\r\nContent-Length: 2\r\n\r\nhi+");
