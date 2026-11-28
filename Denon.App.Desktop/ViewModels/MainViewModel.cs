@@ -314,6 +314,7 @@ public sealed partial class MainViewModel : ObservableObject
         InitializeMcpAndIntelligence(roomIntelligenceService, mcpServer);
         InitializeHelpGuide();
         InitializeSettingsEditor();
+        InitializeZone2Groups();
         UpdateMeterCaptureRequest();
 
         LoadSettings(_settingsStore.Current);
@@ -1109,6 +1110,7 @@ public sealed partial class MainViewModel : ObservableObject
         RefreshCommand.NotifyCanExecuteChanged();
         TogglePowerCommand.NotifyCanExecuteChanged();
         ToggleZone2Command.NotifyCanExecuteChanged();
+        NotifyZone2GroupCommands();
         PlayPauseCommand.NotifyCanExecuteChanged();
         PlayCommand.NotifyCanExecuteChanged();
         PauseCommand.NotifyCanExecuteChanged();
@@ -1166,6 +1168,7 @@ public sealed partial class MainViewModel : ObservableObject
         IsBusy = snapshot.IsBusy;
         IsConnected = snapshot.IsConnected;
         ApplyPushedAcoustics(snapshot.Acoustics);
+        ApplyZone2AndGroups(snapshot);
 
         if (snapshot.Status is { } status)
         {

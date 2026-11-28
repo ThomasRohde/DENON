@@ -32,6 +32,12 @@ public sealed class ScenePresetEditor : ObservableObject
     private string _subwooferTrimText = string.Empty;
     private string _dialogTrimText = string.Empty;
     private string _streamUrl = string.Empty;
+    private string _zone2PowerChoice = string.Empty; // "", "ON", "OFF"
+    private string _zone2Source = string.Empty;
+    private string _zone2VolumeText = string.Empty;
+    private string _zone2MuteChoice = string.Empty; // "", "ON", "OFF"
+    private string _heosGroupMembersText = string.Empty;
+    private bool _heosUngroup;
     private bool _isActivating;
 
     public string Id
@@ -251,6 +257,47 @@ public sealed class ScenePresetEditor : ObservableObject
         set => SetProperty(ref _streamUrl, value);
     }
 
+    /// <summary>Zone 2 power: ON, OFF, or empty for no change.</summary>
+    public string Zone2PowerChoice
+    {
+        get => _zone2PowerChoice;
+        set => SetProperty(ref _zone2PowerChoice, value);
+    }
+
+    /// <summary>Zone 2 source code (TV, NET, SOURCE), or empty for no change.</summary>
+    public string Zone2Source
+    {
+        get => _zone2Source;
+        set => SetProperty(ref _zone2Source, value);
+    }
+
+    /// <summary>Zone 2 volume 0–98, or empty for no change.</summary>
+    public string Zone2VolumeText
+    {
+        get => _zone2VolumeText;
+        set => SetProperty(ref _zone2VolumeText, value);
+    }
+
+    /// <summary>Zone 2 mute: ON, OFF, or empty for no change.</summary>
+    public string Zone2MuteChoice
+    {
+        get => _zone2MuteChoice;
+        set => SetProperty(ref _zone2MuteChoice, value);
+    }
+
+    /// <summary>HEOS players to group with this receiver, comma-separated.</summary>
+    public string HeosGroupMembersText
+    {
+        get => _heosGroupMembersText;
+        set => SetProperty(ref _heosGroupMembersText, value);
+    }
+
+    public bool HeosUngroup
+    {
+        get => _heosUngroup;
+        set => SetProperty(ref _heosUngroup, value);
+    }
+
     public bool IsActivating
     {
         get => _isActivating;
@@ -356,6 +403,12 @@ public sealed class ScenePresetEditor : ObservableObject
             SubwooferTrimText = model.SubwooferTrimDb?.ToString() ?? string.Empty,
             DialogTrimText = model.DialogTrimDb?.ToString() ?? string.Empty,
             StreamUrl = model.StreamUrl ?? string.Empty,
+            Zone2PowerChoice = OnOffChoice(model.Zone2On),
+            Zone2Source = model.Zone2Source ?? string.Empty,
+            Zone2VolumeText = model.Zone2Volume?.ToString() ?? string.Empty,
+            Zone2MuteChoice = OnOffChoice(model.Zone2Muted),
+            HeosGroupMembersText = string.Join(", ", model.HeosGroupMembers),
+            HeosUngroup = model.HeosUngroup,
         };
 
         if (model.PluginActions is { Count: > 0 })
@@ -399,8 +452,25 @@ public sealed class ScenePresetEditor : ObservableObject
             SubwooferTrimDb = TryParseNullableInt(SubwooferTrimText),
             DialogTrimDb = TryParseNullableInt(DialogTrimText),
             StreamUrl = NullIfEmpty(StreamUrl),
+            Zone2On = ParseOnOff(Zone2PowerChoice),
+            Zone2Source = NullIfEmpty(Zone2Source)?.ToUpperInvariant(),
+            Zone2Volume = TryParseNullableInt(Zone2VolumeText),
+            Zone2Muted = ParseOnOff(Zone2MuteChoice),
+            HeosGroupMembers = HeosGroupMembersText
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList(),
+            HeosUngroup = HeosUngroup,
             PluginActions = PluginActions.Select(static s => s.ToModel()).ToList(),
         };
+
+    private static string OnOffChoice(bool? value) => value switch { true => "ON", false => "OFF", _ => string.Empty };
+
+    private static bool? ParseOnOff(string? text) => text?.Trim().ToUpperInvariant() switch
+    {
+        "ON" => true,
+        "OFF" => false,
+        _ => null,
+    };
 
     private static string? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
