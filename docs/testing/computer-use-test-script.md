@@ -85,7 +85,7 @@ Each test has an ID, a tier, the steps and what should happen. Do them in order;
 |---|---|---|---|
 | A1 | A | Look at the title bar and the status line. | The model (AVR-X2400H), a green ONLINE pill with the firmware and LIVE PUSH. The status line shows the receiver address, the input, the volume, "Insights", the last sync time and the version. |
 | A2 | A | Click each page in the left rail: Deck, Music, Stations, Cast, Scenes, Plugins, Brain, Settings, Health, Help. | Each page opens in under a second, with no empty or broken areas, no clipped text and no error banners. The selected item is highlighted. |
-| A3 | A | Press Ctrl+1 to Ctrl+9 (1 Deck, 2 Music, 3 Scenes, 4 Cast, 5 Stations, 6 Plugins, 7 Settings, 8 Health, 9 Help). | Each key opens its page. |
+| A3 | A | Press Ctrl+1 to Ctrl+9, then Ctrl+0 (1 Deck, 2 Music, 3 Stations, 4 Cast, 5 Scenes, 6 Plugins, 7 Brain, 8 Settings, 9 Health, 0 Help). | Each key opens its page, in nav rail order. |
 | A4 | A | On three different pages, press F1. Close the help with Esc. | Help opens on the topic for that page (Settings opens Quick Start). Esc goes back to the page it came from. |
 | A5 | A | Make the window small (drag a corner), then large, then maximize and restore. | The content reflows. Nothing overlaps or is cut off. The window cannot get smaller than its minimum. |
 | A6 | A | Minimize the window (it goes to the tray). Wait 10 s. Press Ctrl+Alt+D. | The window hides, then comes back on the same page. |

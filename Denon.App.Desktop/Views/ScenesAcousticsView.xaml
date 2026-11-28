@@ -78,6 +78,7 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
@@ -105,7 +106,14 @@
                         </StackPanel>
                     </DockPanel>
 
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="{skin:Space 0,0,6,0}">
+                    <!-- Unsaved scene edits (#76); it hides itself when there are none. -->
+                    <controls:UnsavedChangesBanner Grid.Row="1"
+                                                   Message="{Binding ScenesDirtyText}"
+                                                   Area="Scenes"
+                                                   SaveLabel="Save Scenes"
+                                                   Margin="{skin:Space 0,0,0,10}" />
+
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="{skin:Space 0,0,6,0}">
                         <ItemsControl ItemsSource="{Binding ScenePresets}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>

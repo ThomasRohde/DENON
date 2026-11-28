@@ -260,47 +260,22 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (ctrl && modifiers == ModifierKeys.Control)
+        // Ctrl+1–9 and Ctrl+0 open the rail pages top to bottom (PageShortcuts reads the rail list).
+        if (modifiers == ModifierKeys.Control
+            && actualKey is >= Key.D0 and <= Key.D9
+            && CommandPalette.PageShortcuts.ForDigit(actualKey - Key.D0) is { } page)
         {
-            switch (actualKey)
+            if (page.Section == CommandPalette.CommandPalettePages.HelpSection)
             {
-                case Key.D1:
-                    _viewModel.ActiveSection = "Control";
-                    e.Handled = true;
-                    return;
-                case Key.D2:
-                    _viewModel.ActiveSection = "YouTube";
-                    e.Handled = true;
-                    return;
-                case Key.D3:
-                    _viewModel.ActiveSection = "Acoustics";
-                    e.Handled = true;
-                    return;
-                case Key.D4:
-                    _viewModel.ActiveSection = "CastRemote";
-                    e.Handled = true;
-                    return;
-                case Key.D5:
-                    _viewModel.ActiveSection = "Stations";
-                    e.Handled = true;
-                    return;
-                case Key.D6:
-                    _viewModel.ActiveSection = "Plugins";
-                    e.Handled = true;
-                    return;
-                case Key.D7:
-                    _viewModel.ActiveSection = "Settings";
-                    e.Handled = true;
-                    return;
-                case Key.D8:
-                    _viewModel.ActiveSection = "Diagnostics";
-                    e.Handled = true;
-                    return;
-                case Key.D9:
-                    _viewModel.OpenContextualHelp();
-                    e.Handled = true;
-                    return;
+                _viewModel.OpenContextualHelp();
             }
+            else
+            {
+                _viewModel.ActiveSection = page.Section;
+            }
+
+            e.Handled = true;
+            return;
         }
 
         if (isTyping && modifiers == ModifierKeys.None && actualKey is not (>= Key.F1 and <= Key.F24))

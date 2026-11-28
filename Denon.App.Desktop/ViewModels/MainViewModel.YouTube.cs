@@ -302,6 +302,7 @@ public sealed partial class MainViewModel
         {
             var (updated, _) = await _settingsStore.UpdateQuietAsync(s => s.Media.CinemaSyncOffsetMs = offsetMs);
             SettingsCinemaSyncOffsetMs = updated.Media.CinemaSyncOffsetMs.ToString();
+            EditorFieldSaved(SettingsEditorValues.CinemaSyncOffsetMs, SettingsCinemaSyncOffsetMs);
         }
         catch (Exception ex)
         {
