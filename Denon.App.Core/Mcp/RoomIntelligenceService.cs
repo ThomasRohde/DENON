@@ -710,6 +710,22 @@ public sealed class RoomIntelligenceService
                 powerOn = st?.IsPoweredOn ?? false,
                 mainZoneOn = st?.IsMainZoneOn ?? false,
                 zone2On = st?.IsZone2On ?? false,
+                zone2 = st is null ? null : new
+                {
+                    on = st.IsZone2On,
+                    source = st.Zone2Source,
+                    volume = st.Zone2Volume,
+                    muted = st.IsZone2Muted,
+                },
+                heosGroups = snap.HeosGroups?.Groups.Select(static g => new
+                {
+                    gid = g.GroupId,
+                    name = g.Name,
+                    members = g.Members.Select(static m => m.Name),
+                    leader = g.Leader?.Name,
+                    volume = g.Volume,
+                    muted = g.IsMuted,
+                }),
                 volume = st?.Volume ?? 0,
                 volumeDb = st is not null ? FormatDb(st.Volume) : "—",
                 muted = st?.IsMuted ?? false,

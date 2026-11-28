@@ -18,4 +18,7 @@ public sealed record ReceiverStateSnapshot
 
     /// <summary>The last acoustic read (Audyssey, dimmer, trims), kept current by the receiver's PS and DIM lines. Null until read.</summary>
     public AcousticStatus? Acoustics { get; init; }
+
+    /// <summary>The HEOS players and multi-room groups, kept current by the HEOS group events. Null until read.</summary>
+    public HeosGroupsState? HeosGroups { get; init; }
 }

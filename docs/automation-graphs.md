@@ -47,7 +47,7 @@ editor, a page that the app serves on `127.0.0.1` (the Insights server) and show
 | `condition.recent_event` | condition | `yes`, `no` | `event` (names, comma-separated, `*` suffix allowed), `seconds` (1–3600), `filter` (e.g. `origin=external`): yes when a matching event happened that recently; the triggering event never counts |
 | `action.scene` | action | `out` | `sceneId` |
 | `action.plugin` | action | `out` | `pluginId`, `actionId`, `p:<name>` parameters |
-| `action.receiver` | action | `out` | `command` (`power_on`, `power_off`, `mute`, `unmute`, `volume`, `input`, `sound_mode`), `value` |
+| `action.receiver` | action | `out` | `command` (`power_on`, `power_off`, `mute`, `unmute`, `volume`, `input`, `sound_mode`, `zone2_on`, `zone2_off`, `zone2_volume`, `zone2_source`, `zone2_mute`, `zone2_unmute`, `group_with`, `ungroup`, `group_volume`), `value` |
 | `action.delay` | action | `out` | `seconds` (1–600) |
 | `action.learned_volume` | action | `out` | none: sets the Volume memory level of what plays now (capped at the safe volume) |
 
@@ -56,7 +56,17 @@ and holds for 5 s. Its data: `source` (the name), `kind` (`tv_channel`, `tv_app`
 and `from` (the source before). A source change an automation caused does not start it.
 
 A receiver volume set by an automation is capped by the safe-volume ceiling (Settings → MCP, `MaxSafeVolume`), as for
-AI agents: nobody watches an automation when it runs.
+AI agents: nobody watches an automation when it runs. The same cap applies to `zone2_volume` and `group_volume`.
+
+The `value` of `action.receiver` by command:
+
+- `volume`, `zone2_volume`, `group_volume`: a whole number 0–98, the number on the receiver's display.
+- `input`: an input code (`TV`, `NET`). `sound_mode`: a sound mode (`MOVIE`).
+- `zone2_source`: a Zone 2 source code (`TV`, `NET`, `SOURCE` for the main zone's source). Other text is refused.
+- `group_with`: HEOS player names (or ids), comma-separated. This receiver leads the group and the players play what it
+  plays. `ungroup` takes this receiver out of its group (a leader ends the group). `group_volume` sets the volume of the
+  group this receiver is in.
+- The other commands take no value.
 
 ## How a run works
 

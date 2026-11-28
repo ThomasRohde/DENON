@@ -291,11 +291,30 @@ public static class AutomationGraphRunner
         {
             AutomationNodeTypes.ActionScene => $"Scene '{effects.DescribeScene(node.Get("sceneId"))}'",
             AutomationNodeTypes.ActionPlugin => effects.DescribePluginAction(node.Get("pluginId"), node.Get("actionId")),
-            AutomationNodeTypes.ActionReceiver => $"Receiver {node.Get("command").Replace('_', ' ')} {node.Get("value")}".TrimEnd(),
+            AutomationNodeTypes.ActionReceiver => DescribeReceiverCommand(node.Get("command"), node.Get("value")),
             AutomationNodeTypes.ActionDelay => $"Wait {node.Get("seconds")} s",
             AutomationNodeTypes.ActionLearnedVolume => "Set the learned volume",
             _ => node.Type,
         };
+
+    /// <summary>The words for a receiver node in a dry run and the run log: "Zone 2 volume 30", "HEOS group with Kitchen".</summary>
+    internal static string DescribeReceiverCommand(string command, string value)
+    {
+        var title = command switch
+        {
+            "zone2_on" => "Zone 2 on",
+            "zone2_off" => "Zone 2 off",
+            "zone2_volume" => "Zone 2 volume",
+            "zone2_source" => "Zone 2 source",
+            "zone2_mute" => "Zone 2 mute",
+            "zone2_unmute" => "Zone 2 unmute",
+            "group_with" => "HEOS group with",
+            "ungroup" => "Leave HEOS group",
+            "group_volume" => "HEOS group volume",
+            _ => $"Receiver {command.Replace('_', ' ')}",
+        };
+        return $"{title} {value}".TrimEnd();
+    }
 
     private static async Task<string> ExecuteAsync(AutomationNode node, IAutomationEffects effects, CancellationToken ct)
     {

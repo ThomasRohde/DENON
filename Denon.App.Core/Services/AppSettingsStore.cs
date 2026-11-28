@@ -590,6 +590,19 @@ public sealed class AppSettingsStore
                 clone.SleepTimerMinutes = Math.Clamp(clone.SleepTimerMinutes.Value, 0, 120);
             }
 
+            if (clone.Zone2Volume.HasValue)
+            {
+                clone.Zone2Volume = Math.Clamp(clone.Zone2Volume.Value, 0, 98);
+            }
+
+            // A source the receiver does not know would be sent as "Z2<text>": drop it.
+            clone.Zone2Source = DenonCatalog.IsZone2SourceCode(clone.Zone2Source) ? clone.Zone2Source!.Trim().ToUpperInvariant() : null;
+            clone.HeosGroupMembers = (clone.HeosGroupMembers ?? [])
+                .Select(static m => m?.Trim() ?? string.Empty)
+                .Where(static m => m.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
             normalized.Add(clone);
         }
 
