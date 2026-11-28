@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- **Developer guides** (#73): `docs/plugin-development.md` (how to write, install, test and release an external
+  plugin), `CONTRIBUTING.md` (build, tests, CI, pull requests) and `SECURITY.md` (supported versions, private
+  reports, the app's local servers and the update check).
+
 ### Changed
 - **One place for package versions** (#72). `Directory.Packages.props` sets the version of each NuGet package
   for every project, and the projects name only the package. The Hue, Apple TV and HomePod plugins now use the
