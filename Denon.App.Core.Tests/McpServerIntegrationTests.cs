@@ -384,6 +384,99 @@ public sealed class McpServerIntegrationTests : IAsyncLifetime
         Assert.False(foreign.Headers.Contains("Access-Control-Allow-Origin"));
     }
 
+    [Fact]
+    public async Task Every_declared_output_field_is_in_the_tool_result()
+    {
+        await using var client = await ConnectAsync();
+
+        // The tools that need no receiver and no input: their outputSchema must name fields the result really has.
+        foreach (var name in new[] { "get_room_state", "diagnose_room", "get_listening_habits", "get_activity_history" })
+        {
+            var tool = Assert.Single(await client.ListToolsAsync(), t => t.Name == name);
+            if (tool.ProtocolTool.OutputSchema is not { } schema || !schema.TryGetProperty("properties", out var declared))
+            {
+                continue;
+            }
+
+            var result = await client.CallToolAsync(name);
+            Assert.NotEqual(true, result.IsError);
+            var data = result.StructuredContent!.Value;
+            foreach (var field in declared.EnumerateObject())
+            {
+                Assert.True(data.TryGetProperty(field.Name, out _), $"{name}: outputSchema names '{field.Name}', which the result does not have.");
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Apply_atmosphere_refuses_an_undeclared_plugin_action_before_it_changes_anything()
+    {
+        await _settings.UpdateAsync(s => s.Mcp.PermissionTier = McpPermissionTier.SafeControl);
+        await using var client = await ConnectAsync();
+
+        // No receiver here: a step that ran would fail to connect. The refusal must come first.
+        var refused = await Assert.ThrowsAsync<McpProtocolException>(() => client.CallToolAsync("apply_atmosphere", new Dictionary<string, object?>
+        {
+            ["reason"] = "test",
+            ["volume"] = 20,
+            ["tv_action"] = "tv.power_off",
+        }).AsTask());
+        Assert.Equal(McpErrorCode.InvalidParams, refused.ErrorCode);
+        Assert.Contains("smart-tv", refused.Message);
+    }
+
+    [Fact]
+    public async Task An_automation_with_repeated_node_ids_gets_the_validator_message()
+    {
+        await using var client = await ConnectAsync();
+
+        var result = await client.CallToolAsync("create_or_update_automation", new Dictionary<string, object?>
+        {
+            ["automation"] = new Dictionary<string, object?>
+            {
+                ["name"] = "Twice",
+                ["nodes"] = new object[]
+                {
+                    new Dictionary<string, object?> { ["id"] = "a", ["type"] = "trigger.receiver_power" },
+                    new Dictionary<string, object?> { ["id"] = "a", ["type"] = "action.set_volume" },
+                },
+                ["edges"] = Array.Empty<object>(),
+            },
+        });
+
+        Assert.True(result.IsError);
+        var text = Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text;
+        Assert.Contains("not saved", text);
+        Assert.DoesNotContain("same key", text);
+    }
+
+    [Fact]
+    public async Task Health_answers_only_for_this_pcs_host_name()
+    {
+        using var http = new HttpClient();
+        var health = new Uri(Endpoint, "/health");
+
+        var local = await http.GetAsync(health);
+        Assert.True(local.IsSuccessStatusCode);
+
+        using var rebound = new HttpRequestMessage(HttpMethod.Get, health);
+        rebound.Headers.Host = "evil.example:" + health.Port; // A DNS-rebinding page reaches 127.0.0.1 under its own name.
+        var refused = await http.SendAsync(rebound);
+        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("localhost", false, true)]
+    [InlineData("127.0.0.1", false, true)]
+    [InlineData("[::1]", false, true)]
+    [InlineData("evil.example", false, false)]
+    [InlineData("evil.example", true, false)]
+    [InlineData("192.168.1.31", false, false)]
+    [InlineData("192.168.1.31", true, true)]
+    [InlineData("", true, false)]
+    public void The_host_header_must_name_this_pc(string host, bool allowLan, bool allowed) =>
+        Assert.Equal(allowed, DenonMcpServer.IsAllowedHost(host, allowLan));
+
     [Theory]
     [InlineData(null, true)]
     [InlineData("http://localhost:6274", true)]
