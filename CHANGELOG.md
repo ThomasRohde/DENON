@@ -4,6 +4,14 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **An audio tag reader for local music files** (part of #79). `AudioTagReader` in Denon.App.Core reads the
+  title, artist, album, track number, duration and embedded cover art of FLAC, MP3 (ID3v2.2–2.4, ID3v1, Xing/VBRI
+  or bitrate duration) and M4A/MP4 files. It reads only the tag region, needs no extra package, and gives empty
+  fields for a bad or cut-off file. The Jukebox does not use it yet, so you see no change.
+
 ## [2.10.19] - 2026-11-28
 
 ### Security
