@@ -97,7 +97,7 @@ internal static class HomePodGroups
         foreach (var speaker in found)
         {
             var existing = speakers.FirstOrDefault(s => !matched.Contains(s) && s.Id.Equals(speaker.Id, StringComparison.OrdinalIgnoreCase)) ??
-                           speakers.FirstOrDefault(s => !matched.Contains(s) && s.MemberIds.Intersect(speaker.MemberIds, StringComparer.OrdinalIgnoreCase).Any());
+                           speakers.FirstOrDefault(s => !matched.Contains(s) && Keys(s).Intersect(speaker.MemberIds, StringComparer.OrdinalIgnoreCase).Any());
             var isNew = existing is null;
             if (existing is null)
             {
@@ -126,8 +126,8 @@ internal static class HomePodGroups
 
             // A saved speaker whose HomePods all belong to this one now (they became a stereo pair) goes;
             // otherwise it would open a second link and count the same music twice.
-            foreach (var subsumed in speakers.Where(s => s != existing && !matched.Contains(s) && s.MemberIds.Count > 0 &&
-                                                         s.MemberIds.All(m => speaker.MemberIds.Contains(m, StringComparer.OrdinalIgnoreCase))).ToList())
+            foreach (var subsumed in speakers.Where(s => s != existing && !matched.Contains(s) &&
+                                                         Keys(s).All(m => speaker.MemberIds.Contains(m, StringComparer.OrdinalIgnoreCase))).ToList())
             {
                 speakers.Remove(subsumed);
                 removed.Add(subsumed);
@@ -161,6 +161,13 @@ internal static class HomePodGroups
             ? string.Join(" + ", names)
             : string.Join(' ', words[0].Take(shared)) + " " + string.Join(" + ", words.Select(w => string.Join(' ', w.Skip(shared))));
     }
+
+    /// <summary>
+    /// The device ids of a saved speaker's HomePods. Its own id is always one of them (the leader's device id), so a
+    /// speaker saved before member ids were stored still matches its pair.
+    /// </summary>
+    private static IEnumerable<string> Keys(HomePodSpeakerConfig speaker) =>
+        speaker.MemberIds.Append(speaker.Id).Distinct(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>A HomePod's stable key: its device id, else its address.</summary>
     private static string DeviceKey(AppleDevice device) => device.DeviceId ?? device.Address.ToString();

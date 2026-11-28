@@ -15,7 +15,8 @@ Released separately from Denon Desktop with tags `homepod-vX.Y.Z`.
   HomePod that played while the PC slept is logged with the time it was seen playing.
 - **A stereo pair whose leader changes keeps one link and one session** (#49). The old link and its listening session
   are closed under the old id before the new one starts. Two single HomePods that become a pair are one speaker,
-  so the same music is no longer logged twice.
+  so the same music is no longer logged twice. Speakers are matched by the HomePods' device ids, never by name, so
+  two HomePods with the same name stay two speakers; a speaker saved by an earlier version still matches its pair.
 - **The link comes back when it drops right after it opens** (#50). A close before the plugin listened was missed,
   and the speaker showed "Linked" on a dead connection. A command in flight fails at once when the link closes.
 - **Insights: a second of play and then a pause is no session** (#70); it needs 15 seconds of play.

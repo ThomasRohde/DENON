@@ -264,6 +264,34 @@ public sealed class HomePodMergeTests
         new() { Id = id, Name = HomePodGroups.PairName(members), Host = host, Members = [.. members], MemberIds = [.. members.Select(Key)] };
 
     [Fact]
+    public void A_pair_saved_without_member_ids_still_follows_a_leader_switch()
+    {
+        // Saved by the earlier plugin: no member ids, and the pair is off.
+        var pair = new HomePodSpeakerConfig { Id = "L", Name = "HomePod Left + Right", Host = "192.168.1.8", Members = ["HomePod Left", "HomePod Right"], Enabled = false };
+
+        var merge = HomePodGroups.Merge([pair], [Found("R", "192.168.1.9", "HomePod Left", "HomePod Right")], Now);
+
+        var speaker = Assert.Single(merge.Speakers);
+        Assert.Same(pair, speaker);
+        Assert.Equal("R", speaker.Id);
+        Assert.False(speaker.Enabled); // the saved setting stays
+        Assert.Equal(["L", "R"], speaker.MemberIds);
+        Assert.Equal("L", Assert.Single(merge.Restart).OldId);
+    }
+
+    [Fact]
+    public void A_single_saved_without_member_ids_goes_when_it_joins_a_pair()
+    {
+        var left = Saved("L", "192.168.1.8", "HomePod Left");
+        var right = new HomePodSpeakerConfig { Id = "R", Name = "HomePod Right", Host = "192.168.1.9", Members = ["HomePod Right"] };
+
+        var merge = HomePodGroups.Merge([left, right], [Found("L", "192.168.1.8", "HomePod Left", "HomePod Right")], Now);
+
+        Assert.Same(left, Assert.Single(merge.Speakers));
+        Assert.Same(right, Assert.Single(merge.Removed));
+    }
+
+    [Fact]
     public void Two_speakers_with_the_same_name_stay_two_speakers()
     {
         // Two single HomePods both named "Kitchen": the same name, different devices.
