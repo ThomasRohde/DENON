@@ -1,470 +1,173 @@
 # TODO
 
-Open work for Denon Desktop and the external plugins. Keep this file current: add items when work is found or
-left open, and remove them (with a CHANGELOG entry) when they are done.
+Open work for Denon Desktop and the external plugins. Only open items live here: when an item is done, remove it
+and add a CHANGELOG entry (the CHANGELOGs and git history keep what was done). Keep each item to one action.
 
-## Code review issues #28–#79 (Antigravity, 2026-11-28)
+## Live checks (need you)
 
-All 52 issues were checked against the code. The plan is 13 PRs, one area each, done one at a time. Feature
-requests stay open for later: #63, #76, #77, #78, #79 (#74 and #75 are done, see below).
+Each one needs the real devices, and most change them or play media, so they wait for you.
 
-- [x] PR 1: guest input security. #29 closed: a phone track gets its watch and thumbnail address from the video
-      id. Part of #31: values ride in data-* attributes (no inline JavaScript), and only hex colours go into styles.
-      Part of #64: the room-dev-deck harness checks Host and Origin and does not crash on bad JSON.
-- [x] PR 2: receiver and HEOS. #28, #30, #38, #39 and #43 closed; the receiver parts of #66 (HEOS-only scenes and
-      Fix silent audio, SSDP on every interface, the Try* cancel filter, the under-process reset).
-- [x] PR 2 read-only live check (2026-11-28): status reads 1.1–1.25 s against 2.2–3.2 s before, same values,
-      Zone 2 on read right with main zone off.
-- [ ] Verify PR 2 in the app: a Volume Memory fade, and Reset Connections while the volume slider moves.
-- [ ] Not done in PR 2: remember optional queries (ECO?, SLP?, Z2?) that a model never answers, so a status read
-      does not wait 550 ms for each. Needs care: some models do not answer in standby.
-- [x] PR 3: Home Assistant and Hue. #32, #46 and #48 closed; the HA part of #68, the Hue part of #64 (no HTTP
-      fallback with HTTPS on, error answers on reads).
-- [ ] Verify Home Assistant live updates against a real server (#79; only Demo Mode and unit tests with a loopback
-      socket so far): a light switched in Home Assistant changes its tile at once, a wrong token shows "Home
-      Assistant rejected the token" and no retry loop, and a restarted HA server is picked up again. Open choices:
-      a slow REST poll while the socket is down, and the host status line after a rejected token (a failing REST
-      read can overwrite it).
-- [ ] Verify the Hue Entertainment area picker live (#79, needs the user's OK, it changes the lights): with two
-      areas, pick the other one while Music Sync streams and check the lights of the new area follow the music.
-      A saved area that was deleted cannot be confirmed by picking it again (pick another area first).
-- [ ] Verify PR 3 live: Hue Music Sync on, restart the app, and check the log says "Started 50 Hz Hue Entertainment
-      DTLS stream". Needs the user's OK (it changes the lights).
-- [x] PR 4: MCP tiers and limits. #66 closed; the MCP side of #61 and #65, and the /health Host check of #64.
-      Kept as decided: plugin actions marked destructive still run in SafeControl (#61 F1). The plugin-host items of
-      #61 (caller state, origin label, "AVR Control" capability) and #65 (SetPluginEnabledAsync) are in PR 6.
-- [x] PR 5: media relay and Core services. #31, #36, #37, #40, #41, #42 and #67 closed; the :18925 items of #64.
-      Left out as negligible: #41 time block and file routing for backdated events, #67 FFT twiddle tables, Math.Pow
-      in the bands, ArrayPool in PC Cast, the radio path lookup on the UI tick (a few ms, every 15 s at most), the
-      YouTube pump teardown order (only a stray warning) and a background log writer.
-- [ ] Verify PR 5 live: a jukebox FLAC plays to its end and the next one starts. Needs the user's OK (it plays
-      media).
-- [x] PR 6: plugin host. #44, #45, #61, #64, #65 and #69 closed (the host and Plugins page parts, the MCP
-      subscription cleanup). Left as is: #44 F5 (scan only DLLs with a deps.json; a third-party plugin without one
-      would be skipped) and the plugin view dispose hook (#69 F3, a feature).
-- [ ] Not in PR 6: a parameter form on the Plugins page for actions that need input (#78).
-- [x] PR 7: Smart TV plugin. #34, #47 and #68 closed (with PR 6's per-plugin event queues, a TV wake no longer
-      delays the other plugins).
-- [ ] Verify PR 7 live (needs the user, it uses the TV): the screen preview and the trackpad still work (they now
-      check that the TV's addresses are on the LAN), and "Wake TV with the receiver" without a MAC wakes the TV.
-- [x] PR 8: YouTube and Cinema. #33, #51, #52 and #56 closed; the Cinema part of #53 and the clipboard, export and
-      id parts of #71; the Cinema guard for #29.
-- [ ] Verify PR 8 in the app (needs the user, it plays media): Watch a YouTube track (Cinema opens once, after the
-      cast), nudge the sync and check the next track keeps it, and "Allow in firewall" twice gives one rule.
-- [x] PR 9: desktop shell. #53, #54, #55 and #71 closed (with PR 8). Left out of #71: an empty state for the
-      YouTube, Stations and Cast pages (a feature) and full dark ContextMenu templates (cosmetic, larger).
-- [x] PR 10a: release, CI, installer, updater: #58, #60 and #62 closed; parts of #59 and #72. Left out: a signed
-      SHA256SUMS (#62, needs a signing key and a release step), central package versions and the BouncyCastle
-      version split (#72, with the Apple TV and HomePod plugins in PR 12), and the larger #59 test items (Chromecast
-      tests in PR 13, the Apple TV clock in PR 12, loopback tests for the editor and Insights servers).
-- [x] PR 10a follow-up: central package versions in Directory.Packages.props, one BouncyCastle (2.7.0) for Hue,
-      Apple TV and HomePod, and a global.json that CI and the release workflows read (#72). Still on .NET 10;
-      the TargetFramework stays in each project (the SDK and the external plugins must stay on net10.0 when the
-      app moves).
-- [ ] Verify PR 10a (needs the user): uninstall with "Launch at Windows startup" turned on in Settings and check
-      that the startup entry is gone; the next in-app update downloads, starts and shows notes without the
-      download list.
-- [x] PR 10a follow-up: loopback tests for the Insights server and its automation editor API (key cookie, Host,
-      editor header, Origin, body cap, the happy path), #59. The editor API has no listener of its own. The
-      server's icon and font addresses now name the app assembly, so they also resolve outside the app.
-- [x] PR 10b: docs and notices, part of #73. Left out: refreshed website screenshots and the new guides
-      (docs/plugin-development.md, CONTRIBUTING.md, SECURITY.md), which are new documents rather than fixes.
-- [x] PR 10b follow-up: docs/plugin-development.md, CONTRIBUTING.md and SECURITY.md (#73).
-- [ ] Refresh the website screenshots (#73; 02-youtube-music and 13-plugin-smart-tv are stale, and Health, Help and
-      Appearance have none). Needs the real app with the user's devices, so it waits for the user.
-- [x] GitHub private vulnerability reporting is on for the repository (turned on 2026-11-28; SECURITY.md points to it).
-- [x] PR 11: accessibility, #57 closed. A focus ring on the shared styles, names on the symbol buttons of the main
-      window, Control Deck, tray flyout and YouTube page, and light text on the scrim.
-- [ ] Verify PR 11 in the app (needs the user): Tab through the main window in Dark and Light and check the ring
-      shows; Narrator reads "Previous track", "Master volume", "Move up in the queue" and so on; YouTube duration
-      badges read well in Light. The other pages (Settings, Scenes, Stations, Cast, plugins) have no names yet.
-- [x] PR 12: Apple TV and HomePod plugins. #35 and #50 closed; the Apple TV and HomePod parts of #70 and the
-      HomePod part of #49 (old-id re-keying, pairs dedupe). Left out: keep a known pair when one follower misses an
-      mDNS reply (#49), partial _companion-link discovery duplicates and atomic artwork writes off the MRP read
-      loop (#70), and a test seam for MrpClient's pending-request failure. Released as appletv-v0.6.0 and homepod-v0.3.0 (2026-11-28).
-- [ ] Verify PR 12 live (needs the user): pair an Apple TV again (the M6 signature is now enforced; a wrong PIN
-      must refresh the page), check Apple TV now playing and artwork after wake and sleep, a wake automation that
-      is cut short by sleep, and that both HomePods (and the stereo pair) link and show what plays.
-- [x] PR 12 follow-up: a known HomePod stereo pair stays when one HomePod misses a discovery reply (#49); a
-      partial `_companion-link` reply adds no second Apple TV, and artwork is written whole off the MRP read loop
-      (#70); the MRP tracker takes a clock, so its test needs no sleep (#59). Not released yet (appletv, homepod).
-- [ ] Verify the PR 12 follow-up live (needs the user): unplug one HomePod of the pair for one discovery pass, then
-      check that the pair keeps its name and link.
-- [x] PR 13: Chromecast plugin and first tests: the Chromecast parts of #49, #59 and #70 (111 tests, run in CI and
-      the release workflow). Left out: tests of the plugin's actions (they need a fake host and no live clients),
-      and moving the small wake and playback maps to a new id on discovery (they only age out). The #70 TXT item was
-      already right in this parser (a zero-length string never stopped it). Released as chromecast-v0.7.0 (2026-11-28).
-- [ ] Verify PR 13 live (needs the user): add a Chromecast by IP with Auto-Discover on, run Discover, and check the
-      card stays connected and play/pause works; stop an app to Backdrop and check a media command says no app takes
-      it; check now-playing still shows artwork (YouTube, and a LAN server such as Plex if there is one).
-- [x] PR 13 follow-up: the wake-tv maps and the automated-session keys move to a device's new id when discovery
-      re-keys it; a held playback change under the old id is dropped (#70). Not released yet (chromecast).
+**Receiver and HEOS**
+- [ ] Volume Memory: switch between the Apple TV, DR1 and TV 2 Charlie and check the volume follows; Morning Jazz
+      keeps its own volume. During a Volume Memory fade, Reset Connections must not freeze the app.
+- [ ] An input change on the remote gives one `input.changed`, not an extra one (seen once: TV → NET → TV, then
+      TV → NET again).
+- [ ] HEOS groups (#75): group a second HEOS player (it plays in another room), and check the group volume feels the
+      same as the receiver's 0–98 scale.
+- [ ] Jukebox with real files: the cover in Now Playing, the Hue colours from the cover, and the next track
+      starting at the real end of a FLAC.
+- [ ] A real arrival ("arrive home" Shortcut) with the receiver left on and HEOS stopped.
 
-## Live receiver updates on port 23 (#74)
+**Smart TV and casting**
+- [ ] A wake from deep standby (TV off for hours) with "Chromecast on this TV" on Automatic.
+- [ ] A cast from the iPhone while the TV is off: the cast stays (no switch to Live TV).
+- [ ] The TV page's screen preview and trackpad still work, and "Wake TV with the receiver" without a MAC wakes the
+      TV.
+- [ ] Chromecast: add one by IP with Auto-Discover on, run Discover, and check the card stays connected and
+      play/pause works; stop an app to Backdrop and check a media command says no app takes it; artwork shows
+      (YouTube, and a LAN server such as Plex if there is one).
+- [ ] Netflix on the Chromecast: check if play/pause commands work (it shares only "Netflix" as the title).
 
-The reader loop is done: `DenonAvrClient` reads every line, keeps `AvrLiveState` per link, and the controller
-patches `ReceiverStateStore` at once. `ReceiverPollingService` slows to 9 × Poll Interval (30–60 s) while the link
-holds and the HEOS events are connected.
+**Apple TV and HomePod**
+- [ ] Pair the Apple TV again (a wrong PIN must refresh the page); now playing and artwork after wake and sleep; a
+      wake automation cut short by sleep.
+- [ ] Apple TV commands that change the TV (`key`, `launch-app`, `power-on/off`), and Denon automations on wake and
+      sleep.
+- [ ] Apple TV: the 35 s standby grace (power button → `standby`); Pause greyed out on DRTV live and enabled on DRTV
+      on-demand; DRTV autoplay to the next episode (look for the log line "Playback queue shows …").
+- [ ] HomePods: both speakers and the stereo pair link and show what plays; unplug one HomePod of the pair for one
+      discovery pass and check the pair keeps its name and link.
+- [ ] HomePod: a full listening session in Insights (play for more than 15 s), Apple Music started on the HomePod
+      itself, and Play/Pause/Next.
 
-- [x] Read-only live check (2026-11-28, AVR-X2400H): slow check after 7 s ("full check every 45 s"); the knob,
-      mute on/off and input changes from the remote all came in as pushes, between the 45 s checks. It also showed
-      that state changes could be raised out of order from two threads; fixed (one ordered delivery).
-- [ ] Check in the released app that an input change on the remote leaves no extra input.changed (in the live check
-      TV → NET → TV was followed by one more TV → NET; not yet known if the receiver really switched).
-- [x] #75 (HEOS groups and Zone 2 controls): `AvrLiveState` reads every Z2 line (power, volume, source, mute).
-- [ ] The Brain still reads the acoustics every 90 s (`RoomIntelligenceService`). With PS/DIM pushes in
-      `ReceiverStateSnapshot.Acoustics`, it could read them from the state and only check now and then.
+**Hue and Home Assistant**
+- [ ] Hue Music Sync on, restart the app: the log says "Started 50 Hz Hue Entertainment DTLS stream", and Hue moves
+      to the station that plays on.
+- [ ] Hue Entertainment area picker: with two areas, pick the other one while Music Sync streams.
+- [ ] Home Assistant against a real server: the Input Booleans pill filters the tiles; a light switched in HA
+      changes its tile at once (live updates); a wrong token shows "Home Assistant rejected the token" with no
+      retry loop; a restarted HA server is picked up again.
 
-## HEOS groups and Zone 2 (#75)
+**The app on the PC**
+- [ ] YouTube and Cinema: Watch a track (Cinema opens once, after the cast), nudge the sync and check the next track
+      keeps it; Vol + at the safe volume; "Allow in firewall" twice gives one rule. (The HUD buttons and Save Offset
+      were checked on 2026-11-28.)
+- [ ] Tune the Cinema Offset by ear (250 ms now; meters move slightly before the beeps with the metronome FLAC; try
+      300–400 ms). It also times the lyrics and the video. If one value cannot fit all, add a separate meter trim.
+- [ ] Meters: the DENON badge during PC Cast (in sync with the speakers) and the MUTED badge; ROOM mode with a real
+      microphone (the mic opens and closes as the hints say, the gate and AGC on real TV audio, Hue beats).
+- [ ] Accessibility: Tab through the main window in Dark and Light and check the focus ring; Narrator reads the
+      symbol buttons, the command palette and the unsaved-changes banner; YouTube duration badges read well in Light.
+- [ ] Uninstall with "Launch at Windows startup" on: the startup entry is gone. The next in-app update downloads,
+      starts and shows notes without the download list.
+- [ ] Insights with the real event log on the installed app.
+- [ ] After the next release: `%TEMP%\.net\Denon.App.Desktop\` keeps only the current folder, and the log says
+      "Deleted N old runtime extraction folders" (#94; tested only with a probe bundle).
+- [ ] Station logos: the Deck and the phone remote show the TuneIn logo for a saved station (DR P6 Beat).
+- [ ] Skins and windows: the first start on a small screen (1366 × 768, or 1920 × 1080 at 150 %) picks Compact; a
+      second monitor with another scale opens at the right size; the tray flyout, Cinema window and the Chromecast
+      and Apple TV pages in Light and in each skin; the plugin grid with six or more plugins in a narrow window.
+- [ ] iPhone: remove the old phone-remote icon, scan the QR code, add it to the Home Screen again, and open it.
+- [ ] MCP: the now-playing card's play/pause button, the cards in Claude Desktop, and which protocol version Claude
+      Code and Claude Desktop choose.
 
-Done: Zone 2 volume, source and mute (Core, the Control deck, scenes, automations, MCP) and HEOS multi-room groups
-(get_groups, set_group, group volume and mute, the groups_changed, players_changed and group_volume_changed events).
+## Decisions
 
-- [x] Live check in v2.10.30 (2026-11-28, AVR-X2400H, with the user): the Control deck read Zone 2 right (on, 26,
-      FM / AM, not muted), and one − step went to 25 and showed at once from the receiver's echo.
-- [ ] HEOS groups not checked live: the card said "Plays alone" with no other players listed. Check with a second
-      HEOS player and the user there (grouping plays in another room).
-- [ ] The command palette has Zone 2 power only; add Zone 2 volume, source and mute and the group actions there
-      (after #76, which changes the palette).
-- [ ] The scene editor takes Zone 2 and the group as text fields, like the other scene fields. Pickers (a source
-      list, the HEOS players as chips) would be easier.
-- [ ] HEOS group volume uses the HEOS 0–100 scale, capped at the safe volume like the receiver's 0–98. Check on a
-      real group that the numbers feel the same.
+- [ ] Should the Phone Remote's `/api/volume` (and so a Shortcut that calls it) use the safe-volume cap
+      (`MaxSafeVolume`, 65)? MCP agents and automations are capped; the remote is not, because it is the owner at the
+      couch.
+- [ ] #63 (encrypt keys and tokens on disk): convert the saved keys once, or pair every device again? Do it with #78
+      as one Plugin SDK update.
+- [ ] LG TV actions `tv.button`, `tv.launch_app`, `tv.type_text` and `tv.open_url` work but are not listed in
+      `GetActions` (the `tv_computer` MCP tool covers them). List them or not?
+- [ ] User theme files (JSON tokens, validated on import; no loose XAML)?
 
-## Command palette and shortcuts (#76)
+## Releases
 
-Done: the Ctrl+K palette (`Denon.App.Desktop/CommandPalette/`), Ctrl+K as a MainWindow key binding, Ctrl+1–0 in
-rail order from `PageShortcuts` (read from `CommandPalettePages.All`; the reserved gestures and Help use it too),
-and the unsaved-changes banner with scoped reloads (`SettingsEditorState`).
+- [ ] Apple TV, HomePod and Chromecast plugins: the #49, #59 and #70 follow-ups are on master but not released
+      (release only when you ask).
+- [ ] Code signing for the installer and exe: removes the SmartScreen warning and lets the in-app update check who
+      made the installer, not only that it arrived intact. A signed SHA256SUMS needs a signing key too (#62).
+- [ ] Website and README screenshots (#73): `02-youtube-music` (the demo queue now starts with the promo video) and
+      `13-plugin-smart-tv` are stale; Health, Help, Appearance and Insights have none (Insights needs made-up data,
+      not the personal log). Needs the real app.
 
-- [ ] PR 11 (accessibility): check the palette and the unsaved-changes banner with Narrator (the palette status
-      line and the banner text are polite live regions).
-- [ ] The Automations editor and the Brain page save at once and have no banner. If they get a Save button later,
-      add them as areas to `SettingsEditorAreas`.
+## Features (GitHub issues)
 
-## VU meters & RTA (follow the Denon)
+- [ ] #77: MCP audit log, per-tool and per-plugin allow/deny, a scoped webhook token, and an optional LAN-only guard.
+- [ ] #78: shared plugin foundation: SDK WPF theming and skin helpers, a parameter form on the Plugins page for
+      actions that need input, and shared DNS-SD and session logging for the external plugins.
+- [ ] #63: encrypt tokens, pairing keys and private keys at rest with Windows DPAPI (see Decisions).
+- [ ] #79 rest: artwork on the Apple TV and HomePod dashboard cards, and `includeImage` on their now-playing actions.
+- [ ] #75 follow-ups: Zone 2 volume, source and mute and the group actions in the command palette (it has Zone 2 power
+      only); pickers in the scene editor for the Zone 2 source and the group (a source list, the HEOS players as
+      chips) instead of text fields.
 
-Phase 1 is done in 1.15.1 (source router, DENON/SIM/MUTED/PC/IDLE badge, PC Cast meters synced to the HEOS delay).
-Phase 2 is done in 1.18.0: YouTube / YouTube Music and jukebox tracks are decoded by a separate FFmpeg process
-(`AppStreamMeterService`) and shown at the playback position. Verified live with YouTube Music and a jukebox FLAC
-(metronome test track) on 2026-11-23.
+## Known gaps and ideas
 
-- [ ] **Tune the Cinema Offset** (Settings): with the metronome FLAC the meters move very slightly before the beeps.
-      The offset is 250 ms (Auto-Calibrate with a WAV chirp, 2026-11-22); FLAC/YouTube likely buffer a bit longer in
-      HEOS. Try 300–400 ms by ear. The same value times lyrics and the Cinema video. If one value cannot fit all,
-      add a separate meter trim.
-- [ ] A seek inside a jukebox track is not tested (the app has no seek bar; a range read does not restart the clock).
-- [x] **Phase 3: opt-in "ROOM" mode (PC microphone)** for TV/ARC, HDMI and Chromecast audio that the app cannot tap.
-      Implemented (`RoomMicDspProcessor` 35 Hz HPF, adaptive noise floor + soft-knee noise gate, gated smooth AGC,
-      privacy-first `RoomMicGate` that releases the mic immediately on standby/mute/disconnect/hidden meters/opt-out,
-      `ROOM · MIC` / `ROOM MIC FFT` badges, and Settings toggle + capture device picker, off by default).
-- [x] **Philips Hue Music Sync** now follows the same meter router (`LiveAudioAnalyzerService` routed ~60 Hz
-      `PluginAudioFrame` publisher: HEOS-delayed PC Cast, synced YouTube/jukebox frames, active Room Mic, silence on
-      mute/simulated, and PC loopback fallback when the Denon is off or idle).
-- [ ] Verify live: the **DENON** badge during PC Cast (meters in sync with the speakers) and the **MUTED** badge.
-- [ ] Verify live: ROOM mode with a real microphone (only tested with synthetic audio): the mic opens and closes as
-      the hints say (no mic at a start in the tray; Hue Music Sync keeps it open with the meters hidden), the gate
-      and AGC on real TV audio, and Hue beats. Known limit: a perfectly steady sound (a test tone, a hum) for more
-      than ~8 s becomes the noise floor and closes the gate; program audio with normal dips stays open.
-- [x] RTA during PC Cast from a non-default output device no longer falls back to SIM: `PcCastAudioMeterPipeline` runs
-      a 512-pt 31-band FFT directly on the PC Cast capture stream (both default and non-default output devices).
+**Receiver**
+- [ ] Remember optional queries (ECO?, SLP?, Z2?) that a model never answers, so a status read does not wait 550 ms
+      for each. Some models do not answer in standby.
+- [ ] The Brain reads the acoustics every 90 s (`RoomIntelligenceService`). It could read the PS/DIM pushes from
+      `ReceiverStateSnapshot.Acoustics` and only check now and then.
+- [ ] HEOS radio is one Volume Memory source ("HEOS Music"); stations differ in loudness. Idea: a key per station.
 
-## Cinema Companion HUD (#79, part 1)
+**Meters and radio**
+- [ ] Radio meters: check the beat timing against the speakers; if needed, a radio delay setting
+      (`RadioPlaybackClock.AssumedStartDelay`). A HEOS favorite, or a station another app started, has no URL for the
+      app, so it stays simulated.
+- [ ] A seek inside a jukebox track is not tested (the app has no seek bar).
+- [ ] ROOM mode limit: a perfectly steady sound (a test tone, a hum) for more than ~8 s becomes the noise floor and
+      closes the gate.
 
-Done: Play/Pause, Vol −/+ and Mute in the full-screen HUD (`#denon-cinema-hud`, volume in receiver steps, capped
-at the safe volume by `CinemaHudVolume`), and Save Offset in the sync bar (nudges are for the session until saved).
-
-- [x] Verified in the app with a video (2.10.31 test build, 2026-11-28): the four HUD buttons, a nudge shows "not
-      saved", and Save Offset writes the Cinema Offset. Not checked live: Vol + at the safe volume (unit tested).
-
-## Audio tags for the Jukebox (#79, part 2)
-
-`AudioTagReader` (`Denon.App.Core/Media`) reads title, artist, album, track number, duration and cover art from
-FLAC, MP3 and M4A/MP4 files, with no NuGet package.
-
-- [x] The Jukebox uses the tags: title, artist, album, length and cover art (cached in `jukebox-art`) for the list,
-      Now Playing, Hue Album-Art Ambient and the auto-advance wait. A worker reads them off the UI thread; a track
-      that starts before the worker reaches it is read first.
-- [x] The Jukebox and YouTube queues (with shuffle, repeat and the YouTube history) are saved in `queues` and come
-      back after a restart. Nothing starts to play by itself.
-- [ ] Verify in the app with real files (needs the user's OK, it plays media): the cover in Now Playing, the Hue
-      colours from the cover, and the next track starting at the real end of a FLAC.
+**Audio tags**
 - [ ] Sort a dropped folder by disc and track number from the tags (today: by file path, which is right for
       "01 - Title" names).
-- [ ] Other Jukebox formats give no tags yet: .ogg/.opus (Vorbis comments in Ogg pages), .wav (LIST INFO or an
-      `id3 ` chunk), .wma (ASF) and raw .aac (ADTS: an ID3v2 tag is read, but no duration).
-- [ ] An MP3 duration from a Xing/Info header includes the encoder delay and padding (about 50 ms). Subtract them
-      with the LAME tag if gapless timing is ever needed.
+- [ ] .ogg/.opus (Vorbis comments in Ogg pages), .wav (LIST INFO or an `id3 ` chunk), .wma (ASF) and raw .aac (no
+      duration) give no tags yet.
+- [ ] An MP3 duration from a Xing/Info header includes the encoder delay and padding (~50 ms). Subtract them with the
+      LAME tag if gapless timing is ever needed.
 
-## Habit telemetry
-
-- [ ] Events written before 1.15.0 have no `coveredSec` / `exclusiveSec`. Readers must fall back to `durationSec`.
-- [x] **Open sessions lost when the app is killed** (2.9.3): the monitor saves its open sessions (receiver, LG TV)
-      every minute to `logs/events/open-sessions.json`; the next start closes them with reason `app_crashed`.
-- [ ] The plugins' own sessions (Chromecast, Apple TV, HomePod) are still lost on a crash: they keep them in the
-      plugins' watch logs. Same idea, in each plugin.
-- [ ] `WatchTimeReport` (the MCP `get_watch_time` tool) does not join restart splits yet; Insights does
+**Telemetry and Insights**
+- [ ] The external plugins' own sessions (Chromecast, Apple TV, HomePod) are lost on a crash; the app saves its own
+      every minute (`open-sessions.json`). Same idea, in each plugin.
+- [ ] `WatchTimeReport` (MCP `get_watch_time`) does not join restart splits; Insights does
       (`InsightsReport.JoinRestartSplits`). Share one helper.
-- [x] The plugin changes from 2.9.3 (discovery log lines, cast playback hold) are released: Chromecast 0.5.1, Apple TV
-      0.5.1 and HomePod 0.2.1 (2026-11-26).
 
-## Insights page
+**MCP**
+- [ ] Ask instead of refusing: input-required results (`InputRequiredException` with an elicitation) to confirm a
+      volume above the safe ceiling, power off, or which Chromecast. Needs a client that supports it.
+- [ ] Room-state updates reach only session clients; 2026-07-28 clients get none until the SDK fans out resource
+      updates over `subscriptions/listen` (csharp-sdk #1662).
 
-- [ ] Verify live on the installed app with the real event log (tested with the dev build on 40 days of made-up
-      events, Dark/Hi-Fi and Light/Default, Today to 90 days, phone width).
-- [x] Added two additional entry points to Open Insights: on the Brain page (`LEARNED LOCAL PREFERENCES` card) and in
-      the `MainWindow` bottom status line.
-- [ ] A website screenshot of Insights (needs made-up data, not the personal log).
-- [x] Covered receiver-input sessions in the activity feed: `ActivityFeed.Describe` now marks both `session.started` and
-      `session.ended` quiet once a receiver-input session ends covered by a Chromecast or Apple TV session (uncovered
-      and still-running sessions stay visible).
-
-## MCP server (C# SDK)
-
-On the official MCP C# SDK since 2.10.1 (`DenonMcpServer`, `ModelContextProtocol.AspNetCore` 2.4, session mode
-`StatefulForInitializeClients`).
-
-- [ ] Ask instead of refusing: use input-required results (`InputRequiredException` with an elicitation) to confirm a
-      volume above the safe ceiling, power off, or which Chromecast. Needs a client that supports it (`IsMrtrSupported`
-      or a session with elicitation).
-- [x] MCP Apps: the now-playing card (`show_now_playing`, `ui://denon/now-playing.html`, 2.10.3).
-- [x] The card works in the Codex desktop app (2.10.3): it renders in standby and on; volume −/+ and mute/unmute
-      from the card change the receiver and the card updates.
-- [ ] Try the card's play/pause button, and the card in Claude Desktop.
-- [x] Live check (2.10.4): Morning Jazz shows "DR P8 Jazz" in the app and the MCP card, and the P8 tile is ON AIR.
-- [x] More MCP Apps: room remote, automation preview, Insights, radio search, Volume memory (2.10.5).
-- [x] The five new cards render in Codex (2.10.5); the automation card's Open button works through the host.
-- [x] The cards' buttons work in Codex (2.10.5): station, input, sleep timer, power, automation off/on, volume
-      memory −/+, radio Play and Save. The cards read the receiver again 2.5 s after a button (2.10.6).
-- [x] Stations page: Save Changes does not save (no "Settings updated" in the log); Save & Sync in Settings does.
-      Cause not found: on 2.10.5 and 2.10.6 the button saved both from UI Automation and from a real click. A refused
-      or failed save now logs a warning with its reason and shows it on the Stations page.
-- [ ] Room-state updates reach only session clients (initialize, 2025-11-25). 2026-07-28 clients get none: the SDK does
-      not yet fan out resource updates over `subscriptions/listen` (csharp-sdk #1662).
-- [ ] Verify live with Claude Code / Claude Desktop after the release (which protocol version they choose).
-
-## Volume memory
-
-Learns the listening volume per source and sets it on a source change (2.10.0, `VolumeMemoryService`,
-`volume-memory.json`).
-
-- [ ] Verify live: switch between the Apple TV, DR1 and TV 2 Charlie and check the volume follows; check a Smart Scene
-      (Morning Jazz) keeps its own volume.
-- [ ] HEOS radio is one source ("HEOS Music") for now; stations differ in loudness too. Idea: a key per station.
-- [x] MCP: `show_volume_memory` shows the learned levels; `volume_memory_set_level` and `volume_memory_forget` change
-      them (2.10.5).
-
-## Automations
-
-Automation graphs (trigger → conditions → actions), the node editor (`Denon.App.Desktop/Automations`, served by the
-Insights server in a WebView2 window), webhooks and the live `RoomEventBus` are in 2.9.0. See
-`docs/automation-graphs.md`. Next: Claude writing graphs through the `architect_automation` MCP
-prompt is wired (`create_or_update_automation`) but not tried with a real agent.
-
-- [x] **A real iPhone Shortcut over Wi-Fi works** (2026-11-25): "arrive home" on joining the home Wi-Fi runs Morning
-      Jazz. The reply now says what each automation did; check it on the iPhone with Show Result after 2.9.2.
-- [x] **Arrival plays when the receiver was left on but idle** (2.10.12): the receiver condition has "Standby or
-      idle" (on with HEOS stopped or paused). On 2026-11-27 four arrivals did nothing, because a test left the receiver
-      on with the stream stopped. Another input (TV, Apple TV) never counts as idle, since the app cannot see that a
-      TV is on.
-- [ ] Check a real arrival with the receiver left on and HEOS stopped after 2.10.12.
-- [x] Phone remote (2.10.12): the pairing code stays in the address for "Add to Home Screen"; a Turn on/Turn off
-      button; the picture is not reloaded on each refresh.
-- [ ] Check on the iPhone: remove the old home-screen icon, scan the QR code, add it again, and open it.
-- [x] TV power on (2.10.12): Wake-on-LAN every second for 15 s (broadcast and direct), then HDMI-CEC through the
-      Chromecast (`wake-tv`, Chromecast plugin 0.6.0), then Live TV. On 2026-11-27, 9 taps at 14:30 got no answer.
-- [x] Released Chromecast plugin 0.6.0 (`wake-tv`), so the CEC fallback works.
-- [x] Checked on the real TV on 2026-11-28: Wake-on-LAN got no answer for 15 s, the Chromecast "Stuen 2" woke the TV
-      over HDMI-CEC, and the TV went to Live TV. The first try failed: two Cast devices were known (one offline).
-- [x] "Chromecast on this TV" on the Smart TV page; "Automatic" is the only device known, else the only one online.
-- [ ] Check a wake from deep standby (TV off for hours) with "Automatic".
-- [x] "TV on → Live TV" looks again 10 s after the switch (HDMI-CEC pulled the TV back to the Chromecast on
-      2026-11-28) and ends with the receiver on the TV input.
-- [x] Checked live on 2026-11-28: TV on → Live TV and TV audio works.
-- [ ] Check live: a cast from the iPhone while the TV is off → the cast stays.
-- [x] TV page tabs (Watch, Remote, Apps, Settings); the last tab is kept (`DashboardTab`). Checked in the app.
-- [x] Remote tab: one card, TV screen + "Remote" or "Trackpad" (kept in `RemotePanel`) + one keyboard line. Checked in the app.
-- [x] "TV on → Live TV" example and the "Recent event" condition (2.10.12). Not when a cast or the Apple TV woke the TV.
-- [ ] Check "TV on → Live TV" live: TV remote on (HDMI 1 → Live TV), and a cast from the iPhone (stays on the cast).
-- [x] Station logos are cached in memory and in `art-cache`; the last started station is kept in `last-station.txt`
-      so a stream that plays at app start shows its name and logo (2.10.12).
-- [ ] **Decide:** should the Phone Remote's `/api/volume` use the safe-volume cap (`MaxSafeVolume`, 65)? MCP agents and
-      automations are capped; the Phone Remote, and so a Shortcut that calls it, only stops at the receiver's maximum.
-      Left as it is because the remote is the owner at the couch.
-- [ ] A node that two branches reach runs once per branch. Fine for now; a "join" node would need run state.
-- [ ] `PluginReceiverEventType.VolumeChanged` is declared but never sent, and mute changes are not sent to plugins.
-
-## MCP: plugin tools
-
-The bridge returns JSON + images and uses declared parameters/hints since app 1.16.0 / SDK 1.16 (Chromecast plugin 0.2.0 uses it).
-
-- [x] The **Smart Scene editor** (and Automation Rule editor) now includes a parameter editor driven by
-      `PluginActionDescriptor.Parameters` (`Name`, `Type`, `Description`, `Required`) when adding steps and inline on
-      existing steps, with live required-field indicators and persisted `Parameters`.
-- [ ] LG TV actions `tv.button`, `tv.launch_app`, `tv.type_text`, `tv.open_url` are implemented but not listed in
-      `GetActions` (the curated `tv_computer` MCP tool covers them). Decide if they should be listed.
-
-## Chromecast plugin
-
-- [ ] Only one Cast device (Stuen 2, 192.168.1.20) is online. The second device the user expects was not found by
-      mDNS or by a port-8009 scan on 2026-11-23. Check if it is off, in deep standby, or on another network.
-- [x] Documented Windows **Private vs. Public** network profile for mDNS in `external-plugins/Denon.Plugin.Chromecast/README.md`.
-- [ ] Speaker groups (`Google Cast Group`) are skipped.
-- [ ] Stuen 2 lost its link 3 times between 02:57:09 and 02:57:20 on 2026-11-24, with no app restart near it
-      (reconnected at 02:57:32). Find out why, and whether the reconnect needs a back-off.
-- [ ] Netflix shares only "Netflix" as the media title (no program or episode), so all Netflix viewing is one session
-      per app run (`hasTitle: false` since plugin 0.1.1). It does report PLAYING/PAUSED, so `watchedSec` is right.
-      Check if play/pause commands work for Netflix.
-- [x] Extended `CastAppNames` with verified Nordic and major Cast app IDs (YouTube Music, Prime Video, Viaplay, SVT Play,
-      NRK TV/Radio, Yle Areena, Twitch, Plex, Jellyfin, BBC iPlayer/Sounds, SoundCloud, etc.) plus display-name cleanup
-      for dynamic-ID services (TV 2 Play, Max, SkyShowtime, Apple TV+).
-
-## HomePod plugin
-
-- [x] Go/no-go (2026-11-24): transient pairing and MRP on HomePod mini, HomePod software 27.2.1; read "DR P4 København"
-      live from the stereo pair. Plugin 0.1.0 built: discovery, stereo pair as one speaker, now playing, commands,
-      listening sessions, pause on receiver on. Verified live in the app: both speakers linked, the dashboard shows
-      what plays.
-- [ ] Verify live: a full listening session in Insights (play something for longer than 15 s), Apple Music started on
-      the HomePod itself (no AirPlay client message), and that Play/Pause/Next work (ask first: it plays audio).
-- [ ] The pair's leader moves (Left, then Right). The plugin follows it at the next discovery (10 min); a faster
-      switch could follow the HomePod's `igl` TXT change. Check that a leader change keeps the listening session.
-- [ ] "Interrupted" (MRP state 3) shows as paused in the status line; check what the HomePod reports after Siri, a
-      timer or an AirPlay sender that disconnects, and whether it should end the session sooner.
-- [ ] Next: volume (MRP volume for the output device), artwork for the dashboard and Insights, and the HomePod in
+**Automations and plugins**
+- [ ] A node that two branches reach runs once per branch. A "join" node would need run state.
+- [ ] Mute changes are not sent to plugins (volume changes are).
+- [ ] The Automations editor and the Brain page save at once and have no unsaved-changes banner. If they get a Save
+      button, add them to `SettingsEditorAreas`.
+- [ ] Home Assistant: a slow REST poll while the live socket is down? And after a rejected token, a failing REST
+      read can overwrite the host status line.
+- [ ] Chromecast speaker groups (`Google Cast Group`) are skipped.
+- [ ] HomePod: the pair's leader moves; the plugin follows it at the next discovery (10 min). A faster switch could
+      follow the `igl` TXT change. "Interrupted" (MRP state 3) shows as paused; check what Siri, a timer or a
+      disconnecting AirPlay sender report.
+- [ ] HomePod next: volume (MRP output device volume), artwork for the dashboard and Insights, and the HomePod in
       Insights' RIGHT NOW.
+- [ ] Apple TV: test more apps (Netflix, TV 2 Play, YouTube) for titles and series/episode fields.
 
-## Apple TV plugin
+**UI**
+- [ ] From the computer-use run (2026-11-24): low contrast of "Synced …" and the version in the status line (Dark);
+      "Normal 42" is highlighted at volume 41; QUICK INPUTS in the tray flyout marks no input; the Brain habits say
+      "Top input: MPLAY" (the raw code).
+- [ ] Settings, Scenes, Stations, Cast and the plugin pages have no screen-reader names yet (the main window has).
+- [ ] An empty state for the YouTube, Stations and Cast pages; full dark ContextMenu templates.
+- [ ] Channel logos: 16 of the 92 Danish cable channel names have no logo in tv-logos. Pin them with
+      `ChannelLogoOverrides`; a UI to pin a logo is not built.
+- [ ] A station with a wrong or missing TuneIn match cannot set its own logo. Idea: a logo address per station and a
+      switch to turn the TuneIn lookup off. The logo comes over plain http, and the MCP now-playing card does not
+      show it.
 
-Native .NET (no Python), protocol logic ported from pyatv (MIT). See `external-plugins/Denon.Plugin.AppleTv/README.md`.
-
-- [x] Milestone 0: discovery. Found "Stuen (2)", Apple TV 4K (1st gen), tvOS 26.6.1: Companion :49153, AirPlay :7000,
-      no `_mediaremotetv` (now playing must use the AirPlay tunnel).
-- [x] Milestone 1: HAP pairing + Companion. Paired live on 2026-11-23 (first try, M6 signature verified); power
-      state, app list (43 apps) and events work. 27 tests incl. an encrypted loopback session.
-- [ ] Milestone 1 rest: verify live the commands that change the TV (`key`, `power on/off`, `launch`); needs the
-      user's OK each time.
-- [x] Milestone 2: MRP now playing over AirPlay 2 — **GO** (2026-11-23). Works with the Companion pairing (no
-      second PIN). Live: DRTV app, program titles and Playing/idle, pushed within ~1 s when the stream starts or
-      stops. 34 tests (plist cross-checked with Python, real DRTV message sequence).
-- [ ] Milestone 2 rest: artwork (PLAYBACK_QUEUE_REQUEST), test more apps (Netflix, TV 2 Play, YouTube) for titles
-      and series/episode fields, and a long-running session (reconnect after the Apple TV sleeps).
-- [x] Milestone 3: full plugin — **success** (2026-11-23). Live with the dev build: pairing from the dashboard,
-      now playing in the dashboard and the hero (the Apple TV is on Denon input MPLAY), MRP play/pause (DRTV
-      on-demand pauses; DRTV live answers "command failed"), watch sessions, `app_shutdown` on app exit, sleep
-      detected and the now-playing link closed, no wake in 3.5 min of Companion polling while asleep.
-- [x] Power button on the remote: `AppleTvWatchLog` now uses a 35 s `StandbyGracePeriod` before finalizing `app_closed`
-      (freezing duration/watchedSec/avgVolume at stop time) so remote power-off logs `standby` when tvOS reports
-      `Asleep` within 35 s.
-- [x] Disable/grey out the pause button when the app does not support pause: `MrpNowPlaying` parses `supportedCommands`
-      from `SET_STATE`, exposes `canPause` / `"APPLE TV LIVE • …"`, disables Pause with tooltip on the Apple TV
-      dashboard, and gates the hero & tray flyout `PlayPauseCommand` via `CanPauseTransport`. Only an explicit
-      `Pause` command counts (the app sends Pause, not TogglePlayPause).
-- [ ] From the computer-use test run (2026-11-24), not fixed yet: the left rail's buttons have no accessible names
-      (UI Automation sees them as empty; screen readers and test agents cannot find "Help" or "Brain"); low contrast of
-      "Synced …" and the version in the status line (Dark); "Normal 42" is highlighted at volume 41; QUICK INPUTS in the
-      tray flyout marks no input; the Brain habits say "Top input: MPLAY" (raw code); Room Doctor gives no sign that a
-      Rescan ran. F-02 (Help quick jumps do nothing) did not reproduce with real mouse clicks.
-- [ ] Verify live: a Live TV channel without guide data shows the channel only (the program boundary works: seen
-      2026-11-24, DR1 "TVA" 17:15 in the hero and as its own watch-log session with the logo).
-- [ ] Channel logos: 16 of the 92 channel names on the Danish cable list have no logo in tv-logos (Viaplay Sport 1–3,
-      CNBC, Bloomberg, France 2, Rai 1, Discovery ID and local info channels). Pin them with `ChannelLogoOverrides`, or
-      add more name rules if a pattern shows up. A UI to pin a logo is not built yet.
-- [ ] Verify live: the 35 s standby grace (power button → `standby`), and that Pause is greyed out on DRTV live and
-      enabled on DRTV on-demand.
-- [ ] Verify live with the user's OK: Denon automations on wake/sleep, `key`, `launch-app`, `power-on/off`.
-- [ ] DRTV autoplay: when DRTV goes on to the next episode by itself, tvOS reports no player until the user
-      pauses/resumes (seen 2026-11-23: "Løftet" -> "Straffen"; 7 stale paused avkit players, no now-playing client).
-      0.3.0 asks for the playback queue once a minute while nothing is reported, and shows a player that starts
-      playing without a client. Not verified live yet: check at the next autoplay (log line "Playback queue shows …").
-- [x] DRTV artwork for the hero: fetched with PLAYBACK_QUEUE_REQUEST, saved in the plugin data folder (0.3.0;
-      fetched live 2026-11-23 for "Maria Wern: Straffen").
-
-## Theming and skinning (2.0.0)
-
-Preparation done on branch `theming-prep`: every UI color is a token in `Denon.App.Desktop/Themes/Colors.Dark.xaml`
-(neutral ramp `Ink00`–`Ink16`, text levels, accent families, overlays) with brushes in `Themes/Brushes.xaml`;
-styles stay in `Themes/DenonTheme.xaml`. Code reads tokens through `ThemeResources` (app) and `HostTheme` (built-in
-plugins); the meters read `MeterPalette`. `ThemeTokenGuardTests` blocks new hex colors and unknown keys.
-
-Design and decisions: `docs/theming.md` (branch `theming-2.0`).
-
-- [x] Themes: Dark, Light and Follow Windows, live switch (`DynamicResource` everywhere, ~900 references; bindings and
-      code-assigned theme brushes are refreshed by `ThemeManager`). Settings → Appearance.
-- [x] Palette contract tests (same keys, contrast floors) and a guard against `StaticResource` theme references.
-- [x] Skin decisions (2026-11-23, `docs/theming.md`): tokens only (type, radii, spacing, icons, meter materials),
-      live switch, built-in skins only, any skin with any theme, all plugin pages follow, bundled open fonts allowed.
-- [x] Skins, live: Default, Hi-Fi (Bahnschrift + bundled Share Tech Mono, amber VU, teal fluorescent LEDs), Compact,
-      Large. Skin tokens in `Themes/Skins/*.xaml`; spacing and sizes via `{skin:Space}`/`{skin:Size}` (two scales over
-      Default pixels); `SkinChanged` redraws the meters; skin chips in Settings → Appearance; `SkinTests`.
-- [x] Light meters: each skin has a dark and a light meter set (cream VU faces, light LED screen); the theme picks
-      it, live (`MeterPaletteTests`).
-- [x] Plugin pages follow the skin (`HostSkin` in each plugin; `HostSkin.Follow` for the code-built Chromecast and
-      Apple TV pages). Screenshots checked for every skin in Dark and Large in Light, start and live switch.
-- [x] Released Chromecast plugin 0.5.0 and Apple TV plugin 0.4.0 (theme brushes read at each use, `HostSkin`).
-- [x] First start: splash screen, window fitted to the monitor and skin (Compact or Large picked on the first
-      start), auto-grow until the user sizes the window, saved placement, version in the status line, Help updated.
-- [ ] Check live on a small screen (1366 × 768 or 1920 × 1080 at 150 %) that the first start picks Compact, and on a
-      second monitor with another scale that the window opens there at the right size.
-- [ ] Check live in the installed app: tray flyout, YouTube cinema window, Chromecast and Apple TV pages in Light and
-      in each skin (screenshot mode does not show them).
-- [x] Help topic badges and scene colors on Light: added WCAG 2 luminance `BadgeContrastHelper` (>= 4.5:1 contrast) so
-      solid scene/station badges choose the highest-contrast theme ink with a subtle border, and Help/Plugin accent
-      badges adapt on Light surfaces while leaving Dark untouched (live refresh on `ThemeChanged`).
-- [ ] Decide user theme files (JSON tokens, validated on import; no loose XAML).
+**Theming**
 - [ ] Semantic aliases (Success/Warning/Danger/Info/Accent) over the hue families, so a theme can recolor states.
-- [ ] Plugin SDK theme API (`ThemeChanged`, token list) if a plugin ever draws with theme colors in code.
-- [x] Split `MainWindow.xaml` (4,500 lines) into one view per page (`Views/*View.xaml`); the window keeps the
-      title bar, sidebar and page wrappers.
-- [x] Built-in plugins (Hue, Smart TV, Home Assistant): use the app's card and button styles (sizes stay local).
-- [x] Hue Music Sync and the Deck meters follow internet radio that the app starts (FFmpeg decodes a copy; 2.10.10). Checked live
-- [x] After an app restart, the meters and Hue Music Sync pick up the station that still plays (the one the app
-      started last, from `last-station.txt`), once per run while nothing else started.
-- [ ] Check live: play a station, restart the app (or install an update), and see the log line "... plays on from
-      before the app started" and Hue moving to the music.
-      on DR P8 Jazz: Deck meters DENON · SYNCED, Hue LIVE FFT SYNC with beats. During speech (news) the badge
-      blinked to WAITING FOR AUDIO in pauses (~18% of frames below −50 dBFS); the badge now holds 2 s (2.10.11).
-- [ ] Radio meters: check the beat timing against the speakers and, if needed, a radio delay setting
-      (`RadioPlaybackClock.AssumedStartDelay`, the "play" event). A station HEOS already played before the app
-      started (or a HEOS favorite) has no URL for the app, so it stays simulated.
-- [x] App styles for ComboBox, ListBox and PasswordBox; the external plugins dropped their own ComboBox template.
-- [x] One chip style (`ChipButton`/`SuccessChipButton` + `infra:Chip.IsActive`) instead of 23 inline copies; page and
-      sub-tab switching via the `EqualityToVis` converter instead of 14 inline styles. Zone 2 keeps its own style.
-- [x] Typography and shape tokens in `Themes/Typography.xaml`: type scale `FontSize00`–`FontSize14`, radius scale
-      `Radius00`–`Radius09`, fonts `DisplayFont`/`UiFont`/`MonoFont` (610 sizes, 175 radii, 64 font names replaced).
-- [x] Chromecast and Apple TV pages read font sizes and corner radii from the host tokens (`HostTheme.FontSize`/`Radius`).
-- [ ] The meters' drawn text sizes are still literal (the dials scale as a whole with their height, so skins do not
-      need them).
-- [x] Icon set in `Themes/Icons.xaml`: 21 named geometries (sidebar, title bar, transport, chevrons, tick), 25 uses.
-
-## Station logos & plugin list
-
-- [ ] Verify live: the Deck and the phone remote show the TuneIn logo for a saved station (DR P6 Beat). Only tested
-      with a fake directory and in the build; the receiver was not touched.
-- [ ] The logo comes over plain http (the TuneIn logo CDN has no https). The MCP now-playing card does not show the
-      station logo yet.
-- [ ] A station with a wrong or missing TuneIn match has no way to set its own logo. Idea: a logo address per
-      station on the Stations page, and a switch to turn the TuneIn lookup off.
-- [ ] Verify live: the plugin grid with six or more plugins (the screenshot mode has three), in a narrow window and
-      with the Large skin.
-
-## Settings saves
-
-- [x] Eliminated all three `_suppressNextSettingsReload` sites: dB toggle now uses `SaveUiStateAsync`, and Phone Remote
-      toggle/token rotation plus acoustic lip-sync calibration use atomic `AppSettingsStore.UpdateQuietAsync`
-      (respecting corrupt-file recovery with no editor reloads or HEOS reconnects on overlapping saves).
-
-## In-app updates
-
-- [x] Verify live: the first real update (2.3.0 → 2.4.0 on the user's PC, Update → Download and install) worked.
-- [x] Plugin updates (Chromecast `chromecast-v*`, Apple TV `appletv-v*`) through the same check (`UpdateService.CheckForUpdatesAsync`
-      checks app + external plugins in a single request and surfaces them with release notes and release-page links in
-      the status line and update panel).
-- [ ] Code signing would let the update check who made the installer, not only that it arrived intact.
-
-## Release / build
-
-- [ ] The installer and exe are unsigned (SmartScreen warning). Consider code signing.
-- [ ] Take the README and site screenshot `02-youtube-music` again: the demo queue now starts with the promo video
-      (https://www.youtube.com/watch?v=2BL0w4gOYfA). The images in `docs/screenshots` and `site/public/shots` still
-      show the old queue.
+- [ ] A Plugin SDK theme API (`ThemeChanged`, token list) if a plugin ever draws with theme colors in code (see #78).
+- [ ] The meters' drawn text sizes are literal (the dials scale as a whole, so skins do not need them).
