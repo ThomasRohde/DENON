@@ -33,12 +33,21 @@ internal sealed class HomePodSpeakerConfig
 
     public string? OsVersion { get; set; }
 
-    /// <summary>The HomePods in this speaker (two for a stereo pair).</summary>
+    /// <summary>The names of the HomePods in this speaker (two for a stereo pair), for display.</summary>
     public List<string> Members { get; set; } = [];
+
+    /// <summary>The device ids of the HomePods in this speaker: discovery matches and merges speakers by these.</summary>
+    public List<string> MemberIds { get; set; } = [];
 
     public bool Enabled { get; set; } = true;
 
     public DateTimeOffset? LastSeenUtc { get; set; }
 
     public bool IsStereoPair => Members.Count > 1;
+
+    /// <summary>
+    /// Discovery passes in a row in which only part of this stereo pair answered (in memory only, not saved).
+    /// The pair stays as saved until this reaches <see cref="HomePodGroups.MaxPartialPasses"/>.
+    /// </summary>
+    internal int PartialPasses { get; set; }
 }

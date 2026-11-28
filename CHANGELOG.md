@@ -13,6 +13,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   It keeps the folder it runs from, the folder of any other copy that runs, and folders less than 10 minutes old.
   A folder with a file in use is left whole, and the cleanup stops when another copy of the app is starting.
 
+### Changed
+- **One place for package versions** (#72). `Directory.Packages.props` sets the version of each NuGet package
+  for every project, and the projects name only the package. The Hue, Apple TV and HomePod plugins now use the
+  same BouncyCastle (2.7.0; Apple TV and HomePod had 2.5.1). A `global.json` names the .NET 10 SDK, and CI and
+  the release workflows install the SDK from it. The app's packages and output do not change.
+
 ## [2.10.28] - 2026-11-28
 
 ### Fixed

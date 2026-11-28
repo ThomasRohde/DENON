@@ -358,7 +358,15 @@ internal sealed class CastDeviceClient : IAsyncDisposable
             };
 
             var transportId = GetString(a, "transportId");
-            if (!next.IsIdleScreen && transportId is not null && SupportsMedia(a))
+            if (next.IsIdleScreen)
+            {
+                // The idle screen (Backdrop) takes no media commands: forget the app that ran before it.
+                lock (_gate)
+                {
+                    _mediaTransportId = null;
+                }
+            }
+            else if (transportId is not null && SupportsMedia(a))
             {
                 lock (_gate)
                 {

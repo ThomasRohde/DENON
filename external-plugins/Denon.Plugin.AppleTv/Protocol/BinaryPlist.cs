@@ -208,28 +208,63 @@ internal static class BinaryPlist
 
     // ---------------------------------------------------------------- read
 
+    /// <summary>Most objects one read may decode. References can share objects, so a small file could
+    /// otherwise expand into a huge tree.</summary>
+    public const int MaxDecodedObjects = 100_000;
+
+    private const int MaxDepth = 64;
+    private const int TrailerLength = 32;
+
+    /// <summary>Reads a binary plist. Any malformed input throws <see cref="FormatException"/>.</summary>
     public static object? Read(ReadOnlySpan<byte> data)
     {
-        if (data.Length < 40 || !data[..8].SequenceEqual(Magic))
+        if (data.Length < Magic.Length + TrailerLength || !data[..Magic.Length].SequenceEqual(Magic))
         {
             throw new FormatException("Not a binary plist.");
         }
 
-        var trailer = data[^32..];
-        var offsetSize = trailer[6];
-        var refSize = trailer[7];
-        var count = checked((int)BinaryPrimitives.ReadUInt64BigEndian(trailer[8..]));
-        var top = checked((int)BinaryPrimitives.ReadUInt64BigEndian(trailer[16..]));
-        var tableOffset = checked((int)BinaryPrimitives.ReadUInt64BigEndian(trailer[24..]));
-
-        var offsets = new int[count];
-        for (var i = 0; i < count; i++)
+        var trailer = data[^TrailerLength..];
+        int offsetSize = trailer[6];
+        int refSize = trailer[7];
+        if (offsetSize is < 1 or > 8 || refSize is < 1 or > 8)
         {
-            offsets[i] = checked((int)ReadSized(data.Slice(tableOffset + (i * offsetSize), offsetSize)));
+            throw new FormatException("bplist offset or reference size is invalid.");
         }
 
-        var reader = new Reader(data.ToArray(), offsets, refSize);
-        return reader.ReadObject(top, depth: 0);
+        var count = BinaryPrimitives.ReadUInt64BigEndian(trailer[8..]);
+        var top = BinaryPrimitives.ReadUInt64BigEndian(trailer[16..]);
+        var tableOffset = BinaryPrimitives.ReadUInt64BigEndian(trailer[24..]);
+
+        // Objects sit between the magic and the offset table; the table must end before the trailer.
+        var tableEnd = (ulong)(data.Length - TrailerLength);
+        if (count == 0 || top >= count || tableOffset < (ulong)Magic.Length || tableOffset > tableEnd
+            || count > (tableEnd - tableOffset) / (ulong)offsetSize)
+        {
+            throw new FormatException("bplist trailer is invalid.");
+        }
+
+        var offsets = new int[(int)count];
+        for (var i = 0; i < offsets.Length; i++)
+        {
+            var offset = ReadSized(data.Slice((int)tableOffset + (i * offsetSize), offsetSize));
+            if (offset < (ulong)Magic.Length || offset >= tableOffset)
+            {
+                throw new FormatException("bplist object offset is out of range.");
+            }
+
+            offsets[i] = (int)offset;
+        }
+
+        var reader = new Reader(data[..(int)tableOffset].ToArray(), offsets, refSize);
+        try
+        {
+            return reader.ReadObject(top, depth: 0);
+        }
+        catch (Exception ex) when (ex is ArgumentException or IndexOutOfRangeException or OverflowException)
+        {
+            // Backstop: the expected failures are checked, but no malformed input may escape as another type.
+            throw new FormatException("bplist data is malformed.", ex);
+        }
     }
 
     public static Dictionary<string, object?> ReadDictionary(ReadOnlySpan<byte> data) =>
@@ -246,16 +281,28 @@ internal static class BinaryPlist
         return value;
     }
 
+    /// <summary>Reads objects from the object area (everything before the offset table).</summary>
     private sealed class Reader(byte[] data, int[] offsets, int refSize)
     {
-        public object? ReadObject(int index, int depth)
+        private static readonly DateTime Epoch = new(2001, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        private static readonly double MinSeconds = (DateTime.MinValue - Epoch).TotalSeconds;
+        private static readonly double MaxSeconds = (DateTime.MaxValue - Epoch).TotalSeconds;
+
+        private int _decoded;
+
+        public object? ReadObject(ulong index, int depth)
         {
-            if (depth > 64 || index < 0 || index >= offsets.Length)
+            if (depth > MaxDepth || index >= (ulong)offsets.Length)
             {
                 throw new FormatException("bplist reference is invalid.");
             }
 
-            var pos = offsets[index];
+            if (++_decoded > MaxDecodedObjects)
+            {
+                throw new FormatException("bplist has too many objects.");
+            }
+
+            var pos = offsets[(int)index];
             var marker = data[pos];
             var type = marker >> 4;
             var info = marker & 0x0F;
@@ -265,51 +312,51 @@ internal static class BinaryPlist
                 case 0x0:
                     return info switch { 0x08 => false, 0x09 => true, _ => null };
                 case 0x1:
-                    var intBytes = 1 << info;
-                    var span = data.AsSpan(pos + 1, intBytes);
-                    return intBytes switch
-                    {
-                        1 => (long)span[0],
-                        2 => (long)BinaryPrimitives.ReadUInt16BigEndian(span),
-                        4 => (long)BinaryPrimitives.ReadUInt32BigEndian(span),
-                        8 => BinaryPrimitives.ReadInt64BigEndian(span),
-                        16 => BinaryPrimitives.ReadInt64BigEndian(span[8..]), // low 64 bits (plistlib big unsigned)
-                        _ => throw new FormatException("bplist integer size is invalid."),
-                    };
+                    return ReadInteger(pos, info);
                 case 0x2:
-                    return info == 2
-                        ? BinaryPrimitives.ReadSingleBigEndian(data.AsSpan(pos + 1, 4))
-                        : BinaryPrimitives.ReadDoubleBigEndian(data.AsSpan(pos + 1, 8));
+                    return info switch
+                    {
+                        2 => BinaryPrimitives.ReadSingleBigEndian(Bytes(pos + 1, 4)),
+                        3 => BinaryPrimitives.ReadDoubleBigEndian(Bytes(pos + 1, 8)),
+                        _ => throw new FormatException("bplist real size is invalid."),
+                    };
                 case 0x3:
-                    var seconds = BinaryPrimitives.ReadDoubleBigEndian(data.AsSpan(pos + 1, 8));
-                    return new DateTime(2001, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(seconds);
+                    var seconds = BinaryPrimitives.ReadDoubleBigEndian(Bytes(pos + 1, 8));
+                    if (!double.IsFinite(seconds) || seconds <= MinSeconds || seconds >= MaxSeconds)
+                    {
+                        throw new FormatException("bplist date is out of range.");
+                    }
+
+                    return Epoch.AddSeconds(seconds);
                 case 0x4:
                     var (dataLength, dataStart) = Count(pos, info);
-                    return data.AsSpan(dataStart, dataLength).ToArray();
+                    return Bytes(dataStart, dataLength).ToArray();
                 case 0x5:
                     var (asciiLength, asciiStart) = Count(pos, info);
-                    return Encoding.ASCII.GetString(data, asciiStart, asciiLength);
+                    return Encoding.ASCII.GetString(Bytes(asciiStart, asciiLength));
                 case 0x6:
                     var (utf16Length, utf16Start) = Count(pos, info);
-                    return Encoding.BigEndianUnicode.GetString(data, utf16Start, utf16Length * 2);
+                    return Encoding.BigEndianUnicode.GetString(Bytes(utf16Start, utf16Length * 2));
                 case 0x8:
-                    return (long)ReadSized(data.AsSpan(pos + 1, info + 1));
+                    return (long)ReadSized(Bytes(pos + 1, info + 1));
                 case 0xA:
                     var (arrayCount, arrayStart) = Count(pos, info);
-                    var list = new List<object?>(arrayCount);
+                    var arrayRefs = Bytes(arrayStart, arrayCount * refSize);
+                    var list = new List<object?>((int)Math.Min(arrayCount, 256));
                     for (var i = 0; i < arrayCount; i++)
                     {
-                        list.Add(ReadObject(Ref(arrayStart, i), depth + 1));
+                        list.Add(ReadObject(Ref(arrayRefs, i), depth + 1));
                     }
 
                     return list;
                 case 0xD:
                     var (dictCount, dictStart) = Count(pos, info);
-                    var dict = new Dictionary<string, object?>(dictCount);
+                    var dictRefs = Bytes(dictStart, dictCount * 2 * refSize);
+                    var dict = new Dictionary<string, object?>((int)Math.Min(dictCount, 256));
                     for (var i = 0; i < dictCount; i++)
                     {
-                        var key = ReadObject(Ref(dictStart, i), depth + 1)?.ToString() ?? string.Empty;
-                        dict[key] = ReadObject(Ref(dictStart, dictCount + i), depth + 1);
+                        var key = ReadObject(Ref(dictRefs, i), depth + 1)?.ToString() ?? string.Empty;
+                        dict[key] = ReadObject(Ref(dictRefs, (int)dictCount + i), depth + 1);
                     }
 
                     return dict;
@@ -318,18 +365,61 @@ internal static class BinaryPlist
             }
         }
 
-        private int Ref(int start, int i) => (int)ReadSized(data.AsSpan(start + (i * refSize), refSize));
+        private long ReadInteger(int pos, int info)
+        {
+            // Sizes are 1, 2, 4, 8 or 16 bytes (info 0 to 4); anything larger is not a valid integer.
+            if (info > 4)
+            {
+                throw new FormatException("bplist integer size is invalid.");
+            }
 
-        private (int Count, int Start) Count(int pos, int info)
+            var span = Bytes(pos + 1, 1 << info);
+            return info switch
+            {
+                0 => span[0],
+                1 => BinaryPrimitives.ReadUInt16BigEndian(span),
+                2 => BinaryPrimitives.ReadUInt32BigEndian(span),
+                3 => BinaryPrimitives.ReadInt64BigEndian(span),
+                _ => BinaryPrimitives.ReadInt64BigEndian(span[8..]), // low 64 bits (plistlib big unsigned)
+            };
+        }
+
+        private ulong Ref(ReadOnlySpan<byte> refs, int i) => ReadSized(refs.Slice(i * refSize, refSize));
+
+        /// <summary>A checked slice of the object area. Lengths are long so a hostile size cannot wrap.</summary>
+        private ReadOnlySpan<byte> Bytes(long start, long length)
+        {
+            if (start < 0 || length < 0 || start > data.Length || length > data.Length - start)
+            {
+                throw new FormatException("bplist object runs past the end of the data.");
+            }
+
+            return data.AsSpan((int)start, (int)length);
+        }
+
+        /// <summary>A container or string length: the low nibble, or a following integer object when it is 0xF.</summary>
+        private (long Count, int Start) Count(int pos, int info)
         {
             if (info != 0x0F)
             {
                 return (info, pos + 1);
             }
 
-            var intMarker = data[pos + 1];
-            var size = 1 << (intMarker & 0x0F);
-            return ((int)ReadSized(data.AsSpan(pos + 2, size)), pos + 2 + size);
+            var intMarker = Bytes(pos + 1, 1)[0];
+            var sizeInfo = intMarker & 0x0F;
+            if (intMarker >> 4 != 0x1 || sizeInfo > 3)
+            {
+                throw new FormatException("bplist count is invalid.");
+            }
+
+            var size = 1 << sizeInfo;
+            var value = ReadSized(Bytes(pos + 2, size));
+            if (value > int.MaxValue)
+            {
+                throw new FormatException("bplist count is too large.");
+            }
+
+            return ((long)value, pos + 2 + size);
         }
     }
 }

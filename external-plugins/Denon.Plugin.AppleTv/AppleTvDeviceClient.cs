@@ -162,6 +162,11 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
                 {
                     var closed = new TaskCompletionSource<Exception?>(TaskCreationOptions.RunContinuationsAsynchronously);
                     companion.Closed += ex => closed.TrySetResult(ex);
+                    if (!companion.IsConnected)
+                    {
+                        closed.TrySetResult(null); // it closed before we subscribed
+                    }
+
                     companion.EventReceived += OnCompanionEvent;
                     _companion = companion;
                     backoff = TimeSpan.FromSeconds(5);
@@ -276,18 +281,27 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
         try
         {
             var mrp = await MrpClient.ConnectAsync(_host, _airPlayPort, _credentials, _identity, ct);
+            if (!State.IsAwake)
+            {
+                // It fell asleep while we connected: do not ask a sleeping Apple TV for its queue or artwork.
+                await mrp.DisposeAsync();
+                return;
+            }
+
+            _mrpDead = false;
             mrp.NowPlayingChanged += snapshot =>
             {
                 SetState(s => s with { NowPlaying = snapshot, AppName = NameFor(snapshot) });
                 RequestArtwork(mrp, snapshot);
             };
-            mrp.Closed += _ =>
-            {
-                _mrpDead = true;
-                _poke.Release();
-            };
+            mrp.Closed += _ => MarkNowPlayingDead();
             _mrp = mrp;
-            _mrpDead = false;
+            if (mrp.IsClosed)
+            {
+                MarkNowPlayingDead(); // it closed before we subscribed
+                return;
+            }
+
             var now = mrp.NowPlaying.Current;
             SetState(s => s with { NowPlayingLinked = true, NowPlaying = now, AppName = NameFor(now) });
             Diagnostic?.Invoke("Now-playing link open.");
@@ -302,6 +316,13 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
             _mrpRetryAt = DateTimeOffset.UtcNow + NowPlayingRetry;
             Diagnostic?.Invoke($"Now-playing link failed (retry in {NowPlayingRetry.TotalSeconds:0} s): {ex.Message}");
         }
+    }
+
+    /// <summary>The now-playing link closed: the loop closes it and retries in a moment.</summary>
+    private void MarkNowPlayingDead()
+    {
+        _mrpDead = true;
+        _poke.Release();
     }
 
     /// <summary>
@@ -336,7 +357,8 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
 
     /// <summary>
     /// Gets the artwork of the program when the app has one: from the disk cache, else with a
-    /// PLAYBACK_QUEUE_REQUEST (in the background). One request per program; a failed one is retried after a minute.
+    /// PLAYBACK_QUEUE_REQUEST. One request per program; a failed one is retried after a minute. This runs on the
+    /// MRP read loop, so all disk work is done in the background.
     /// </summary>
     private void RequestArtwork(MrpClient mrp, NowPlayingSnapshot snapshot)
     {
@@ -356,23 +378,19 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
             _artworkRetryAt = DateTimeOffset.UtcNow + ArtworkRetry;
         }
 
-        var name = ArtworkFileName(key);
-        var cached = Directory.Exists(_artworkDirectory)
-            ? Directory.EnumerateFiles(_artworkDirectory, name + ".*").FirstOrDefault()
-            : null;
-        if (cached is not null)
-        {
-            SetState(s => s with { Artwork = new AppleTvArtwork(key, new Uri(cached).AbsoluteUri) });
-            return;
-        }
-
-        _ = Task.Run(() => FetchArtworkAsync(mrp, key, name, snapshot.QueueLocation));
+        _ = Task.Run(() => FetchArtworkAsync(mrp, key, ArtworkFileName(key), snapshot.QueueLocation));
     }
 
     private async Task FetchArtworkAsync(MrpClient mrp, string key, string name, int location)
     {
         try
         {
+            if (FindCachedArtwork(_artworkDirectory, name) is { } cached)
+            {
+                SetState(s => s with { Artwork = new AppleTvArtwork(key, new Uri(cached).AbsoluteUri) });
+                return;
+            }
+
             var artwork = await mrp.RequestPlaybackQueueAsync(location, _cts.Token);
             if (artwork is null)
             {
@@ -380,9 +398,7 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
                 return;
             }
 
-            Directory.CreateDirectory(_artworkDirectory);
-            var path = Path.Combine(_artworkDirectory, name + artwork.Extension);
-            await File.WriteAllBytesAsync(path, artwork.Data, _cts.Token);
+            var path = await SaveArtworkAsync(_artworkDirectory, name, artwork, _cts.Token);
             PruneArtwork();
             SetState(s => s with { Artwork = new AppleTvArtwork(key, new Uri(path).AbsoluteUri) });
         }
@@ -393,6 +409,32 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
         {
             Diagnostic?.Invoke($"Artwork not fetched (retry in {ArtworkRetry.TotalSeconds:0} s): {ex.Message}");
         }
+    }
+
+    /// <summary>The saved artwork file for <paramref name="name"/> (JPEG or PNG), or null.</summary>
+    internal static string? FindCachedArtwork(string directory, string name) =>
+        new[] { ".jpg", ".png" }.Select(ext => Path.Combine(directory, name + ext)).FirstOrDefault(File.Exists);
+
+    /// <summary>
+    /// Writes the artwork to a temporary file and then moves it into place, so a reader (the host's now-playing
+    /// view) never sees half a file. Returns the file's path.
+    /// </summary>
+    internal static async Task<string> SaveArtworkAsync(string directory, string name, MrpArtwork artwork, CancellationToken ct)
+    {
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, name + artwork.Extension);
+        var temp = Path.Combine(directory, $"{name}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            await File.WriteAllBytesAsync(temp, artwork.Data, ct);
+            File.Move(temp, path, overwrite: true);
+        }
+        finally
+        {
+            File.Delete(temp); // no-op after the move
+        }
+
+        return path;
     }
 
     /// <summary>A file name from the program key (the key can hold any character).</summary>

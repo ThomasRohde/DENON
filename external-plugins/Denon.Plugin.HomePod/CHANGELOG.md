@@ -2,6 +2,41 @@
 
 Released separately from Denon Desktop with tags `homepod-vX.Y.Z`.
 
+## [Unreleased]
+
+### Changed
+- **BouncyCastle 2.7.0** (#72), the same version as the Hue plugin in Denon Desktop (it was 2.5.1). The package
+  versions now come from the repository's `Directory.Packages.props`.
+
+### Fixed
+- **A stereo pair stays a pair when one HomePod misses a discovery reply** (#49). The pair's leader has no pair id
+  of its own, so a missed reply from the other HomePod made the pair a single speaker, and a missed reply from the
+  leader moved the link to the other HomePod. Now the saved pair keeps its name, members and leader while the
+  missing HomePod answers nowhere. After three such passes in a row (about 30 minutes), discovery's view wins. A
+  pair that you split in the Home app splits at once, because both HomePods then answer as single speakers.
+
+## [0.3.0] - 2026-11-28
+
+### Security
+- **Bad network data can no longer crash Denon Desktop or stall the link** (#35). The shared AirPlay readers check
+  every length before they allocate: binary plists (trailer, offsets, object count), data-stream frames (smaller than
+  the header or over 16 MB now close the connection, which reconnects, instead of stalling it), HTTP Content-Length
+  and protobuf lengths.
+
+### Fixed
+- **A PC sleep no longer adds hours of listening time** (#70). Each step counts at most 120 seconds of play, so a
+  HomePod that played while the PC slept is logged with the time it was seen playing.
+- **A stereo pair whose leader changes keeps one link and one session** (#49). The old link and its listening session
+  are closed under the old id before the new one starts. Two single HomePods that become a pair are one speaker,
+  so the same music is no longer logged twice. Speakers are matched by the HomePods' device ids, never by name, so
+  two HomePods with the same name stay two speakers; a speaker saved by an earlier version still matches its pair.
+- **The link comes back when it drops right after it opens** (#50). A close before the plugin listened was missed,
+  and the speaker showed "Linked" on a dead connection. A command in flight fails at once when the link closes.
+- **Insights: a second of play and then a pause is no session** (#70); it needs 15 seconds of play.
+- **Discovery: an empty TXT string no longer hides the entries after it** (#70), and a reserved DNS label type
+  drops the packet instead of misreading the rest of it.
+- Connections and timers are cleaned up when the remote-control setup fails part-way or the plugin restarts (#70).
+
 ## [0.2.1] - 2026-11-26
 
 ### Fixed

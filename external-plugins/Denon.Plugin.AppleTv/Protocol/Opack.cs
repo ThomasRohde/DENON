@@ -17,6 +17,10 @@ namespace Denon.Plugin.AppleTv.Protocol;
 /// </summary>
 internal static class Opack
 {
+    /// <summary>How deep containers may nest when unpacking. Real messages nest a few levels; a cap keeps a
+    /// hostile frame from overflowing the stack (which would end the whole process).</summary>
+    public const int MaxDepth = 64;
+
     public static byte[] Pack(object? data) => Pack(data, []);
 
     public static object? Unpack(ReadOnlySpan<byte> data) => Unpack(data, out _);
@@ -25,7 +29,7 @@ internal static class Opack
     {
         var objects = new List<object?>();
         var pos = 0;
-        var value = Unpack(data, ref pos, objects);
+        var value = Unpack(data, ref pos, objects, 0);
         consumed = pos;
         return value;
     }
@@ -212,11 +216,16 @@ internal static class Opack
 
     // ---------------------------------------------------------------- unpack
 
-    private static object? Unpack(ReadOnlySpan<byte> data, ref int pos, List<object?> objects)
+    private static object? Unpack(ReadOnlySpan<byte> data, ref int pos, List<object?> objects, int depth)
     {
         if (pos >= data.Length)
         {
             throw new FormatException("OPACK data ended early.");
+        }
+
+        if (depth > MaxDepth)
+        {
+            throw new FormatException("OPACK containers nest too deeply.");
         }
 
         var tag = data[pos++];
@@ -261,14 +270,14 @@ internal static class Opack
                 value = Encoding.UTF8.GetString(Take(data, ref pos, tag - 0x40));
                 break;
             case >= 0x61 and <= 0x64:
-                var strLength = (int)ReadLittleEndian(Take(data, ref pos, tag & 0xF));
+                var strLength = ReadLittleEndian(Take(data, ref pos, tag & 0xF));
                 value = Encoding.UTF8.GetString(Take(data, ref pos, strLength));
                 break;
             case >= 0x70 and <= 0x90:
                 value = Take(data, ref pos, tag - 0x70).ToArray();
                 break;
             case >= 0x91 and <= 0x94:
-                var dataLength = (int)ReadLittleEndian(Take(data, ref pos, 1 << ((tag & 0xF) - 1)));
+                var dataLength = ReadLittleEndian(Take(data, ref pos, 1 << ((tag & 0xF) - 1)));
                 value = Take(data, ref pos, dataLength).ToArray();
                 break;
             case >= 0xD0 and <= 0xDF:
@@ -278,7 +287,7 @@ internal static class Opack
                 {
                     while (Peek(data, pos) != 0x03)
                     {
-                        list.Add(Unpack(data, ref pos, objects));
+                        list.Add(Unpack(data, ref pos, objects, depth + 1));
                     }
 
                     pos++;
@@ -287,7 +296,7 @@ internal static class Opack
                 {
                     for (var i = 0; i < listCount; i++)
                     {
-                        list.Add(Unpack(data, ref pos, objects));
+                        list.Add(Unpack(data, ref pos, objects, depth + 1));
                     }
                 }
 
@@ -301,8 +310,8 @@ internal static class Opack
                 {
                     while (Peek(data, pos) != 0x03)
                     {
-                        var key = Unpack(data, ref pos, objects) ?? throw new FormatException("OPACK dictionary key is null.");
-                        dict[key] = Unpack(data, ref pos, objects);
+                        var key = Unpack(data, ref pos, objects, depth + 1) ?? throw new FormatException("OPACK dictionary key is null.");
+                        dict[key] = Unpack(data, ref pos, objects, depth + 1);
                     }
 
                     pos++;
@@ -311,8 +320,8 @@ internal static class Opack
                 {
                     for (var i = 0; i < dictCount; i++)
                     {
-                        var key = Unpack(data, ref pos, objects) ?? throw new FormatException("OPACK dictionary key is null.");
-                        dict[key] = Unpack(data, ref pos, objects);
+                        var key = Unpack(data, ref pos, objects, depth + 1) ?? throw new FormatException("OPACK dictionary key is null.");
+                        dict[key] = Unpack(data, ref pos, objects, depth + 1);
                     }
                 }
 
@@ -320,10 +329,10 @@ internal static class Opack
                 remember = false;
                 break;
             case >= 0xA0 and <= 0xC0:
-                value = Reference(objects, tag - 0xA0);
+                value = Reference(objects, (ulong)(tag - 0xA0));
                 break;
             case >= 0xC1 and <= 0xC4:
-                value = Reference(objects, (int)ReadLittleEndian(Take(data, ref pos, tag - 0xC0)));
+                value = Reference(objects, ReadLittleEndian(Take(data, ref pos, tag - 0xC0)));
                 break;
             default:
                 throw new FormatException($"Unsupported OPACK tag 0x{tag:X2}.");
@@ -337,21 +346,25 @@ internal static class Opack
         return value;
     }
 
-    private static object? Reference(List<object?> objects, int index) =>
-        index < objects.Count ? objects[index] : throw new FormatException($"OPACK reference {index} is out of range.");
+    private static object? Reference(List<object?> objects, ulong index) =>
+        index < (ulong)objects.Count ? objects[(int)index] : throw new FormatException($"OPACK reference {index} is out of range.");
 
     private static byte Peek(ReadOnlySpan<byte> data, int pos) =>
         pos < data.Length ? data[pos] : throw new FormatException("OPACK container has no terminator.");
 
-    private static ReadOnlySpan<byte> Take(ReadOnlySpan<byte> data, ref int pos, int count)
+    private static ReadOnlySpan<byte> Take(ReadOnlySpan<byte> data, ref int pos, int count) =>
+        count < 0 ? throw new FormatException("OPACK length is negative.") : Take(data, ref pos, (ulong)count);
+
+    /// <summary>Takes the next bytes. Compares against what is left, so a huge length cannot overflow.</summary>
+    private static ReadOnlySpan<byte> Take(ReadOnlySpan<byte> data, ref int pos, ulong count)
     {
-        if (count < 0 || pos + count > data.Length)
+        if ((uint)pos > (uint)data.Length || count > (ulong)(data.Length - pos))
         {
             throw new FormatException("OPACK data ended early.");
         }
 
-        var slice = data.Slice(pos, count);
-        pos += count;
+        var slice = data.Slice(pos, (int)count);
+        pos += (int)count;
         return slice;
     }
 

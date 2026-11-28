@@ -12,6 +12,7 @@ namespace Denon.Plugin.Chromecast;
 /// Rules:
 /// - One session per program (app + title). A new title closes the old session ("switched").
 /// - A session is logged only after it lasts <see cref="DwellSeconds"/> (same 15 s dwell as the host).
+///   While it is paused, it also needs that much play time first.
 /// - If the title arrives after the app started, the open session gets the title. It does not restart.
 /// - <c>watchedSec</c> counts only PLAYING/BUFFERING time. <c>durationSec</c> is wall-clock time.
 ///   Both start when the program first shows (the dwell time is included in both).
@@ -93,8 +94,10 @@ internal sealed class CastWatchLog
                     continue;
                 }
 
+                // A paused program needs real play first: one second of play and then a pause is not watching.
                 if (slot.Active is null && slot.Pending is { } pending &&
-                    (now - pending.StartedUtc).TotalSeconds >= DwellSeconds)
+                    (now - pending.StartedUtc).TotalSeconds >= DwellSeconds &&
+                    (slot.IsPlaying || pending.WatchedSec >= DwellSeconds))
                 {
                     // The receiver may not have been known when the program started (plugin just loaded).
                     if (pending.ReceiverInput is null && receiverFor(slot.DeviceId) is { IsPoweredOn: true } rx)
@@ -141,7 +144,8 @@ internal sealed class CastWatchLog
     {
         lock (_gate)
         {
-            foreach (var slot in _slots.Values.Where(s => deviceId is null || s.DeviceId == deviceId))
+            foreach (var slot in _slots.Values.Where(s =>
+                         deviceId is null || string.Equals(s.DeviceId, deviceId, StringComparison.OrdinalIgnoreCase)))
             {
                 slot.Accumulate(now);
                 if (slot.Active is not null)

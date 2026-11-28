@@ -153,6 +153,11 @@ internal sealed class HomePodClient : IAsyncDisposable
                 mrp = await MrpClient.ConnectTransientAsync(_host, _port, _identity, ct);
                 var closed = new TaskCompletionSource<Exception?>(TaskCreationOptions.RunContinuationsAsynchronously);
                 mrp.Closed += ex => closed.TrySetResult(ex);
+                if (mrp.IsClosed)
+                {
+                    closed.TrySetResult(null); // it closed before we subscribed; the event will not come again
+                }
+
                 var linked = mrp;
                 mrp.NowPlayingChanged += snapshot =>
                 {

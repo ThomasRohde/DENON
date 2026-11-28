@@ -27,6 +27,7 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
     private readonly Dictionary<string, AppleTvDeviceClient> _clients = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, CompanionPairing> _pairings = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _sleepTimers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> _wakeWork = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _configGate = new(1, 1);
 
     private IPluginContext? _context;
@@ -75,6 +76,7 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
         _lifetime?.Cancel();
+        _lifetime?.Dispose();
         _lifetime = new CancellationTokenSource();
         foreach (var device in SnapshotConfigs().Where(d => d.Enabled && d.IsPaired))
         {
@@ -102,6 +104,11 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
         }
 
         _sleepTimers.Clear();
+        foreach (var wake in _wakeWork.Values)
+        {
+            TryCancel(wake);
+        }
+
         foreach (var pairing in _pairings.Values)
         {
             await pairing.DisposeAsync();
@@ -315,7 +322,10 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
         DevicesChanged?.Invoke();
     }
 
-    /// <summary>Finishes pairing with the PIN, stores the credentials and connects.</summary>
+    /// <summary>
+    /// Finishes pairing with the PIN, stores the credentials and connects. The pairing session ends either way,
+    /// so the dashboard refreshes even when the PIN is wrong or the Apple TV's signature does not verify.
+    /// </summary>
     internal async Task FinishPairingAsync(string deviceId, string pin)
     {
         if (!_pairings.TryRemove(deviceId, out var pairing))
@@ -323,41 +333,47 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
             throw new InvalidOperationException("Start pairing first.");
         }
 
-        HapCredentials credentials;
-        await using (pairing)
-        {
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-            credentials = await pairing.FinishAsync(pin.Trim(), timeout.Token);
-        }
-
-        AppleTvDeviceConfig? config;
-        await _configGate.WaitAsync();
         try
         {
-            lock (_gate)
+            HapCredentials credentials;
+            await using (pairing)
             {
-                config = _config.Devices.FirstOrDefault(d => d.Id == deviceId);
-                if (config is null)
-                {
-                    return;
-                }
-
-                config.Credentials = credentials.ToString();
-                config.Identity = CompanionIdentity.Create(PairingName);
-                config.PairedUtc = DateTimeOffset.UtcNow;
-                config.Enabled = true;
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                credentials = await pairing.FinishAsync(pin.Trim(), timeout.Token);
             }
 
-            await SaveConfigCoreAsync(CancellationToken.None);
+            AppleTvDeviceConfig? config;
+            await _configGate.WaitAsync();
+            try
+            {
+                lock (_gate)
+                {
+                    config = _config.Devices.FirstOrDefault(d => d.Id == deviceId);
+                    if (config is null)
+                    {
+                        return;
+                    }
+
+                    config.Credentials = credentials.ToString();
+                    config.Identity = CompanionIdentity.Create(PairingName);
+                    config.PairedUtc = DateTimeOffset.UtcNow;
+                    config.Enabled = true;
+                }
+
+                await SaveConfigCoreAsync(CancellationToken.None);
+            }
+            finally
+            {
+                _configGate.Release();
+            }
+
+            _context?.Logger.Info($"Paired with {config.Name} ({credentials.ToSafeString()}).");
+            await RestartClientAsync(config);
         }
         finally
         {
-            _configGate.Release();
+            DevicesChanged?.Invoke();
         }
-
-        _context?.Logger.Info($"Paired with {config.Name} ({credentials.ToSafeString()}).");
-        await RestartClientAsync(config);
-        DevicesChanged?.Invoke();
     }
 
     internal async Task CancelPairingAsync(string deviceId)
@@ -457,45 +473,13 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
 
         var added = 0;
         var restart = new List<AppleTvDeviceConfig>();
+        var skipped = new List<AppleDevice>();
         await _configGate.WaitAsync(cancellationToken);
         try
         {
             lock (_gate)
             {
-                foreach (var device in found)
-                {
-                    var id = device.DeviceId ?? device.Address.ToString();
-                    var companionPort = device.Service(AppleServiceTypes.Companion)!.Port;
-                    var airPlayPort = device.Service(AppleServiceTypes.AirPlay)?.Port is > 0 and var p ? p : 7000;
-                    var existing = _config.Devices.FirstOrDefault(d => d.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
-                    if (existing is null)
-                    {
-                        _config.Devices.Add(new AppleTvDeviceConfig
-                        {
-                            Id = id,
-                            Name = device.Name,
-                            Host = device.Address.ToString(),
-                            CompanionPort = companionPort,
-                            AirPlayPort = airPlayPort,
-                            Model = device.ModelName,
-                            OsVersion = device.OsVersion ?? string.Empty,
-                        });
-                        added++;
-                        continue;
-                    }
-
-                    var moved = existing.Host != device.Address.ToString() || existing.CompanionPort != companionPort || existing.AirPlayPort != airPlayPort;
-                    existing.Name = device.Name;
-                    existing.Host = device.Address.ToString();
-                    existing.CompanionPort = companionPort;
-                    existing.AirPlayPort = airPlayPort;
-                    existing.Model = device.ModelName;
-                    existing.OsVersion = device.OsVersion ?? existing.OsVersion;
-                    if (moved && existing.IsPaired && existing.Enabled)
-                    {
-                        restart.Add(existing);
-                    }
-                }
+                added = MergeDiscovered(_config.Devices, found, restart, skipped);
             }
 
             if (found.Count > 0)
@@ -519,11 +503,74 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
             _context?.Logger.Info($"Apple TV discovery: {found.Count} answered, {added} new.");
         }
 
+        foreach (var device in skipped)
+        {
+            _context?.Logger.Info($"Apple TV discovery: {device.Name} at {device.Address} answered without its device id; not added yet.");
+        }
+
         _lastDiscoveryAnswered = found.Count;
         DevicesChanged?.Invoke();
         ReportAggregateStatus();
         return added;
     }
+
+    /// <summary>
+    /// Merges discovered Apple TVs into the saved ones and returns how many are new. A saved Apple TV is found by
+    /// its device id. A reply without the device id (only Companion answered; the id is in the AirPlay record) is
+    /// found by its address, and is never added: under its address it would be a second copy of the same Apple TV.
+    /// Those go to <paramref name="skipped"/>. Paired, enabled Apple TVs that moved go to <paramref name="restart"/>.
+    /// </summary>
+    internal static int MergeDiscovered(List<AppleTvDeviceConfig> devices, IEnumerable<AppleDevice> found,
+        List<AppleTvDeviceConfig> restart, List<AppleDevice> skipped)
+    {
+        var added = 0;
+        foreach (var device in found)
+        {
+            var companionPort = device.Service(AppleServiceTypes.Companion)!.Port;
+            var existing = device.DeviceId is { } id
+                ? devices.FirstOrDefault(d => d.Id.Equals(id, StringComparison.OrdinalIgnoreCase))
+                : devices.FirstOrDefault(d => d.Host == device.Address.ToString());
+            if (existing is null && device.DeviceId is null)
+            {
+                skipped.Add(device);
+                continue;
+            }
+
+            if (existing is null)
+            {
+                devices.Add(new AppleTvDeviceConfig
+                {
+                    Id = device.DeviceId!,
+                    Name = device.Name,
+                    Host = device.Address.ToString(),
+                    CompanionPort = companionPort,
+                    AirPlayPort = AirPlayPortOf(device) ?? 7000,
+                    Model = device.ModelName,
+                    OsVersion = device.OsVersion ?? string.Empty,
+                });
+                added++;
+                continue;
+            }
+
+            // A reply without AirPlay has no AirPlay port: the saved one stays.
+            var airPlayPort = AirPlayPortOf(device) ?? existing.AirPlayPort;
+            var moved = existing.Host != device.Address.ToString() || existing.CompanionPort != companionPort || existing.AirPlayPort != airPlayPort;
+            existing.Name = device.Name;
+            existing.Host = device.Address.ToString();
+            existing.CompanionPort = companionPort;
+            existing.AirPlayPort = airPlayPort;
+            existing.Model = device.ModelName;
+            existing.OsVersion = device.OsVersion ?? existing.OsVersion;
+            if (moved && existing.IsPaired && existing.Enabled)
+            {
+                restart.Add(existing);
+            }
+        }
+
+        return added;
+    }
+
+    private static int? AirPlayPortOf(AppleDevice device) => device.Service(AppleServiceTypes.AirPlay)?.Port is > 0 and var port ? port : null;
 
     // ---------------------------------------------------------------- internals
 
@@ -531,6 +578,18 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
     {
         if (!config.IsPaired)
         {
+            return;
+        }
+
+        HapCredentials credentials;
+        try
+        {
+            credentials = HapCredentials.Parse(config.Credentials);
+        }
+        catch (FormatException ex)
+        {
+            // One damaged saved pairing must not stop the other Apple TVs. Pairing again replaces it.
+            _context?.Logger.Warning($"[{config.Name}] The saved pairing is damaged ({ex.Message}). Pair the Apple TV again.");
             return;
         }
 
@@ -543,7 +602,7 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
             }
 
             client = new AppleTvDeviceClient(config.Id, config.Host, config.CompanionPort, config.AirPlayPort,
-                HapCredentials.Parse(config.Credentials), config.Identity!,
+                credentials, config.Identity!,
                 Path.Combine(_context!.Storage.PluginDataDirectory, "artwork", string.Concat(config.Id.Where(char.IsLetterOrDigit))));
             _clients[config.Id] = client;
         }
@@ -566,6 +625,7 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
             timer.Cancel();
         }
 
+        CancelWakeWork(deviceId);
         _watchLog?.EndAll(DateTimeOffset.UtcNow, "device_disabled", deviceId);
         if (client is not null)
         {
@@ -658,7 +718,8 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
             if (!previous.IsAwake && current.IsAwake)
             {
                 RecordEvent("appletv.woke", config, current, origin: "external");
-                _ = Task.Run(() => OnWokeAsync(config));
+                var wake = BeginWakeWork(config.Id); // made here, so a sleep that follows at once can cancel it
+                _ = Task.Run(() => OnWokeAsync(config, wake));
             }
             else if (previous.IsAwake && current.Power == AttentionState.Asleep)
             {
@@ -680,7 +741,53 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
         }
     }
 
-    private async Task OnWokeAsync(AppleTvDeviceConfig config)
+    /// <summary>A token for one wake's automation, cancelled when the Apple TV sleeps again (or the plugin stops).</summary>
+    private CancellationTokenSource BeginWakeWork(string deviceId)
+    {
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime?.Token ?? CancellationToken.None);
+        if (_wakeWork.TryRemove(deviceId, out var old))
+        {
+            TryCancel(old);
+        }
+
+        _wakeWork[deviceId] = cts;
+        return cts;
+    }
+
+    private void CancelWakeWork(string deviceId)
+    {
+        if (_wakeWork.TryRemove(deviceId, out var wake))
+        {
+            TryCancel(wake);
+        }
+    }
+
+    /// <summary>Cancels a CTS that its own task may have just disposed.</summary>
+    private static void TryCancel(CancellationTokenSource cts)
+    {
+        try
+        {
+            cts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+    }
+
+    private async Task OnWokeAsync(AppleTvDeviceConfig config, CancellationTokenSource wake)
+    {
+        try
+        {
+            await RunWakeAutomationAsync(config, wake.Token);
+        }
+        finally
+        {
+            _wakeWork.TryRemove(new KeyValuePair<string, CancellationTokenSource>(config.Id, wake));
+            wake.Dispose();
+        }
+    }
+
+    private async Task RunWakeAutomationAsync(AppleTvDeviceConfig config, CancellationToken ct)
     {
         if (_sleepTimers.TryRemove(config.Id, out var timer))
         {
@@ -693,7 +800,6 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
             return;
         }
 
-        var ct = _lifetime?.Token ?? CancellationToken.None;
         var steps = new List<string>();
         try
         {
@@ -747,6 +853,7 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
 
     private void OnSlept(AppleTvDeviceConfig config)
     {
+        CancelWakeWork(config.Id); // a wake automation still running (receiver start-up, scene) stops here
         var minutes = config.Automation.PowerOffAfterSleepMinutes;
         if (!_config.AutomationsEnabled || minutes <= 0 || _receiverControl is null || _context is null)
         {

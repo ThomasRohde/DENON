@@ -24,7 +24,7 @@ jobs:
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          global-json-file: global.json
 
       - name: Read and check version
         id: version
@@ -40,6 +40,12 @@ jobs:
             }
           }
           "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Test plugin
+        shell: pwsh
+        run: |
+          dotnet test external-plugins/Denon.Plugin.Chromecast.Tests/Denon.Plugin.Chromecast.Tests.csproj -c Release --nologo
+          if ($LASTEXITCODE -ne 0) { throw "Tests failed." }
 
       - name: Publish plugin
         shell: pwsh

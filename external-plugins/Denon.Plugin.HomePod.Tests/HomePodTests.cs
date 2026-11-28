@@ -133,6 +133,14 @@ public sealed class HomePodListenLogTests
         NowPlaying = NowPlayingSnapshot.Empty with { AppBundleId = bundle, AppName = "AirMusic", Title = title, Artist = artist, State = playback },
     };
 
+    private static void TickEvery5s(HomePodListenLog log, DateTimeOffset from, DateTimeOffset to)
+    {
+        for (var t = from; t <= to; t = t.AddSeconds(5))
+        {
+            log.Tick(t);
+        }
+    }
+
     private static (HomePodListenLog Log, List<(string Name, Dictionary<string, object?> Data)> Events) NewLog()
     {
         var events = new List<(string, Dictionary<string, object?>)>();
@@ -156,7 +164,7 @@ public sealed class HomePodListenLogTests
         Assert.Equal("HomePod Left + Right", started.Data["homepodDevice"]);
         Assert.Equal("HomePod Left, HomePod Right", started.Data["homepodSpeakers"]);
 
-        log.Tick(T0.AddMinutes(30));
+        TickEvery5s(log, T0.AddSeconds(15), T0.AddMinutes(30)); // the plugin ticks every few seconds
         log.Update(Pair, State(MrpPlaybackState.Unknown, null) with { NowPlaying = NowPlayingSnapshot.Empty }, T0.AddMinutes(30));
         var ended = events[^1];
         Assert.Equal("session.ended", ended.Name);
@@ -207,5 +215,265 @@ public sealed class HomePodListenLogTests
         log.EndAll(T0.AddSeconds(80), "app_shutdown");
         Assert.Equal("app_shutdown", events[^1].Data["reason"]);
         Assert.Equal(2, events.Count);
+    }
+
+    [Fact]
+    public void A_pc_sleep_while_the_speaker_plays_does_not_add_hours()
+    {
+        var (log, events) = NewLog();
+        log.Update(Pair, State(MrpPlaybackState.Playing, "DR P4"), T0);
+        TickEvery5s(log, T0.AddSeconds(5), T0.AddSeconds(60));
+
+        // The PC sleeps for three hours; the next tick comes after it wakes.
+        var wake = T0.AddSeconds(60).AddHours(3);
+        log.Tick(wake);
+        log.Update(Pair, State(MrpPlaybackState.Unknown, null) with { NowPlaying = NowPlayingSnapshot.Empty }, wake.AddSeconds(5));
+
+        var ended = events[^1];
+        Assert.Equal("session.ended", ended.Name);
+        Assert.Equal(60 + 120 + 5, ended.Data["watchedSec"]); // each step counts at most 120 s
+    }
+
+    [Fact]
+    public void A_second_of_play_then_a_pause_is_not_a_session()
+    {
+        var (log, events) = NewLog();
+        log.Update(Pair, State(MrpPlaybackState.Playing, "Song"), T0);
+        log.Update(Pair, State(MrpPlaybackState.Paused, "Song"), T0.AddSeconds(1));
+        TickEvery5s(log, T0.AddSeconds(5), T0.AddSeconds(120));
+        Assert.Empty(events);
+
+        log.Update(Pair, State(MrpPlaybackState.Playing, "Song"), T0.AddSeconds(125));
+        log.Tick(T0.AddSeconds(130));
+        Assert.Equal("session.started", Assert.Single(events).Name);
+    }
+}
+
+public sealed class HomePodMergeTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 11, 28, 12, 0, 0, TimeSpan.Zero);
+
+    // Made-up ids and addresses. Each HomePod's device id is its first letter ("HomePod Left" is "L"), as in the
+    // speaker ids below.
+    private static string Key(string name) => name.StartsWith("HomePod ", StringComparison.Ordinal) ? name[8..9] : name[..1];
+
+    private static DiscoveredSpeaker Found(string id, string host, params string[] members) =>
+        new(id, HomePodGroups.PairName(members), host, 7000, "HomePod mini", "27.2", members, members.Select(Key).ToList());
+
+    private static HomePodSpeakerConfig Saved(string id, string host, params string[] members) =>
+        new() { Id = id, Name = HomePodGroups.PairName(members), Host = host, Members = [.. members], MemberIds = [.. members.Select(Key)] };
+
+    [Fact]
+    public void A_pair_saved_without_member_ids_still_follows_a_leader_switch()
+    {
+        // Saved by the earlier plugin: no member ids, and the pair is off.
+        var pair = new HomePodSpeakerConfig { Id = "L", Name = "HomePod Left + Right", Host = "192.168.1.8", Members = ["HomePod Left", "HomePod Right"], Enabled = false };
+
+        var merge = HomePodGroups.Merge([pair], [Found("R", "192.168.1.9", "HomePod Left", "HomePod Right")], Now);
+
+        var speaker = Assert.Single(merge.Speakers);
+        Assert.Same(pair, speaker);
+        Assert.Equal("R", speaker.Id);
+        Assert.False(speaker.Enabled); // the saved setting stays
+        Assert.Equal(["L", "R"], speaker.MemberIds);
+        Assert.Equal("L", Assert.Single(merge.Restart).OldId);
+    }
+
+    [Fact]
+    public void A_single_saved_without_member_ids_goes_when_it_joins_a_pair()
+    {
+        var left = Saved("L", "192.168.1.8", "HomePod Left");
+        var right = new HomePodSpeakerConfig { Id = "R", Name = "HomePod Right", Host = "192.168.1.9", Members = ["HomePod Right"] };
+
+        var merge = HomePodGroups.Merge([left, right], [Found("L", "192.168.1.8", "HomePod Left", "HomePod Right")], Now);
+
+        Assert.Same(left, Assert.Single(merge.Speakers));
+        Assert.Same(right, Assert.Single(merge.Removed));
+    }
+
+    [Fact]
+    public void Two_speakers_with_the_same_name_stay_two_speakers()
+    {
+        // Two single HomePods both named "Kitchen": the same name, different devices.
+        var a = new HomePodSpeakerConfig { Id = "A", Name = "Kitchen", Host = "192.168.1.7", Members = ["Kitchen"], MemberIds = ["A"], Enabled = false };
+        var b = new HomePodSpeakerConfig { Id = "B", Name = "Kitchen", Host = "192.168.1.8", Members = ["Kitchen"], MemberIds = ["B"] };
+
+        var merge = HomePodGroups.Merge(
+            [a, b],
+            [new("A", "Kitchen", "192.168.1.7", 7000, "HomePod mini", "27.2", ["Kitchen"], ["A"]),
+             new("B", "Kitchen", "192.168.1.8", 7000, "HomePod mini", "27.2", ["Kitchen"], ["B"])],
+            Now);
+
+        Assert.Equal(2, merge.Speakers.Count);
+        Assert.Empty(merge.Removed);
+        Assert.Empty(merge.Restart); // nothing moved, so no client restarts
+        Assert.False(merge.Speakers.Single(s => s.Id == "A").Enabled); // its saved setting stays
+    }
+
+    [Fact]
+    public void A_leader_switch_restarts_the_speaker_under_its_old_id()
+    {
+        var pair = Saved("L", "192.168.1.8", "HomePod Left", "HomePod Right");
+
+        var merge = HomePodGroups.Merge([pair], [Found("R", "192.168.1.9", "HomePod Left", "HomePod Right")], Now);
+
+        var speaker = Assert.Single(merge.Speakers);
+        Assert.Equal("R", speaker.Id);
+        Assert.Equal("192.168.1.9", speaker.Host);
+        var (oldId, restarted) = Assert.Single(merge.Restart);
+        Assert.Equal("L", oldId); // the running client and the listen-log slot are keyed by this one
+        Assert.Same(speaker, restarted);
+        Assert.Empty(merge.Removed);
+        Assert.Equal(0, merge.Added);
+    }
+
+    [Fact]
+    public void Two_single_speakers_that_become_a_pair_are_one_speaker()
+    {
+        var left = Saved("L", "192.168.1.8", "HomePod Left");
+        var right = Saved("R", "192.168.1.9", "HomePod Right");
+
+        var merge = HomePodGroups.Merge([left, right], [Found("L", "192.168.1.8", "HomePod Left", "HomePod Right")], Now);
+
+        var speaker = Assert.Single(merge.Speakers);
+        Assert.Equal("L", speaker.Id);
+        Assert.Equal(["HomePod Left", "HomePod Right"], speaker.Members);
+        Assert.Same(right, Assert.Single(merge.Removed)); // its client stops and its session ends under "R"
+        Assert.Empty(merge.Restart); // same leader, same address: the link stays
+    }
+
+    [Fact]
+    public void A_pair_led_by_the_other_speaker_keeps_that_speaker_and_drops_the_old_pair()
+    {
+        // A stale single "R" and the pair saved under "L"; the pair now answers with "R" as leader.
+        var pair = Saved("L", "192.168.1.8", "HomePod Left", "HomePod Right");
+        var right = Saved("R", "192.168.1.9", "HomePod Right");
+
+        var merge = HomePodGroups.Merge([pair, right], [Found("R", "192.168.1.9", "HomePod Left", "HomePod Right")], Now);
+
+        var speaker = Assert.Single(merge.Speakers);
+        Assert.Same(right, speaker);
+        Assert.Equal(2, speaker.Members.Count);
+        Assert.Same(pair, Assert.Single(merge.Removed));
+    }
+
+    [Fact]
+    public void New_moved_and_unchanged_speakers()
+    {
+        var kitchen = Saved("K", "192.168.1.7", "Køkken");
+        var bath = Saved("B", "192.168.1.5", "Bad");
+
+        var merge = HomePodGroups.Merge(
+            [kitchen, bath],
+            [Found("K", "192.168.1.7", "Køkken"), Found("B", "192.168.1.6", "Bad"), Found("N", "192.168.1.4", "Ny")],
+            Now);
+
+        Assert.Equal(1, merge.Added);
+        Assert.Equal(3, merge.Speakers.Count);
+        Assert.Equal(["B", "N"], merge.Restart.Select(r => r.OldId).Order());
+        Assert.Empty(merge.Removed);
+        Assert.Equal(Now, kitchen.LastSeenUtc);
+    }
+
+    [Fact]
+    public void A_pair_stays_a_pair_when_the_other_homepod_misses_a_reply()
+    {
+        // The leader carries no pgid, so on its own it looks like a single HomePod.
+        var pair = Saved("L", "192.168.1.8", "HomePod Left", "HomePod Right");
+
+        var merge = HomePodGroups.Merge([pair], [Found("L", "192.168.1.8", "HomePod Left")], Now);
+
+        var speaker = Assert.Single(merge.Speakers);
+        Assert.Same(pair, speaker);
+        Assert.Equal("HomePod Left + Right", speaker.Name);
+        Assert.Equal(["HomePod Left", "HomePod Right"], speaker.Members);
+        Assert.Equal(["L", "R"], speaker.MemberIds);
+        Assert.Empty(merge.Restart); // the link stays
+        Assert.Empty(merge.Removed);
+        Assert.Equal(Now, speaker.LastSeenUtc);
+    }
+
+    [Fact]
+    public void A_pair_keeps_its_leader_when_only_the_other_homepod_answers()
+    {
+        var pair = Saved("L", "192.168.1.8", "HomePod Left", "HomePod Right");
+
+        var merge = HomePodGroups.Merge([pair], [Found("R", "192.168.1.9", "HomePod Right")], Now);
+
+        var speaker = Assert.Single(merge.Speakers);
+        Assert.Equal("L", speaker.Id);
+        Assert.Equal("192.168.1.8", speaker.Host);
+        Assert.Equal(2, speaker.Members.Count);
+        Assert.Empty(merge.Restart);
+        Assert.Equal(0, merge.Added);
+    }
+
+    [Fact]
+    public void A_pair_whose_leader_answers_alone_at_a_new_address_restarts_there()
+    {
+        var pair = Saved("L", "192.168.1.8", "HomePod Left", "HomePod Right");
+
+        var merge = HomePodGroups.Merge([pair], [Found("L", "192.168.1.18", "HomePod Left")], Now);
+
+        var (oldId, speaker) = Assert.Single(merge.Restart);
+        Assert.Equal("L", oldId);
+        Assert.Equal("192.168.1.18", speaker.Host);
+        Assert.Equal(2, speaker.Members.Count);
+    }
+
+    [Fact]
+    public void A_pair_that_answers_in_part_too_long_follows_discovery()
+    {
+        var pair = Saved("L", "192.168.1.8", "HomePod Left", "HomePod Right");
+
+        for (var pass = 1; pass < HomePodGroups.MaxPartialPasses; pass++)
+        {
+            HomePodGroups.Merge([pair], [Found("L", "192.168.1.8", "HomePod Left")], Now);
+            Assert.Equal(2, pair.Members.Count);
+        }
+
+        var merge = HomePodGroups.Merge([pair], [Found("L", "192.168.1.8", "HomePod Left")], Now);
+
+        Assert.Equal(["HomePod Left"], Assert.Single(merge.Speakers).Members);
+    }
+
+    [Fact]
+    public void A_full_reply_resets_the_count_of_partial_replies()
+    {
+        var pair = Saved("L", "192.168.1.8", "HomePod Left", "HomePod Right");
+
+        for (var pass = 0; pass < HomePodGroups.MaxPartialPasses * 2; pass++)
+        {
+            var found = pass % 2 == 0
+                ? Found("L", "192.168.1.8", "HomePod Left")
+                : Found("L", "192.168.1.8", "HomePod Left", "HomePod Right");
+            HomePodGroups.Merge([pair], [found], Now);
+        }
+
+        Assert.Equal(2, pair.Members.Count);
+        Assert.Equal(0, pair.PartialPasses);
+    }
+
+    [Fact]
+    public void A_pair_split_in_the_home_app_splits_at_once()
+    {
+        // Both HomePods answer, each as its own speaker: the pair is gone.
+        var pair = Saved("L", "192.168.1.8", "HomePod Left", "HomePod Right");
+
+        var merge = HomePodGroups.Merge([pair], [Found("L", "192.168.1.8", "HomePod Left"), Found("R", "192.168.1.9", "HomePod Right")], Now);
+
+        Assert.Equal(2, merge.Speakers.Count);
+        Assert.Equal(["HomePod Left"], merge.Speakers.Single(s => s.Id == "L").Members);
+        Assert.Equal(1, merge.Added);
+    }
+
+    [Fact]
+    public void Ids_match_in_any_case()
+    {
+        var kitchen = Saved("ce:2e", "192.168.1.7", "Køkken");
+        var merge = HomePodGroups.Merge([kitchen], [Found("CE:2E", "192.168.1.7", "Køkken")], Now);
+
+        Assert.Same(kitchen, Assert.Single(merge.Speakers));
+        Assert.Equal("ce:2e", Assert.Single(merge.Restart).OldId); // the id text changed, so the client re-keys
     }
 }

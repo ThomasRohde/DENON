@@ -92,7 +92,8 @@ internal sealed class HomePodListenLog(Action<string, Dictionary<string, object?
                         continue;
                     }
 
-                    if ((now - pending.StartedUtc).TotalSeconds >= DwellSeconds)
+                    // A paused item needs the full dwell of real play: a second of play then a pause is no session.
+                    if ((now - pending.StartedUtc).TotalSeconds >= DwellSeconds && (slot.IsPlaying || pending.PlayedSec >= DwellSeconds))
                     {
                         slot.Pending = null;
                         slot.Active = new Session(pending);
@@ -225,12 +226,18 @@ internal sealed class HomePodListenLog(Action<string, Dictionary<string, object?
 
         public Session? Active { get; set; }
 
-        /// <summary>Adds the time since the last call to the play time of the item that plays.</summary>
+        /// <summary>Most play time one step may add. Ticks come every few seconds; a longer gap is a PC sleep.</summary>
+        public const double MaxStepSeconds = 120;
+
+        /// <summary>
+        /// Adds the time since the last call to the play time of the item that plays. Each step is clamped to
+        /// [0, <see cref="MaxStepSeconds"/>], so a PC that sleeps while the speaker played does not add hours.
+        /// </summary>
         public void Accumulate(DateTimeOffset now)
         {
-            if (LastTickUtc is { } last && IsPlaying && now > last && (Active?.Item ?? Pending) is { } item)
+            if (LastTickUtc is { } last && IsPlaying && (Active?.Item ?? Pending) is { } item)
             {
-                item.PlayedSec += (now - last).TotalSeconds;
+                item.PlayedSec += Math.Clamp((now - last).TotalSeconds, 0, MaxStepSeconds);
             }
 
             LastTickUtc = now;

@@ -20,7 +20,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          global-json-file: global.json
 
       - name: Test the app
         shell: pwsh
@@ -35,7 +35,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          global-json-file: global.json
 
       - name: Test the Apple TV and HomePod plugins
         shell: pwsh
@@ -45,11 +45,11 @@ jobs:
           dotnet test external-plugins/Denon.Plugin.HomePod.Tests/Denon.Plugin.HomePod.Tests.csproj -c Release --nologo
           if ($LASTEXITCODE -ne 0) { throw "HomePod plugin tests failed." }
 
-      - name: Build the Chromecast plugin
+      - name: Test the Chromecast plugin
         shell: pwsh
         run: |
-          dotnet build external-plugins/Denon.Plugin.Chromecast/Denon.Plugin.Chromecast.csproj -c Release --nologo
-          if ($LASTEXITCODE -ne 0) { throw "Chromecast plugin build failed." }
+          dotnet test external-plugins/Denon.Plugin.Chromecast.Tests/Denon.Plugin.Chromecast.Tests.csproj -c Release --nologo
+          if ($LASTEXITCODE -ne 0) { throw "Chromecast plugin tests failed." }
 
   site:
     runs-on: ubuntu-latest
