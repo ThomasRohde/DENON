@@ -15,7 +15,8 @@ public sealed record SavedLocalTrack(
     double? DurationSeconds = null,
     int? TrackNumber = null,
     string? CoverArtPath = null,
-    bool TagsRead = false);
+    bool TagsRead = false,
+    DateTime? FileModifiedUtc = null);
 
 /// <summary>The Jukebox queue as it is saved between app runs.</summary>
 public sealed record SavedJukeboxQueue(

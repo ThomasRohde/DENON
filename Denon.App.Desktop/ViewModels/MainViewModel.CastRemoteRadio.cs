@@ -193,7 +193,9 @@ public sealed partial class MainViewModel
             }
         });
 
-        _localJukeboxService.JukeboxChanged += snap => _ = _dispatcher.InvokeAsync(() => ApplyLocalJukeboxSnapshot(snap));
+        // Show the latest snapshot, not the one in the event: events from the tag worker and from an edit can arrive
+        // out of order, and an older one would bring back a removed track.
+        _localJukeboxService.JukeboxChanged += changed => _ = _dispatcher.InvokeAsync(() => ApplyLocalJukeboxSnapshot(_localJukeboxService.Snapshot));
         _pcAudioCastService.CastStateChanged += (active, msg) => _ = _dispatcher.InvokeAsync(() =>
         {
             IsPcCastActive = active;

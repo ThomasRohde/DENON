@@ -224,6 +224,29 @@ public sealed class MediaQueueTests : IDisposable
     }
 
     [Fact]
+    public async Task A_file_changed_between_runs_gets_its_tags_read_again()
+    {
+        var file = WriteFlac("song.flac", title: "Old Title", artist: "Artist", album: "Album", seconds: 60, cover: null);
+        var (jukebox, store, _) = CreateJukebox();
+        jukebox.AddPaths([file]);
+        await jukebox.WhenTagsReadAsync();
+        Assert.Equal(TimeSpan.FromSeconds(60), Assert.Single(jukebox.Snapshot.Tracks).Duration);
+        jukebox.Dispose();
+        store.Flush();
+
+        // The same path holds a new, longer recording now.
+        WriteFlac("song.flac", title: "New Title", artist: "Artist", album: "Album", seconds: 300, cover: null);
+        File.SetLastWriteTimeUtc(file, DateTime.UtcNow.AddMinutes(1));
+
+        var (restored, _, _) = CreateJukebox();
+        await restored.WhenTagsReadAsync();
+
+        var track = Assert.Single(restored.Snapshot.Tracks);
+        Assert.Equal("New Title", track.Title);
+        Assert.Equal(TimeSpan.FromSeconds(300), track.Duration);
+    }
+
+    [Fact]
     public void Shuffle_and_repeat_come_back_with_an_empty_queue()
     {
         var (jukebox, store, _) = CreateJukebox();

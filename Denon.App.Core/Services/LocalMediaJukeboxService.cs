@@ -460,18 +460,16 @@ public sealed class LocalMediaJukeboxService : IDisposable
             track = _tracks[index];
         }
 
-        // Read the tags first when the worker has not come to this file yet: the title, cover and length must be
-        // right before the track starts (Now Playing, the Hue colours and the auto-advance wait use them).
-        if (!track.TagsRead)
-        {
-            var trackId = track.TrackId;
-            await Task.Run(() => ReadTagsInto(trackId), cancellationToken);
+        // Read the tags first when the worker has not come to this file yet or the file changed since: the title,
+        // cover and length must be right before the track starts (Now Playing, the Hue colours and the auto-advance
+        // wait use them). With tags that are still good, this is one file check.
+        var trackId = track.TrackId;
+        await Task.Run(() => ReadTagsInto(trackId), cancellationToken);
 
-            // Take the list's record also when this call read nothing: the worker may have read the tags meanwhile.
-            lock (_sync)
-            {
-                track = _tracks.Find(t => string.Equals(t.TrackId, trackId, StringComparison.Ordinal)) ?? track;
-            }
+        // Take the list's record also when this call read nothing: the worker may have read the tags meanwhile.
+        lock (_sync)
+        {
+            track = _tracks.Find(t => string.Equals(t.TrackId, trackId, StringComparison.Ordinal)) ?? track;
         }
 
         try
@@ -797,7 +795,9 @@ public sealed class LocalMediaJukeboxService : IDisposable
             return false;
         }
 
-        var updated = WithTags(track, AudioTagReader.Read(track.FilePath, includeCoverArt: _coverArtCache is not null), _coverArtCache);
+        // The file information comes before the read: a change during the read makes the next check read it again.
+        var fileBeforeRead = new FileInfo(track.FilePath);
+        var updated = WithTags(track, AudioTagReader.Read(track.FilePath, includeCoverArt: _coverArtCache is not null), _coverArtCache, fileBeforeRead);
         lock (_sync)
         {
             var index = _tracks.FindIndex(t => string.Equals(t.TrackId, trackId, StringComparison.Ordinal));
@@ -812,18 +812,37 @@ public sealed class LocalMediaJukeboxService : IDisposable
         return true;
     }
 
-    private bool NeedsTagRead(LocalAudioTrackItem track) =>
-        !track.TagsRead || (track.CoverArtPath is not null && _coverArtCache?.Contains(track.CoverArtPath) != true);
+    /// <summary>
+    /// True when the tags were not read, the cover file is gone, or the file changed (size or last write time)
+    /// since its tags were read. It reads file information, so call it off the UI thread.
+    /// </summary>
+    private bool NeedsTagRead(LocalAudioTrackItem track)
+    {
+        if (!track.TagsRead || (track.CoverArtPath is not null && _coverArtCache?.Contains(track.CoverArtPath) != true))
+        {
+            return true;
+        }
+
+        var info = new FileInfo(track.FilePath);
+        return info.Exists && (info.Length != track.FileSizeBytes || info.LastWriteTimeUtc != track.FileModifiedUtc);
+    }
 
     /// <summary>
     /// The track with the title, artist, album, number, length and cover from its tags. A missing title or artist
     /// keeps the name from the file path.
     /// </summary>
-    internal static LocalAudioTrackItem WithTags(LocalAudioTrackItem track, AudioTags tags, LocalCoverArtCache? coverArtCache)
+    internal static LocalAudioTrackItem WithTags(
+        LocalAudioTrackItem track,
+        AudioTags tags,
+        LocalCoverArtCache? coverArtCache,
+        FileInfo? fileBeforeRead = null)
     {
         var (pathArtist, pathTitle) = ParseMetadataFromPath(track.FilePath);
+        var file = fileBeforeRead is { Exists: true } ? fileBeforeRead : null;
         return track with
         {
+            FileSizeBytes = file?.Length ?? track.FileSizeBytes,
+            FileModifiedUtc = file?.LastWriteTimeUtc,
             Title = tags.Title ?? pathTitle,
             Artist = tags.Artist ?? pathArtist,
             Album = tags.Album,
@@ -836,7 +855,7 @@ public sealed class LocalMediaJukeboxService : IDisposable
 
     /// <summary>
     /// Loads the queue saved by the last run. It never starts playback: the tracks are there, nothing plays. The
-    /// tags of tracks that were not read (or whose cover file is gone) are read again in the background.
+    /// tags of tracks that were not read, whose cover file is gone or whose file changed are read again in the background.
     /// </summary>
     private void RestoreSavedQueue()
     {
@@ -885,7 +904,9 @@ public sealed class LocalMediaJukeboxService : IDisposable
                 TrackNumber: item.TrackNumber is > 0 ? item.TrackNumber : null,
                 // A saved cover outside the cache folder is dropped; the worker reads the file again.
                 CoverArtPath: cover,
-                TagsRead: item.TagsRead && (item.CoverArtPath is null || cover is not null)));
+                TagsRead: item.TagsRead && (item.CoverArtPath is null || cover is not null),
+                // The worker compares it with the file and reads the tags again when the file changed.
+                FileModifiedUtc: item.FileModifiedUtc));
         }
 
         lock (_sync)
@@ -920,7 +941,8 @@ public sealed class LocalMediaJukeboxService : IDisposable
                 t.Duration?.TotalSeconds,
                 t.TrackNumber,
                 t.CoverArtPath,
-                t.TagsRead))],
+                t.TagsRead,
+                t.FileModifiedUtc))],
             snapshot.IsShuffleEnabled,
             snapshot.RepeatMode));
     }

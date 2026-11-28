@@ -64,7 +64,8 @@ public sealed record LocalAudioTrackItem(
     TimeSpan? Duration = null,
     int? TrackNumber = null,
     string? CoverArtPath = null,
-    bool TagsRead = false)
+    bool TagsRead = false,
+    DateTime? FileModifiedUtc = null)
 {
     public string CodecBadge => Extension.TrimStart('.').ToUpperInvariant();
 
