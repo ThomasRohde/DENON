@@ -10,6 +10,12 @@ public sealed class McpAccessSwitch(string key, string label, string detail, boo
 {
     private bool _isAllowed = isAllowed;
 
+    /// <summary>The saved state when the switch was built.</summary>
+    public bool SavedAllowed { get; } = isAllowed;
+
+    /// <summary>Changed on the page and not saved yet.</summary>
+    public bool IsPending => IsAllowed != SavedAllowed;
+
     /// <summary>The tool name, or the plugin id.</summary>
     public string Key { get; } = key;
 
@@ -37,6 +43,7 @@ public sealed partial class MainViewModel
     private RelayCommand? _copyWebhookTokenCommand;
     private AsyncRelayCommand? _regenerateWebhookTokenCommand;
     private RelayCommand? _setAllMcpToolsCommand;
+    private string _mcpSwitchesSignature = string.Empty;
 
     /// <summary>The room and media tools, each with its own switch.</summary>
     public ObservableCollection<McpAccessSwitch> McpToolSwitches { get; } = [];
@@ -111,18 +118,40 @@ public sealed partial class MainViewModel
 
     public AsyncRelayCommand RegenerateWebhookTokenCommand => _regenerateWebhookTokenCommand ??= new AsyncRelayCommand(_ => RegenerateWebhookTokenAsync());
 
-    /// <summary>Reads the security settings into the page fields (at start, and after a save).</summary>
+    /// <summary>
+    /// Reads the security settings into the page fields: at start, after Save &amp; Apply, and after an import (all
+    /// saved values, unsaved switches dropped).
+    /// </summary>
     private void SyncSecurityFieldsFromSettings(AppSettings settings)
     {
-        _isLanOnly = settings.Security.LanOnly;
-        OnPropertyChanged(nameof(IsLanOnly));
-        WebhookToken = settings.Remote.WebhookToken;
+        SyncInstantSecurityFields(settings);
         McpAuditLogEnabled = settings.Mcp.AuditLogEnabled;
-        RefreshMcpToolSwitches();
+        RefreshMcpToolSwitches(keepPending: false);
     }
 
-    /// <summary>Builds the Tool access switches from the server's tools and the saved deny lists.</summary>
-    private void RefreshMcpToolSwitches()
+    /// <summary>
+    /// The fields that save at once (LAN only, the webhook token) follow every settings change, so the page never
+    /// shows a value the servers no longer use.
+    /// </summary>
+    private void SyncInstantSecurityFields(AppSettings settings)
+    {
+        if (_isLanOnly != settings.Security.LanOnly)
+        {
+            _isLanOnly = settings.Security.LanOnly;
+            OnPropertyChanged(nameof(IsLanOnly));
+        }
+
+        WebhookToken = settings.Remote.WebhookToken;
+    }
+
+    /// <summary>
+    /// Builds the Tool access switches from the server's tools and the saved deny lists. With
+    /// <paramref name="keepPending"/>, a switch changed on the page and not saved keeps its value, and nothing is
+    /// rebuilt when the tools and the saved lists are the same (a plugin's status report).
+    /// </summary>
+    private void RefreshMcpToolSwitches() => RefreshMcpToolSwitches(keepPending: true);
+
+    private void RefreshMcpToolSwitches(bool keepPending)
     {
         if (_mcpServer is null)
         {
@@ -131,6 +160,19 @@ public sealed partial class MainViewModel
 
         var cfg = _settingsStore.Current.Mcp;
         var catalog = _mcpServer.GetToolCatalog();
+        var signature = string.Join("|", catalog.Select(static t => $"{t.Name}:{t.PluginId}:{t.PluginName}:{t.ReadOnly}")) +
+                        "#" + string.Join(",", cfg.DeniedTools) + "#" + string.Join(",", cfg.DeniedPluginIds);
+        if (keepPending && signature == _mcpSwitchesSignature)
+        {
+            return;
+        }
+
+        _mcpSwitchesSignature = signature;
+        var pending = keepPending
+            ? McpToolSwitches.Concat(McpPluginSwitches).Where(static s => s.IsPending)
+                .GroupBy(static s => s.Key, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(static g => g.Key, static g => g.First().IsAllowed, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var item in McpToolSwitches.Concat(McpPluginSwitches))
         {
@@ -162,6 +204,11 @@ public sealed partial class MainViewModel
 
         foreach (var item in McpToolSwitches.Concat(McpPluginSwitches))
         {
+            if (pending.TryGetValue(item.Key, out var allowed))
+            {
+                item.IsAllowed = allowed;
+            }
+
             item.PropertyChanged += OnMcpSwitchChanged;
         }
 

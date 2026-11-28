@@ -95,8 +95,12 @@ public sealed partial class MainViewModel
         if (fullReload)
         {
             LoadSettings(settings);
+            SyncSecurityFieldsFromSettings(settings);
             return;
         }
+
+        SyncInstantSecurityFields(settings);
+        RefreshMcpToolSwitches();
 
         var plan = _editorState.Plan(SettingsEditorValues.FromSettings(settings), CaptureEditorValues());
         LoadSettings(settings, plan.Reload);

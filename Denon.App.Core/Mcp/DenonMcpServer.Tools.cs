@@ -1118,6 +1118,13 @@ public sealed partial class DenonMcpServer
             EnsureAtmospherePluginAction("smart-tv", tvAction, cfg);
         }
 
+        // The screen-off and toast steps use the TV plugin too.
+        if ((GetBool(args, "oled_screen_off") == true || GetString(args, "tv_toast") is { Length: > 0 }) &&
+            McpToolAccess.IsPluginDenied(cfg, "smart-tv"))
+        {
+            throw new UnauthorizedAccessException(McpToolAccess.PluginRefusalMessage("apply_atmosphere", "smart-tv"));
+        }
+
         var reason = GetString(args, "reason", "AI Atmosphere");
         var captured = _intelligence.CaptureSnapshot($"MCP Atmosphere: {reason}");
 

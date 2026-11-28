@@ -309,6 +309,20 @@ public sealed class LeastPrivilegeTests : IDisposable
         Assert.Contains(rig.AuditLines(), static l => l.Tool == "apply_atmosphere" && l.Outcome == "refused");
     }
 
+    [Theory]
+    [InlineData("oled_screen_off", true)]
+    [InlineData("tv_toast", "Hello")]
+    public async Task Apply_atmosphere_is_refused_when_its_tv_steps_would_use_the_tv_plugin_that_is_off(string argument, object value)
+    {
+        await using var rig = await McpRig.StartAsync(_tempDir, static s => s.Mcp.DeniedPluginIds = ["smart-tv"]);
+        await using var client = await rig.ConnectAsync();
+
+        var result = await client.CallToolAsync("apply_atmosphere", new Dictionary<string, object?> { [argument] = value, ["volume"] = 30 });
+        Assert.True(result.IsError);
+        Assert.Contains("smart-tv", Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text);
+        Assert.Null(rig.Server.GetRecentActivity().FirstOrDefault(static a => a.Outcome == "OK" && a.Detail == "apply_atmosphere"));
+    }
+
     private sealed record AuditLine(string Tool, string Outcome, string? Ip, string? Client, string[] ArgKeys);
 
     private sealed class McpRig : IAsyncDisposable
