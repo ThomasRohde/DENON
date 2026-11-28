@@ -449,22 +449,36 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
         return $"Paired & LIVE ({_client.CurrentState.TransportLabel})! Discovered {inputsCount} inputs & {appsCount} installed apps. Client key saved.";
     }
 
-    /// <summary>Keeps the page's tab for the next visit. Only the stored file changes: no reconnect.</summary>
-    internal async Task SaveDashboardTabAsync(string tab)
+    /// <summary>
+    /// Keeps the page's tab and the Remote tab's panel for the next visit. Only the stored file changes: no reconnect.
+    /// </summary>
+    internal async Task SavePageChoiceAsync(string? tab = null, string? remotePanel = null)
     {
-        if (_config.DashboardTab == tab || _context is null)
+        var changed = false;
+        if (tab is not null && _config.DashboardTab != tab)
+        {
+            _config.DashboardTab = tab;
+            changed = true;
+        }
+
+        if (remotePanel is not null && _config.RemotePanel != remotePanel)
+        {
+            _config.RemotePanel = remotePanel;
+            changed = true;
+        }
+
+        if (!changed || _context is null)
         {
             return;
         }
 
-        _config.DashboardTab = tab;
         try
         {
             await _context.Storage.SaveConfigAsync(_config);
         }
         catch (Exception ex)
         {
-            _context.Logger.Warning($"Could not keep the Smart TV page tab: {ex.Message}");
+            _context.Logger.Warning($"Could not keep the Smart TV page choice: {ex.Message}");
         }
     }
 

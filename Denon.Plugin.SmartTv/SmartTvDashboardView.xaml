@@ -7,6 +7,15 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="TvBoolToVis" />
 
+        <!-- Remote icons (24×24 outlines, filled with the button's text color) -->
+        <Geometry x:Key="TvIconUp">M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z</Geometry>
+        <Geometry x:Key="TvIconDown">M7.41,8.59L12,13.17L16.59,8.59L18,10L12,16L6,10L7.41,8.59Z</Geometry>
+        <Geometry x:Key="TvIconLeft">M15.41,16.58L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.58Z</Geometry>
+        <Geometry x:Key="TvIconRight">M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z</Geometry>
+        <Geometry x:Key="TvIconRewind">M11.5,12L20,18V6M11,18V6L2.5,12L11,18Z</Geometry>
+        <Geometry x:Key="TvIconForward">M13,6V18L21.5,12M4,18L12.5,12L4,6V18Z</Geometry>
+        <Geometry x:Key="TvIconStop">M18,18H6V6H18V18Z</Geometry>
+
         <Style x:Key="TelemetryTile" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource SidebarBgBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource Ink08Brush}" />
@@ -347,138 +356,43 @@
             </Grid>
 
             <!-- ======================== REMOTE ======================== -->
-            <StackPanel Visibility="{Binding IsRemoteTab, Converter={StaticResource TvBoolToVis}}">
-                <Border Style="{StaticResource SurfaceCard}" Margin="{skin:Space 0,0,0,14}">
-                    <StackPanel>
-                        <TextBlock Text="VIRTUAL MAGIC REMOTE (POINTER SOCKET)" FontSize="{DynamicResource FontSize03}" FontWeight="Bold" Foreground="{DynamicResource TextFaintBrush}" Margin="{skin:Space 0,0,0,10}" />
-
-                        <!-- D-Pad + Side Nav Keys -->
-                        <Grid Margin="{skin:Space 0,0,0,10}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="{skin:Size 12}" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <!-- Tactile 3x3 D-Pad -->
-                            <Border Grid.Column="0" Background="{DynamicResource SidebarBgBrush}" BorderBrush="{DynamicResource Ink08Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius05}" Padding="{skin:Space 8}">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="{skin:Size 5}" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="{skin:Size 5}" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="{skin:Size 5}" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="{skin:Size 5}" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-
-                                    <Button Grid.Row="0" Grid.Column="2" Content="▲" Command="{Binding SendButtonCommand}" CommandParameter="UP" Style="{StaticResource DPadBtn}" />
-                                    <Button Grid.Row="2" Grid.Column="0" Content="◄" Command="{Binding SendButtonCommand}" CommandParameter="LEFT" Style="{StaticResource DPadBtn}" />
-                                    <Button Grid.Row="2" Grid.Column="2" Content="OK" Command="{Binding SendButtonCommand}" CommandParameter="ENTER" Style="{StaticResource TvPrimaryBtn}" Width="{skin:Size 44}" Height="{skin:Size 36}" Padding="0" FontSize="{DynamicResource FontSize05}" />
-                                    <Button Grid.Row="2" Grid.Column="4" Content="►" Command="{Binding SendButtonCommand}" CommandParameter="RIGHT" Style="{StaticResource DPadBtn}" />
-                                    <Button Grid.Row="4" Grid.Column="2" Content="▼" Command="{Binding SendButtonCommand}" CommandParameter="DOWN" Style="{StaticResource DPadBtn}" />
-                                </Grid>
+            <!-- One card: the TV screen on the left; on the right the remote buttons or the trackpad (the person picks),
+                 and one keyboard line for both. -->
+            <Border Style="{StaticResource SurfaceCard}" Visibility="{Binding IsRemoteTab, Converter={StaticResource TvBoolToVis}}">
+                <StackPanel>
+                    <Grid Margin="{skin:Space 0,0,0,10}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="{skin:Size 12}" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="TV SCREEN" FontSize="{DynamicResource FontSize03}" FontWeight="Bold" Foreground="{DynamicResource TextFaintBrush}" VerticalAlignment="Center" />
+                            <Border Background="{DynamicResource Ink05Brush}" BorderBrush="{DynamicResource Ink12Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 7,1.5}" Margin="{skin:Space 8,0,0,0}" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding PreviewStatusText}" FontSize="{DynamicResource FontSize02}" Foreground="{DynamicResource AccentCyanBrightBrush}" />
                             </Border>
-
-                            <!-- Quick Remote Keys -->
-                            <WrapPanel Grid.Column="2" VerticalAlignment="Center">
-                                <Button Content="Home" Command="{Binding SendButtonCommand}" CommandParameter="HOME" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,6,6}" />
-                                <Button Content="Back" Command="{Binding SendButtonCommand}" CommandParameter="BACK" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,6,6}" />
-                                <Button Content="Exit" Command="{Binding SendButtonCommand}" CommandParameter="EXIT" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,6,6}" />
-                                <Button Content="Settings" Command="{Binding LaunchAppCommand}" CommandParameter="settings" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,6,6}" ToolTip="Open LG webOS TV Settings" />
-                                <Button Content="Info" Command="{Binding SendButtonCommand}" CommandParameter="INFO" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,6,6}" />
-                                <Button Content="Guide" Command="{Binding SendButtonCommand}" CommandParameter="GUIDE" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,6,6}" />
-                                <Button Content="Ch ▲" Command="{Binding SendButtonCommand}" CommandParameter="CHANNELUP" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,6,6}" />
-                                <Button Content="Ch ▼" Command="{Binding SendButtonCommand}" CommandParameter="CHANNELDOWN" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,6,6}" />
-                            </WrapPanel>
-                        </Grid>
-
-                        <!-- Media Transport -->
-                        <WrapPanel Margin="{skin:Space 0,0,0,12}">
-                            <Button Content="⏮ Rew" Command="{Binding SendMediaCommand}" CommandParameter="rewind" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,6,4}" />
-                            <Button Content="▶ Play" Command="{Binding SendMediaCommand}" CommandParameter="play" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,6,4}" />
-                            <Button Content="⏸ Pause" Command="{Binding SendMediaCommand}" CommandParameter="pause" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,6,4}" />
-                            <Button Content="⏹ Stop" Command="{Binding SendMediaCommand}" CommandParameter="stop" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,6,4}" />
-                            <Button Content="⏭ FF" Command="{Binding SendMediaCommand}" CommandParameter="fastforward" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,0,4}" />
+                        </StackPanel>
+                        <WrapPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <CheckBox Content="Auto-Refresh"
+                                      IsChecked="{Binding AutoRefreshPreview, Mode=TwoWay}"
+                                      Foreground="{DynamicResource TextSoftBrush}"
+                                      FontSize="{DynamicResource FontSize05}"
+                                      VerticalAlignment="Center"
+                                      Margin="{skin:Space 0,0,10,0}"
+                                      ToolTip="Refresh the TV screen picture (every 1 s while you use the trackpad, else every 2.5 s; only on this tab)" />
+                            <Button Content="TV Settings" Command="{Binding LaunchAppCommand}" CommandParameter="settings" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,6,0}" ToolTip="Open the TV's own settings" />
+                            <Button Content="Snap Now" Command="{Binding CapturePreviewCommand}" Style="{StaticResource TvPrimaryBtn}" Padding="{skin:Space 12,5.5}" FontSize="{DynamicResource FontSize05}" />
                         </WrapPanel>
+                    </Grid>
 
-                        <TextBlock Text="PC KEYBOARD → TV SEARCH / INPUT FIELD" FontSize="{DynamicResource FontSize02}" FontWeight="Bold" Foreground="{DynamicResource TextFaintBrush}" Margin="{skin:Space 0,0,0,4}" />
-                        <Grid Margin="{skin:Space 0,0,0,10}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="{skin:Size 6}" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="{skin:Size 5}" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBox Grid.Column="0" Text="{Binding KeyboardText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TvInput}" Tag="Type here &amp; press Enter to send to TV..." ToolTip="Focus any search box on the TV, type here, and press Enter">
-                                <TextBox.InputBindings>
-                                    <KeyBinding Key="Return" Command="{Binding SendKeyboardCommand}" />
-                                </TextBox.InputBindings>
-                            </TextBox>
-                            <Button Grid.Column="2" Content="Send ↵" Command="{Binding SendKeyboardCommand}" Style="{StaticResource TvBtn}" Padding="{skin:Space 10,5}" />
-                            <Button Grid.Column="4" Content="⌫" Command="{Binding BackspaceKeyboardCommand}" Style="{StaticResource TvBtn}" Padding="{skin:Space 9,5}" ToolTip="Delete 1 character on TV keyboard" />
-                        </Grid>
-                    </StackPanel>
-                </Border>
-                <Border Style="{StaticResource SurfaceCard}" Margin="{skin:Space 0,0,0,14}">
-                    <StackPanel>
-                        <Grid Margin="{skin:Space 0,0,0,10}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="{skin:Size 12}" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="LIVE TV SCREEN &amp; VIRTUAL TRACKPAD" FontSize="{DynamicResource FontSize03}" FontWeight="Bold" Foreground="{DynamicResource TextFaintBrush}" VerticalAlignment="Center" />
-                                    <Border Background="{DynamicResource Ink05Brush}" BorderBrush="{DynamicResource Ink12Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 7,1.5}" Margin="{skin:Space 8,0,0,0}">
-                                        <TextBlock Text="{Binding PreviewStatusText}" FontSize="{DynamicResource FontSize02}" Foreground="{DynamicResource AccentCyanBrightBrush}" />
-                                    </Border>
-                                </StackPanel>
-                            </StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.38*" />
+                            <ColumnDefinition Width="{skin:Size 14}" />
+                            <ColumnDefinition Width="0.62*" MinWidth="{skin:Size 300}" />
+                        </Grid.ColumnDefinitions>
 
-                            <WrapPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                <CheckBox Content="Auto-Refresh"
-                                          IsChecked="{Binding AutoRefreshPreview, Mode=TwoWay}"
-                                          Foreground="{DynamicResource TextSoftBrush}"
-                                          FontSize="{DynamicResource FontSize05}"
-                                          VerticalAlignment="Center"
-                                          Margin="{skin:Space 0,0,10,0}"
-                                          ToolTip="Automatically refresh the live TV preview (1s while actively using the trackpad, 2.5s idle; pauses when tab is hidden)" />
-                                <Button Content="TV Settings"
-                                        Command="{Binding LaunchAppCommand}"
-                                        CommandParameter="settings"
-                                        Style="{StaticResource TvChipBtn}"
-                                        Margin="{skin:Space 0,0,6,0}"
-                                        ToolTip="Open LG webOS TV Settings directly" />
-                                <Button Content="Center Cursor"
-                                        Command="{Binding RecalibrateCursorCommand}"
-                                        Style="{StaticResource TvChipBtn}"
-                                        Margin="{skin:Space 0,0,6,0}"
-                                        ToolTip="Recalibrate LG Magic Remote pointer to the center of the TV screen" />
-                                <Button Content="Snap Now"
-                                        Command="{Binding CapturePreviewCommand}"
-                                        Style="{StaticResource TvPrimaryBtn}"
-                                        Padding="{skin:Space 12,5.5}"
-                                        FontSize="{DynamicResource FontSize05}" />
-                            </WrapPanel>
-                        </Grid>
-
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1.38*" />
-                                <ColumnDefinition Width="{skin:Size 14}" />
-                                <ColumnDefinition Width="0.62*" />
-                            </Grid.ColumnDefinitions>
-
-                            <!-- Left: Clickable 16:9 Live TV Preview + Browser URL Bar -->
+                        <!-- Left: the TV screen (click to point) and the browser line -->
                             <StackPanel Grid.Column="0">
                                 <Border x:Name="PreviewSurface"
                                         Background="{DynamicResource ChassisBgBrush}"
@@ -555,85 +469,135 @@
                                 </Grid>
                             </StackPanel>
 
-                            <!-- Right: Precision Virtual Trackpad + Quick Type -->
-                            <Grid Grid.Column="2">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="*" />
-                                    <RowDefinition Height="{skin:Size 8}" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="{skin:Size 8}" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-
-                                <Border x:Name="TrackpadSurface"
-                                        Grid.Row="0"
-                                        Background="{DynamicResource Ink03Brush}"
-                                        BorderBrush="{DynamicResource Ink12Brush}"
-                                        BorderThickness="1"
-                                        CornerRadius="{DynamicResource Radius05}"
-                                        Cursor="Hand"
-                                        MinHeight="{skin:Size 168}"
-                                        MouseLeftButtonDown="Trackpad_MouseLeftButtonDown"
-                                        MouseMove="Trackpad_MouseMove"
-                                        MouseLeftButtonUp="Trackpad_MouseLeftButtonUp"
-                                        MouseRightButtonDown="Trackpad_MouseRightButtonDown"
-                                        MouseWheel="Trackpad_MouseWheel"
-                                        ToolTip="Drag to steer Magic Remote pointer • Tap to click • Right-click = Back • Wheel = Scroll">
-                                    <Grid>
-                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="{skin:Space 14}" IsHitTestVisible="False">
-                                            <TextBlock Text="VIRTUAL TRACKPAD"
-                                                       FontSize="{DynamicResource FontSize04}"
-                                                       FontWeight="Bold"
-                                                       Foreground="{DynamicResource AccentCyanBrightBrush}"
-                                                       HorizontalAlignment="Center"
-                                                       Margin="{skin:Space 0,0,0,6}" />
-                                            <TextBlock x:Name="TrackpadHintText"
-                                                       Text="Hold &amp; drag to move pointer&#x0a;Click to select • Right-click Back&#x0a;Scroll wheel to scroll page"
-                                                       FontSize="{DynamicResource FontSize04}"
-                                                       Foreground="{DynamicResource TextFaintBrush}"
-                                                       TextAlignment="Center"
-                                                       LineHeight="17" />
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-
-                                <UniformGrid Grid.Row="2" Columns="5">
-                                    <Button Content="Click" Command="{Binding PointerClickCommand}" Style="{StaticResource TvPrimaryBtn}" Padding="{skin:Space 4,5.5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,4,0}" />
-                                    <Button Content="Back" Command="{Binding SendButtonCommand}" CommandParameter="BACK" Style="{StaticResource TvChipBtn}" Padding="{skin:Space 4,5.5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,4,0}" />
-                                    <Button Content="Home" Command="{Binding SendButtonCommand}" CommandParameter="HOME" Style="{StaticResource TvChipBtn}" Padding="{skin:Space 4,5.5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,4,0}" />
-                                    <Button Content="▲" Command="{Binding PointerScrollCommand}" CommandParameter="up" Style="{StaticResource TvChipBtn}" Padding="{skin:Space 4,5.5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,4,0}" ToolTip="Scroll Up" />
-                                    <Button Content="▼" Command="{Binding PointerScrollCommand}" CommandParameter="down" Style="{StaticResource TvChipBtn}" Padding="{skin:Space 4,5.5}" FontSize="{DynamicResource FontSize04}" ToolTip="Scroll Down" />
-                                </UniformGrid>
-
-                                <!-- Inline Quick Type to TV -->
-                                <Grid Grid.Row="4">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="{skin:Size 5}" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox Grid.Column="0"
-                                             Text="{Binding KeyboardText, UpdateSourceTrigger=PropertyChanged}"
-                                             Style="{StaticResource TvInput}"
-                                             Padding="{skin:Space 8,5}"
-                                             FontSize="{DynamicResource FontSize05}"
-                                             Tag="Quick type to TV &amp; Enter...">
-                                        <TextBox.InputBindings>
-                                            <KeyBinding Key="Return" Command="{Binding SendKeyboardCommand}" />
-                                        </TextBox.InputBindings>
-                                    </TextBox>
-                                    <Button Grid.Column="2"
-                                            Content="Send ↵"
-                                            Command="{Binding SendKeyboardCommand}"
-                                            Style="{StaticResource TvBtn}"
-                                            Padding="{skin:Space 9,5}"
-                                            FontSize="{DynamicResource FontSize04}" />
-                                </Grid>
+                        <!-- Right: Remote or Trackpad, then the keyboard line -->
+                        <StackPanel Grid.Column="2">
+                            <Grid Margin="{skin:Space 0,0,0,10}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                    <RadioButton Content="Remote" GroupName="TvRemotePanel" IsChecked="{Binding IsButtonsPanel}" Style="{StaticResource TvTab}" ToolTip="Arrow keys, OK, Home, Back and media keys" />
+                                    <RadioButton Content="Trackpad" GroupName="TvRemotePanel" IsChecked="{Binding IsTrackpadPanel}" Style="{StaticResource TvTab}" ToolTip="Move the Magic Remote pointer" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Center Cursor" Command="{Binding RecalibrateCursorCommand}" Style="{StaticResource TvChipBtn}" VerticalAlignment="Center"
+                                        Visibility="{Binding IsTrackpadPanel, Converter={StaticResource TvBoolToVis}}"
+                                        ToolTip="Put the Magic Remote pointer in the middle of the TV screen" />
                             </Grid>
-                        </Grid>
-                    </StackPanel>
-                </Border>
-            </StackPanel>
+
+                            <!-- Remote: D-pad with the keys beside it, media keys below -->
+                            <StackPanel Visibility="{Binding IsButtonsPanel, Converter={StaticResource TvBoolToVis}}">
+                                <Grid Margin="{skin:Space 0,0,0,8}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="{skin:Size 12}" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Background="{DynamicResource SidebarBgBrush}" BorderBrush="{DynamicResource Ink08Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius05}" Padding="{skin:Space 7}" VerticalAlignment="Top">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="{skin:Size 5}" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="{skin:Size 5}" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="{skin:Size 5}" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="{skin:Size 5}" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Button Grid.Row="0" Grid.Column="2" Command="{Binding SendButtonCommand}" CommandParameter="UP" Style="{StaticResource DPadBtn}" ToolTip="Up" AutomationProperties.Name="Up"><Path Data="{StaticResource TvIconUp}" Width="{skin:Size 14}" Height="{skin:Size 14}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" /></Button>
+                                            <Button Grid.Row="2" Grid.Column="0" Command="{Binding SendButtonCommand}" CommandParameter="LEFT" Style="{StaticResource DPadBtn}" ToolTip="Left" AutomationProperties.Name="Left"><Path Data="{StaticResource TvIconLeft}" Width="{skin:Size 14}" Height="{skin:Size 14}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" /></Button>
+                                            <Button Grid.Row="2" Grid.Column="2" Content="OK" Command="{Binding SendButtonCommand}" CommandParameter="ENTER" Style="{StaticResource TvPrimaryBtn}" Width="{skin:Size 44}" Height="{skin:Size 36}" Padding="0" FontSize="{DynamicResource FontSize05}" />
+                                            <Button Grid.Row="2" Grid.Column="4" Command="{Binding SendButtonCommand}" CommandParameter="RIGHT" Style="{StaticResource DPadBtn}" ToolTip="Right" AutomationProperties.Name="Right"><Path Data="{StaticResource TvIconRight}" Width="{skin:Size 14}" Height="{skin:Size 14}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" /></Button>
+                                            <Button Grid.Row="4" Grid.Column="2" Command="{Binding SendButtonCommand}" CommandParameter="DOWN" Style="{StaticResource DPadBtn}" ToolTip="Down" AutomationProperties.Name="Down"><Path Data="{StaticResource TvIconDown}" Width="{skin:Size 14}" Height="{skin:Size 14}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" /></Button>
+                                        </Grid>
+                                    </Border>
+                                    <UniformGrid Grid.Column="2" Columns="2" VerticalAlignment="Top">
+                                        <Button Content="Home" Command="{Binding SendButtonCommand}" CommandParameter="HOME" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,5,5}" />
+                                        <Button Content="Back" Command="{Binding SendButtonCommand}" CommandParameter="BACK" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,5,5}" />
+                                        <Button Content="Exit" Command="{Binding SendButtonCommand}" CommandParameter="EXIT" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,5,5}" />
+                                        <Button Content="Info" Command="{Binding SendButtonCommand}" CommandParameter="INFO" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,5,5}" />
+                                        <Button Content="Guide" Command="{Binding SendButtonCommand}" CommandParameter="GUIDE" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,5,5}" />
+                                        <Button Content="Settings" Command="{Binding LaunchAppCommand}" CommandParameter="settings" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,5,5}" ToolTip="Open the TV's own settings" />
+                                        <Button Content="Ch +" Command="{Binding SendButtonCommand}" CommandParameter="CHANNELUP" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,5,5}" ToolTip="Next channel" />
+                                        <Button Content="Ch −" Command="{Binding SendButtonCommand}" CommandParameter="CHANNELDOWN" Style="{StaticResource TvChipBtn}" Margin="{skin:Space 0,0,5,5}" ToolTip="Previous channel" />
+                                    </UniformGrid>
+                                </Grid>
+                                <UniformGrid Columns="5">
+                                    <Button Command="{Binding SendMediaCommand}" CommandParameter="rewind" Style="{StaticResource TvChipBtn}" Padding="{skin:Space 0,7}" Margin="{skin:Space 0,0,5,0}" ToolTip="Rewind" AutomationProperties.Name="Rewind"><Path Data="{StaticResource TvIconRewind}" Width="{skin:Size 13}" Height="{skin:Size 13}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" /></Button>
+                                    <Button Command="{Binding SendMediaCommand}" CommandParameter="play" Style="{StaticResource TvChipBtn}" Padding="{skin:Space 0,7}" Margin="{skin:Space 0,0,5,0}" ToolTip="Play" AutomationProperties.Name="Play"><Path Data="{DynamicResource IconPlay}" Width="{skin:Size 13}" Height="{skin:Size 13}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" /></Button>
+                                    <Button Command="{Binding SendMediaCommand}" CommandParameter="pause" Style="{StaticResource TvChipBtn}" Padding="{skin:Space 0,7}" Margin="{skin:Space 0,0,5,0}" ToolTip="Pause" AutomationProperties.Name="Pause"><Path Data="{DynamicResource IconPause}" Width="{skin:Size 13}" Height="{skin:Size 13}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" /></Button>
+                                    <Button Command="{Binding SendMediaCommand}" CommandParameter="stop" Style="{StaticResource TvChipBtn}" Padding="{skin:Space 0,7}" Margin="{skin:Space 0,0,5,0}" ToolTip="Stop" AutomationProperties.Name="Stop"><Path Data="{StaticResource TvIconStop}" Width="{skin:Size 13}" Height="{skin:Size 13}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" /></Button>
+                                    <Button Command="{Binding SendMediaCommand}" CommandParameter="fastforward" Style="{StaticResource TvChipBtn}" Padding="{skin:Space 0,7}" Margin="{skin:Space 0,0,0,0}" ToolTip="Fast forward" AutomationProperties.Name="Fast forward"><Path Data="{StaticResource TvIconForward}" Width="{skin:Size 13}" Height="{skin:Size 13}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" /></Button>
+                                </UniformGrid>
+                            </StackPanel>
+
+                            <!-- Trackpad: drag to point, tap to click -->
+                            <StackPanel Visibility="{Binding IsTrackpadPanel, Converter={StaticResource TvBoolToVis}}">
+                                    <Border x:Name="TrackpadSurface"
+                                            Background="{DynamicResource Ink03Brush}"
+                                            BorderBrush="{DynamicResource Ink12Brush}"
+                                            BorderThickness="1"
+                                            CornerRadius="{DynamicResource Radius05}"
+                                            Cursor="Hand"
+                                            Height="{skin:Size 172}"
+                                            MouseLeftButtonDown="Trackpad_MouseLeftButtonDown"
+                                            MouseMove="Trackpad_MouseMove"
+                                            MouseLeftButtonUp="Trackpad_MouseLeftButtonUp"
+                                            MouseRightButtonDown="Trackpad_MouseRightButtonDown"
+                                            MouseWheel="Trackpad_MouseWheel"
+                                            ToolTip="Drag to steer Magic Remote pointer • Tap to click • Right-click = Back • Wheel = Scroll">
+                                        <Grid>
+                                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="{skin:Space 14}" IsHitTestVisible="False">
+                                                <TextBlock Text="VIRTUAL TRACKPAD"
+                                                           FontSize="{DynamicResource FontSize04}"
+                                                           FontWeight="Bold"
+                                                           Foreground="{DynamicResource AccentCyanBrightBrush}"
+                                                           HorizontalAlignment="Center"
+                                                           Margin="{skin:Space 0,0,0,6}" />
+                                                <TextBlock x:Name="TrackpadHintText"
+                                                           Text="Hold &amp; drag to move pointer&#x0a;Click to select • Right-click Back&#x0a;Scroll wheel to scroll page"
+                                                           FontSize="{DynamicResource FontSize04}"
+                                                           Foreground="{DynamicResource TextFaintBrush}"
+                                                           TextAlignment="Center"
+                                                           LineHeight="17" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                    <UniformGrid Columns="5" Margin="{skin:Space 0,8,0,0}">
+                                        <Button Content="Click" Command="{Binding PointerClickCommand}" Style="{StaticResource TvPrimaryBtn}" Padding="{skin:Space 4,5.5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,4,0}" />
+                                        <Button Content="Back" Command="{Binding SendButtonCommand}" CommandParameter="BACK" Style="{StaticResource TvChipBtn}" Padding="{skin:Space 4,5.5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,4,0}" />
+                                        <Button Content="Home" Command="{Binding SendButtonCommand}" CommandParameter="HOME" Style="{StaticResource TvChipBtn}" Padding="{skin:Space 4,5.5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,4,0}" />
+                                        <Button Command="{Binding PointerScrollCommand}" CommandParameter="up" Style="{StaticResource TvChipBtn}" Padding="{skin:Space 4,5.5}" Margin="{skin:Space 0,0,4,0}" ToolTip="Scroll up" AutomationProperties.Name="Scroll up"><Path Data="{StaticResource TvIconUp}" Width="{skin:Size 13}" Height="{skin:Size 13}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" /></Button>
+                                        <Button Command="{Binding PointerScrollCommand}" CommandParameter="down" Style="{StaticResource TvChipBtn}" Padding="{skin:Space 4,5.5}" ToolTip="Scroll down" AutomationProperties.Name="Scroll down"><Path Data="{StaticResource TvIconDown}" Width="{skin:Size 13}" Height="{skin:Size 13}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" /></Button>
+                                    </UniformGrid>
+                            </StackPanel>
+
+                            <!-- Keyboard: for a search box on the TV, with either panel -->
+                            <Grid Margin="{skin:Space 0,10,0,0}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="{skin:Size 6}" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="{skin:Size 5}" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Grid.Column="0" Text="{Binding KeyboardText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TvInput}" Tag="Type to the TV and press Enter" ToolTip="Select a search box on the TV, type here, and press Enter">
+                                    <TextBox.InputBindings>
+                                        <KeyBinding Key="Return" Command="{Binding SendKeyboardCommand}" />
+                                    </TextBox.InputBindings>
+                                </TextBox>
+                                <Button Grid.Column="2" Content="Send" Command="{Binding SendKeyboardCommand}" Style="{StaticResource TvBtn}" Padding="{skin:Space 10,5}" />
+                                <Button Grid.Column="4" Content="⌫" Command="{Binding BackspaceKeyboardCommand}" Style="{StaticResource TvBtn}" Padding="{skin:Space 9,5}" ToolTip="Delete one character on the TV" AutomationProperties.Name="Delete one character" />
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
 
             <!-- ======================== APPS ======================== -->
             <StackPanel Visibility="{Binding IsAppsTab, Converter={StaticResource TvBoolToVis}}">

@@ -4,6 +4,14 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **The Remote tab is one compact card.** The TV screen is on the left. On the right you choose "Remote" (the D-pad
+  with Home, Back, Exit, Info, Guide, Settings and the channel keys beside it, media keys below) or "Trackpad". One
+  keyboard line serves both. The arrows and media keys have icons instead of text symbols. The page keeps your
+  choice for the next visit.
+
 ## [2.10.17] - 2026-11-28
 
 ### Changed
