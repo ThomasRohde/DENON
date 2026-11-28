@@ -275,8 +275,12 @@ public sealed class AppSettingsStore
                 throw new JsonException("Settings file deserialized to null.");
             }
 
-            // A missing, empty or redacted token gets a new one in Normalize: save it, or it changes on every start.
-            var tokensToSave = IsRedactedOrEmpty(settings.Mcp?.BearerToken) ||
+            // A missing, empty or redacted token gets a new one: save it, or it changes on every start. A missing key
+            // is not seen on the object (deserialization fills in a generated default), so look at the text too.
+            var tokensToSave = !rawJson.Contains("\"bearerToken\"", StringComparison.OrdinalIgnoreCase) ||
+                               !rawJson.Contains("\"ownerToken\"", StringComparison.OrdinalIgnoreCase) ||
+                               !rawJson.Contains("\"guestToken\"", StringComparison.OrdinalIgnoreCase) ||
+                               IsRedactedOrEmpty(settings.Mcp?.BearerToken) ||
                                IsRedactedOrEmpty(settings.Remote?.OwnerToken) ||
                                IsRedactedOrEmpty(settings.Remote?.GuestToken);
             var normalized = Normalize(settings, seedDefaultsIfEmpty: false);

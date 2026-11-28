@@ -136,6 +136,32 @@ public sealed class MediaRelayCoreTests : IDisposable
         Assert.NotNull(settings.Ui);
     }
 
+    [Theory]
+    [InlineData("abc")]
+    [InlineData("-5")]
+    [InlineData("99999999999")]
+    public async Task An_unreadable_content_length_counts_as_too_large(string length)
+    {
+        var request = Encoding.ASCII.GetBytes($"POST /api/volume HTTP/1.1\r\nHost: 192.168.1.31:18925\r\nContent-Length: {length}\r\n\r\n{{}}");
+        await using var stream = new MemoryStream(request);
+
+        var parsed = await LocalAudioRelayServer.ReadHttpRequestAsync(stream, CancellationToken.None);
+
+        Assert.NotNull(parsed);
+        Assert.True(parsed.BodyTooLarge);
+    }
+
+    [Fact]
+    public async Task A_file_without_an_mcp_section_saves_the_new_token_once()
+    {
+        var path = Path.Combine(_tempDir, "no-mcp.json");
+        File.WriteAllText(path, """{ "receiver": { "host": "192.168.1.3" }, "remote": { "ownerToken": "own_a", "guestToken": "gst_b" } }""");
+        var first = await new AppSettingsStore(new AppLogStore(Path.Combine(_tempDir, "m1.log")), path).InitializeAsync();
+        var second = await new AppSettingsStore(new AppLogStore(Path.Combine(_tempDir, "m2.log")), path).InitializeAsync();
+
+        Assert.Equal(first.Mcp.BearerToken, second.Mcp.BearerToken);
+    }
+
     [Fact]
     public async Task An_empty_token_gets_a_new_one_that_is_saved_once()
     {

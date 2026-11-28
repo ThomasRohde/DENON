@@ -729,7 +729,12 @@ public sealed class YouTubeQueueService : IDisposable
             {
                 _logStore.Warning($"YouTube queue auto-advance failed: {ex.Message}");
             }
-        }, cts.Token);
+            finally
+            {
+                // The task owns its source; others only cancel it.
+                cts.Dispose();
+            }
+        }, CancellationToken.None);
     }
 
     private void OnNonRelaySourceActivated()

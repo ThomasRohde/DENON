@@ -1015,7 +1015,11 @@ public sealed class LocalAudioRelayServer : IDisposable
             }
             else if (lines[i].StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
             {
-                _ = int.TryParse(lines[i]["Content-Length:".Length..].Trim(), out contentLength);
+                // An unreadable or negative length is refused like a too-large body, not read as 0.
+                if (!int.TryParse(lines[i]["Content-Length:".Length..].Trim(), out contentLength) || contentLength < 0)
+                {
+                    contentLength = int.MaxValue;
+                }
             }
             else if (lines[i].StartsWith("Origin:", StringComparison.OrdinalIgnoreCase))
             {

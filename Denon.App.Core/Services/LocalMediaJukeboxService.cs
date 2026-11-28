@@ -573,7 +573,12 @@ public sealed class LocalMediaJukeboxService : IDisposable
             {
                 _logStore.Warning($"Local Jukebox auto-advance failed: {ex.Message}");
             }
-        }, cts.Token);
+            finally
+            {
+                // The task owns its source; others only cancel it.
+                cts.Dispose();
+            }
+        }, CancellationToken.None);
     }
 
     private void OnLocalTrackPlaybackStarted(string token, DateTimeOffset startedAtUtc)
