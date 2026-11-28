@@ -240,6 +240,7 @@ public sealed partial class MainViewModel : ObservableObject
             DisplayVolumeInDb = !DisplayVolumeInDb;
             SettingsDisplayVolumeInDb = DisplayVolumeInDb;
             var newVal = DisplayVolumeInDb;
+            EditorFieldSaved(SettingsEditorValues.DisplayVolumeInDb, SettingsEditorValues.Text(newVal));
             _ = SaveVolumeDisplayModeAsync(newVal);
         });
 
@@ -312,6 +313,7 @@ public sealed partial class MainViewModel : ObservableObject
         InitializeStudioAndSync(lyricsService, calibrationService);
         InitializeMcpAndIntelligence(roomIntelligenceService, mcpServer);
         InitializeHelpGuide();
+        InitializeSettingsEditor();
         UpdateMeterCaptureRequest();
 
         LoadSettings(_settingsStore.Current);
@@ -328,7 +330,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         _stateStore.StateChanged += snapshot => _ = _dispatcher.InvokeAsync(() => ApplyStateSnapshot(snapshot));
-        _settingsStore.SettingsChanged += settings => _ = _dispatcher.InvokeAsync(() => LoadSettings(settings));
+        _settingsStore.SettingsChanged += OnStoreSettingsChanged;
         _telemetryLog.StatsChanged += () => _ = _dispatcher.InvokeAsync(RefreshTelemetryStats);
         RefreshTelemetryStats();
         _logStore.EntryAdded += entry => _ = _dispatcher.InvokeAsync(() =>
@@ -1311,55 +1313,83 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    private void LoadSettings(AppSettings settings)
+    /// <summary>
+    /// Loads saved settings into the editors. Only <paramref name="areas"/> are loaded into the Settings, Scenes and
+    /// Stations editors; the parts that are not edited there (automations, the theme, the deck presets) always follow
+    /// the saved settings. <paramref name="isNewBaseline"/> is false when the values are not saved (factory defaults).
+    /// </summary>
+    private void LoadSettings(AppSettings settings, SettingsEditorAreas areas = SettingsEditorAreas.All, bool isNewBaseline = true)
     {
-        SettingsHost = settings.Receiver.Host;
-        SettingsPort = settings.Receiver.Port.ToString();
-        SettingsPlayerName = settings.Receiver.PlayerName;
-        SettingsPollIntervalSeconds = settings.Receiver.PollIntervalSeconds.ToString();
-        SettingsLowVolume = settings.Receiver.DefaultLowVolume.ToString();
-        SettingsVolumePresetsText = string.Join(", ", settings.Receiver.VolumePresets);
-        SettingsStartMinimizedToTray = settings.Ui.StartMinimizedToTray;
-        SettingsMinimizeToTray = settings.Ui.MinimizeToTray;
-        SettingsCloseToTray = settings.Ui.CloseToTray;
-        SettingsShowNotifications = settings.Ui.ShowNotifications;
-        SettingsDisplayVolumeInDb = settings.Ui.DisplayVolumeInDb;
-        SettingsLaunchAtWindowsStartup = settings.Ui.LaunchAtWindowsStartup || _startupService.IsEnabled();
-        SettingsCheckForUpdates = settings.Ui.CheckForUpdates;
-        LoadRoomMicSettings(settings.Ui);
-        DisplayVolumeInDb = settings.Ui.DisplayVolumeInDb;
-        MarkActiveTheme(settings.Ui.Theme);
-        MarkActiveSkin(settings.Ui.Skin);
-
-        SettingsTelemetryEnabled = settings.Telemetry.Enabled;
-        SettingsTelemetryRetentionDays = settings.Telemetry.RetentionDays.ToString();
-        SettingsTelemetryMediaDwellSeconds = settings.Telemetry.MediaDwellSeconds.ToString();
-        RefreshTelemetryStats();
-
-        SettingsRelayPort = settings.Media.RelayPort.ToString();
-        SettingsFfmpegPath = settings.Media.FfmpegPath;
-        SettingsPreferFfmpegMp3 = settings.Media.PreferFfmpegMp3Transcode;
-        SettingsCinemaSyncOffsetMs = settings.Media.CinemaSyncOffsetMs.ToString();
-        RefreshFfmpegBadge();
-
-        LoadScenesFromSettings(settings);
-        LoadAutomationsFromSettings(settings);
-        LoadShortcutsFromSettings(settings);
-
-        RebuildVolumePresets(settings.Receiver.VolumePresets);
-
-        StationPresets.Clear();
-        foreach (var station in settings.Receiver.Stations)
+        _isLoadingEditor = true;
+        try
         {
-            StationPresets.Add(StationPresetEditor.FromModel(station));
+            if (areas.HasFlag(SettingsEditorAreas.Settings))
+            {
+                SettingsHost = settings.Receiver.Host;
+                SettingsPort = settings.Receiver.Port.ToString();
+                SettingsPlayerName = settings.Receiver.PlayerName;
+                SettingsPollIntervalSeconds = settings.Receiver.PollIntervalSeconds.ToString();
+                SettingsLowVolume = settings.Receiver.DefaultLowVolume.ToString();
+                SettingsVolumePresetsText = string.Join(", ", settings.Receiver.VolumePresets);
+                SettingsStartMinimizedToTray = settings.Ui.StartMinimizedToTray;
+                SettingsMinimizeToTray = settings.Ui.MinimizeToTray;
+                SettingsCloseToTray = settings.Ui.CloseToTray;
+                SettingsShowNotifications = settings.Ui.ShowNotifications;
+                SettingsDisplayVolumeInDb = settings.Ui.DisplayVolumeInDb;
+                SettingsLaunchAtWindowsStartup = settings.Ui.LaunchAtWindowsStartup || _startupService.IsEnabled();
+                SettingsCheckForUpdates = settings.Ui.CheckForUpdates;
+                SettingsTelemetryEnabled = settings.Telemetry.Enabled;
+                SettingsTelemetryRetentionDays = settings.Telemetry.RetentionDays.ToString();
+                SettingsTelemetryMediaDwellSeconds = settings.Telemetry.MediaDwellSeconds.ToString();
+                SettingsRelayPort = settings.Media.RelayPort.ToString();
+                SettingsFfmpegPath = settings.Media.FfmpegPath;
+                SettingsPreferFfmpegMp3 = settings.Media.PreferFfmpegMp3Transcode;
+                SettingsCinemaSyncOffsetMs = settings.Media.CinemaSyncOffsetMs.ToString();
+                LoadShortcutsFromSettings(settings);
+            }
+
+            // These save at once or only show the saved settings, so they always follow them.
+            LoadRoomMicSettings(settings.Ui);
+            DisplayVolumeInDb = settings.Ui.DisplayVolumeInDb;
+            MarkActiveTheme(settings.Ui.Theme);
+            MarkActiveSkin(settings.Ui.Skin);
+            RefreshTelemetryStats();
+            RefreshFfmpegBadge();
+            RebuildVolumePresets(settings.Receiver.VolumePresets);
+            LoadAutomationsFromSettings(settings);
+
+            if (areas.HasFlag(SettingsEditorAreas.Scenes))
+            {
+                LoadScenesFromSettings(settings);
+            }
+
+            if (areas.HasFlag(SettingsEditorAreas.Stations))
+            {
+                StationPresets.Clear();
+                foreach (var station in settings.Receiver.Stations)
+                {
+                    StationPresets.Add(StationPresetEditor.FromModel(station));
+                }
+
+                if (StationPresets.Count > 0 && SelectedStationPreset is null)
+                {
+                    SelectedStationPreset = StationPresets[0];
+                }
+
+                FilteredStationPresets.Refresh();
+            }
+        }
+        finally
+        {
+            _isLoadingEditor = false;
         }
 
-        if (StationPresets.Count > 0 && SelectedStationPreset is null)
+        if (isNewBaseline)
         {
-            SelectedStationPreset = StationPresets[0];
+            _editorState.Loaded(areas, SettingsEditorValues.FromSettings(settings), CaptureEditorValues());
         }
 
-        FilteredStationPresets.Refresh();
+        UpdateEditorDirtyFlags();
     }
 
     private void RebuildVolumePresets(IReadOnlyList<int> presets)
@@ -1930,14 +1960,14 @@ public sealed partial class MainViewModel : ObservableObject
 
             _startupService.SetEnabled(SettingsLaunchAtWindowsStartup, SettingsStartMinimizedToTray ? true : null);
             _receiverController.ResetConnections();
-            await _settingsStore.SaveEditorAsync(s =>
+            await SaveWithFullEditorReloadAsync(() => _settingsStore.SaveEditorAsync(s =>
             {
                 s.Receiver = settings.Receiver;
                 s.Ui.ApplyEditorFields(editorUi); // the latest theme, skin, placement and splash marker stay
                 s.Media = settings.Media;
                 s.Shortcuts = settings.Shortcuts;
                 s.Telemetry = settings.Telemetry;
-            });
+            }));
             saved = true;
             SettingsSaveProblem = string.Empty;
             RefreshTelemetryStats();
@@ -2017,8 +2047,9 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void LoadDefaultSettingsIntoEditor()
     {
-        LoadSettings(AppSettings.CreateDefault());
-        StatusMessage = "Factory defaults loaded into editor. Click Save Settings to apply.";
+        // The defaults are not saved yet, so the editors show them as unsaved changes.
+        LoadSettings(AppSettings.CreateDefault(), isNewBaseline: false);
+        StatusMessage = "Factory defaults loaded into editor. Click Save & Sync to apply.";
     }
 
     private void ExportSettings()
@@ -2062,7 +2093,7 @@ public sealed partial class MainViewModel : ObservableObject
         try
         {
             var json = await File.ReadAllTextAsync(dialog.FileName);
-            await _settingsStore.ImportJsonAsync(json);
+            await SaveWithFullEditorReloadAsync(() => _settingsStore.ImportJsonAsync(json));
             _receiverController.ResetConnections();
             StatusMessage = $"Settings imported from {Path.GetFileName(dialog.FileName)}.";
         }

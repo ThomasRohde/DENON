@@ -92,19 +92,14 @@ holds and the HEOS events are connected.
 
 ## Command palette and shortcuts (#76)
 
-Part 1 is done: the Ctrl+K palette (`Denon.App.Desktop/CommandPalette/`). It waits for PR 8 and PR 9 (they change
-MainWindow and MainViewModel), then:
+Done: the Ctrl+K palette (`Denon.App.Desktop/CommandPalette/`), Ctrl+K as a MainWindow key binding, Ctrl+1–0 in
+rail order from `PageShortcuts` (read from `CommandPalettePages.All`; the reserved gestures and Help use it too),
+and the unsaved-changes banner with scoped reloads (`SettingsEditorState`).
 
-- [ ] Bind Ctrl+K in `MainWindow` to `OpenCommandPaletteCommand` and delete the class handler in
-      `CommandPaletteHotkey` (a temporary hook so part 1 did not touch MainWindow).
-- [ ] Add Ctrl+K to the Help shortcut list (the reserved gestures have it since PR 9).
-- [ ] Ctrl+1–0 in nav rail order (Brain included), read from `CommandPalettePages.All`, synced with the reserved
-      gestures and Help.
-- [ ] Unsaved-changes banner (`IsSettingsDirty`) for Settings, Scenes and Stations, and a scoped `LoadSettings` so
-      saves of Automations or Volume Memory do not overwrite fields that are being edited.
-- [ ] PR 11 (accessibility): check the palette with Narrator (the status line is a polite live region).
-- [ ] Release after Ctrl+K is in the reserved gestures and Help. Until then a custom in-app shortcut on Ctrl+K
-      is swallowed by the palette.
+- [ ] PR 11 (accessibility): check the palette and the unsaved-changes banner with Narrator (the palette status
+      line and the banner text are polite live regions).
+- [ ] The Automations editor and the Brain page save at once and have no banner. If they get a Save button later,
+      add them as areas to `SettingsEditorAreas`.
 
 ## VU meters & RTA (follow the Denon)
 
