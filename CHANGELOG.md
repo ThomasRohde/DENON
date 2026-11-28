@@ -47,6 +47,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Ctrl+K is a normal key binding of the main window now (it was a temporary class handler). It does nothing while
   the shortcut recorder or the update panel is open.
 
+### Fixed
+- **Old runtime folders in %TEMP% are deleted.** Each app version and each local build left about 9 MB of native
+  DLLs in `%TEMP%\.net\<exe name>\` (or in `DOTNET_BUNDLE_EXTRACT_BASE_DIR`), and .NET never deletes them: over
+  100 folders, 1.2 GB, on a test PC. On start the app now deletes the old folders of its own exe in the background.
+  It keeps the folder it runs from, the folder of any other copy that runs, and folders less than 10 minutes old.
+  A folder with a file in use is left whole, and the cleanup stops when another copy of the app is starting.
+
 ## [2.10.30] - 2026-11-28
 
 ### Added
