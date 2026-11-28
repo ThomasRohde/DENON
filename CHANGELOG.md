@@ -4,6 +4,13 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **"Chromecast on this TV" really shows the choice.** In 2.10.14 the box was still empty after the device list
+  loaded. The list now keeps its entries and only updates their text, so the chosen entry stays selected. Checked
+  in the app: the box shows "Automatic (Stuen 2)", and picking a device saves it.
+
 ## [2.10.14] - 2026-11-28
 
 ### Fixed
