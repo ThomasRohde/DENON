@@ -439,6 +439,56 @@ public sealed class AutomationEventTests : IDisposable
     }
 
     [Fact]
+    public async Task The_live_tv_example_switches_again_when_hdmi_cec_pulls_the_tv_back()
+    {
+        var graph = AutomationGraph.CreateDefaults().Single(g => g.Id == "auto-tv-live");
+        var trigger = graph.Nodes.Single(n => n.Type == AutomationNodeTypes.TriggerEvent);
+        var powerOn = new RoomEvent(DateTimeOffset.Now, "tv", "smart-tv", "app.changed", "external",
+            new Dictionary<string, object?> { ["fromAppId"] = "", ["toAppId"] = "com.webos.app.hdmi1" });
+
+        // During the 10 s wait the receiver comes on and HDMI-CEC switches the TV back to HDMI 1.
+        var effects = new FakeEffects { Facts = new ReceiverFacts(true, "TV", false) };
+        var waits = 0;
+        effects.OnDelay = () =>
+        {
+            if (++waits == 2)
+            {
+                effects.Recent.Insert(0, new RoomEvent(DateTimeOffset.Now, "tv", "smart-tv", "app.changed", "external",
+                    new Dictionary<string, object?> { ["fromAppId"] = "com.webos.app.livetv", ["toAppId"] = "com.webos.app.hdmi1" }));
+            }
+        };
+        var run = await AutomationGraphRunner.RunAsync(graph, trigger, powerOn, "Event", effects, false, DateTimeOffset.Now, default);
+        Assert.Equal(["wait:4", "plugin:smart-tv:tv.livetv", "wait:10", "plugin:smart-tv:tv.livetv"], effects.Calls);
+
+        // No bounce, and the receiver is in standby: Live TV once, then the receiver on the TV input.
+        var quiet = new FakeEffects { Facts = new ReceiverFacts(false, "NET", false) };
+        await AutomationGraphRunner.RunAsync(graph, trigger, powerOn, "Event", quiet, false, DateTimeOffset.Now, default);
+        Assert.Equal(["wait:4", "plugin:smart-tv:tv.livetv", "wait:10", "receiver:power_on:", "receiver:input:TV"], quiet.Calls);
+
+        // A cast woke the TV: it keeps the cast, and the receiver still goes to the TV input.
+        var cast = new FakeEffects { Facts = new ReceiverFacts(true, "NET", false) };
+        cast.Recent.Add(new RoomEvent(DateTimeOffset.Now, "plugin:chromecast", "chromecast", "cast.app_started", "external", null));
+        await AutomationGraphRunner.RunAsync(graph, trigger, powerOn, "Event", cast, false, DateTimeOffset.Now, default);
+        Assert.Equal(["wait:4", "receiver:power_on:", "receiver:input:TV"], cast.Calls);
+
+        // A cast started after the first switch (HDMI 1 again for the cast): the cast stays.
+        var later = new FakeEffects { Facts = new ReceiverFacts(true, "TV", false) };
+        var laterWaits = 0;
+        later.OnDelay = () =>
+        {
+            if (++laterWaits == 2)
+            {
+                later.Recent.Insert(0, new RoomEvent(DateTimeOffset.Now, "plugin:chromecast", "chromecast", "cast.app_started", "external", null));
+                later.Recent.Insert(0, new RoomEvent(DateTimeOffset.Now, "tv", "smart-tv", "app.changed", "external",
+                    new Dictionary<string, object?> { ["fromAppId"] = "com.webos.app.livetv", ["toAppId"] = "com.webos.app.hdmi1" }));
+            }
+        };
+        await AutomationGraphRunner.RunAsync(graph, trigger, powerOn, "Event", later, false, DateTimeOffset.Now, default);
+        Assert.Equal(["wait:4", "plugin:smart-tv:tv.livetv", "wait:10"], later.Calls);
+        Assert.True(run.Success);
+    }
+
+    [Fact]
     public void Condition_StandbyOrIdle_PassesWhenHeosPlaysNothing()
     {
         var effects = new FakeEffects();

@@ -4,6 +4,15 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **"TV on → Live TV" holds Live TV and brings the receiver to the TV input.** On 2026-11-28 the TV woke, went to
+  Live TV, and 6 s later HDMI-CEC pulled it back to the Chromecast while the receiver came on. Now the automation
+  looks again 10 s after the switch: if the TV left Live TV and no cast started, it switches once more. Then it
+  turns the receiver on at the TV input. A cast or the Apple TV that woke the TV keeps its picture; the receiver
+  still goes to the TV input.
+
 ## [2.10.15] - 2026-11-28
 
 ### Fixed
