@@ -63,7 +63,6 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     private bool _screenOffOnMusicScene;
     private string _cecWakeCastDevice = string.Empty;
     private bool _isLoadingCastDevices;
-    private IReadOnlyList<CastDeviceOption> _castDeviceOptions = [new(string.Empty, "Automatic")];
 
     private bool _isLiveConnected;
     private string _connectionBadgeText = "STANDBY / OFFLINE";
@@ -130,14 +129,10 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     public ObservableCollection<LgTvAppInfo> FilteredApps { get; } = [];
 
     /// <summary>
-    /// "Automatic" and the Cast devices the Chromecast plugin knows, for "Chromecast on this TV". A load replaces the
-    /// whole list (not Clear and Add), so the box resets at once and then shows the choice again.
+    /// "Automatic" and the Cast devices the Chromecast plugin knows, for "Chromecast on this TV". A load updates the
+    /// entries in place: an entry that stays keeps its object, so the box does not lose the chosen one.
     /// </summary>
-    public IReadOnlyList<CastDeviceOption> CastDeviceOptions
-    {
-        get => _castDeviceOptions;
-        private set => Set(ref _castDeviceOptions, value);
-    }
+    public ObservableCollection<CastDeviceOption> CastDeviceOptions { get; } = [new(string.Empty, "Automatic")];
 
     public ICommand DiscoverCommand { get; }
     public ICommand AutoMacCommand { get; }
@@ -228,7 +223,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     /// </summary>
     public CastDeviceOption? SelectedCastDevice
     {
-        get => _castDeviceOptions.FirstOrDefault(o => o.Id.Equals(_cecWakeCastDevice, StringComparison.OrdinalIgnoreCase));
+        get => CastDeviceOptions.FirstOrDefault(o => o.Id.Equals(_cecWakeCastDevice, StringComparison.OrdinalIgnoreCase));
         set
         {
             if (value is null || _isLoadingCastDevices || value.Id.Equals(_cecWakeCastDevice, StringComparison.Ordinal))
@@ -395,6 +390,47 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
+    /// Makes the list match <paramref name="options"/> in order. An entry with the same id keeps its object and only
+    /// its label changes; others are removed or added.
+    /// </summary>
+    private void SyncCastDeviceOptions(IReadOnlyList<(string Id, string Label)> options)
+    {
+        for (var i = CastDeviceOptions.Count - 1; i >= 0; i--)
+        {
+            if (!options.Any(o => o.Id.Equals(CastDeviceOptions[i].Id, StringComparison.OrdinalIgnoreCase)))
+            {
+                CastDeviceOptions.RemoveAt(i);
+            }
+        }
+
+        for (var i = 0; i < options.Count; i++)
+        {
+            var (id, label) = options[i];
+            var at = -1;
+            for (var j = 0; j < CastDeviceOptions.Count; j++)
+            {
+                if (CastDeviceOptions[j].Id.Equals(id, StringComparison.OrdinalIgnoreCase))
+                {
+                    at = j;
+                    break;
+                }
+            }
+
+            if (at < 0)
+            {
+                CastDeviceOptions.Insert(i, new CastDeviceOption(id, label));
+                continue;
+            }
+
+            CastDeviceOptions[at].Label = label;
+            if (at != i)
+            {
+                CastDeviceOptions.Move(at, i);
+            }
+        }
+    }
+
+    /// <summary>
     /// Fills "Chromecast on this TV" from the Chromecast plugin. "Automatic" names the device it picks now. A chosen
     /// device the plugin no longer knows stays in the list, so the choice is not lost.
     /// </summary>
@@ -415,11 +451,11 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
             var chosen = _cecWakeCastDevice;
             var (auto, _) = SmartTvPlugin.PickCecCastDevice(null, devices);
             var autoName = devices?.FirstOrDefault(d => d.Id == auto)?.Name;
-            var options = new List<CastDeviceOption>
+            var options = new List<(string Id, string Label)>
             {
-                new(string.Empty, autoName is null ? "Automatic" : $"Automatic ({autoName})"),
+                (string.Empty, autoName is null ? "Automatic" : $"Automatic ({autoName})"),
             };
-            options.AddRange((devices ?? []).Select(d => new CastDeviceOption(d.Id, d.IsConnected ? d.Name : $"{d.Name} (offline)")));
+            options.AddRange((devices ?? []).Select(d => (d.Id, d.IsConnected ? d.Name : $"{d.Name} (offline)")));
 
             // The setting may hold a name or an IP (the plugin takes those too): it shows as its device.
             var device = chosen.Length == 0
@@ -432,13 +468,13 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
             }
             else if (chosen.Length > 0)
             {
-                options.Add(new CastDeviceOption(chosen, $"{chosen} (not found)"));
+                options.Add((chosen, $"{chosen} (not found)"));
             }
 
             _isLoadingCastDevices = true;
             try
             {
-                CastDeviceOptions = options;
+                SyncCastDeviceOptions(options);
             }
             finally
             {

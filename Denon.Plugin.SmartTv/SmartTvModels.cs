@@ -54,8 +54,33 @@ public sealed class SmartTvConfig
 /// <summary>A Cast device the Chromecast plugin knows: its id, its name, and whether it is online now.</summary>
 internal sealed record CastDeviceChoice(string Id, string Name, bool IsConnected);
 
-/// <summary>One entry of the "Chromecast on this TV" list on the Smart TV page. An empty id is "Automatic".</summary>
-public sealed record CastDeviceOption(string Id, string Label);
+/// <summary>
+/// One entry of the "Chromecast on this TV" list on the Smart TV page. An empty id is "Automatic". The entry stays
+/// the same object while the list reloads, and only its label changes, so the box keeps the chosen entry.
+/// </summary>
+public sealed class CastDeviceOption(string id, string label) : System.ComponentModel.INotifyPropertyChanged
+{
+    private string _label = label;
+
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+    public string Id { get; } = id;
+
+    public string Label
+    {
+        get => _label;
+        set
+        {
+            if (_label == value)
+            {
+                return;
+            }
+
+            _label = value;
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Label)));
+        }
+    }
+}
 
 /// <summary>A program from the TV's guide (DVB EIT), in real time (any day shift in the TV's guide removed).</summary>
 public sealed record LgTvProgram(string Name, DateTimeOffset Start, DateTimeOffset End);
