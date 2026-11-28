@@ -12,7 +12,7 @@ public sealed partial class ThemeTokenGuardTests
     private static readonly string[] SourceDirs =
     [
         "Denon.App.Desktop", "Denon.Plugin.HomeAssistant", "Denon.Plugin.PhilipsHue", "Denon.Plugin.SmartTv",
-        "external-plugins/Denon.Plugin.Chromecast", "external-plugins/Denon.Plugin.AppleTv",
+        "external-plugins/Denon.Plugin.Chromecast", "external-plugins/Denon.Plugin.AppleTv", "external-plugins/Denon.Plugin.HomePod",
     ];
 
     /// <summary>
@@ -36,6 +36,7 @@ public sealed partial class ThemeTokenGuardTests
         ["Denon.Plugin.PhilipsHue/ViewModels/HueDashboardViewModel.cs"] = "light and album-art preview colors (content)",
         ["external-plugins/Denon.Plugin.Chromecast/ChromecastPlugin.cs"] = "plugin identity color in the manifest",
         ["external-plugins/Denon.Plugin.AppleTv/AppleTvPlugin.cs"] = "plugin identity color in the manifest",
+        ["external-plugins/Denon.Plugin.HomePod/HomePodPlugin.cs"] = "plugin identity color in the manifest",
     };
 
     private static readonly string Root = FindRepoRoot();

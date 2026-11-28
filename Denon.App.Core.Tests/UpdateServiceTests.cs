@@ -10,16 +10,16 @@ public sealed class UpdateServiceTests
 {
     private const string Releases = """
         [
-          { "tag_name": "chromecast-v0.9.0", "draft": false, "prerelease": false, "body": "plugin", "html_url": "https://x/cc", "assets": [] },
-          { "tag_name": "v9.9.9", "draft": true, "prerelease": false, "body": "draft", "html_url": "https://x/draft", "assets": [] },
-          { "tag_name": "v3.0.0-beta", "draft": false, "prerelease": true, "body": "beta", "html_url": "https://x/beta", "assets": [] },
-          { "tag_name": "v2.9.0", "draft": false, "prerelease": false, "body": "older", "html_url": "https://x/290", "assets": [] },
-          { "tag_name": "v2.10.0", "draft": false, "prerelease": false, "body": "### Added\n- **New** thing", "html_url": "https://x/2100",
+          { "tag_name": "chromecast-v0.9.0", "draft": false, "prerelease": false, "body": "plugin", "html_url": "https://github.com/ThomasRohde/DENON/cc", "assets": [] },
+          { "tag_name": "v9.9.9", "draft": true, "prerelease": false, "body": "draft", "html_url": "https://github.com/ThomasRohde/DENON/draft", "assets": [] },
+          { "tag_name": "v3.0.0-beta", "draft": false, "prerelease": true, "body": "beta", "html_url": "https://github.com/ThomasRohde/DENON/beta", "assets": [] },
+          { "tag_name": "v2.9.0", "draft": false, "prerelease": false, "body": "older", "html_url": "https://github.com/ThomasRohde/DENON/290", "assets": [] },
+          { "tag_name": "v2.10.0", "draft": false, "prerelease": false, "body": "### Added\n- **New** thing", "html_url": "https://github.com/ThomasRohde/DENON/2100",
             "assets": [
-              { "name": "DenonDesktop-Setup-win-x64.exe", "browser_download_url": "https://x/setup.exe" },
-              { "name": "SHA256SUMS.txt", "browser_download_url": "https://x/sums.txt" }
+              { "name": "DenonDesktop-Setup-win-x64.exe", "browser_download_url": "https://github.com/ThomasRohde/DENON/setup.exe" },
+              { "name": "SHA256SUMS.txt", "browser_download_url": "https://github.com/ThomasRohde/DENON/sums.txt" }
             ] },
-          { "tag_name": "appletv-v0.4.0", "draft": false, "prerelease": false, "body": "plugin", "html_url": "https://x/atv", "assets": [] }
+          { "tag_name": "appletv-v0.4.0", "draft": false, "prerelease": false, "body": "plugin", "html_url": "https://github.com/ThomasRohde/DENON/atv", "assets": [] }
         ]
         """;
 
@@ -31,9 +31,9 @@ public sealed class UpdateServiceTests
         Assert.NotNull(latest);
         Assert.Equal("v2.10.0", latest.Tag); // numeric order: 2.10 is newer than 2.9; plugins, drafts and betas are skipped
         Assert.Equal("2.10.0", latest.Label);
-        Assert.Equal("https://x/setup.exe", latest.InstallerUrl);
-        Assert.Equal("https://x/sums.txt", latest.ChecksumsUrl);
-        Assert.Equal("https://x/2100", latest.PageUrl);
+        Assert.Equal("https://github.com/ThomasRohde/DENON/setup.exe", latest.InstallerUrl);
+        Assert.Equal("https://github.com/ThomasRohde/DENON/sums.txt", latest.ChecksumsUrl);
+        Assert.Equal("https://github.com/ThomasRohde/DENON/2100", latest.PageUrl);
     }
 
     [Fact]
@@ -82,6 +82,71 @@ public sealed class UpdateServiceTests
         Assert.Equal("Added\n• Website at site/, see the guide.\n\nFixed\n• A fix.", notes);
     }
 
+    [Fact]
+    public void Release_notes_leave_out_the_download_list()
+    {
+        var notes = UpdateService.PlainNotes("### Fixed\n- A fix.\n\n---\n\n### Downloads\n- Setup.exe\n\n### SHA-256 Checksums");
+
+        Assert.Equal("Fixed\n• A fix.", notes);
+    }
+
+    [Theory]
+    [InlineData("https://github.com/ThomasRohde/DENON/releases/download/v2.10.0/DenonDesktop-Setup-win-x64.exe", true)]
+    [InlineData("https://GitHub.com/thomasrohde/denon/releases/tag/v2.10.0", true)]
+    [InlineData("http://github.com/ThomasRohde/DENON/releases/download/v2.10.0/x.exe", false)]
+    [InlineData("https://github.com:8443/ThomasRohde/DENON/releases", false)]
+    [InlineData("https://user@github.com/ThomasRohde/DENON/releases", false)]
+    [InlineData("https://github.com/someone-else/DENON/releases/download/v2.10.0/x.exe", false)]
+    [InlineData("https://github.com.example.net/ThomasRohde/DENON/releases", false)]
+    [InlineData("https://example.net/ThomasRohde/DENON/releases", false)]
+    [InlineData("file:///C:/Windows/System32/calc.exe", false)]
+    [InlineData("javascript:alert(1)", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void Only_the_apps_own_github_addresses_are_trusted(string? url, bool trusted) =>
+        Assert.Equal(trusted, UpdateService.IsTrustedGitHubUrl(url));
+
+    [Fact]
+    public void Release_links_outside_the_apps_github_are_ignored()
+    {
+        const string json = """
+            [
+              { "tag_name": "v3.0.0", "draft": false, "prerelease": false, "body": "x", "html_url": "http://example.net/page",
+                "assets": [
+                  { "name": "DenonDesktop-Setup-win-x64.exe", "browser_download_url": "https://example.net/setup.exe" },
+                  { "name": "SHA256SUMS.txt", "browser_download_url": "https://github.com/ThomasRohde/DENON/releases/download/v3.0.0/SHA256SUMS.txt" }
+                ] }
+            ]
+            """;
+
+        var latest = UpdateService.PickLatest(json);
+
+        Assert.NotNull(latest);
+        Assert.Null(latest.InstallerUrl); // no installer: the app offers the release page instead
+        Assert.Equal(string.Empty, latest.PageUrl);
+        Assert.Equal("https://github.com/ThomasRohde/DENON/releases/download/v3.0.0/SHA256SUMS.txt", latest.ChecksumsUrl);
+    }
+
+    [Fact]
+    public void A_homepod_release_is_found_as_a_plugin_update()
+    {
+        const string json = """
+            [
+              { "tag_name": "homepod-v0.3.0", "draft": false, "prerelease": false, "body": "pod", "html_url": "https://github.com/ThomasRohde/DENON/releases/tag/homepod-v0.3.0",
+                "assets": [
+                  { "name": "Denon.Plugin.HomePod-0.3.0.zip", "browser_download_url": "https://github.com/ThomasRohde/DENON/releases/download/homepod-v0.3.0/Denon.Plugin.HomePod-0.3.0.zip" }
+                ] },
+              { "tag_name": "v2.10.0", "draft": false, "prerelease": false, "body": "app", "html_url": "https://github.com/ThomasRohde/DENON/releases/tag/v2.10.0", "assets": [] }
+            ]
+            """;
+
+        var update = Assert.Single(UpdateService.MatchPluginUpdates(json, [ExternalPlugin("homepod", "HomePod", "0.2.0")]));
+
+        Assert.Equal("homepod", update.PluginId);
+        Assert.Equal("0.3.0", update.LatestVersionLabel);
+        Assert.Equal("v2.10.0", UpdateService.PickLatest(json)?.Tag); // the plugin tag is never the app's release
+    }
+
     private static PluginRecordSnapshot ExternalPlugin(string id, string name, string version) => new()
     {
         Id = id,
@@ -106,21 +171,21 @@ public sealed class UpdateServiceTests
 
     private const string PluginReleases = """
         [
-          { "tag_name": "chromecast-v0.10.0", "draft": false, "prerelease": false, "body": "### Added\n- More Cast apps", "html_url": "https://x/cc-010",
+          { "tag_name": "chromecast-v0.10.0", "draft": false, "prerelease": false, "body": "### Added\n- More Cast apps", "html_url": "https://github.com/ThomasRohde/DENON/cc-010",
             "assets": [
-              { "name": "Denon.Plugin.Chromecast-0.10.0.zip", "browser_download_url": "https://x/cc-0.10.0.zip" },
-              { "name": "SHA256SUMS.txt", "browser_download_url": "https://x/cc-sums.txt" }
+              { "name": "Denon.Plugin.Chromecast-0.10.0.zip", "browser_download_url": "https://github.com/ThomasRohde/DENON/cc-0.10.0.zip" },
+              { "name": "SHA256SUMS.txt", "browser_download_url": "https://github.com/ThomasRohde/DENON/cc-sums.txt" }
             ] },
-          { "tag_name": "chromecast-v0.9.0", "draft": false, "prerelease": false, "body": "older", "html_url": "https://x/cc-09", "assets": [] },
-          { "tag_name": "chromecast-v9.0.0", "draft": true, "prerelease": false, "body": "draft", "html_url": "https://x/cc-draft", "assets": [] },
-          { "tag_name": "chromecast-v8.0.0", "draft": false, "prerelease": true, "body": "beta", "html_url": "https://x/cc-beta", "assets": [] },
-          { "tag_name": "appletv-v0.5.0", "draft": false, "prerelease": false, "body": "### Fixed\n- Grace period", "html_url": "https://x/atv-05",
+          { "tag_name": "chromecast-v0.9.0", "draft": false, "prerelease": false, "body": "older", "html_url": "https://github.com/ThomasRohde/DENON/cc-09", "assets": [] },
+          { "tag_name": "chromecast-v9.0.0", "draft": true, "prerelease": false, "body": "draft", "html_url": "https://github.com/ThomasRohde/DENON/cc-draft", "assets": [] },
+          { "tag_name": "chromecast-v8.0.0", "draft": false, "prerelease": true, "body": "beta", "html_url": "https://github.com/ThomasRohde/DENON/cc-beta", "assets": [] },
+          { "tag_name": "appletv-v0.5.0", "draft": false, "prerelease": false, "body": "### Fixed\n- Grace period", "html_url": "https://github.com/ThomasRohde/DENON/atv-05",
             "assets": [
-              { "name": "SHA256SUMS.txt", "browser_download_url": "https://x/atv-sums.txt" },
-              { "name": "Denon.Plugin.AppleTv-0.5.0.zip", "browser_download_url": "https://x/atv-0.5.0.zip" }
+              { "name": "SHA256SUMS.txt", "browser_download_url": "https://github.com/ThomasRohde/DENON/atv-sums.txt" },
+              { "name": "Denon.Plugin.AppleTv-0.5.0.zip", "browser_download_url": "https://github.com/ThomasRohde/DENON/atv-0.5.0.zip" }
             ] },
-          { "tag_name": "appletv-v0.4.0", "draft": false, "prerelease": false, "body": "older", "html_url": "https://x/atv-04", "assets": [] },
-          { "tag_name": "v2.10.0", "draft": false, "prerelease": false, "body": "app release", "html_url": "https://x/app", "assets": [] }
+          { "tag_name": "appletv-v0.4.0", "draft": false, "prerelease": false, "body": "older", "html_url": "https://github.com/ThomasRohde/DENON/atv-04", "assets": [] },
+          { "tag_name": "v2.10.0", "draft": false, "prerelease": false, "body": "app release", "html_url": "https://github.com/ThomasRohde/DENON/app", "assets": [] }
         ]
         """;
 
@@ -134,16 +199,16 @@ public sealed class UpdateServiceTests
         var cc = latest["chromecast"];
         Assert.Equal("chromecast-v0.10.0", cc.Tag);
         Assert.Equal("0.10.0", cc.Label);
-        Assert.Equal("https://x/cc-0.10.0.zip", cc.ZipUrl);
-        Assert.Equal("https://x/cc-sums.txt", cc.ChecksumsUrl);
-        Assert.Equal("https://x/cc-010", cc.PageUrl);
+        Assert.Equal("https://github.com/ThomasRohde/DENON/cc-0.10.0.zip", cc.ZipUrl);
+        Assert.Equal("https://github.com/ThomasRohde/DENON/cc-sums.txt", cc.ChecksumsUrl);
+        Assert.Equal("https://github.com/ThomasRohde/DENON/cc-010", cc.PageUrl);
 
         var atv = latest["apple-tv"];
         Assert.Equal("appletv-v0.5.0", atv.Tag);
         Assert.Equal("0.5.0", atv.Label);
-        Assert.Equal("https://x/atv-0.5.0.zip", atv.ZipUrl);
-        Assert.Equal("https://x/atv-sums.txt", atv.ChecksumsUrl);
-        Assert.Equal("https://x/atv-05", atv.PageUrl);
+        Assert.Equal("https://github.com/ThomasRohde/DENON/atv-0.5.0.zip", atv.ZipUrl);
+        Assert.Equal("https://github.com/ThomasRohde/DENON/atv-sums.txt", atv.ChecksumsUrl);
+        Assert.Equal("https://github.com/ThomasRohde/DENON/atv-05", atv.PageUrl);
     }
 
     [Fact]
@@ -166,9 +231,9 @@ public sealed class UpdateServiceTests
         Assert.Equal("0.10.0", update.LatestVersionLabel);
         Assert.Equal("chromecast-v0.10.0", update.Tag);
         Assert.Equal("### Added\n- More Cast apps", update.ReleaseNotes);
-        Assert.Equal("https://x/cc-010", update.ReleaseUrl);
-        Assert.Equal("https://x/cc-0.10.0.zip", update.ZipUrl);
-        Assert.Equal("https://x/cc-sums.txt", update.ChecksumsUrl);
+        Assert.Equal("https://github.com/ThomasRohde/DENON/cc-010", update.ReleaseUrl);
+        Assert.Equal("https://github.com/ThomasRohde/DENON/cc-0.10.0.zip", update.ZipUrl);
+        Assert.Equal("https://github.com/ThomasRohde/DENON/cc-sums.txt", update.ChecksumsUrl);
     }
 
     [Fact]
