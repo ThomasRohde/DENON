@@ -173,6 +173,12 @@ public sealed class DenonAvrClient : IDisposable
     public Task SetZone2VolumeAsync(ReceiverSettings settings, int level, CancellationToken cancellationToken) =>
         SendCommandAsync(settings, Zone2VolumeCommand(level), cancellationToken);
 
+    /// <summary>The Zone 2 mute (Z2MU?), or null when the receiver does not answer.</summary>
+    public async Task<bool?> TryGetZone2MutedAsync(ReceiverSettings settings, CancellationToken cancellationToken) =>
+        await TryQueryAsync(settings, "Z2MU?", "Z2MU", cancellationToken) is { } reply
+            ? AvrLiveState.Empty.Apply(reply).IsZone2Muted
+            : null;
+
     /// <summary>One step up (Z2UP) or down (Z2DOWN).</summary>
     public Task StepZone2VolumeAsync(ReceiverSettings settings, bool up, CancellationToken cancellationToken) =>
         SendCommandAsync(settings, up ? "Z2UP" : "Z2DOWN", cancellationToken);

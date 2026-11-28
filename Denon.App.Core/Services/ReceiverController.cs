@@ -254,7 +254,8 @@ public sealed class ReceiverController
     /// </summary>
     public async Task<HeosGroupsState> LeaveHeosGroupAsync(int playerId, CancellationToken cancellationToken = default)
     {
-        var state = _stateStore.Snapshot.HeosGroups ?? await RefreshHeosGroupsAsync(cancellationToken);
+        // Read the groups now: another controller may have changed them since the last read.
+        var state = await RefreshHeosGroupsAsync(cancellationToken);
         return state.GroupOf(playerId) is { } group
             ? await SetHeosGroupAsync(PlayersAfterLeave(group, playerId), cancellationToken)
             : state;
@@ -981,6 +982,26 @@ public sealed class ReceiverController
         }
     }
 
+    /// <summary>
+    /// The Zone 2 mute as the receiver said it on this link, or its answer to Z2MU?. Null when it does not answer.
+    /// </summary>
+    private async Task<bool?> ReadZone2MutedAsync(ReceiverSettings settings, CancellationToken token)
+    {
+        if (_avrClient.GetLiveState(settings.Host).IsZone2Muted is bool live)
+        {
+            return live;
+        }
+
+        try
+        {
+            return await _avrClient.TryGetZone2MutedAsync(settings, token);
+        }
+        catch (Exception) when (!token.IsCancellationRequested)
+        {
+            return null;
+        }
+    }
+
     /// <summary>Runs a step that must work: a failure goes to the caller.</summary>
     private static async Task<bool> RunRequiredStepAsync(Func<Task> step)
     {
@@ -1048,7 +1069,13 @@ public sealed class ReceiverController
         CancellationToken token)
     {
         var guard = volume is not null && (on == true || source is not null);
-        var finalMute = muted ?? (guard ? _stateStore.Snapshot.Status?.IsZone2Muted ?? false : null);
+
+        // Without a mute asked for, the guard puts back the mute the zone had. Unknown (no answer): it stays muted.
+        var finalMute = muted;
+        if (guard && muted is null)
+        {
+            finalMute = await ReadZone2MutedAsync(settings, token) ?? true;
+        }
 
         if (guard)
         {

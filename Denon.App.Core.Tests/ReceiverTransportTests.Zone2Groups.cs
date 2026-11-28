@@ -182,6 +182,55 @@ public sealed partial class ReceiverTransportTests
     }
 
     [Fact]
+    public async Task Before_any_read_the_guard_asks_the_receiver_for_the_zone_2_mute()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        avr.Replies["Z2MU?"] = "Z2MUON\r"; // the zone is muted; the app has not read anything yet
+        var (controller, _, telemetry) = await CreateControllerAsync(avr, heos);
+
+        await controller.ApplyZone2Async(on: true, source: null, volume: 20, muted: null);
+
+        Assert.Contains("Z2MU?", avr.Commands);
+        Assert.DoesNotContain("Z2MUOFF", avr.Commands); // stays muted, as it was
+        Assert.Equal("Z2MUON", Zone2Commands(avr)[^1]);
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task With_no_mute_answer_the_guard_keeps_zone_2_muted()
+    {
+        using var avr = new FakeAvr(); // no Z2MU? reply
+        using var heos = new FakeHeos();
+        var (controller, _, telemetry) = await CreateControllerAsync(avr, heos);
+
+        await controller.ApplyZone2Async(on: true, source: null, volume: 20, muted: null);
+
+        Assert.DoesNotContain("Z2MUOFF", avr.Commands);
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Leaving_a_group_reads_the_members_first()
+    {
+        using var avr = new FakeAvr();
+        // The cache knows nothing; the speaker has Fake leading Kitchen and Patio.
+        const string patio = ",{\"name\":\"Patio\",\"pid\":3,\"model\":\"HEOS 1\",\"version\":\"1\",\"ip\":\"127.0.0.3\",\"network\":\"wifi\",\"lineout\":0,\"serial\":\"\"}";
+        using var heos = new FakeHeos
+        {
+            MorePlayersJson = KitchenPlayer + patio,
+            GroupsJson = "[{\"name\":\"All\",\"gid\":1,\"players\":[{\"name\":\"Fake\",\"pid\":1,\"role\":\"leader\"},{\"name\":\"Kitchen\",\"pid\":2,\"role\":\"member\"},{\"name\":\"Patio\",\"pid\":3,\"role\":\"member\"}]}]",
+        };
+        var (controller, state, telemetry) = await CreateControllerAsync(avr, heos);
+        state.UpdateHeosGroups(HeosGroupsState.Empty with { RetrievedAt = DateTimeOffset.Now }); // a stale "alone"
+
+        await controller.LeaveHeosGroupAsync(2);
+
+        Assert.Contains("group/set_group?pid=1,3", heos.Commands); // Kitchen leaves, Patio stays
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
     public async Task A_zone_2_sequence_without_a_volume_needs_no_mute_and_turns_off_last()
     {
         using var avr = new FakeAvr();
