@@ -1679,9 +1679,17 @@ public sealed partial class MainViewModel : ObservableObject
         _soundModeShortcutInput = InputSourceCode;
         SoundModeNote = string.Empty;
 
-        await ExecuteReceiverActionAsync(
+        var sent = await ExecuteReceiverActionAsync(
             () => _receiverController.SetSoundModeAsync(code),
             $"Sound mode set to {code}.");
+
+        if (!sent)
+        {
+            // The receiver did not get the shortcut: its current mode is not its choice.
+            _soundModeShortcut = null;
+            SoundModeNote = string.Empty;
+            return;
+        }
 
         // The receiver may pick its mode a moment later; the status updates refresh the note until then.
         UpdateSoundModeNote(SoundMode, InputSourceCode);
@@ -2531,17 +2539,20 @@ public sealed partial class MainViewModel : ObservableObject
         return true;
     }
 
-    private async Task ExecuteReceiverActionAsync(Func<Task<ReceiverStatus>> action, string successMessage)
+    /// <summary>Runs a receiver command and shows the result. False when the command failed.</summary>
+    private async Task<bool> ExecuteReceiverActionAsync(Func<Task<ReceiverStatus>> action, string successMessage)
     {
         try
         {
             await action();
             StatusMessage = successMessage;
+            return true;
         }
         catch (Exception exception)
         {
             LastError = exception.Message;
             StatusMessage = exception.Message;
+            return false;
         }
     }
 
