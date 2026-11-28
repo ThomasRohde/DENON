@@ -1135,6 +1135,7 @@ public sealed partial class MainViewModel : ObservableObject
     private void NotifyCommandStateChanged()
     {
         RefreshCommand.NotifyCanExecuteChanged();
+        NotifySetupCommands();
         TogglePowerCommand.NotifyCanExecuteChanged();
         ToggleZone2Command.NotifyCanExecuteChanged();
         NotifyZone2GroupCommands();

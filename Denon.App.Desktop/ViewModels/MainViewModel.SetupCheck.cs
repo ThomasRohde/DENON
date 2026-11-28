@@ -142,10 +142,7 @@ public sealed partial class MainViewModel
         {
             if (SetProperty(ref _isSetupBusy, value))
             {
-                RunSetupCheckCommand?.NotifyCanExecuteChanged();
-                SelectSetupUseCommand?.NotifyCanExecuteChanged();
-                ApplySetupCommand?.NotifyCanExecuteChanged();
-                UndoSetupCommand?.NotifyCanExecuteChanged();
+                NotifySetupCommands();
             }
         }
     }
@@ -213,6 +210,15 @@ public sealed partial class MainViewModel
     public bool HasSetupRows => SetupRows.Count > 0;
 
     public string SetupProfilesFolder => AppDataPaths.ProfilesDirectory;
+
+    /// <summary>Re-reads whether the setup commands may run. Called when the receiver's busy state changes too.</summary>
+    private void NotifySetupCommands()
+    {
+        RunSetupCheckCommand?.NotifyCanExecuteChanged();
+        SelectSetupUseCommand?.NotifyCanExecuteChanged();
+        ApplySetupCommand?.NotifyCanExecuteChanged();
+        UndoSetupCommand?.NotifyCanExecuteChanged();
+    }
 
     private void InitializeSetupCheck(ReceiverSetupService setup)
     {
