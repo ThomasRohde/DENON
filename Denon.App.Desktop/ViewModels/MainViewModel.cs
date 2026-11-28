@@ -1236,10 +1236,12 @@ public sealed partial class MainViewModel : ObservableObject
                 activeStationLogoUrl: stationLogoUrl));
 
             PlayState = resolved.PlayStateLabel;
-            var titleChanged = !string.Equals(NowPlayingTitle, resolved.Title, StringComparison.Ordinal);
+            // The lyrics lookup uses title and artist: a new value in either is another song.
+            var trackChanged = !string.Equals(NowPlayingTitle, resolved.Title, StringComparison.Ordinal) ||
+                               !string.Equals(NowPlayingDetail, resolved.Detail, StringComparison.Ordinal);
             NowPlayingTitle = resolved.Title;
             NowPlayingDetail = resolved.Detail;
-            if (titleChanged)
+            if (trackChanged)
             {
                 // After both: the lookup reads the title and the artist, and the artist used to be the old one.
                 NotifyTrackChangedForLyrics(NowPlayingTitle, NowPlayingDetail);

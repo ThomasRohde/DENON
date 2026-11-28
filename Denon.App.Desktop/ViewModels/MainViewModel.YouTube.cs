@@ -102,8 +102,7 @@ public sealed partial class MainViewModel
 
         _relayServer.StatusChanged += snapshot => _ = _dispatcher.InvokeAsync(() => ApplyRelayStatus(snapshot));
         _youtubeQueueService.QueueChanged += snapshot => _ = _dispatcher.InvokeAsync(() => ApplyYouTubeQueueSnapshot(snapshot));
-        _cinemaWindow.SyncOffsetChanged += offsetMs =>
-            _ = _settingsStore.UpdateAsync(s => s.Media.CinemaSyncOffsetMs = offsetMs);
+        _cinemaWindow.SyncOffsetChanged += offsetMs => _ = SaveCinemaSyncOffsetAsync(offsetMs);
         _youtubeQueueService.TrackStarted += track => _ = _dispatcher.InvokeAsync(async () =>
         {
             if (_cinemaWindow.IsVisible)
@@ -290,6 +289,23 @@ public sealed partial class MainViewModel
         }
         catch
         {
+        }
+    }
+
+    /// <summary>
+    /// A Cinema nudge saves only the offset, quietly: a full settings change would reload the Settings, Scenes and
+    /// Stations editors and drop edits that are not saved yet.
+    /// </summary>
+    private async Task SaveCinemaSyncOffsetAsync(int offsetMs)
+    {
+        try
+        {
+            var (updated, _) = await _settingsStore.UpdateQuietAsync(s => s.Media.CinemaSyncOffsetMs = offsetMs);
+            SettingsCinemaSyncOffsetMs = updated.Media.CinemaSyncOffsetMs.ToString();
+        }
+        catch (Exception ex)
+        {
+            _logStore.Warning($"Cinema sync offset not saved: {ex.Message}");
         }
     }
 
