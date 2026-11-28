@@ -52,7 +52,7 @@ public sealed class AlbumArtPaletteService : IDisposable
             if (!_cache.TryGetValue(imageUrl, out var palette))
             {
                 var bytes = await _http.GetByteArrayAsync(imageUrl, cancellationToken);
-                var (dominant, secondary) = ExtractVibrantColors(bytes);
+                var (dominant, secondary) = await Task.Run(() => ExtractVibrantColors(bytes), cancellationToken);
                 palette = new PluginAlbumArtPalette(dominant, secondary, trackTitle, imageUrl);
                 _cache[imageUrl] = palette;
             }
@@ -75,12 +75,14 @@ public sealed class AlbumArtPaletteService : IDisposable
     private static (string DominantHex, string SecondaryHex) ExtractVibrantColors(byte[] imageBytes)
     {
         using var ms = new MemoryStream(imageBytes);
-        var decoder = BitmapDecoder.Create(ms, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad);
-        var frame = decoder.Frames.FirstOrDefault();
-        if (frame is null)
-        {
-            return ("#00D4FF", "#F59E0B");
-        }
+        var frame = new BitmapImage();
+        frame.BeginInit();
+        frame.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+        frame.CacheOption = BitmapCacheOption.OnLoad;
+        frame.DecodePixelWidth = 96; // Enough for the sample grid; a full 1500 px cover took tens of ms.
+        frame.StreamSource = ms;
+        frame.EndInit();
+        frame.Freeze();
 
         // Convert to standard Bgra32 and sample a 24x24 grid
         var formatted = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);

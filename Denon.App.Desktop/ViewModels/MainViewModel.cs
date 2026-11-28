@@ -637,10 +637,7 @@ public sealed partial class MainViewModel : ObservableObject
         get => _nowPlayingTitle;
         private set
         {
-            if (SetProperty(ref _nowPlayingTitle, value))
-            {
-                NotifyTrackChangedForLyrics(value, NowPlayingDetail);
-            }
+            SetProperty(ref _nowPlayingTitle, value);
         }
     }
 
@@ -1239,8 +1236,14 @@ public sealed partial class MainViewModel : ObservableObject
                 activeStationLogoUrl: stationLogoUrl));
 
             PlayState = resolved.PlayStateLabel;
+            var titleChanged = !string.Equals(NowPlayingTitle, resolved.Title, StringComparison.Ordinal);
             NowPlayingTitle = resolved.Title;
             NowPlayingDetail = resolved.Detail;
+            if (titleChanged)
+            {
+                // After both: the lookup reads the title and the artist, and the artist used to be the old one.
+                NotifyTrackChangedForLyrics(NowPlayingTitle, NowPlayingDetail);
+            }
             NowPlayingImageUrl = resolved.ImageUrl;
 
             MaxVolume = status.MaxVolume > 0 ? status.MaxVolume : 98;
@@ -1816,7 +1819,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         var editor = new StationPresetEditor
         {
-            Alias = $"station-{StationPresets.Count + 1}",
+            Alias = UniqueId.From($"station-{StationPresets.Count + 1}", StationPresets.Select(static s => s.Alias)),
             DisplayName = "New Radio Station",
             Url = "http://",
         };
@@ -2027,9 +2030,17 @@ public sealed partial class MainViewModel : ObservableObject
 
         if (dialog.ShowDialog() == true)
         {
-            File.WriteAllText(dialog.FileName, _settingsStore.ExportJson());
-            StatusMessage = $"Settings exported to {Path.GetFileName(dialog.FileName)}.";
-            _logStore.Info($"Exported settings to {dialog.FileName}");
+            try
+            {
+                File.WriteAllText(dialog.FileName, _settingsStore.ExportJson());
+                StatusMessage = $"Settings exported to {Path.GetFileName(dialog.FileName)}.";
+                _logStore.Info($"Exported settings to {dialog.FileName}");
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                StatusMessage = $"Export failed: {ex.Message}";
+                _logStore.Warning($"Export to {dialog.FileName} failed: {ex.Message}");
+            }
         }
     }
 
@@ -2108,8 +2119,9 @@ public sealed partial class MainViewModel : ObservableObject
     private void CopyLogsToClipboard()
     {
         var lines = LogEntries.Select(static e => $"{e.Timestamp:yyyy-MM-dd HH:mm:ss} [{e.Level}] {e.Message}");
-        System.Windows.Clipboard.SetText(string.Join(Environment.NewLine, lines));
-        StatusMessage = "Copied activity history to clipboard.";
+        StatusMessage = TrySetClipboard(string.Join(Environment.NewLine, lines))
+            ? "Copied activity history to clipboard."
+            : "Could not copy: another app holds the clipboard. Try again.";
     }
 
     private async Task FixSilentAudioAsync() =>
@@ -2356,8 +2368,24 @@ public sealed partial class MainViewModel : ObservableObject
             sb.AppendLine($"{entry.Timestamp:HH:mm:ss} [{entry.Level}] {entry.Message}");
         }
 
-        System.Windows.Clipboard.SetText(sb.ToString());
-        StatusMessage = "Copied full health & support report to clipboard.";
+        StatusMessage = TrySetClipboard(sb.ToString())
+            ? "Copied full health & support report to clipboard."
+            : "Could not copy: another app holds the clipboard. Try again.";
+    }
+
+    /// <summary>The clipboard can be held by another app (CLIPBRD_E_CANT_OPEN): that must not close this one.</summary>
+    private bool TrySetClipboard(string text)
+    {
+        try
+        {
+            System.Windows.Clipboard.SetText(text);
+            return true;
+        }
+        catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or System.Runtime.InteropServices.ExternalException)
+        {
+            _logStore.Warning($"Clipboard copy failed: {ex.Message}");
+            return false;
+        }
     }
 
     private static void OpenFolder(string path)

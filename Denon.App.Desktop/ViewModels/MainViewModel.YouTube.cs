@@ -102,6 +102,8 @@ public sealed partial class MainViewModel
 
         _relayServer.StatusChanged += snapshot => _ = _dispatcher.InvokeAsync(() => ApplyRelayStatus(snapshot));
         _youtubeQueueService.QueueChanged += snapshot => _ = _dispatcher.InvokeAsync(() => ApplyYouTubeQueueSnapshot(snapshot));
+        _cinemaWindow.SyncOffsetChanged += offsetMs =>
+            _ = _settingsStore.UpdateAsync(s => s.Media.CinemaSyncOffsetMs = offsetMs);
         _youtubeQueueService.TrackStarted += track => _ = _dispatcher.InvokeAsync(async () =>
         {
             if (_cinemaWindow.IsVisible)
@@ -291,6 +293,43 @@ public sealed partial class MainViewModel
         }
     }
 
+    private const string FirewallRuleName = "Denon Desktop Audio Relay";
+
+    private static string NetshPath => System.IO.Path.Combine(Environment.SystemDirectory, "netsh.exe");
+
+    /// <summary>
+    /// "set" when the rule exists (so a second click does not add a second rule), else "add". Scoped to this exe
+    /// when its path is known. The check runs without elevation; only the change asks for it.
+    /// </summary>
+    private static async Task<string> BuildFirewallRuleArgumentsAsync(int port)
+    {
+        var program = Environment.ProcessPath is { Length: > 0 } path ? $" program=\"{path}\"" : string.Empty;
+        var exists = false;
+        try
+        {
+            using var check = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = NetshPath,
+                Arguments = $"advfirewall firewall show rule name=\"{FirewallRuleName}\"",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+            if (check is not null)
+            {
+                await check.WaitForExitAsync();
+                exists = check.ExitCode == 0;
+            }
+        }
+        catch
+        {
+            // Add a rule then.
+        }
+
+        return exists
+            ? $"advfirewall firewall set rule name=\"{FirewallRuleName}\" new dir=in action=allow protocol=TCP localport={port} profile=private{program}"
+            : $"advfirewall firewall add rule name=\"{FirewallRuleName}\" dir=in action=allow protocol=TCP localport={port} profile=private{program}";
+    }
+
     private async Task AllowRelayFirewallAsync()
     {
         try
@@ -299,8 +338,9 @@ public sealed partial class MainViewModel
             var port = _relayServer.BoundPort > 0 ? _relayServer.BoundPort : _settingsStore.Current.Media.RelayPort;
             var psi = new System.Diagnostics.ProcessStartInfo
             {
-                FileName = "netsh",
-                Arguments = $"advfirewall firewall add rule name=\"Denon Desktop Audio Relay\" dir=in action=allow protocol=TCP localport={port} profile=private",
+                // The full path: a bare "netsh" would run a netsh.exe planted in the app's folder, elevated.
+                FileName = NetshPath,
+                Arguments = await BuildFirewallRuleArgumentsAsync(port),
                 UseShellExecute = true,
                 Verb = "runas",
                 WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
@@ -414,11 +454,14 @@ public sealed partial class MainViewModel
         }
     }
 
-    private async Task PlayYouTubeTrackAsync(object? parameter)
+    private async Task PlayYouTubeTrackAsync(object? parameter) => await TryPlayYouTubeTrackAsync(parameter);
+
+    /// <returns>True when the cast started.</returns>
+    private async Task<bool> TryPlayYouTubeTrackAsync(object? parameter)
     {
         if (parameter is not YouTubeTrackItem track)
         {
-            return;
+            return false;
         }
 
         try
@@ -434,12 +477,14 @@ public sealed partial class MainViewModel
             await _youtubeQueueService.PlayNowAsync(track, useLowVolume: false, UnmuteBeforePlay);
             YouTubeStatusText = $"Now casting \"{track.Title}\" on Denon AVR.";
             StatusMessage = $"Playing YouTube: {track.Title}";
+            return true;
         }
         catch (Exception ex)
         {
             LastError = ex.Message;
             StatusMessage = ex.Message;
             YouTubeStatusText = $"Playback failed: {ex.Message}";
+            return false;
         }
     }
 
@@ -450,7 +495,12 @@ public sealed partial class MainViewModel
             return;
         }
 
-        await PlayYouTubeTrackAsync(track);
+        var wasOpen = _cinemaWindow.IsVisible;
+        if (!await TryPlayYouTubeTrackAsync(track) || wasOpen)
+        {
+            return; // Failed: no silent video. Already open: the TrackStarted handler loads the new track.
+        }
+
         await _cinemaWindow.LoadTrackAsync(
             track,
             _settingsStore.Current.Media.CinemaSyncOffsetMs,

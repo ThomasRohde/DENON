@@ -33,8 +33,10 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
       media).
 - [ ] PR 6: plugin host: #44, #45, #69, the CreateHttpClient part of #64.
 - [ ] PR 7: Smart TV plugin: #34, #47, the Smart TV part of #68.
-- [ ] PR 8: YouTube and Cinema: #33, #51, #52, #56, the Cinema parts of #53 and #71. Add a Cinema guard too: open
-      and navigate only http/https (defense in depth for #29).
+- [x] PR 8: YouTube and Cinema. #33, #51, #52 and #56 closed; the Cinema part of #53 and the clipboard, export and
+      id parts of #71; the Cinema guard for #29.
+- [ ] Verify PR 8 in the app (needs the user, it plays media): Watch a YouTube track (Cinema opens once, after the
+      cast), nudge the sync and check the next track keeps it, and "Allow in firewall" twice gives one rule.
 - [ ] PR 9: desktop shell: #53, #54, #55 (tray shows dB; show the 0–98 number), #71.
 - [ ] PR 10: release, CI, installer, docs: #58, #59, #60, #62, #72, #73.
 - [ ] PR 11: accessibility (after PR 9): #57.
