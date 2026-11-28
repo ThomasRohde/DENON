@@ -1,8 +1,15 @@
 using System.Net.Sockets;
 using System.Text;
+using System.Threading.Channels;
 using Denon.App.Core.Models;
 
 namespace Denon.App.Core.Heos;
+
+/// <summary>
+/// Lines the receiver sent on one link (see <see cref="DenonAvrClient.LinesReceived"/>), and the link's live state
+/// right after the last of them.
+/// </summary>
+public sealed record AvrLinesReceived(string Host, long Generation, IReadOnlyList<string> Lines, AvrLiveState Live);
 
 public sealed class DenonAvrClient : IDisposable
 {
@@ -15,9 +22,9 @@ public sealed class DenonAvrClient : IDisposable
 
     private readonly int _port;
     private readonly SemaphoreSlim _connectionGate = new(1, 1);
-    private TcpClient? _client;
-    private NetworkStream? _stream;
-    private string? _connectedHost;
+    private readonly Channel<LinkEvent> _events = Channel.CreateUnbounded<LinkEvent>(new UnboundedChannelOptions { SingleReader = true });
+    private volatile AvrLink? _link;
+    private long _linkCount;
     private DateTimeOffset _lastWriteAt = DateTimeOffset.MinValue;
 
     /// <summary>
@@ -32,7 +39,48 @@ public sealed class DenonAvrClient : IDisposable
     }
 
     /// <summary>Tests point the client at a fake receiver on another port.</summary>
-    internal DenonAvrClient(int port) => _port = port;
+    internal DenonAvrClient(int port)
+    {
+        _port = port;
+        _ = Task.Run(PumpEventsAsync);
+    }
+
+    /// <summary>
+    /// Lines from the receiver: answers and the status lines it pushes by itself (a turn of the knob, the remote).
+    /// Raised on one background task, in order. Lines that came in close together come as one event.
+    /// </summary>
+    public event Action<AvrLinesReceived>? LinesReceived;
+
+    /// <summary>The link to this receiver address closed: the receiver dropped it, a query got no answer, or Disconnect.</summary>
+    public event Action<string>? LinkClosed;
+
+    /// <summary>A number for the open link (each new connection gets a new one), or 0 when no link is open.</summary>
+    public long OpenLinkGeneration => _link is { IsOpen: true } link ? link.Generation : 0;
+
+    /// <summary>
+    /// What the receiver at <paramref name="host"/> said on the open link, every line in order. Empty when no link to
+    /// that address is open: a new link starts empty, and the next full status read fills it.
+    /// </summary>
+    public AvrLiveState GetLiveState(string host) =>
+        _link is { IsOpen: true } link && string.Equals(link.Host, host, StringComparison.OrdinalIgnoreCase)
+            ? link.Live
+            : AvrLiveState.Empty;
+
+    /// <summary>
+    /// The newest state to apply for <paramref name="received"/>: the open link's live state while it is the link the
+    /// lines came on (lines may have come in since), the state the event carries once that link closed (the receiver
+    /// can send a change and then drop the link), or null when a newer link is open (these lines are old).
+    /// </summary>
+    public AvrLiveState? LatestLiveState(AvrLinesReceived received)
+    {
+        var link = _link;
+        if (link is { IsOpen: true })
+        {
+            return link.Generation == received.Generation ? link.Live : null;
+        }
+
+        return link is null || link.Generation <= received.Generation ? received.Live : null;
+    }
 
     public async Task<AvrDeviceStatus> GetStatusAsync(ReceiverSettings settings, CancellationToken cancellationToken)
     {
@@ -349,7 +397,7 @@ public sealed class DenonAvrClient : IDisposable
         return (enabled, db);
     }
 
-    private static bool? ParseOnOff(string? value)
+    internal static bool? ParseOnOff(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -365,7 +413,7 @@ public sealed class DenonAvrClient : IDisposable
         };
     }
 
-    private static string NormalizeDimmerCode(string? value)
+    internal static string NormalizeDimmerCode(string? value)
     {
         var upper = (value ?? string.Empty).Trim().ToUpperInvariant();
         return upper switch
@@ -612,9 +660,11 @@ public sealed class DenonAvrClient : IDisposable
         Func<IReadOnlyList<string>, bool>? isComplete = null)
     {
         isComplete ??= HasLineStartingWith(expectedPrefix);
+        var heardAnything = false;
         for (var attempt = 0; attempt < 3; attempt++)
         {
             var lines = await ExchangeLinesAsync(settings.Host, command, ReadTimeout, isComplete, cancellationToken);
+            heardAnything |= lines.Count > 0;
             var matches = lines
                 .Where(line => line.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase))
                 .ToList();
@@ -625,6 +675,13 @@ public sealed class DenonAvrClient : IDisposable
             }
 
             await Task.Delay(180, cancellationToken);
+        }
+
+        if (!heardAnything)
+        {
+            // Three tries and not one line: the link is dead (a half-open socket) or the receiver is silent. Drop it,
+            // so the next command connects again and the poll falls back to its normal pace.
+            Disconnect();
         }
 
         return [];
@@ -647,6 +704,11 @@ public sealed class DenonAvrClient : IDisposable
         }
     }
 
+    /// <summary>
+    /// Sends one command and returns the lines that came in during the read window. The link's reader reads every
+    /// line; while this command waits, the reader gives it the lines too. Status lines the receiver pushes in that
+    /// time come with the answer, as before: callers pick the lines with their prefix.
+    /// </summary>
     private async Task<List<string>> ExchangeLinesAsync(
         string host,
         string command,
@@ -661,8 +723,7 @@ public sealed class DenonAvrClient : IDisposable
             await _connectionGate.WaitAsync(cancellationToken);
             try
             {
-                await EnsureConnectedLockedAsync(host, cancellationToken);
-                DrainPendingBytesLocked();
+                var link = await EnsureConnectedLockedAsync(host, cancellationToken);
 
                 var sinceLastWrite = DateTimeOffset.UtcNow - _lastWriteAt;
                 if (sinceLastWrite < MinCommandSpacing)
@@ -670,14 +731,23 @@ public sealed class DenonAvrClient : IDisposable
                     await Task.Delay(MinCommandSpacing - sinceLastWrite, cancellationToken);
                 }
 
-                var payload = Encoding.ASCII.GetBytes(command + "\r");
-                await _stream!.WriteAsync(payload, cancellationToken);
-                await _stream.FlushAsync(cancellationToken);
-                _lastWriteAt = DateTimeOffset.UtcNow;
+                // Collect before the write: the answer can come in before WriteAsync returns.
+                var reply = link.BeginReply();
+                try
+                {
+                    var payload = Encoding.ASCII.GetBytes(command + "\r");
+                    await link.Stream.WriteAsync(payload, cancellationToken);
+                    await link.Stream.FlushAsync(cancellationToken);
+                    _lastWriteAt = DateTimeOffset.UtcNow;
 
-                return await ReadFramesLockedAsync(readWindow, isComplete, cancellationToken);
+                    return await CollectReplyAsync(link, reply, readWindow, isComplete, cancellationToken);
+                }
+                finally
+                {
+                    link.EndReply(reply);
+                }
             }
-            catch (Exception exception) when (exception is IOException or SocketException && attempt == 0)
+            catch (Exception exception) when (exception is (IOException or SocketException or ObjectDisposedException) && attempt == 0)
             {
                 lastException = exception;
                 ResetConnectionLocked();
@@ -697,7 +767,71 @@ public sealed class DenonAvrClient : IDisposable
         throw lastException ?? new InvalidOperationException($"AVR command '{command}' failed.");
     }
 
-    private async Task EnsureConnectedLockedAsync(string host, CancellationToken cancellationToken)
+    /// <param name="isComplete">
+    /// Tells when the lines so far are the whole answer, so the wait ends at once. Null for answers whose length is
+    /// not known (several lines): they end 120 ms after the last line.
+    /// </param>
+    private static async Task<List<string>> CollectReplyAsync(
+        AvrLink link,
+        Channel<string> reply,
+        TimeSpan readWindow,
+        Func<IReadOnlyList<string>, bool>? isComplete,
+        CancellationToken cancellationToken)
+    {
+        var lines = new List<string>();
+        var deadline = DateTimeOffset.UtcNow + readWindow;
+
+        while (true)
+        {
+            var remaining = deadline - DateTimeOffset.UtcNow;
+            if (remaining <= TimeSpan.Zero)
+            {
+                break;
+            }
+
+            // Once a line is in, wait only briefly for follow-up lines (for example MVMAX).
+            var slice = lines.Count > 0
+                ? TimeSpan.FromMilliseconds(Math.Min(120, remaining.TotalMilliseconds))
+                : remaining;
+
+            using var sliceCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            sliceCts.CancelAfter(slice);
+            bool open;
+            try
+            {
+                open = await reply.Reader.WaitToReadAsync(sliceCts.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+
+            if (!open)
+            {
+                // The link closed. An answer that is already in counts: sending the command again would run it twice.
+                if (lines.Count > 0)
+                {
+                    break;
+                }
+
+                throw new IOException("AVR Telnet connection closed by remote host.", link.CloseReason);
+            }
+
+            while (reply.Reader.TryRead(out var line))
+            {
+                lines.Add(line);
+            }
+
+            if (isComplete is not null && isComplete(lines))
+            {
+                break;
+            }
+        }
+
+        return lines;
+    }
+
+    private async Task<AvrLink> EnsureConnectedLockedAsync(string host, CancellationToken cancellationToken)
     {
         if (_resetRequested)
         {
@@ -705,16 +839,15 @@ public sealed class DenonAvrClient : IDisposable
             ResetConnectionLocked();
         }
 
-        if (_client is { Connected: true } &&
-            _stream is not null &&
-            string.Equals(_connectedHost, host, StringComparison.OrdinalIgnoreCase))
+        if (_link is { IsOpen: true } open && string.Equals(open.Host, host, StringComparison.OrdinalIgnoreCase))
         {
-            return;
+            return open;
         }
 
         ResetConnectionLocked();
 
         var client = new TcpClient { NoDelay = true };
+        EnableKeepAlive(client.Client);
         using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         connectCts.CancelAfter(ConnectTimeout);
 
@@ -728,86 +861,150 @@ public sealed class DenonAvrClient : IDisposable
             throw;
         }
 
-        _client = client;
-        _stream = client.GetStream();
-        _connectedHost = host;
+        var link = new AvrLink(client, host, Interlocked.Increment(ref _linkCount));
+        _link = link;
+        // On the thread pool: the reader must never run on the caller's UI thread.
+        _ = Task.Run(() => ReadLoopAsync(link));
+        return link;
     }
 
-    private void DrainPendingBytesLocked()
+    /// <summary>The receiver sends nothing while nothing changes, so a pulled cable never closes the link by itself.</summary>
+    private static void EnableKeepAlive(Socket socket)
     {
-        if (_stream is null || !_stream.DataAvailable)
+        try
         {
-            return;
+            socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, 30);
+            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, 5);
+            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, 3);
         }
-
-        var scratch = new byte[1024];
-        while (_stream.DataAvailable)
+        catch (Exception ex) when (ex is SocketException or PlatformNotSupportedException or NotSupportedException or ArgumentException)
         {
-            var read = _stream.Read(scratch, 0, scratch.Length);
-            if (read <= 0)
-            {
-                break;
-            }
+            // Some systems do not take these options. A query with no answer still drops a dead link.
         }
     }
 
-    /// <param name="isComplete">
-    /// Tells when the complete lines read so far are the whole answer, so the read ends at once. Null for
-    /// answers whose length is not known (several lines): they end 120 ms after the last line, as before.
-    /// </param>
-    private async Task<List<string>> ReadFramesLockedAsync(
-        TimeSpan readWindow,
-        Func<IReadOnlyList<string>, bool>? isComplete,
-        CancellationToken cancellationToken)
+    /// <summary>
+    /// Reads every line on the link for as long as it is open. Each line goes into the link's live state first, then
+    /// to the command that waits for an answer (if any), then to <see cref="LinesReceived"/>. In that order, a status
+    /// written after an answer always has that answer in the live state too.
+    /// </summary>
+    private async Task ReadLoopAsync(AvrLink link)
     {
         var buffer = new byte[2048];
-        var builder = new StringBuilder();
-        var deadline = DateTimeOffset.UtcNow + readWindow;
-        var hasReceivedAny = false;
-
-        while (DateTimeOffset.UtcNow < deadline)
+        var pending = new StringBuilder();
+        Exception? reason = null;
+        try
         {
-            var remaining = deadline - DateTimeOffset.UtcNow;
-            if (remaining <= TimeSpan.Zero)
+            while (!link.Stop.IsCancellationRequested)
             {
-                break;
-            }
-
-            // Once we have at least one complete \r-terminated frame, only wait briefly for follow-up lines (e.g. MVMAX)
-            var slice = hasReceivedAny
-                ? TimeSpan.FromMilliseconds(Math.Min(120, remaining.TotalMilliseconds))
-                : remaining;
-
-            using var readCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            readCts.CancelAfter(slice);
-
-            try
-            {
-                var read = await _stream!.ReadAsync(buffer, readCts.Token);
+                var read = await link.Stream.ReadAsync(buffer, link.Stop.Token);
                 if (read <= 0)
                 {
-                    throw new IOException("AVR Telnet connection closed by remote host.");
+                    reason = new IOException("AVR Telnet connection closed by remote host.");
+                    break;
                 }
 
-                builder.Append(Encoding.ASCII.GetString(buffer, 0, read));
-                var text = builder.ToString();
-                var lastLineEnd = text.LastIndexOf('\r');
-                if (lastLineEnd >= 0)
+                pending.Append(Encoding.ASCII.GetString(buffer, 0, read));
+                var lines = TakeCompleteLines(pending);
+                if (lines.Count == 0)
                 {
-                    hasReceivedAny = true;
-                    if (isComplete is not null && isComplete(SplitLines(text[..lastLineEnd])))
-                    {
-                        break;
-                    }
+                    continue;
                 }
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                break;
+
+                link.Receive(lines);
+                _events.Writer.TryWrite(new LinkEvent(link.Host, link.Generation, lines, link.Live));
             }
         }
+        catch (Exception exception)
+        {
+            reason = exception;
+        }
+        finally
+        {
+            if (link.MarkClosed(reason))
+            {
+                _events.Writer.TryWrite(new LinkEvent(link.Host, link.Generation, Lines: null, link.Live));
+            }
 
-        return SplitLines(builder.ToString());
+            link.Close();
+        }
+    }
+
+    /// <summary>Takes the complete lines (ended by CR or LF) out of <paramref name="pending"/>; a part line stays.</summary>
+    internal static List<string> TakeCompleteLines(StringBuilder pending)
+    {
+        var text = pending.ToString();
+        var end = text.LastIndexOfAny(['\r', '\n']);
+        if (end < 0)
+        {
+            return [];
+        }
+
+        pending.Clear().Append(text[(end + 1)..]);
+        return SplitLines(text[..end]);
+    }
+
+    /// <summary>
+    /// Raises the link events on one task, in order, away from the reader: a slow handler never holds up an answer.
+    /// Lines that wait in the queue together go out as one event, so a burst (a volume fade) is one state change.
+    /// </summary>
+    private async Task PumpEventsAsync()
+    {
+        var reader = _events.Reader;
+        while (await reader.WaitToReadAsync())
+        {
+            LinkEvent? last = null;
+            var batch = new List<string>();
+            while (reader.TryRead(out var linkEvent))
+            {
+                if (last is not null && (linkEvent.Generation != last.Generation || linkEvent.Lines is null))
+                {
+                    RaiseLines(last, batch);
+                    last = null;
+                    batch = [];
+                }
+
+                if (linkEvent.Lines is null)
+                {
+                    RaiseLinkClosed(linkEvent.Host);
+                    continue;
+                }
+
+                last = linkEvent;
+                batch.AddRange(linkEvent.Lines);
+            }
+
+            if (last is not null)
+            {
+                RaiseLines(last, batch);
+            }
+        }
+    }
+
+    /// <param name="last">The batch's last event: its live state has every line of the batch.</param>
+    private void RaiseLines(LinkEvent last, IReadOnlyList<string> lines)
+    {
+        try
+        {
+            LinesReceived?.Invoke(new AvrLinesReceived(last.Host, last.Generation, lines, last.Live));
+        }
+        catch
+        {
+            // A handler's failure must not stop the events.
+        }
+    }
+
+    private void RaiseLinkClosed(string host)
+    {
+        try
+        {
+            LinkClosed?.Invoke(host);
+        }
+        catch
+        {
+            // A handler's failure must not stop the events.
+        }
     }
 
     private static List<string> SplitLines(string text) =>
@@ -815,11 +1012,13 @@ public sealed class DenonAvrClient : IDisposable
 
     private void ResetConnectionLocked()
     {
-        try { _stream?.Dispose(); } catch { }
-        try { _client?.Dispose(); } catch { }
-        _stream = null;
-        _client = null;
-        _connectedHost = null;
+        var link = _link;
+        _link = null;
+        if (link is not null)
+        {
+            // The reader sees the cancel, marks the link closed and raises LinkClosed.
+            link.Close();
+        }
     }
 
     /// <summary>
@@ -846,8 +1045,126 @@ public sealed class DenonAvrClient : IDisposable
         }
     }
 
-    /// <summary>The gate holds no OS handle, so it is not disposed: a command in flight may still release it.</summary>
-    public void Dispose() => Disconnect();
+    /// <summary>
+    /// Drops the link and ends the event task (no events after this). The gate holds no OS handle, so it is not
+    /// disposed: a command in flight may still release it.
+    /// </summary>
+    public void Dispose()
+    {
+        Disconnect();
+        _events.Writer.TryComplete();
+    }
+
+    private sealed record LinkEvent(string Host, long Generation, IReadOnlyList<string>? Lines, AvrLiveState Live);
+
+    /// <summary>One connection on port 23 and its reader. A new connection is a new link with a new number.</summary>
+    private sealed class AvrLink
+    {
+        private readonly object _sync = new();
+        private readonly TcpClient _client;
+        private Channel<string>? _reply;
+        private AvrLiveState _live = AvrLiveState.Empty;
+        private volatile bool _isOpen = true;
+
+        public AvrLink(TcpClient client, string host, long generation)
+        {
+            _client = client;
+            Stream = client.GetStream();
+            Host = host;
+            Generation = generation;
+        }
+
+        public NetworkStream Stream { get; }
+
+        public string Host { get; }
+
+        public long Generation { get; }
+
+        public CancellationTokenSource Stop { get; } = new();
+
+        public bool IsOpen => _isOpen;
+
+        public Exception? CloseReason { get; private set; }
+
+        public AvrLiveState Live => Volatile.Read(ref _live);
+
+        /// <summary>Starts collecting lines for one command. On a closed link the collection is empty and done.</summary>
+        public Channel<string> BeginReply()
+        {
+            var reply = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
+            lock (_sync)
+            {
+                if (_isOpen)
+                {
+                    _reply = reply;
+                }
+                else
+                {
+                    reply.Writer.TryComplete();
+                }
+            }
+
+            return reply;
+        }
+
+        public void EndReply(Channel<string> reply)
+        {
+            lock (_sync)
+            {
+                if (ReferenceEquals(_reply, reply))
+                {
+                    _reply = null;
+                }
+            }
+        }
+
+        /// <summary>The live state first, then the command that waits: see <see cref="ReadLoopAsync"/>.</summary>
+        public void Receive(IReadOnlyList<string> lines)
+        {
+            lock (_sync)
+            {
+                var live = _live;
+                foreach (var line in lines)
+                {
+                    live = live.Apply(line);
+                }
+
+                Volatile.Write(ref _live, live);
+                if (_reply is { } reply)
+                {
+                    foreach (var line in lines)
+                    {
+                        reply.Writer.TryWrite(line);
+                    }
+                }
+            }
+        }
+
+        /// <summary>True the first time only.</summary>
+        public bool MarkClosed(Exception? reason)
+        {
+            lock (_sync)
+            {
+                if (!_isOpen)
+                {
+                    return false;
+                }
+
+                _isOpen = false;
+                CloseReason = reason;
+                _reply?.Writer.TryComplete();
+                _reply = null;
+                return true;
+            }
+        }
+
+        public void Close()
+        {
+            try { Stop.Cancel(); } catch { }
+            try { Stream.Dispose(); } catch { }
+            try { _client.Dispose(); } catch { }
+        }
+    }
 
     private static string ParsePrefixValue(string? response, string prefix)
     {

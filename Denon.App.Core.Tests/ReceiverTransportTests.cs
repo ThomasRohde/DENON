@@ -13,7 +13,7 @@ namespace Denon.App.Core.Tests;
 /// <summary>
 /// The receiver links (Telnet on port 23 and HEOS on port 1255), checked against small fake receivers on loopback:
 /// Disconnect never blocks (#28), one command is one line (#30), Zone 2 and the grace window (#39), fast replies
-/// and fades (#43), HEOS-only scenes (#66), and the push listener's heartbeat (#38).
+/// and fades (#43), HEOS-only scenes (#66), the push listener's heartbeat (#38), and the port 23 reader with its pushes (#74).
 /// </summary>
 public sealed class ReceiverTransportTests : IDisposable
 {
@@ -438,6 +438,467 @@ public sealed class ReceiverTransportTests : IDisposable
         }
     }
 
+    // ---- #74: one reader on port 23, pushes update the state at once ----------------------------------------------
+
+    private async Task<(ReceiverController Controller, ReceiverStateStore State, EventTelemetryLog Telemetry, AppSettingsStore Store, AppLogStore Log)> CreateRigAsync(
+        FakeAvr avr,
+        FakeHeos heos)
+    {
+        var log = new AppLogStore(Path.Combine(_tempDir, Guid.NewGuid().ToString("N") + ".log"));
+        var store = new AppSettingsStore(log, Path.Combine(_tempDir, Guid.NewGuid().ToString("N") + ".json"));
+        await store.InitializeAsync();
+        await store.UpdateAsync(s =>
+        {
+            s.Receiver.Host = "127.0.0.1";
+            s.Receiver.Port = heos.Port;
+        });
+        var bus = new RoomEventBus(log);
+        var telemetry = new EventTelemetryLog(store, log, bus, Path.Combine(_tempDir, "events-" + Guid.NewGuid().ToString("N")));
+        var state = new ReceiverStateStore();
+        var controller = new ReceiverController(new HeosClient(), new DenonAvrClient(avr.Port), store, state, telemetry, log);
+        return (controller, state, telemetry, store, log);
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition, string what, double seconds = 5)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(seconds);
+        while (!condition())
+        {
+            if (DateTime.UtcNow > deadline)
+            {
+                throw new TimeoutException($"Waited {seconds} s for: {what}");
+            }
+
+            await Task.Delay(10);
+        }
+    }
+
+    [Theory]
+    [InlineData("PWSTANDBY", nameof(AvrLiveState.IsPoweredOn), false)]
+    [InlineData("ZMOFF", nameof(AvrLiveState.IsMainZoneOn), false)]
+    [InlineData("MV505", nameof(AvrLiveState.VolumeExact), 50.5)]
+    [InlineData("MVMAX 80", nameof(AvrLiveState.MaxVolume), 80)]
+    [InlineData("MUON", nameof(AvrLiveState.IsMuted), true)]
+    [InlineData("SIGAME", nameof(AvrLiveState.InputSource), "GAME")]
+    [InlineData("MSDOLBY DIGITAL", nameof(AvrLiveState.SoundMode), "DOLBY DIGITAL")]
+    [InlineData("ECOAUTO", nameof(AvrLiveState.EcoMode), "AUTO")]
+    [InlineData("SLP030", nameof(AvrLiveState.SleepTimerMinutes), 30)]
+    [InlineData("Z2ON", nameof(AvrLiveState.IsZone2On), true)]
+    public void A_receiver_line_sets_its_field(string line, string field, object expected)
+    {
+        var live = AvrLiveState.Empty.Apply(line);
+        var value = typeof(AvrLiveState).GetProperty(field)!.GetValue(live);
+        Assert.Equal(Convert.ToString(expected, System.Globalization.CultureInfo.InvariantCulture),
+            Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [Theory]
+    [InlineData("Z2TV")]       // zone 2 source, not its power
+    [InlineData("Z240")]       // zone 2 volume
+    [InlineData("MSQUICK1")]   // a Quick Select memory, not a sound mode
+    [InlineData("MVxx")]
+    [InlineData("SSINFAISFSV 441")]
+    public void Other_lines_leave_the_state_as_it_is(string line) =>
+        Assert.Equal(AvrLiveState.Empty, AvrLiveState.Empty.Apply(line));
+
+    [Fact]
+    public void A_part_line_waits_for_its_end()
+    {
+        var pending = new StringBuilder("MV45\rMVMA");
+        Assert.Equal(["MV45"], DenonAvrClient.TakeCompleteLines(pending));
+        pending.Append("X 98\r");
+        Assert.Equal(["MVMAX 98"], DenonAvrClient.TakeCompleteLines(pending));
+        Assert.Equal(0, pending.Length);
+    }
+
+    [Theory]
+    [InlineData(2, 30)]
+    [InlineData(5, 45)]
+    [InlineData(6, 54)]
+    [InlineData(60, 60)]
+    public void The_slow_check_is_nine_polls_from_30_to_60_s(int pollSeconds, int slowSeconds) =>
+        Assert.Equal(TimeSpan.FromSeconds(slowSeconds), ReceiverPollingService.SlowCheckInterval(pollSeconds));
+
+    [Fact]
+    public async Task State_changes_from_many_threads_are_raised_in_order_and_end_on_the_newest()
+    {
+        var state = new ReceiverStateStore();
+        var player = new ReceiverPlayerInfo("Fake", 1, "Fake AVR", "1", "127.0.0.1", "wired", 0, "");
+        var media = new NowPlayingMedia("", "", "", "", "", "", "", null, null);
+        var start = new ReceiverStatus(player, "stop", 0, false, media, DateTimeOffset.Now, IsPoweredOn: true, IsMainZoneOn: true);
+        state.UpdateStatus(start); // A status to patch.
+        var raised = new List<int>();
+        state.StateChanged += snapshot =>
+        {
+            lock (raised)
+            {
+                raised.Add(snapshot.Status?.Volume ?? -1);
+            }
+        };
+
+        var order = 0;
+        // Like a full read and the receiver's pushes at the same time. The stamp is taken inside the store's lock,
+        // so it is the order of the writes.
+        await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() =>
+        {
+            for (var i = 0; i < 200; i++)
+            {
+                if (i % 2 == 0)
+                {
+                    state.UpdateStatus(start, s => s with { Volume = Interlocked.Increment(ref order) });
+                }
+                else
+                {
+                    state.PatchFromReceiver(s => s with { Volume = Interlocked.Increment(ref order) });
+                }
+            }
+        })));
+
+        Assert.Equal(1600, order);
+        Assert.Equal(1600, raised[^1]); // The last raised state is the newest.
+        for (var i = 1; i < raised.Count; i++)
+        {
+            Assert.True(raised[i] > raised[i - 1], $"State {raised[i]} was raised after {raised[i - 1]}.");
+        }
+    }
+
+    [Fact]
+    public async Task A_query_gets_its_answer_while_a_push_comes_in_between()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        avr.Replies["SI?"] = "MV50\rSITV\r"; // The knob turned to 50 just before the receiver answered SI?.
+        var (controller, state, telemetry, _, _) = await CreateRigAsync(avr, heos);
+
+        var status = await controller.RefreshAsync();
+
+        Assert.Equal("TV", status.InputSource);   // SI? got its answer past the push.
+        Assert.Equal(50, status.Volume);          // The MV? answer said 45; the push after it wins.
+        Assert.Equal(50, state.Snapshot.Status!.Volume);
+
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A_push_with_no_query_updates_the_state_at_once()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        var (controller, state, telemetry, _, _) = await CreateRigAsync(avr, heos);
+        await controller.RefreshAsync();
+        Assert.False(state.Snapshot.Status!.IsMuted);
+        avr.ClearCommands();
+
+        var seen = new TaskCompletionSource<TimeSpan>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var watch = Stopwatch.StartNew();
+        state.StateChanged += snapshot =>
+        {
+            if (snapshot.Status is { IsMuted: true })
+            {
+                seen.TrySetResult(watch.Elapsed);
+            }
+        };
+        await avr.PushAsync("MUON\r"); // The mute button on the remote.
+
+        var after = await seen.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(after < TimeSpan.FromMilliseconds(250), $"The push took {after.TotalMilliseconds:0} ms");
+        Assert.Empty(avr.Commands); // No query: the receiver said it by itself.
+
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A_pushed_input_change_reads_the_full_state_soon_after()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        var (controller, state, telemetry, _, _) = await CreateRigAsync(avr, heos);
+        await controller.RefreshAsync();
+        avr.ClearCommands();
+
+        avr.Replies["SI?"] = "SIGAME\r";
+        await avr.PushAsync("SIGAME\r"); // Someone pressed GAME on the remote.
+
+        await WaitUntilAsync(() => state.Snapshot.Status?.InputSource == "GAME", "the pushed input");
+        await avr.WaitForCommandAsync("PW?"); // Then a full read, for what HEOS plays now.
+        Assert.Equal("GAME", state.Snapshot.Status!.InputSource);
+
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A_volume_burst_writes_one_settled_event()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        var log = new AppLogStore(Path.Combine(_tempDir, "burst.log"));
+        var store = new AppSettingsStore(log, Path.Combine(_tempDir, "burst.json"));
+        await store.InitializeAsync();
+        await store.UpdateAsync(s =>
+        {
+            s.Receiver.Host = "127.0.0.1";
+            s.Receiver.Port = heos.Port;
+        });
+        var bus = new RoomEventBus(log);
+        var telemetry = new EventTelemetryLog(store, log, bus, Path.Combine(_tempDir, "burst-events"));
+        var state = new ReceiverStateStore();
+        var controller = new ReceiverController(new HeosClient(), new DenonAvrClient(avr.Port), store, state, telemetry, log);
+        var ytMedia = new YouTubeMediaService(store, log);
+        using var relay = new LocalAudioRelayServer(ytMedia, store, log);
+        using var ytQueue = new YouTubeQueueService(relay, controller, state, log);
+        var plugins = new Denon.App.Core.Plugins.PluginHostService([], store, state, controller, telemetry, log);
+        using var monitor = new EventTelemetryMonitorService(telemetry, store, state, ytQueue, plugins, log);
+        var seen = new List<RoomEvent>();
+        using var subscription = bus.Subscribe(e => { lock (seen) seen.Add(e); });
+        state.StateChanged += monitor.ProcessReceiverSnapshot;
+
+        await controller.RefreshAsync(); // Volume 45.
+        for (var level = 46; level <= 55; level++)
+        {
+            await avr.PushAsync($"MV{level}\r"); // The knob turned up, one line per step.
+            await Task.Delay(15);
+        }
+
+        await WaitUntilAsync(() => state.Snapshot.Status?.Volume == 55, "the last pushed volume");
+        monitor.EvaluateVolumeSettle(DateTimeOffset.UtcNow.AddSeconds(30));
+
+        var marker = Guid.NewGuid().ToString("N");
+        telemetry.Record("control", "test", "test.marker", "test", new Dictionary<string, object?> { ["id"] = marker });
+        await WaitUntilAsync(() => { lock (seen) return seen.Any(e => e.GetText("id") == marker); }, "the event bus");
+
+        List<RoomEvent> settled;
+        lock (seen)
+        {
+            settled = seen.Where(static e => e.Event == "volume.settled").ToList();
+        }
+
+        var only = Assert.Single(settled);
+        Assert.Equal("45", only.GetText("from"));
+        Assert.Equal("55", only.GetText("to"));
+
+        await telemetry.DisposeAsync();
+        bus.Dispose();
+    }
+
+    [Fact]
+    public async Task A_pushed_acoustic_line_updates_the_kept_acoustics()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        avr.Replies["PSMULTEQ: ?"] = "PSMULTEQ:AUDYSSEY\r";
+        avr.Replies["PSDYNEQ ?"] = "PSDYNEQ ON\r";
+        avr.Replies["PSDYNVOL ?"] = "PSDYNVOL OFF\r";
+        avr.Replies["PSRSTR ?"] = "PSRSTR OFF\r";
+        avr.Replies["DIM ?"] = "DIM BRI\r";
+        avr.Replies["PSSWL ?"] = "PSSWL ON\rPSSWL 50\r";
+        avr.Replies["PSDIL ?"] = "PSDIL OFF\rPSDIL 50\r";
+        avr.Replies["PSTONE CTRL ?"] = "PSTONE CTRL ON\r";
+        avr.Replies["PSBAS ?"] = "PSBAS 50\r";
+        avr.Replies["PSTRE ?"] = "PSTRE 50\r";
+        var (controller, state, telemetry, _, _) = await CreateRigAsync(avr, heos);
+        await controller.RefreshAsync();
+        Assert.Null(state.Snapshot.Acoustics); // Not read yet.
+
+        await controller.GetAcousticStatusAsync();
+        Assert.True(state.Snapshot.Acoustics!.DynamicEq);
+
+        await avr.PushAsync("PSDYNEQ OFF\rPSBAS 53\r"); // Changed on the remote's menu.
+
+        await WaitUntilAsync(() => state.Snapshot.Acoustics?.DynamicEq == false, "the pushed Dynamic EQ");
+        Assert.Equal(3, state.Snapshot.Acoustics!.BassDb);
+
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task An_acoustic_push_during_the_full_acoustic_read_is_kept()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        avr.Replies["PSDYNEQ ?"] = "PSDYNEQ ON\r";
+        // Dynamic EQ is turned off on the remote after PSDYNEQ ? answered, while the read asks for the treble.
+        avr.Replies["PSTRE ?"] = "PSDYNEQ OFF\rPSTRE 50\r";
+        var (controller, state, telemetry, _, _) = await CreateRigAsync(avr, heos);
+        await controller.RefreshAsync();
+
+        var read = await controller.GetAcousticStatusAsync();
+
+        Assert.False(read.DynamicEq);
+        Assert.False(state.Snapshot.Acoustics!.DynamicEq);
+        await Task.Delay(100); // The event task has the lines too: it must not bring back the older answer.
+        Assert.False(state.Snapshot.Acoustics!.DynamicEq);
+
+        await telemetry.DisposeAsync();
+    }
+
+    [Theory]
+    [InlineData("PSDYNEQ ON", "PSDYNEQ")]
+    [InlineData("PSSWL ON", "PSSWL:ONOFF")]
+    [InlineData("PSSWL 52", "PSSWL:LEVEL")]
+    [InlineData("DIM BRI", "DIM")]
+    [InlineData("PSSWL2 50", null)] // a second subwoofer: not read
+    [InlineData("PSBAS UP", null)]
+    [InlineData("MV45", null)]
+    public void An_acoustic_line_is_kept_per_setting(string line, string? key) =>
+        Assert.Equal(key, AvrLiveState.AcousticKey(line));
+
+    [Fact]
+    public async Task A_change_sent_just_before_the_link_closes_is_kept_and_an_old_link_is_ignored()
+    {
+        using var avr = new FakeAvr();
+        var client = new DenonAvrClient(avr.Port);
+        await client.GetStatusAsync(Loopback(), CancellationToken.None); // Opens link 1.
+        var firstLink = client.OpenLinkGeneration;
+
+        var seen = new TaskCompletionSource<AvrLiveState?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.LinesReceived += received =>
+        {
+            if (!received.Lines.Contains("PSDYNEQ OFF"))
+            {
+                return;
+            }
+
+            // Handle the event only once the link is closed, as when the event task is behind.
+            SpinWait.SpinUntil(() => client.OpenLinkGeneration == 0, TimeSpan.FromSeconds(5));
+            seen.TrySetResult(client.LatestLiveState(received));
+        };
+
+        await avr.PushAsync("PSDYNEQ OFF\r");
+        avr.DropAll(); // The receiver sends a change, then drops the link.
+
+        var live = await seen.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.NotNull(live);
+        Assert.False(live!.ApplyAcousticsTo(AcousticStatus.Empty).DynamicEq);
+
+        // A newer link is open: lines from the old one are old and change nothing.
+        await client.GetStatusAsync(Loopback(), CancellationToken.None);
+        Assert.True(client.OpenLinkGeneration > firstLink);
+        Assert.Null(client.LatestLiveState(new AvrLinesReceived("127.0.0.1", firstLink, ["MV10"], AvrLiveState.Empty.Apply("MV10"))));
+    }
+
+    [Fact]
+    public async Task A_pushed_change_then_a_drop_still_updates_the_state()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        avr.Replies["PSDYNEQ ?"] = "PSDYNEQ ON\r";
+        var (controller, state, telemetry, _, _) = await CreateRigAsync(avr, heos);
+        await controller.RefreshAsync();
+        await controller.GetAcousticStatusAsync();
+        Assert.True(state.Snapshot.Acoustics!.DynamicEq);
+
+        await avr.PushAsync("PSDYNEQ OFF\rMUON\r");
+        avr.DropAll();
+
+        await WaitUntilAsync(() => state.Snapshot.Acoustics?.DynamicEq == false, "the acoustic line before the drop");
+        await WaitUntilAsync(() => state.Snapshot.Status?.IsMuted == true, "the mute line before the drop");
+
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A_refused_command_sends_nothing_and_the_link_keeps_listening()
+    {
+        using var avr = new FakeAvr();
+        var client = new DenonAvrClient(avr.Port);
+        await client.GetStatusAsync(Loopback(), CancellationToken.None); // Opens the link.
+        avr.ClearCommands();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => client.SendRawCommandAsync(Loopback(), "SITV\rMV98", CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentException>(() => client.SetInputSourceAsync(Loopback(), "TV\nPWSTANDBY", CancellationToken.None));
+        Assert.Empty(avr.Commands);
+
+        var heard = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.LinesReceived += received =>
+        {
+            if (received.Lines.Contains("MUON"))
+            {
+                heard.TrySetResult();
+            }
+        };
+        await avr.PushAsync("MUON\r");
+        await heard.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(1, avr.Connections); // The same link.
+        Assert.True(client.GetLiveState("127.0.0.1").IsMuted);
+    }
+
+    [Fact]
+    public async Task After_a_drop_the_poll_connects_again_reads_the_full_state_and_slows_down_again()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        var (controller, state, telemetry, store, log) = await CreateRigAsync(avr, heos);
+        using var heosEvents = new HeosEventListenerService(store, state, controller, log);
+        using var poller = new ReceiverPollingService(controller, new DenonDiscoveryService(), store, heosEvents, log)
+        {
+            NormalIntervalOverride = TimeSpan.FromMilliseconds(150),
+            SlowIntervalOverride = TimeSpan.FromMinutes(5), // Only a wake can start the next read in this test.
+        };
+        await heosEvents.StartAsync(CancellationToken.None);
+        await poller.StartAsync(CancellationToken.None);
+        try
+        {
+            await WaitUntilAsync(() => poller.IsSlowCheck, "the slow check");
+            Assert.Equal(1, avr.Connections);
+
+            avr.ClearCommands();
+            avr.DropAll(); // The receiver restarts its network module.
+
+            // At once (the slow check waits 5 minutes): a new connection and the full read, then one more read at the
+            // normal pace to see that the new link holds, then the slow check again.
+            await WaitUntilAsync(() => avr.Connections >= 2, "a new connection");
+            await WaitUntilAsync(() => avr.Commands.Count(static c => c == "Z2?") >= 2, "the full read and one at the normal pace");
+            await WaitUntilAsync(() => poller.IsSlowCheck, "the slow check again");
+            var reads = avr.Commands.Count(static c => c == "PW?");
+            await Task.Delay(500);
+            Assert.Equal(reads, avr.Commands.Count(static c => c == "PW?")); // No read at the normal pace now.
+
+            // The new link listens too.
+            await avr.PushAsync("MUON\r");
+            await WaitUntilAsync(() => state.Snapshot.Status?.IsMuted == true, "a push on the new link");
+        }
+        finally
+        {
+            await poller.StopAsync(CancellationToken.None);
+            await heosEvents.StopAsync(CancellationToken.None);
+            await telemetry.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task A_silent_receiver_drops_the_link_and_the_poll_goes_back_to_its_normal_pace()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        var (controller, state, telemetry, store, log) = await CreateRigAsync(avr, heos);
+        using var heosEvents = new HeosEventListenerService(store, state, controller, log);
+        using var poller = new ReceiverPollingService(controller, new DenonDiscoveryService(), store, heosEvents, log)
+        {
+            NormalIntervalOverride = TimeSpan.FromMilliseconds(150),
+            SlowIntervalOverride = TimeSpan.FromMilliseconds(300),
+        };
+        await heosEvents.StartAsync(CancellationToken.None);
+        await poller.StartAsync(CancellationToken.None);
+        try
+        {
+            await WaitUntilAsync(() => poller.IsSlowCheck, "the slow check");
+
+            avr.Silent = true; // A half-open link: the receiver reads, and never answers.
+            await WaitUntilAsync(() => !poller.IsSlowCheck, "the normal pace", seconds: 10);
+
+            avr.Silent = false;
+            await WaitUntilAsync(() => avr.Connections >= 2, "a new connection", seconds: 10);
+            await WaitUntilAsync(() => poller.IsSlowCheck, "the slow check again", seconds: 10);
+        }
+        finally
+        {
+            await poller.StopAsync(CancellationToken.None);
+            await heosEvents.StopAsync(CancellationToken.None);
+            await telemetry.DisposeAsync();
+        }
+    }
+
     // ---- Fakes ---------------------------------------------------------------------------------------------------
 
     /// <summary>Runs posted continuations on one thread, like the WPF Dispatcher.</summary>
@@ -499,6 +960,42 @@ public sealed class ReceiverTransportTests : IDisposable
 
         public void ClearCommands() => _commands.Clear();
 
+        private readonly ConcurrentDictionary<TcpClient, NetworkStream> _open = new();
+
+        /// <summary>Sends text to every open connection, with no command first: what the receiver pushes by itself.</summary>
+        public async Task PushAsync(string text)
+        {
+            var bytes = Encoding.UTF8.GetBytes(text);
+            foreach (var stream in _open.Values)
+            {
+                await stream.WriteAsync(bytes);
+            }
+        }
+
+        /// <summary>Closes every open connection (the receiver restarts, or another app takes the port).</summary>
+        public void DropAll()
+        {
+            foreach (var client in _open.Keys)
+            {
+                _open.TryRemove(client, out _);
+                client.Dispose();
+            }
+        }
+
+        public async Task WaitForConnectionsAsync(int count)
+        {
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            while (Connections < count || _open.Count == 0)
+            {
+                if (DateTime.UtcNow > deadline)
+                {
+                    throw new TimeoutException($"The fake has {Connections} connections, not {count}.");
+                }
+
+                await Task.Delay(10);
+            }
+        }
+
         public async Task WaitForCommandAsync(string command)
         {
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
@@ -547,6 +1044,7 @@ public sealed class ReceiverTransportTests : IDisposable
             using (client)
             {
                 var stream = client.GetStream();
+                _open[client] = stream;
                 var buffer = new byte[4096];
                 var pending = new StringBuilder();
                 try
@@ -599,6 +1097,10 @@ public sealed class ReceiverTransportTests : IDisposable
                 catch
                 {
                     // Connection closed.
+                }
+                finally
+                {
+                    _open.TryRemove(client, out _);
                 }
             }
         }

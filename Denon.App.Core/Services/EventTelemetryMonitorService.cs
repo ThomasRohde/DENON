@@ -840,6 +840,15 @@ public sealed partial class EventTelemetryMonitorService : BackgroundService
         _held[eventName] = new HeldChange { Event = eventName, From = from, To = to, Since = nowUtc, Hold = hold, Origin = origin, Data = data };
     }
 
+    /// <summary>Writes the pending volume.settled when the volume held still long enough by <paramref name="nowUtc"/> (tests).</summary>
+    internal void EvaluateVolumeSettle(DateTimeOffset nowUtc)
+    {
+        lock (_sync)
+        {
+            EvaluateVolumeSettleLocked(nowUtc, _settingsStore.Current.Telemetry.VolumeSettleMs);
+        }
+    }
+
     /// <summary>Writes the held changes that have held long enough by <paramref name="nowUtc"/> (the tick, and tests).</summary>
     internal void EvaluateHeldChanges(DateTimeOffset nowUtc)
     {

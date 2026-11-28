@@ -134,7 +134,8 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0">
                                 <TextBlock Text="Poll Interval (sec)" FontSize="{DynamicResource FontSize06}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="{skin:Space 0,0,0,5}" />
-                                <TextBox Text="{Binding SettingsPollIntervalSeconds, UpdateSourceTrigger=PropertyChanged}" Margin="{skin:Space 0,0,0,12}" />
+                                <TextBox Text="{Binding SettingsPollIntervalSeconds, UpdateSourceTrigger=PropertyChanged}" Margin="{skin:Space 0,0,0,12}"
+                                         ToolTip="How often the app reads the receiver when it gets no live updates. While the receiver sends its changes live, a full check runs at 9 times this value (30 to 60 s)." />
                             </StackPanel>
                             <StackPanel Grid.Column="2">
                                 <TextBlock Text="Safety Low Volume (0-98)" FontSize="{DynamicResource FontSize06}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="{skin:Space 0,0,0,5}" />
