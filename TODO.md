@@ -35,7 +35,10 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
       subscription cleanup). Left as is: #44 F5 (scan only DLLs with a deps.json; a third-party plugin without one
       would be skipped) and the plugin view dispose hook (#69 F3, a feature).
 - [ ] Not in PR 6: a parameter form on the Plugins page for actions that need input (#78).
-- [ ] PR 7: Smart TV plugin: #34, #47, the Smart TV part of #68.
+- [x] PR 7: Smart TV plugin. #34, #47 and #68 closed (with PR 6's per-plugin event queues, a TV wake no longer
+      delays the other plugins).
+- [ ] Verify PR 7 live (needs the user, it uses the TV): the screen preview and the trackpad still work (they now
+      check that the TV's addresses are on the LAN), and "Wake TV with the receiver" without a MAC wakes the TV.
 - [ ] PR 8: YouTube and Cinema: #33, #51, #52, #56, the Cinema parts of #53 and #71. Add a Cinema guard too: open
       and navigate only http/https (defense in depth for #29).
 - [ ] PR 9: desktop shell: #53, #54, #55 (tray shows dB; show the 0–98 number), #71.

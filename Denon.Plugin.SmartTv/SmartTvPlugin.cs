@@ -347,7 +347,8 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
             {
                 if (receiverEvent.Snapshot.IsPoweredOn)
                 {
-                    if (_config.WakeWithDenonPowerOn && !string.IsNullOrWhiteSpace(_config.MacAddress))
+                    // No MAC is needed: without one, PowerOnAsync wakes the TV through HDMI-CEC (a Cast device).
+                    if (_config.WakeWithDenonPowerOn)
                     {
                         await ExecuteActionAsync("tv.power_on", null, cancellationToken);
                     }
@@ -546,10 +547,17 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
         }
 
         _viewModel?.ApplyLiveState(state);
-        EmitTvTelemetryDeltas(state);
-        LogProgramChange(state);
+        lock (_telemetrySync)
+        {
+            EmitTvTelemetryDeltas(state);
+            LogProgramChange(state);
+        }
+
         UpdateHealthStatus();
     }
+
+    /// <summary>The TV client raises state changes from several threads: the telemetry deltas run one at a time.</summary>
+    private readonly object _telemetrySync = new();
 
     /// <summary>Fetches the logos of the TV's channel list (once per list; see <see cref="ChannelLogoCache"/>).</summary>
     private void OnChannelListLoaded(IReadOnlyList<LgTvChannel> channels)
@@ -1619,6 +1627,10 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
             var label = string.IsNullOrWhiteSpace(live.ModelName) ? _config.TvName : live.ModelName;
             var screenTag = live.IsScreenOff ? " • Screen Off" : string.Empty;
             _context?.ReportStatus($"LIVE • {label} • {live.NowShowingSummary}{screenTag}", PluginHealthState.Connected, BuildStatusDetails(live));
+        }
+        else if (_client.NeedsRePairing)
+        {
+            _context?.ReportStatus($"The TV asks to pair again • open the LG TV page and click Pair ({_config.TvIp})", PluginHealthState.Warning);
         }
         else if (!string.IsNullOrWhiteSpace(_config.TvIp) && !string.IsNullOrWhiteSpace(_config.ClientKey))
         {

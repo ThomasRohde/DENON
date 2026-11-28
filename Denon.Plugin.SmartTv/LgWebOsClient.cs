@@ -74,13 +74,101 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
         "browser",
     ];
 
-    private static readonly HttpClient SnapshotHttpClient = new(new HttpClientHandler
+    private static readonly HttpClient SnapshotHttpClient = CreateSnapshotClient();
+
+    /// <summary>
+    /// Connects only to LAN IP addresses (checked after DNS, so a TV set up by host name works and a name that points
+    /// at the internet does not). On such a connection the TV's self-signed certificate is accepted. At most 10 MB.
+    /// </summary>
+    private static HttpClient CreateSnapshotClient()
     {
-        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
-    })
+        var handler = new SocketsHttpHandler
+        {
+            ConnectCallback = async (context, ct) =>
+            {
+                var lan = await ResolveLanAddressesAsync(context.DnsEndPoint.Host, ct);
+                if (lan.Length == 0)
+                {
+                    throw new HttpRequestException($"'{context.DnsEndPoint.Host}' is not a LAN address.");
+                }
+
+                var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+                try
+                {
+                    await socket.ConnectAsync(lan, context.DnsEndPoint.Port, ct);
+                    return new NetworkStream(socket, ownsSocket: true);
+                }
+                catch
+                {
+                    socket.Dispose();
+                    throw;
+                }
+            },
+        };
+        handler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true; // The connection is to the LAN only.
+        return new HttpClient(handler)
+        {
+            Timeout = TimeSpan.FromSeconds(8),
+            MaxResponseContentBufferSize = 10 * 1024 * 1024,
+        };
+    }
+
+    /// <summary>The LAN IP addresses of a host: the literal itself, or the DNS answers that are on the LAN.</summary>
+    internal static async Task<IPAddress[]> ResolveLanAddressesAsync(string host, CancellationToken ct)
     {
-        Timeout = TimeSpan.FromSeconds(8),
-    };
+        if (IPAddress.TryParse(host.Trim('[', ']'), out var literal))
+        {
+            return IsLanAddress(literal.ToString()) ? [literal] : [];
+        }
+
+        try
+        {
+            var addresses = await Dns.GetHostAddressesAsync(host, ct);
+            return addresses.Where(static a => IsLanAddress(a.ToString())).ToArray();
+        }
+        catch (SocketException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>An IP address on the LAN (IPv4 private or link-local, IPv6 unique-local or link-local).</summary>
+    internal static bool IsLanAddress(string? host)
+    {
+        if (!IPAddress.TryParse((host ?? string.Empty).Trim('[', ']'), out var ip))
+        {
+            return false;
+        }
+
+        if (ip.IsIPv4MappedToIPv6)
+        {
+            ip = ip.MapToIPv4();
+        }
+
+        if (ip.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            return ip.IsIPv6LinkLocal || ip.IsIPv6UniqueLocal;
+        }
+
+        var b = ip.GetAddressBytes();
+        return b[0] == 10 || (b[0] == 172 && b[1] is >= 16 and <= 31) || (b[0] == 192 && b[1] == 168) || (b[0] == 169 && b[1] == 254);
+    }
+
+    /// <summary>
+    /// An address the TV sent (a screenshot or the pointer socket) must use one of the given schemes and name the TV:
+    /// a LAN IP, or the configured TV host. A host name is checked again after DNS when connecting (it must resolve to
+    /// the LAN), so a configured name that points at the internet is still refused.
+    /// </summary>
+    internal static bool IsTvLanUri(string? value, string tvHost, params string[] schemes)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
+            !schemes.Any(scheme => string.Equals(uri.Scheme, scheme, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        return string.Equals(uri.Host, tvHost, StringComparison.OrdinalIgnoreCase) || IsLanAddress(uri.Host);
+    }
 
     // Empirically calibrated LG webOS pointer logical coordinate space (1280x720 with uniform small deltas).
     private const int LogicalScreenWidth = 1280;
@@ -143,6 +231,11 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
 
     public bool IsConnected => _ws?.State == WebSocketState.Open || _demoMode;
 
+    /// <summary>Set when the TV refused the saved key; background reconnects wait until the user pairs again.</summary>
+    private volatile bool _rePairNeeded;
+
+    public bool NeedsRePairing => _rePairNeeded;
+
     public void Configure(string tvIp, string clientKey, bool demoMode, string? fallbackModel = null, string? fallbackWebOs = null)
     {
         var cleanIp = CleanHost(tvIp);
@@ -155,6 +248,10 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
         _configuredIp = cleanIp;
         _configuredClientKey = cleanKey;
         _demoMode = demoMode;
+        if (endpointChanged)
+        {
+            _rePairNeeded = false; // A new TV or key: try it.
+        }
 
         if (_demoMode)
         {
@@ -994,6 +1091,11 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
                     $"TV firmware did not return an imageUri for executeOneShot. {lastEx?.Message}".Trim());
             }
 
+            if (!IsTvLanUri(imageUri, _configuredIp, "http", "https"))
+            {
+                throw new InvalidOperationException($"The TV returned an unexpected screenshot address ({imageUri}).");
+            }
+
             var bytes = await SnapshotHttpClient.GetByteArrayAsync(imageUri, ct);
             var mime = imageUri.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ? "image/png" : "image/jpeg";
             return new LgTvScreenshotResult(
@@ -1332,6 +1434,7 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
             try
             {
                 if (!_demoMode &&
+                    !_rePairNeeded &&
                     !string.IsNullOrWhiteSpace(_configuredIp) &&
                     !string.IsNullOrWhiteSpace(_configuredClientKey))
                 {
@@ -1403,7 +1506,21 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
             await DisconnectCoreLockedAsync();
 
             var (ws, transport) = await OpenWebSocketAsync(_configuredIp, ct);
-            var key = await RegisterSessionCoreAsync(ws, allowInteractivePairing, forcePairing, ct);
+            string key;
+            try
+            {
+                key = await RegisterSessionCoreAsync(ws, allowInteractivePairing, forcePairing, ct);
+            }
+            catch
+            {
+                ws.Dispose();
+                throw;
+            }
+
+            if (allowInteractivePairing)
+            {
+                _rePairNeeded = false;
+            }
 
             _ws = ws;
             _transportLabel = transport;
@@ -1536,10 +1653,15 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
                 throw new InvalidOperationException(err ?? "LG TV rejected registration.");
             }
 
-            // "response" with pairingType="PROMPT" means the TV is now showing the Accept dialog — keep waiting!
+            // "response" with pairingType="PROMPT" means the TV is now showing the Accept dialog. On a background
+            // reconnect with the saved key, that means the TV no longer knows the key: stop here and wait for the
+            // user to pair, or the TV would show the dialog again on every retry (about every 30 s).
             if (string.Equals(type, "response", StringComparison.OrdinalIgnoreCase) && !allowInteractivePairing && !string.IsNullOrWhiteSpace(existingKey))
             {
-                DiagnosticLog?.Invoke("LG TV requested re-confirmation for stored client key.");
+                _rePairNeeded = true;
+                DiagnosticLog?.Invoke("The TV no longer accepts the saved key. Pair again on the LG TV page; reconnects stop until then.");
+                UpdateState(s2 => s2 with { IsConnected = false });
+                throw new InvalidOperationException("The TV asks to pair again. Open the LG TV page and click Pair.");
             }
         }
 
@@ -2096,6 +2218,12 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
             throw new InvalidOperationException("LG TV did not return a pointer input socketPath. Try clicking 'Re-Pair (Full Permissions)'.");
         }
 
+        if (!IsTvLanUri(socketPath, _configuredIp, "ws", "wss") ||
+            (await ResolveLanAddressesAsync(new Uri(socketPath).Host, ct)).Length == 0)
+        {
+            throw new InvalidOperationException($"The TV returned an unexpected pointer socket address ({socketPath}).");
+        }
+
         var pws = new ClientWebSocket();
         pws.Options.KeepAliveInterval = TimeSpan.FromSeconds(15);
         if (socketPath.StartsWith("wss://", StringComparison.OrdinalIgnoreCase))
@@ -2103,9 +2231,18 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
             pws.Options.RemoteCertificateValidationCallback = (_, _, _, _) => true;
         }
 
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(TimeSpan.FromSeconds(4));
-        await pws.ConnectAsync(new Uri(socketPath), cts.Token);
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(4));
+            await pws.ConnectAsync(new Uri(socketPath), cts.Token);
+        }
+        catch
+        {
+            pws.Dispose();
+            throw;
+        }
+
         _pointerWs = pws;
 
         UpdateState(s => s with { IsPointerConnected = true });
@@ -2219,33 +2356,46 @@ public sealed partial class LgWebOsClient : IAsyncDisposable
             _sessionCts = null;
         }
 
-        if (_pointerWs is not null)
+        // Take each socket out first, so a pointer send in flight sees null, not a disposed socket. A close on a
+        // half-open link (the TV unplugged) waits for TCP to give up: at most 1 s here.
+        var pointer = Interlocked.Exchange(ref _pointerWs, null);
+        var main = Interlocked.Exchange(ref _ws, null);
+        await CloseQuietlyAsync(pointer);
+        await CloseQuietlyAsync(main);
+
+        // The receive loop no longer owns this socket, so it will not publish the drop: do it here.
+        if (main is not null || pointer is not null)
         {
-            try
+            UpdateState(s => s with
             {
-                if (_pointerWs.State == WebSocketState.Open)
-                {
-                    await _pointerWs.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
-                }
-            }
-            catch { }
-            _pointerWs.Dispose();
-            _pointerWs = null;
+                IsConnected = s.IsDemo && s.IsConnected,
+                IsPointerConnected = false,
+                TransportLabel = s.IsDemo ? s.TransportLabel : "OFFLINE",
+            });
+        }
+    }
+
+    private static async Task CloseQuietlyAsync(ClientWebSocket? socket)
+    {
+        if (socket is null)
+        {
+            return;
         }
 
-        if (_ws is not null)
+        try
         {
-            try
+            if (socket.State == WebSocketState.Open)
             {
-                if (_ws.State == WebSocketState.Open)
-                {
-                    await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
-                }
+                using var closeCts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+                await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", closeCts.Token);
             }
-            catch { }
-            _ws.Dispose();
-            _ws = null;
         }
+        catch
+        {
+            // Closed or timed out: dispose below aborts it.
+        }
+
+        socket.Dispose();
     }
 
     private async Task SendRawTextAsync(ClientWebSocket ws, string json, CancellationToken ct)

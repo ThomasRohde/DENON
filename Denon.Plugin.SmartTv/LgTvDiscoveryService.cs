@@ -209,6 +209,10 @@ public static partial class LgTvDiscoveryService
 
                 var location = match.Groups[1].Value.Trim();
                 var ip = resp.RemoteEndPoint.Address.ToString();
+                if (!IsLocationOnResponder(location, ip))
+                {
+                    continue;
+                }
 
                 lock (sync)
                 {
@@ -279,4 +283,10 @@ public static partial class LgTvDiscoveryService
 
     [GeneratedRegex(@"^LOCATION:\s*(\S+)", RegexOptions.IgnoreCase | RegexOptions.Multiline)]
     private static partial Regex LocationRegex();
+
+    /// <summary>True when the SSDP LOCATION is an http(s) address on the device that sent the answer.</summary>
+    internal static bool IsLocationOnResponder(string location, string responderIp) =>
+        Uri.TryCreate(location, UriKind.Absolute, out var uri) &&
+        (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) &&
+        string.Equals(uri.Host, responderIp, StringComparison.OrdinalIgnoreCase);
 }

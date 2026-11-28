@@ -34,6 +34,7 @@ public partial class SmartTvDashboardView : UserControl
     private void OnViewUnloaded(object sender, RoutedEventArgs e)
     {
         ViewModel?.SetViewVisible(false);
+        _markerCts?.Cancel();
     }
 
     private void PreviewSurface_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -173,7 +174,7 @@ public partial class SmartTvDashboardView : UserControl
             try
             {
                 await Task.Delay(550, cts.Token);
-                Dispatcher.Invoke(() => ClickMarker.Visibility = Visibility.Collapsed);
+                _ = Dispatcher.InvokeAsync(() => ClickMarker.Visibility = Visibility.Collapsed);
             }
             catch
             {

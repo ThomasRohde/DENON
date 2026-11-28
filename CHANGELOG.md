@@ -4,6 +4,24 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **The TV no longer asks to pair every half minute after it forgot the key** (#47). When the TV refuses the saved
+  key, the app stops reconnecting and the LG TV card says "The TV asks to pair again". Before, a background
+  reconnect showed the TV's Accept dialog again about every 30 s and left a socket open each time.
+- **A disconnect from an unplugged TV takes at most a second per socket** (#47), not up to 20 s, so the other
+  plugins still get their stop time at exit. A failed connect or pointer socket is closed, not left open.
+- **"Wake TV with the receiver" also works without a MAC address** (#68). It wakes the TV through HDMI-CEC (the
+  Cast device on the TV), as Power On does. Before, the option did nothing without a MAC.
+- TV events that arrive from several threads no longer mix up the TV's Insights entries (#68). The screen preview
+  sets its status on the UI thread, and the click marker no longer blocks a background thread.
+
+### Security
+- **The LG TV plugin trusts only LAN addresses** (#34). A screenshot or pointer-socket address the TV sends must be
+  the TV on the LAN (not this PC, not the internet). A self-signed certificate is accepted only from a LAN address.
+  A screenshot is at most 10 MB. In Auto-Discover, an SSDP answer must point at the device that sent it.
+
 ## [2.10.25] - 2026-11-28
 
 ### Fixed
