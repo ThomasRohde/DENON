@@ -79,10 +79,13 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     private string _keyboardText = string.Empty;
     private string _youtubeUrlOrId = string.Empty;
     private string _toastText = "Denon Desktop • Home Theater Ready";
-    private string _statusMessage = "Click Auto-Discover TV or enter your LG webOS TV IP & click Pair.";
+    /// <summary>The first-run hint; a paired TV starts with no message.</summary>
+    private const string NotPairedHint = "Open Settings, then click Auto-Discover TV, or enter the TV's IP address and click Pair with LG TV.";
+
+    private string _statusMessage = NotPairedHint;
     private string _appsCountBadge = "7 quick apps";
     private bool _isBusy;
-    private bool _isSetupExpanded = true;
+    private string _selectedTab = SmartTvConfig.WatchTab;
     private bool _suppressAutoSave;
 
     public SmartTvDashboardViewModel(SmartTvPlugin plugin)
@@ -96,11 +99,6 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
         RefreshCommand = new AsyncRelayCommand(_ => RefreshStateAsync());
         SaveCommand = new AsyncRelayCommand(_ => SaveAsync());
         ToggleDemoCommand = new AsyncRelayCommand(_ => ToggleDemoAsync());
-        ToggleSetupCommand = new AsyncRelayCommand(_ =>
-        {
-            IsSetupExpanded = !IsSetupExpanded;
-            return Task.CompletedTask;
-        });
         RunActionCommand = new AsyncRelayCommand(p => p is string act ? RunActionAsync(act) : Task.CompletedTask);
         SwitchInputCommand = new AsyncRelayCommand(p => p is string input ? SwitchInputAsync(input) : Task.CompletedTask);
         LaunchAppCommand = new AsyncRelayCommand(p => p is string appId ? LaunchAppAsync(appId) : Task.CompletedTask);
@@ -141,7 +139,6 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     public ICommand RefreshCommand { get; }
     public ICommand SaveCommand { get; }
     public ICommand ToggleDemoCommand { get; }
-    public ICommand ToggleSetupCommand { get; }
     public ICommand RunActionCommand { get; }
     public ICommand SwitchInputCommand { get; }
     public ICommand LaunchAppCommand { get; }
@@ -179,19 +176,40 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 
     public string DemoButtonLabel => DemoMode ? "Exit Demo" : "Try Demo";
 
-    public bool IsSetupExpanded
-    {
-        get => _isSetupExpanded;
-        set
-        {
-            if (Set(ref _isSetupExpanded, value))
-            {
-                Raise(nameof(SetupToggleLabel));
-            }
-        }
-    }
+    // The page's tabs, by how often each control is used: Watch (power, inputs, sound), Remote, Apps, Settings.
+    // A RadioButton sets its own to true; the false for the one it replaces changes nothing.
+    public bool IsWatchTab { get => _selectedTab == SmartTvConfig.WatchTab; set { if (value) SelectTab(SmartTvConfig.WatchTab); } }
 
-    public string SetupToggleLabel => IsSetupExpanded ? "Hide Setup ▴" : "Setup ▾";
+    public bool IsRemoteTab { get => _selectedTab == SmartTvConfig.RemoteTab; set { if (value) SelectTab(SmartTvConfig.RemoteTab); } }
+
+    public bool IsAppsTab { get => _selectedTab == SmartTvConfig.AppsTab; set { if (value) SelectTab(SmartTvConfig.AppsTab); } }
+
+    public bool IsSettingsTab { get => _selectedTab == SmartTvConfig.SettingsTab; set { if (value) SelectTab(SmartTvConfig.SettingsTab); } }
+
+    /// <summary>
+    /// Shows a tab. A tab the person picks is kept for the next visit (<paramref name="remember"/>); one the page
+    /// opens by itself (Settings while the TV is not paired) is not. The screen preview refreshes only on Remote.
+    /// </summary>
+    private void SelectTab(string tab, bool remember = true)
+    {
+        tab = SmartTvConfig.NormalizeTab(tab);
+        if (remember)
+        {
+            _ = _plugin.SaveDashboardTabAsync(tab);
+        }
+
+        if (_selectedTab == tab)
+        {
+            return;
+        }
+
+        _selectedTab = tab;
+        Raise(nameof(IsWatchTab));
+        Raise(nameof(IsRemoteTab));
+        Raise(nameof(IsAppsTab));
+        Raise(nameof(IsSettingsTab));
+        UpdatePreviewLoop();
+    }
 
     public bool WakeWithDenon
     {
@@ -509,7 +527,11 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
                 Raise(nameof(SelectedCastDevice));
 
                 var isConfigured = cfg.DemoMode || (!string.IsNullOrWhiteSpace(cfg.TvIp) && !string.IsNullOrWhiteSpace(cfg.ClientKey));
-                IsSetupExpanded = !isConfigured;
+                SelectTab(isConfigured ? cfg.DashboardTab : SmartTvConfig.SettingsTab, remember: false);
+                if (isConfigured && StatusMessage == NotPairedHint)
+                {
+                    StatusMessage = string.Empty;
+                }
 
                 if (!string.IsNullOrWhiteSpace(cfg.LastModelName) && ModelSummary == "Not paired yet")
                 {
@@ -664,7 +686,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 
     private async Task DiscoverAsync()
     {
-        IsSetupExpanded = true;
+        SelectTab(SmartTvConfig.SettingsTab, remember: false);
         IsBusy = true;
         StatusMessage = "Scanning local LAN for LG webOS Smart TVs (SSDP + ARP)...";
         try
@@ -745,7 +767,6 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
         {
             StatusMessage = $"✓ {await _plugin.PairTvAsync(TvIp, forcePairing)}";
             SyncFromConfig(_plugin.Config);
-            IsSetupExpanded = false;
             ApplyLiveState(_plugin.Client.CurrentState);
         }
         catch (Exception ex)
@@ -800,6 +821,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
             LastModelName = _plugin.Config.LastModelName,
             LastWebOsVersion = _plugin.Config.LastWebOsVersion,
             CecWakeCastDevice = _cecWakeCastDevice,
+            DashboardTab = _plugin.Config.DashboardTab,
         });
         StatusMessage = quiet ? "✓ Coordination setting saved automatically." : "✓ Saved Smart TV settings.";
     }
@@ -1151,7 +1173,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
         _previewLoopCts?.Dispose();
         _previewLoopCts = null;
 
-        if (!_autoRefreshPreview || !_isViewVisible)
+        if (!_autoRefreshPreview || !_isViewVisible || !IsRemoteTab)
         {
             return;
         }

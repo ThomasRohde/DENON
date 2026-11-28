@@ -113,7 +113,9 @@ prompt is wired (`create_or_update_automation`) but not tried with a real agent.
 - [ ] Check a wake from deep standby (TV off for hours) with "Automatic".
 - [x] "TV on → Live TV" looks again 10 s after the switch (HDMI-CEC pulled the TV back to the Chromecast on
       2026-11-28) and ends with the receiver on the TV input.
-- [ ] Check live: TV on with the app → Live TV and TV audio; a cast from the iPhone → the cast stays.
+- [x] Checked live on 2026-11-28: TV on → Live TV and TV audio works.
+- [ ] Check live: a cast from the iPhone while the TV is off → the cast stays.
+- [x] TV page tabs (Watch, Remote, Apps, Settings); the last tab is kept (`DashboardTab`). Checked in the app.
 - [x] "TV on → Live TV" example and the "Recent event" condition (2.10.12). Not when a cast or the Apple TV woke the TV.
 - [ ] Check "TV on → Live TV" live: TV remote on (HDMI 1 → Live TV), and a cast from the iPhone (stays on the cast).
 - [x] Station logos are cached in memory and in `art-cache`; the last started station is kept in `last-station.txt`
