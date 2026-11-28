@@ -100,6 +100,9 @@ public sealed class LocalMediaJukeboxService : IDisposable
         _stateStore.StateChanged += OnReceiverStateChanged;
     }
 
+    /// <summary>Reads the tags of one track now, on this thread (for tests).</summary>
+    internal bool ReadTagsNowForTest(string trackId) => ReadTagsInto(trackId);
+
     /// <summary>Completes when the tag worker has no more files to read (for tests).</summary>
     internal Task WhenTagsReadAsync()
     {
@@ -797,7 +800,20 @@ public sealed class LocalMediaJukeboxService : IDisposable
 
         // The file information comes before the read: a change during the read makes the next check read it again.
         var fileBeforeRead = new FileInfo(track.FilePath);
-        var updated = WithTags(track, AudioTagReader.Read(track.FilePath, includeCoverArt: _coverArtCache is not null), _coverArtCache, fileBeforeRead);
+        AudioTags tags;
+        try
+        {
+            using var stream = new FileStream(
+                track.FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096, FileOptions.RandomAccess);
+            tags = AudioTagReader.Read(stream, includeCoverArt: _coverArtCache is not null, Path.GetExtension(track.FilePath));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // A locked or unreadable file is not marked as read: the worker or the next play tries again.
+            return false;
+        }
+
+        var updated = WithTags(track, tags, _coverArtCache, fileBeforeRead);
         lock (_sync)
         {
             var index = _tracks.FindIndex(t => string.Equals(t.TrackId, trackId, StringComparison.Ordinal));

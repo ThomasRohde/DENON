@@ -247,6 +247,27 @@ public sealed class MediaQueueTests : IDisposable
     }
 
     [Fact]
+    public async Task A_locked_file_is_read_again_when_the_lock_is_gone()
+    {
+        var file = WriteFlac("locked.flac", title: "Tag Title", artist: "Artist", album: "Album", seconds: 90, cover: null);
+        var (jukebox, _, _) = CreateJukebox();
+        using (new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            jukebox.AddPaths([file]);
+            await jukebox.WhenTagsReadAsync();
+            Assert.False(Assert.Single(jukebox.Snapshot.Tracks).TagsRead);
+        }
+
+        // The next read (the worker or a play) gets the tags.
+        var id = Assert.Single(jukebox.Snapshot.Tracks).TrackId;
+        Assert.True(jukebox.ReadTagsNowForTest(id));
+        var track = Assert.Single(jukebox.Snapshot.Tracks);
+        Assert.True(track.TagsRead);
+        Assert.Equal("Tag Title", track.Title);
+        Assert.Equal(TimeSpan.FromSeconds(90), track.Duration);
+    }
+
+    [Fact]
     public void Shuffle_and_repeat_come_back_with_an_empty_queue()
     {
         var (jukebox, store, _) = CreateJukebox();
