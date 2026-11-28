@@ -575,7 +575,8 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
         _config.MusicSync.Enabled = enabled;
         if (!enabled)
         {
-            await EndStartupSyncAsync();
+            // The startup sync keeps running (it reads the rooms, lights and areas). If it is starting the stream
+            // now, that start sees Music Sync off when it finishes and stops the stream itself.
             StopDemoBeatSimulator();
             if (_entertainmentClient is not null)
             {
@@ -584,6 +585,20 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
         }
         else
         {
+            if (!_config.DemoMode && IsConfigured && (_entertainmentAreas.Count == 0 || _cachedLights.Count == 0))
+            {
+                // The first bridge read did not finish (or failed): read it now, so the stream has an area and the
+                // REST path has lights.
+                try
+                {
+                    await RefreshBridgeStateAsync(cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _context?.Logger.Warning($"Hue bridge read before Music Sync failed: {ex.Message}");
+                }
+            }
+
             await EnsureDtlsStreamAsync(cancellationToken);
         }
 
