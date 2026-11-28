@@ -28,6 +28,16 @@ public sealed class BundleExtractionCleanupTests : IDisposable
         Assert.Equal(Path.Combine(@"D:\x", "App"), BundleExtractionCleanupService.GetExtractionAppRoot(@"D:\x\", @"C:\t", "App"));
     }
 
+    [Theory]
+    [InlineData(@"extract")]
+    [InlineData(@"..\extract")]
+    [InlineData(@"\extract")]
+    [InlineData(@"C:extract")]
+    public void A_base_dir_variable_that_is_not_a_full_path_turns_cleanup_off(string baseDir)
+    {
+        Assert.Null(BundleExtractionCleanupService.GetExtractionAppRoot(baseDir, @"C:\t", "App"));
+    }
+
     [Fact]
     public void Extraction_folders_come_from_paths_inside_the_app_root_only()
     {

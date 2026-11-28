@@ -33,6 +33,10 @@ internal static class BundleExtractionCleanupService
 
         var appName = Path.GetFileNameWithoutExtension(processPath);
         var appRoot = GetExtractionAppRoot(Environment.GetEnvironmentVariable(BaseDirVariable), Path.GetTempPath(), appName);
+        if (appRoot is null)
+        {
+            return CleanupResult.None;
+        }
 
         // The host puts the extraction folder on the native DLL search path; the loaded DLLs confirm it.
         var ownPaths = new List<string>();
@@ -83,11 +87,19 @@ internal static class BundleExtractionCleanupService
         return DeleteOldFolders(appRoot, keep, DateTime.UtcNow, MinimumAge);
     }
 
-    /// <summary>The folder that holds one extraction folder per build: <c>&lt;base&gt;\&lt;app name&gt;</c>.</summary>
-    internal static string GetExtractionAppRoot(string? baseDirOverride, string tempPath, string appName)
+    /// <summary>
+    /// The folder that holds one extraction folder per build: <c>&lt;base&gt;\&lt;app name&gt;</c>. Null when
+    /// <c>DOTNET_BUNDLE_EXTRACT_BASE_DIR</c> is set but is not a full path: the host resolves such a value against
+    /// its own working folder, so the app does not guess where that is and deletes nothing.
+    /// </summary>
+    internal static string? GetExtractionAppRoot(string? baseDirOverride, string tempPath, string appName)
     {
-        var baseDir = string.IsNullOrWhiteSpace(baseDirOverride) ? Path.Combine(tempPath, ".net") : baseDirOverride;
-        return Normalize(Path.Combine(baseDir, appName));
+        if (string.IsNullOrWhiteSpace(baseDirOverride))
+        {
+            return Normalize(Path.Combine(tempPath, ".net", appName));
+        }
+
+        return Path.IsPathFullyQualified(baseDirOverride) ? Normalize(Path.Combine(baseDirOverride, appName)) : null;
     }
 
     /// <summary>The extraction folders (direct children of <paramref name="appRoot"/>) that the paths are in.</summary>
