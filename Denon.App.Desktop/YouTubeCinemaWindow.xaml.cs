@@ -210,27 +210,29 @@ public partial class YouTubeCinemaWindow : Window
             `;
 
             // The receiver part of the HUD (#79): the main window sends its state, the buttons send commands.
+            // Writes only what changed: a text write is a DOM mutation, and the page's MutationObserver calls this
+            // again, so an unconditional write would loop every frame.
+            const setText = (el, text) => {
+                if (el && el.textContent !== text) el.textContent = text;
+            };
+            const setAttr = (el, name, value) => {
+                if (el && el.getAttribute(name) !== value) el.setAttribute(name, value);
+            };
             const renderHud = (hud) => {
                 const s = window.__denonHudState;
                 if (!hud || !s) return;
                 const play = hud.querySelector('#denon-hud-play');
-                if (play) {
-                    play.textContent = s.playing ? '⏸' : '▶';
-                    play.title = s.playing ? 'Pause' : 'Play';
-                    play.setAttribute('aria-label', play.title);
-                }
+                const playLabel = s.playing ? 'Pause' : 'Play';
+                setText(play, s.playing ? '⏸' : '▶');
+                setAttr(play, 'title', playLabel);
+                setAttr(play, 'aria-label', playLabel);
                 const vol = hud.querySelector('#denon-hud-vol');
-                if (vol) {
-                    vol.textContent = s.muted ? `Muted ${s.volume}` : `Vol ${s.volume}`;
-                    vol.classList.toggle('muted', !!s.muted);
-                }
+                setText(vol, s.muted ? `Muted ${s.volume}` : `Vol ${s.volume}`);
+                vol?.classList.toggle('muted', !!s.muted);
                 const mute = hud.querySelector('#denon-hud-mute');
-                if (mute) {
-                    mute.textContent = s.muted ? 'Unmute' : 'Mute';
-                    mute.classList.toggle('denon-hud-on', !!s.muted);
-                }
-                const note = hud.querySelector('#denon-hud-note');
-                if (note) note.textContent = s.note || '';
+                setText(mute, s.muted ? 'Unmute' : 'Mute');
+                mute?.classList.toggle('denon-hud-on', !!s.muted);
+                setText(hud.querySelector('#denon-hud-note'), s.note || '');
             };
 
             window.__denonSetHudState = (state) => {
@@ -897,11 +899,10 @@ public partial class YouTubeCinemaWindow : Window
         SaveOffsetButton.IsEnabled = false;
         if (await save(offset))
         {
+            // A nudge during the save (also one back to the old saved value) stays in use and unsaved.
+            var inUse = SyncOffsetMs;
             _savedSyncOffsetMs = offset;
-            if (_sessionSyncOffsetMs == offset)
-            {
-                _sessionSyncOffsetMs = null; // A nudge during the save stays unsaved.
-            }
+            _sessionSyncOffsetMs = inUse == offset ? null : inUse;
 
             SyncStatusText.Text = $"Offset {offset} ms saved. The next videos, the lyrics and the meters use it.";
         }
