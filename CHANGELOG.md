@@ -13,6 +13,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   only the parts that changed and have no edits. If the part you edit also changed, your edits stay and the banner
   and the status line say so; Save replaces that change and Discard loads it. Factory Reset shows the defaults as
   unsaved changes until you save them.
+- **Receiver buttons in the Cinema window's full-screen HUD** (#79): when the bars are hidden, the floating HUD
+  has Play/Pause, Vol −, Vol + and Mute next to Show Bars, Fullscreen and Close, and shows the volume as the
+  receiver's number ("Vol 35", "Muted 35"). One press moves the volume 2 steps. Vol + stops at the safe volume
+  (the same limit as Volume Memory and the automations, Brain → HARD MAX SAFE VOLUME CEILING) and says so in the
+  HUD; Vol − always works.
+- **Save Offset in the Cinema window's sync bar** (#79). The −500 / −100 / +100 / +500 ms buttons now change the
+  A/V offset for this session only: Re-Sync and the next tracks keep it, and the status line says "not saved".
+  Click Save Offset to keep it as the Cinema Offset, which also times the lyrics and the meters. Before, every
+  nudge saved the offset at once, so a quick try changed the lyrics and the meters too.
 
 ### Changed
 - **Ctrl+1 to Ctrl+9 and Ctrl+0 follow the nav rail** (#76): 1 Deck, 2 Music, 3 Stations, 4 Cast, 5 Scenes,

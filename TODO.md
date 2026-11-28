@@ -167,6 +167,15 @@ Phase 2 is done in 1.18.0: YouTube / YouTube Music and jukebox tracks are decode
 - [x] RTA during PC Cast from a non-default output device no longer falls back to SIM: `PcCastAudioMeterPipeline` runs
       a 512-pt 31-band FFT directly on the PC Cast capture stream (both default and non-default output devices).
 
+## Cinema Companion HUD (#79, part 1)
+
+Done: Play/Pause, Vol −/+ and Mute in the full-screen HUD (`#denon-cinema-hud`, volume in receiver steps, capped
+at the safe volume by `CinemaHudVolume`), and Save Offset in the sync bar (nudges are for the session until saved).
+
+- [ ] Verify in the app with a video (needs the user's OK, it plays media): hide the bars, use the four HUD
+      buttons, nudge the offset, play the next track (the nudge stays), click Save Offset and check Settings →
+      Cinema Offset.
+
 ## Audio tags for the Jukebox (#79, part 2)
 
 `AudioTagReader` (`Denon.App.Core/Media`) reads title, artist, album, track number, duration and cover art from
