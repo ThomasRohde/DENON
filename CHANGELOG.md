@@ -4,6 +4,16 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **The LG TV page has tabs: Watch, Remote, Apps and Settings.** The TV status (model, now showing, audio, volume)
+  stays on top. Watch has power, inputs, sound and volume; Remote has the D-pad, keyboard, screen preview and
+  trackpad; Apps has the installed apps and YouTube; Settings has the TV connection, the receiver options, the
+  Chromecast on this TV and the toast banner. The page opens on the tab you used last, and on Settings while the TV
+  is not paired. The screen preview refreshes only on the Remote tab. "Wake TV (WoL)" is now "Power On", since it
+  also wakes the TV through the Chromecast.
+
 ## [2.10.16] - 2026-11-28
 
 ### Changed

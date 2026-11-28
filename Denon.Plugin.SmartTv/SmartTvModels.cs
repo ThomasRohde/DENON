@@ -2,6 +2,18 @@ namespace Denon.Plugin.SmartTv;
 
 public sealed class SmartTvConfig
 {
+    public const string WatchTab = "watch";
+    public const string RemoteTab = "remote";
+    public const string AppsTab = "apps";
+    public const string SettingsTab = "settings";
+
+    /// <summary>A known tab name, else Watch.</summary>
+    public static string NormalizeTab(string? tab) =>
+        tab?.Trim().ToLowerInvariant() is RemoteTab or AppsTab or SettingsTab ? tab.Trim().ToLowerInvariant() : WatchTab;
+
+    /// <summary>The tab the Smart TV page opens on: the one the person used last.</summary>
+    public string DashboardTab { get; set; } = WatchTab;
+
     public string TvName { get; set; } = "Living Room Smart TV";
 
     public string TvIp { get; set; } = string.Empty;

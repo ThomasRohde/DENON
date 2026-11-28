@@ -449,6 +449,25 @@ public sealed class SmartTvPlugin : IDenonPlugin, IPluginViewProvider
         return $"Paired & LIVE ({_client.CurrentState.TransportLabel})! Discovered {inputsCount} inputs & {appsCount} installed apps. Client key saved.";
     }
 
+    /// <summary>Keeps the page's tab for the next visit. Only the stored file changes: no reconnect.</summary>
+    internal async Task SaveDashboardTabAsync(string tab)
+    {
+        if (_config.DashboardTab == tab || _context is null)
+        {
+            return;
+        }
+
+        _config.DashboardTab = tab;
+        try
+        {
+            await _context.Storage.SaveConfigAsync(_config);
+        }
+        catch (Exception ex)
+        {
+            _context.Logger.Warning($"Could not keep the Smart TV page tab: {ex.Message}");
+        }
+    }
+
     internal async Task SaveConfigAsync(SmartTvConfig? updated = null)
     {
         if (updated is not null)
