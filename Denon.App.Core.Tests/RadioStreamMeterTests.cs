@@ -117,9 +117,16 @@ public sealed class RadioStreamMeterTests
         Assert.Null(AppStreamMeterService.StationToResume(false, Snapshot(playState: "pause"), jazz));
         Assert.Null(AppStreamMeterService.StationToResume(false, Snapshot(sourceId: 4, song: "Real Song"), jazz));
 
+        // The metadata names another saved station: the saved hint is stale. The same station, or none named, is fine.
+        Assert.Null(AppStreamMeterService.StationToResume(false, WithActiveStation(Snapshot(), "p3"), jazz));
+        Assert.Same(jazz, AppStreamMeterService.StationToResume(false, WithActiveStation(Snapshot(), "P8JAZZ"), jazz));
+
         // Only an http(s) stream can be decoded.
         Assert.Null(AppStreamMeterService.StationToResume(false, Snapshot(), new StationPreset("x", "X", "file:///C:/x.mp3")));
     }
+
+    private static ReceiverStateSnapshot WithActiveStation(ReceiverStateSnapshot snapshot, string alias) =>
+        snapshot with { Status = snapshot.Status! with { ActiveStationAlias = alias } };
 
     [Fact]
     public void Radio_counts_as_playing_only_on_heos_with_the_apps_stream()

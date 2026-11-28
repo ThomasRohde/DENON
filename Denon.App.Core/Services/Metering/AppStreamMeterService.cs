@@ -288,6 +288,14 @@ public sealed class AppStreamMeterService : IDisposable
             return null;
         }
 
+        // The receiver's own metadata can name another saved station (another app or a phone started it while this
+        // app was closed): then the saved hint is stale, and decoding it would drive Hue with the wrong music.
+        if (snapshot.Status?.ActiveStationAlias is { Length: > 0 } detected &&
+            !string.Equals(detected, lastStarted.Alias, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
         return Uri.TryCreate(lastStarted.Url, UriKind.Absolute, out var uri) &&
                (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
             ? lastStarted
