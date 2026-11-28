@@ -4,7 +4,7 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.10.26] - 2026-11-28
 
 ### Fixed
 - **The TV no longer asks to pair every half minute after it forgot the key** (#47). When the TV refuses the saved
