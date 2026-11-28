@@ -799,7 +799,9 @@ public sealed class LocalMediaJukeboxService : IDisposable
         }
 
         // The file information comes before the read: a change during the read makes the next check read it again.
+        // FileInfo reads lazily: Refresh takes the size and time now, before the file is opened.
         var fileBeforeRead = new FileInfo(track.FilePath);
+        fileBeforeRead.Refresh();
         AudioTags tags;
         try
         {
