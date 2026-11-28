@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   It keeps the folder it runs from, the folder of any other copy that runs, and folders less than 10 minutes old.
   A folder with a file in use is left whole, and the cleanup stops when another copy of the app
   is starting.
+- **Hue Music Sync and the synced meters follow a station again after the app restarts.** The app learned a
+  stream's address only when it started the station, so after a restart (an update, for example) a station that
+  played on gave Hue silence until you started it again. Now the app picks up the station it started last when HEOS
+  still plays it and nothing else started since. Seen on 2026-11-28 after three updates during DR P8 Jazz.
 - **Uninstalling removes the Windows startup entry** (#60), also when "Launch at Windows startup" was turned on in
   Settings rather than in Setup. Before, Windows tried to start the deleted app at every sign-in.
 - **The update window shows only the release notes** (#58), without the release page's download list and
