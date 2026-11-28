@@ -33,6 +33,22 @@ requests stay open for later: #63, #74, #75, #76, #77, #78, #79.
 - [ ] PR 13: Chromecast plugin and first tests: #49, the Chromecast parts of #59 and #70 (release only when asked).
 - [ ] Not in the review: the Phone Remote volume shows dB (`fmtDb` in `RemoteWebUiHtml.cs`). Show the 0–98 number.
 
+## Command palette and shortcuts (#76)
+
+Part 1 is done: the Ctrl+K palette (`Denon.App.Desktop/CommandPalette/`). It waits for PR 8 and PR 9 (they change
+MainWindow and MainViewModel), then:
+
+- [ ] Bind Ctrl+K in `MainWindow` to `OpenCommandPaletteCommand` and delete the class handler in
+      `CommandPaletteHotkey` (a temporary hook so part 1 did not touch MainWindow).
+- [ ] Add Ctrl+K to the reserved gestures (the shortcut editor must refuse it) and to the Help shortcut list.
+- [ ] Ctrl+1–0 in nav rail order (Brain included), read from `CommandPalettePages.All`, synced with the reserved
+      gestures and Help.
+- [ ] Unsaved-changes banner (`IsSettingsDirty`) for Settings, Scenes and Stations, and a scoped `LoadSettings` so
+      saves of Automations or Volume Memory do not overwrite fields that are being edited.
+- [ ] PR 11 (accessibility): check the palette with Narrator (the status line is a polite live region).
+- [ ] Release after Ctrl+K is in the reserved gestures and Help. Until then a custom in-app shortcut on Ctrl+K
+      is swallowed by the palette.
+
 ## VU meters & RTA (follow the Denon)
 
 Phase 1 is done in 1.15.1 (source router, DENON/SIM/MUTED/PC/IDLE badge, PC Cast meters synced to the HEOS delay).

@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- **Command palette (Ctrl+K)**, part 1 of #76. Press Ctrl+K in the main window and type to find a page, a Smart
+  Scene, a saved station, a receiver input, a sound mode, a plugin or a plugin action. Up and Down choose, Enter or
+  a click runs it, Esc closes. It runs through the same commands as the pages. The matching and ranking
+  (`CommandPaletteSearch`) has no WPF and has unit tests. Not in this part: Ctrl+K in the reserved gestures and
+  Help, Ctrl+1–0 in rail order, and the unsaved-changes banner.
+
 ### Fixed
 - **Reset Connections, Save & Sync and Import no longer freeze the app** (#28). When a volume or refresh command from
   the window was still waiting for the receiver, these buttons blocked the window for good. Disconnect now never
@@ -29,9 +36,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   query now ends as soon as its answer is in (MV? waits for MVMAX), not 120 ms after every answer. On a real
   receiver a status read went from about 2.2 s to about 1.2 s; most of what is left is the receiver's own reply
   time (about 90 ms per query).
-  Commands still keep the 50 ms gap that Denon asks for. A fade step sets the volume and then reads only the zone power, the input
-  and the real volume, not the full status. So the fade still stops on standby, a turn of the knob or another
-  source. The last step reads the full status.
+  Commands still keep the 50 ms gap that Denon asks for. A fade step sets the volume and then reads only the zone
+  power, the input and the real volume, not the full status. So the fade still stops on standby, a turn of the
+  knob or another source. The last step reads the full status.
 
 ### Security
 - **A source, sound mode or stream URL with a line break is refused** (#30). An MCP client could send
