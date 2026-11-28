@@ -102,6 +102,25 @@ public sealed class BundleExtractionCleanupTests : IDisposable
     }
 
     [Fact]
+    public void A_new_copy_seen_after_the_rename_moves_the_folder_back_and_stops()
+    {
+        var first = MakeFolder("a-first", Now.AddDays(-30));
+        var second = MakeFolder("b-second", Now.AddDays(-30));
+        var checks = 0;
+
+        var result = BundleExtractionCleanupService.DeleteOldFolders(
+            _root, new HashSet<string>(), Now, TimeSpan.FromMinutes(10), () => ++checks == 1);
+
+        Assert.Equal(1, result.Deleted); // the first folder went; then a new copy showed up
+        Assert.Equal(1, result.Skipped);
+        Assert.Equal(2, checks);         // no folder after that was touched
+        Assert.False(Directory.Exists(first));
+        Assert.True(Directory.Exists(second));
+        Assert.Equal(3, Directory.GetFiles(second).Length);
+        Assert.Single(Directory.GetDirectories(_root)); // moved back under its own name
+    }
+
+    [Fact]
     public void A_missing_app_root_does_nothing()
     {
         var result = BundleExtractionCleanupService.DeleteOldFolders(Path.Combine(_root, "none"), new HashSet<string>(), Now, TimeSpan.Zero);

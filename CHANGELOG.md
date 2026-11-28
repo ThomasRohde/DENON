@@ -11,7 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   DLLs in `%TEMP%\.net\<exe name>\` (or in `DOTNET_BUNDLE_EXTRACT_BASE_DIR`), and .NET never deletes them: over
   100 folders, 1.2 GB, on a test PC. On start the app now deletes the old folders of its own exe in the background.
   It keeps the folder it runs from, the folder of any other copy that runs, and folders less than 10 minutes old.
-  A folder with a file in use is left whole.
+  A folder with a file in use is left whole, and the cleanup stops when another copy of the app
+  is starting.
 - **Uninstalling removes the Windows startup entry** (#60), also when "Launch at Windows startup" was turned on in
   Settings rather than in Setup. Before, Windows tried to start the deleted app at every sign-in.
 - **The update window shows only the release notes** (#58), without the release page's download list and

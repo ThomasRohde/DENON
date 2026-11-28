@@ -57,8 +57,8 @@ internal static class BundleExtractionCleanupService
         }
 
         // Another instance or an older version can run from its own folder. Renaming does not fail for a folder
-        // with loaded DLLs, so look at what those processes have loaded. If one cannot be read, do nothing.
-        var otherPaths = new List<string>();
+        // with loaded DLLs, so look at what those processes have loaded.
+        var others = new HashSet<int>();
         foreach (var process in Process.GetProcessesByName(appName))
         {
             using (process)
@@ -68,23 +68,53 @@ internal static class BundleExtractionCleanupService
                     continue;
                 }
 
+                List<string> paths;
                 try
                 {
-                    otherPaths.AddRange(ModulePaths(process));
+                    paths = ModulePaths(process);
                 }
                 catch (InvalidOperationException)
                 {
-                    // It exited.
+                    continue; // it exited
                 }
                 catch (Win32Exception)
                 {
                     return CleanupResult.None; // elevated, or exiting while read: try again at the next start
                 }
+
+                var folders = FindExtractionFolders(paths, appRoot);
+                if (folders.Count == 0)
+                {
+                    // Still starting: its host can be about to use an old folder that it has not loaded from yet.
+                    // (A dev build with this exe name also stops the cleanup while it runs.)
+                    return CleanupResult.None;
+                }
+
+                keep.UnionWith(folders);
+                others.Add(process.Id);
             }
         }
 
-        keep.UnionWith(FindExtractionFolders(otherPaths, appRoot));
-        return DeleteOldFolders(appRoot, keep, DateTime.UtcNow, MinimumAge);
+        // A copy that starts after the list above can be about to use an old folder. Each folder is renamed before
+        // it is deleted, so a copy that starts after the rename extracts a new one; a copy that started before it
+        // is in a new list taken after the rename, and the folder is then moved back.
+        return DeleteOldFolders(appRoot, keep, DateTime.UtcNow, MinimumAge, () => NoNewInstance(appName, others));
+    }
+
+    private static bool NoNewInstance(string appName, IReadOnlySet<int> known)
+    {
+        var processes = Process.GetProcessesByName(appName);
+        try
+        {
+            return processes.All(p => p.Id == Environment.ProcessId || known.Contains(p.Id));
+        }
+        finally
+        {
+            foreach (var process in processes)
+            {
+                process.Dispose();
+            }
+        }
     }
 
     /// <summary>
@@ -139,9 +169,11 @@ internal static class BundleExtractionCleanupService
     /// <summary>
     /// Deletes every folder in <paramref name="appRoot"/> that is not in <paramref name="keep"/> and is older than
     /// <paramref name="minimumAge"/>. Each folder is first renamed (fails when a file in it is open), then deleted.
-    /// IO errors skip that folder.
+    /// IO errors skip that folder. When <paramref name="stillSafe"/> says no after a rename, the folder is moved back
+    /// and the cleanup stops.
     /// </summary>
-    internal static CleanupResult DeleteOldFolders(string appRoot, IReadOnlySet<string> keep, DateTime nowUtc, TimeSpan minimumAge)
+    internal static CleanupResult DeleteOldFolders(
+        string appRoot, IReadOnlySet<string> keep, DateTime nowUtc, TimeSpan minimumAge, Func<bool>? stillSafe = null)
     {
         var keepFull = new HashSet<string>(keep.Select(Normalize), StringComparer.OrdinalIgnoreCase);
         string[] folders;
@@ -183,6 +215,12 @@ internal static class BundleExtractionCleanupService
                 var size = info.EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length);
                 var doomed = full + ".old-" + Guid.NewGuid().ToString("N")[..8];
                 Directory.Move(full, doomed);
+                if (stillSafe is not null && !stillSafe())
+                {
+                    Directory.Move(doomed, full); // a new copy started: it can use this folder
+                    return new CleanupResult(deleted, skipped + 1, freed);
+                }
+
                 Directory.Delete(doomed, recursive: true);
                 deleted++;
                 freed += size;
@@ -196,7 +234,7 @@ internal static class BundleExtractionCleanupService
         return new CleanupResult(deleted, skipped, freed);
     }
 
-    private static IEnumerable<string> ModulePaths(Process process)
+    private static List<string> ModulePaths(Process process)
     {
         var paths = new List<string>();
         foreach (ProcessModule module in process.Modules)
