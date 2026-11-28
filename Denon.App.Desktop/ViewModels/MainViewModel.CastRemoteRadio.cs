@@ -30,11 +30,13 @@ public sealed class LocalTrackItemViewModel : ObservableObject
 
     public string Title => Track.Title;
 
-    public string Artist => Track.Artist;
+    /// <summary>"Artist • Album" from the tags (the artist alone without an album).</summary>
+    public string Artist => Track.ArtistAlbumDisplay;
 
     public string CodecBadge => Track.CodecBadge;
 
-    public string SizeDisplay => Track.SizeDisplay;
+    /// <summary>"4:05 • 32.4 MB" when the length is known, else the size alone.</summary>
+    public string SizeDisplay => Track.DurationDisplay.Length > 0 ? $"{Track.DurationDisplay} • {Track.SizeDisplay}" : Track.SizeDisplay;
 
     public string PositionLabel => IsCurrent ? "▶" : $"{_position:00}";
 
@@ -191,7 +193,9 @@ public sealed partial class MainViewModel
             }
         });
 
-        _localJukeboxService.JukeboxChanged += snap => _ = _dispatcher.InvokeAsync(() => ApplyLocalJukeboxSnapshot(snap));
+        // Show the latest snapshot, not the one in the event: events from the tag worker and from an edit can arrive
+        // out of order, and an older one would bring back a removed track.
+        _localJukeboxService.JukeboxChanged += changed => _ = _dispatcher.InvokeAsync(() => ApplyLocalJukeboxSnapshot(_localJukeboxService.Snapshot));
         _pcAudioCastService.CastStateChanged += (active, msg) => _ = _dispatcher.InvokeAsync(() =>
         {
             IsPcCastActive = active;

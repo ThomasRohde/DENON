@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Http;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using Denon.App.Core.Infrastructure;
 using Denon.App.Core.Plugins;
 using Denon.App.PluginSdk;
 
@@ -31,11 +32,12 @@ public sealed class AlbumArtPaletteService : IDisposable
 
     public event Action<PluginAlbumArtPalette>? PaletteExtracted;
 
+    /// <summary>A local picture larger than this gives no colours (the Jukebox cache keeps covers smaller).</summary>
+    private const int MaxLocalImageBytes = 8 * 1024 * 1024;
+
     public async Task ProcessArtworkAsync(string? imageUrl, string trackTitle, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(imageUrl) ||
-            (!imageUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-             !imageUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+        if (!Uri.TryCreate(imageUrl, UriKind.Absolute, out var uri) || !IsSupportedSource(uri))
         {
             return;
         }
@@ -51,7 +53,14 @@ public sealed class AlbumArtPaletteService : IDisposable
         {
             if (!_cache.TryGetValue(imageUrl, out var palette))
             {
-                var bytes = await _http.GetByteArrayAsync(imageUrl, cancellationToken);
+                var bytes = uri.IsFile
+                    ? await ReadLocalImageAsync(uri.LocalPath, cancellationToken)
+                    : await _http.GetByteArrayAsync(uri, cancellationToken);
+                if (bytes is null)
+                {
+                    return;
+                }
+
                 var (dominant, secondary) = await Task.Run(() => ExtractVibrantColors(bytes), cancellationToken);
                 palette = new PluginAlbumArtPalette(dominant, secondary, trackTitle, imageUrl);
                 _cache[imageUrl] = palette;
@@ -71,6 +80,37 @@ public sealed class AlbumArtPaletteService : IDisposable
     }
 
     public void Dispose() => _http.Dispose();
+
+    /// <summary>
+    /// A web picture, or Jukebox cover art from the app's own cache folder. Other local files (a TV channel logo) give
+    /// no album colours, and a network share is never read (that sends the Windows login hash to the server).
+    /// </summary>
+    internal static bool IsSupportedSource(Uri uri) =>
+        uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps ||
+        (uri.IsFile && !uri.IsUnc && IsInFolder(uri.LocalPath, AppDataPaths.JukeboxArtDirectory));
+
+    private static bool IsInFolder(string path, string folder)
+    {
+        try
+        {
+            return string.Equals(Path.GetDirectoryName(Path.GetFullPath(path)), Path.GetFullPath(folder), StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private static async Task<byte[]?> ReadLocalImageAsync(string path, CancellationToken cancellationToken)
+    {
+        var info = new FileInfo(path);
+        if (!info.Exists || info.Length == 0 || info.Length > MaxLocalImageBytes)
+        {
+            return null;
+        }
+
+        return await File.ReadAllBytesAsync(path, cancellationToken);
+    }
 
     private static (string DominantHex, string SecondaryHex) ExtractVibrantColors(byte[] imageBytes)
     {

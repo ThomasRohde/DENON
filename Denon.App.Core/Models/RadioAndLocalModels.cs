@@ -59,9 +59,23 @@ public sealed record LocalAudioTrackItem(
     string Title,
     string Artist,
     string Extension,
-    long FileSizeBytes)
+    long FileSizeBytes,
+    string? Album = null,
+    TimeSpan? Duration = null,
+    int? TrackNumber = null,
+    string? CoverArtPath = null,
+    bool TagsRead = false,
+    DateTime? FileModifiedUtc = null)
 {
     public string CodecBadge => Extension.TrimStart('.').ToUpperInvariant();
+
+    /// <summary>"Artist • Album", or the artist alone without an album tag.</summary>
+    public string ArtistAlbumDisplay => string.IsNullOrWhiteSpace(Album) ? Artist : $"{Artist} • {Album}";
+
+    /// <summary>"4:05" (or "1:02:03"), or empty when the length is not known.</summary>
+    public string DurationDisplay => Duration is { } d && d > TimeSpan.Zero
+        ? (d.TotalHours >= 1 ? d.ToString(@"h\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture) : d.ToString(@"m\:ss", System.Globalization.CultureInfo.InvariantCulture))
+        : string.Empty;
 
     public string SizeDisplay => FileSizeBytes >= 1024 * 1024
         ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{FileSizeBytes / (1024.0 * 1024.0):0.1} MB")

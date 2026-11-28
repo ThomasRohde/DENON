@@ -135,6 +135,8 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<ReceiverController>();
             builder.Services.AddSingleton<YouTubeMediaService>();
             builder.Services.AddSingleton<LocalAudioRelayServer>();
+            builder.Services.AddSingleton(sp => new MediaQueueStore(AppDataPaths.QueuesDirectory, sp.GetRequiredService<AppLogStore>()));
+            builder.Services.AddSingleton(_ => new Denon.App.Core.Media.LocalCoverArtCache(AppDataPaths.JukeboxArtDirectory));
             builder.Services.AddSingleton<YouTubeQueueService>();
             builder.Services.AddSingleton<LocalMediaJukeboxService>();
             builder.Services.AddSingleton<AppStreamMeterService>();
