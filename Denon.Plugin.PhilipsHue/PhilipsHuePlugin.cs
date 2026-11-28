@@ -524,9 +524,7 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
             return;
         }
 
-        var area = _entertainmentAreas.FirstOrDefault(a =>
-                       string.Equals(a.Id, _config.MusicSync.SelectedEntertainmentAreaId, StringComparison.OrdinalIgnoreCase))
-                   ?? _entertainmentAreas.FirstOrDefault();
+        var area = ResolveEntertainmentArea(_entertainmentAreas, _config.MusicSync.SelectedEntertainmentAreaId);
         if (area is null)
         {
             _context?.Logger.Info("Hue Music Sync uses REST: the bridge has no entertainment area.");
@@ -548,6 +546,50 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
         {
             _context?.Logger.Warning($"Hue Entertainment DTLS stream on '{area.Name}' did not start; Music Sync uses REST.");
         }
+    }
+
+    /// <summary>
+    /// The area Music Sync streams to: the saved area, or the first area when no area is saved or the saved area
+    /// is gone. Null when the bridge has no area.
+    /// </summary>
+    internal static HueEntertainmentArea? ResolveEntertainmentArea(IReadOnlyList<HueEntertainmentArea> areas, string? selectedId) =>
+        areas.FirstOrDefault(a => string.Equals(a.Id, selectedId, StringComparison.OrdinalIgnoreCase))
+        ?? areas.FirstOrDefault();
+
+    /// <summary>
+    /// Saves the area the user picked. When Music Sync is on, the stream moves to that area: the old stream stops,
+    /// then a stream starts on the new area. No second stream starts.
+    /// </summary>
+    internal async Task SelectEntertainmentAreaAsync(string areaId, CancellationToken cancellationToken = default)
+    {
+        _config.MusicSync.SelectedEntertainmentAreaId = areaId;
+        await SaveConfigAsync(cancellationToken);
+
+        if (!_isStarted || !_musicSyncActive || _entertainmentClient is null)
+        {
+            return;
+        }
+
+        await _dtlsStartGate.WaitAsync(cancellationToken);
+        try
+        {
+            // Read the saved id here, not the argument: when the user picks again fast, the last pick wins.
+            var wanted = ResolveEntertainmentArea(_entertainmentAreas, _config.MusicSync.SelectedEntertainmentAreaId);
+            var streamingId = _entertainmentClient.StreamingAreaId;
+            if (streamingId is not null && !string.Equals(streamingId, wanted?.Id, StringComparison.OrdinalIgnoreCase))
+            {
+                await _entertainmentClient.StopAsync();
+                _viewModel?.SetDtlsStreamingState(false);
+            }
+
+            await StartDtlsStreamLockedAsync(cancellationToken);
+        }
+        finally
+        {
+            _dtlsStartGate.Release();
+        }
+
+        _viewModel?.SetDtlsStreamingState(_entertainmentClient?.IsStreaming == true);
     }
 
     internal async Task RefreshBridgeStateAsync(CancellationToken cancellationToken = default)

@@ -20,6 +20,9 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
       does not wait 550 ms for each. Needs care: some models do not answer in standby.
 - [x] PR 3: Home Assistant and Hue. #32, #46 and #48 closed; the HA part of #68, the Hue part of #64 (no HTTP
       fallback with HTTPS on, error answers on reads).
+- [ ] Verify the Hue Entertainment area picker live (#79, needs the user's OK, it changes the lights): with two
+      areas, pick the other one while Music Sync streams and check the lights of the new area follow the music.
+      A saved area that was deleted cannot be confirmed by picking it again (pick another area first).
 - [ ] Verify PR 3 live: Hue Music Sync on, restart the app, and check the log says "Started 50 Hz Hue Entertainment
       DTLS stream". Needs the user's OK (it changes the lights).
 - [x] PR 4: MCP tiers and limits. #66 closed; the MCP side of #61 and #65, and the /health Host check of #64.
