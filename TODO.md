@@ -61,8 +61,6 @@ Each one needs the real devices, and most change them or play media, so they wai
 - [ ] Uninstall with "Launch at Windows startup" on: the startup entry is gone. The next in-app update downloads,
       starts and shows notes without the download list.
 - [ ] Insights with the real event log on the installed app.
-- [ ] After the next release: `%TEMP%\.net\Denon.App.Desktop\` keeps only the current folder, and the log says
-      "Deleted N old runtime extraction folders" (#94; tested only with a probe bundle).
 - [ ] Station logos: the Deck and the phone remote show the TuneIn logo for a saved station (DR P6 Beat).
 - [ ] Skins and windows: the first start on a small screen (1366 × 768, or 1920 × 1080 at 150 %) picks Compact; a
       second monitor with another scale opens at the right size; the tray flyout, Cinema window and the Chromecast
