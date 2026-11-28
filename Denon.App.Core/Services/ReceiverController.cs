@@ -217,6 +217,8 @@ public sealed class ReceiverController
     /// <summary>Reads the HEOS players, the groups and each group's volume, and keeps them in the state store.</summary>
     public async Task<HeosGroupsState> RefreshHeosGroupsAsync(CancellationToken cancellationToken = default)
     {
+        // Group volume events that come in while this read runs are newer than it: the store keeps them.
+        var readStart = _stateStore.BeginHeosGroupsRead();
         var settings = _settingsStore.Current.Receiver;
         var players = await _heosClient.GetPlayersAsync(settings, cancellationToken);
         var groups = new List<HeosGroup>();
@@ -233,9 +235,7 @@ public sealed class ReceiverController
             }
         }
 
-        var state = new HeosGroupsState(players, groups, DateTimeOffset.Now);
-        _stateStore.UpdateHeosGroups(state);
-        return state;
+        return _stateStore.UpdateHeosGroups(new HeosGroupsState(players, groups, DateTimeOffset.Now), readStart);
     }
 
     /// <summary>
@@ -1066,10 +1066,15 @@ public sealed class ReceiverController
         }
 
         if (volume is int level &&
-            !await run(() => _avrClient.SetZone2VolumeAsync(settings, Math.Clamp(level, 0, DenonVolumeMath.MaxAbsoluteVolume), token)) &&
-            guard)
+            !await run(() => _avrClient.SetZone2VolumeAsync(settings, Math.Clamp(level, 0, DenonVolumeMath.MaxAbsoluteVolume), token)))
         {
-            _logStore.Warning("Zone 2 stays muted: its volume could not be set, so the source and mute steps were skipped.");
+            // The old volume may be loud: no new source and no unmute. A mute asked for, and off, still run.
+            _logStore.Warning("Zone 2 volume could not be set: its source and unmute steps were skipped.");
+            if (muted == true)
+            {
+                await run(() => _avrClient.SetZone2MuteAsync(settings, true, token));
+            }
+
             if (on == false)
             {
                 await run(() => _avrClient.SetZone2PowerAsync(settings, false, token));

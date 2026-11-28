@@ -105,15 +105,49 @@ public sealed class ReceiverStateStore
         return kept;
     }
 
-    /// <summary>Keeps a full read of the HEOS players and groups. Nothing is raised when nothing changed.</summary>
-    public void UpdateHeosGroups(HeosGroupsState groups)
+    /// <summary>The newest group volume event of each group, and the number of the event, for reads that overlap it.</summary>
+    private readonly Dictionary<int, (int? Volume, bool? IsMuted, long Sequence)> _groupPushes = [];
+    private long _groupPushSequence;
+
+    /// <summary>Call before a groups read starts; pass the number to <see cref="UpdateHeosGroups"/>.</summary>
+    public long BeginHeosGroupsRead()
     {
-        var changed = false;
         lock (_syncRoot)
         {
-            if (!Equals(_current.HeosGroups, groups))
+            return _groupPushSequence;
+        }
+    }
+
+    /// <summary>
+    /// Keeps a full read of the HEOS players and groups, with the group volume events that came in after the read began
+    /// (<paramref name="readStart"/> from <see cref="BeginHeosGroupsRead"/>): they are newer than the read. Nothing is
+    /// raised when nothing changed. The groups kept are returned.
+    /// </summary>
+    public HeosGroupsState UpdateHeosGroups(HeosGroupsState groups, long? readStart = null)
+    {
+        var changed = false;
+        HeosGroupsState kept;
+        lock (_syncRoot)
+        {
+            var since = readStart ?? _groupPushSequence;
+            kept = groups with
             {
-                _current = _current with { HeosGroups = groups };
+                Groups = groups.Groups
+                    .Select(g => _groupPushes.TryGetValue(g.GroupId, out var push) && push.Sequence > since
+                        ? g with { Volume = push.Volume ?? g.Volume, IsMuted = push.IsMuted ?? g.IsMuted }
+                        : g)
+                    .ToList(),
+            };
+
+            // Events the read already saw are in it now.
+            foreach (var gid in _groupPushes.Where(p => p.Value.Sequence <= since).Select(static p => p.Key).ToList())
+            {
+                _groupPushes.Remove(gid);
+            }
+
+            if (!Equals(_current.HeosGroups, kept))
+            {
+                _current = _current with { HeosGroups = kept };
                 _version++;
                 changed = true;
             }
@@ -123,6 +157,8 @@ public sealed class ReceiverStateStore
         {
             Deliver();
         }
+
+        return kept;
     }
 
     /// <summary>
@@ -134,6 +170,11 @@ public sealed class ReceiverStateStore
         var changed = false;
         lock (_syncRoot)
         {
+            // Kept for a read that runs now (or a group it does not know yet): see UpdateHeosGroups.
+            var sequence = ++_groupPushSequence;
+            var before = _groupPushes.TryGetValue(groupId, out var known) ? known : default;
+            _groupPushes[groupId] = (volume ?? before.Volume, isMuted ?? before.IsMuted, sequence);
+
             if (_current.HeosGroups is { } state &&
                 state.Groups.FirstOrDefault(g => g.GroupId == groupId) is { } group)
             {

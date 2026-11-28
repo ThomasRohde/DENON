@@ -247,6 +247,40 @@ public sealed class Zone2AndHeosGroupTests
     }
 
     [Fact]
+    public void A_group_volume_event_during_a_read_wins_over_the_read()
+    {
+        var store = new ReceiverStateStore();
+        store.UpdateHeosGroups(TwoRooms(volume: 20));
+
+        var before = store.BeginHeosGroupsRead();
+        store.PatchGroupVolume(1, 10, null);          // came in before the read began: the read has it
+        var readStart = store.BeginHeosGroupsRead();
+        store.PatchGroupVolume(1, 35, true);          // came in while the read ran
+        var kept = store.UpdateHeosGroups(TwoRooms(volume: 22), readStart);
+
+        Assert.Equal(35, kept.Groups[0].Volume);
+        Assert.True(kept.Groups[0].IsMuted);
+        Assert.Equal(kept, store.Snapshot.HeosGroups);
+
+        // A later read that began after the event: the read wins.
+        var later = store.UpdateHeosGroups(TwoRooms(volume: 22), store.BeginHeosGroupsRead());
+        Assert.Equal(22, later.Groups[0].Volume);
+        Assert.True(before < readStart);
+    }
+
+    [Fact]
+    public void A_group_volume_event_for_a_group_the_read_brings_is_kept()
+    {
+        var store = new ReceiverStateStore();
+        var readStart = store.BeginHeosGroupsRead();
+        store.PatchGroupVolume(1, 40, false);         // no groups known yet
+
+        var kept = store.UpdateHeosGroups(TwoRooms(volume: 20), readStart);
+
+        Assert.Equal(40, kept.Groups[0].Volume);
+    }
+
+    [Fact]
     public void The_same_groups_read_again_raises_nothing()
     {
         var store = new ReceiverStateStore();
