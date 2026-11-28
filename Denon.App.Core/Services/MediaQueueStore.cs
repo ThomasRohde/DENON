@@ -33,12 +33,16 @@ public sealed record SavedYouTubeTrack(
     string? ThumbnailUrl,
     string? QueueEntryId);
 
-/// <summary>The YouTube queue and its history as they are saved between app runs.</summary>
+/// <summary>
+/// The YouTube queue and its history as they are saved between app runs. <paramref name="PlayingEntryId"/>: the queue
+/// entry that was casting when this was saved (null when none was), so a restart can cast it again.
+/// </summary>
 public sealed record SavedYouTubeQueue(
     IReadOnlyList<SavedYouTubeTrack> Queue,
     IReadOnlyList<SavedYouTubeTrack> History,
     bool IsShuffleEnabled,
-    YouTubeRepeatMode RepeatMode);
+    YouTubeRepeatMode RepeatMode,
+    string? PlayingEntryId = null);
 
 /// <summary>
 /// Saves the Jukebox and YouTube queues as JSON files in one folder, so they come back after the app restarts.

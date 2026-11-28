@@ -76,6 +76,9 @@ public sealed class ReceiverController
 
     public event Action? NonRelaySourceActivated;
 
+    /// <summary>A relay stream from this PC (YouTube, Jukebox, PC Cast, a calibration tone) is about to be cast.</summary>
+    public event Action? RelayStreamStarting;
+
     /// <summary>
     /// HEOS was told to play an internet radio stream (a station button, a Smart Scene's stream or a custom URL):
     /// the URL and a name for it. The synced meters and Hue Music Sync decode a copy of it.
@@ -744,6 +747,7 @@ public sealed class ReceiverController
         CancellationToken cancellationToken = default)
     {
         var volume = useLowVolume ? (int?)_settingsStore.Current.Receiver.DefaultLowVolume : null;
+        RelayStreamStarting?.Invoke();
         return ExecuteAsync(
             $"Cast LAN audio '{trackTitle}'",
             async (settings, token) =>
