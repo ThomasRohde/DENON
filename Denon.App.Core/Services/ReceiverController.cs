@@ -1094,9 +1094,16 @@ public sealed class ReceiverController
             finalMute = await ReadZone2MutedAsync(settings, token) ?? true;
         }
 
-        if (guard)
+        if (guard && !await run(() => _avrClient.SetZone2MuteAsync(settings, true, token)))
         {
-            await run(() => _avrClient.SetZone2MuteAsync(settings, true, token));
+            // Without the mute the zone could play at its old volume: no power on, no source, no volume. Off still runs.
+            _logStore.Warning("Zone 2 could not be muted first: its power, source and volume steps were skipped.");
+            if (on == false)
+            {
+                await run(() => _avrClient.SetZone2PowerAsync(settings, false, token));
+            }
+
+            return;
         }
 
         if (on == true)
