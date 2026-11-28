@@ -17,14 +17,10 @@ Each one needs the real devices, and most change them or play media, so they wai
 - [ ] Jukebox with real files: the cover in Now Playing, the Hue colours from the cover, and the next track
       starting at the real end of a FLAC.
 - [ ] A real arrival ("arrive home" Shortcut) with the receiver left on and HEOS stopped.
-- [ ] Receiver setup check (Scenes & Acoustics → Setup check) on the real X2400H, with the receiver on and an input
-      selected: "Check receiver" only reads. Look at the log (`PSREFLEV ?`, `PSCINEMA EQ. ?`, `PSDRC ?`, `PSLOM ?`,
-      `PSLFE ?`, `PSDELAY ?` were never sent to this receiver) and at the rows: none should say CANNOT READ for a
-      setting the X2400H has. If the receiver does not answer one, fix its read pattern in the bundled profile.
 - [ ] Receiver setup check, per input: apply one safe row (Cinema EQ) on one input, switch to another input and read it
       there. The code assumes a `PS` write changes the selected input only, and that a read answers for it. If the
       write changes every input, the per-input rows in the profile become global.
-- [ ] Receiver setup check, Undo: apply two rows, press Undo last apply, and check both values are back. Check the
+- [ ] Receiver setup check, Undo with two rows (one apply + Undo of ECO was checked on 2026-11-28). Check the
       Reference Level Offset row (it needs Dynamic EQ on) and the Direct / Pure Direct rows (blocked by mode).
 
 **Smart TV and casting**

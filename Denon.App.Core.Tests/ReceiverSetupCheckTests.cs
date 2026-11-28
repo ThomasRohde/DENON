@@ -36,6 +36,13 @@ public sealed class ReceiverSetupCheckTests : IDisposable
         Assert.Equal(expected == SetupRowState.Differs, row.CanApply);
     }
 
+    [Theory]
+    [InlineData("000", "0 ms")] // the X2400H answers "PSDELAY 000"
+    [InlineData("040", "40 ms")]
+    [InlineData("200", "200 ms")]
+    public void A_zero_padded_number_reads_as_a_plain_number(string token, string expected) =>
+        Assert.Equal(expected, SetupValueText.Format(Setting("audioDelay"), token));
+
     [Fact]
     public void A_use_with_two_accepted_values_is_ok_for_either_and_applies_the_first()
     {

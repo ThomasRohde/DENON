@@ -176,7 +176,11 @@ public static class SetupValueText
             return string.IsNullOrEmpty(setting.Unit) ? signed : $"{signed} {setting.Unit}";
         }
 
-        return string.IsNullOrEmpty(setting.Unit) ? token : $"{token} {setting.Unit}";
+        // A zero-padded number from the receiver ("PSDELAY 000") reads as a plain number: "0 ms", not "000 ms".
+        var shown = token.All(char.IsAsciiDigit) && int.TryParse(token, NumberStyles.None, CultureInfo.InvariantCulture, out var plain)
+            ? plain.ToString(CultureInfo.InvariantCulture)
+            : token;
+        return string.IsNullOrEmpty(setting.Unit) ? shown : $"{shown} {setting.Unit}";
     }
 
     /// <summary>"Reference or Light" for a recommendation with more than one accepted value.</summary>
