@@ -224,6 +224,23 @@ public sealed class MediaQueueTests : IDisposable
     }
 
     [Fact]
+    public void Shuffle_and_repeat_come_back_with_an_empty_queue()
+    {
+        var (jukebox, store, _) = CreateJukebox();
+        jukebox.ToggleShuffle();
+        jukebox.CycleRepeatMode();
+        jukebox.Clear();
+        jukebox.Dispose();
+        store.Flush();
+
+        var (restored, _, _) = CreateJukebox();
+
+        Assert.Empty(restored.Snapshot.Tracks);
+        Assert.True(restored.Snapshot.IsShuffleEnabled);
+        Assert.Equal(YouTubeRepeatMode.All, restored.Snapshot.RepeatMode);
+    }
+
+    [Fact]
     public void A_damaged_queue_file_loads_as_no_queue()
     {
         Directory.CreateDirectory(QueueDir);

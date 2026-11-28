@@ -841,10 +841,13 @@ public sealed class LocalMediaJukeboxService : IDisposable
     private void RestoreSavedQueue()
     {
         var saved = _queueStore?.LoadJukebox();
-        if (saved?.Tracks is not { Count: > 0 } savedTracks)
+        if (saved is null)
         {
             return;
         }
+
+        // Shuffle and repeat come back also with an empty queue.
+        var savedTracks = saved.Tracks ?? [];
 
         var restored = new List<LocalAudioTrackItem>();
         var ids = new HashSet<string>(StringComparer.Ordinal);
