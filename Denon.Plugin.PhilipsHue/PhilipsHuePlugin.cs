@@ -30,6 +30,9 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
 
     private Task _startupSync = Task.CompletedTask;
 
+    /// <summary>One stream start at a time: a second start would close the first one's socket.</summary>
+    private readonly SemaphoreSlim _dtlsStartGate = new(1, 1);
+
     // Real-time Music Sync state
     private volatile bool _musicSyncActive;
     private volatile bool _demoBeatRunning;
@@ -499,6 +502,21 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
     /// falls back to REST at about 10 Hz. Logs why when the stream does not start.
     /// </summary>
     private async Task EnsureDtlsStreamAsync(CancellationToken cancellationToken)
+    {
+        // The startup sync and a "Music Sync on" (button or action) can both get here during one handshake:
+        // the second waits, then sees the stream running and returns.
+        await _dtlsStartGate.WaitAsync(cancellationToken);
+        try
+        {
+            await StartDtlsStreamLockedAsync(cancellationToken);
+        }
+        finally
+        {
+            _dtlsStartGate.Release();
+        }
+    }
+
+    private async Task StartDtlsStreamLockedAsync(CancellationToken cancellationToken)
     {
         if (_config.DemoMode || _entertainmentClient is null || string.IsNullOrWhiteSpace(_config.ClientKey) ||
             _entertainmentClient.IsStreaming)
