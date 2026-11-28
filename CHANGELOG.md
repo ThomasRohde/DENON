@@ -4,7 +4,7 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.10.36] - 2026-11-28
 
 ### Fixed
 - **A YouTube cast goes on after the app restarts** (an update, a crash). The app sends YouTube audio to the
