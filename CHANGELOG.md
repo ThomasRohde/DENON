@@ -4,6 +4,21 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **The app sees the receiver's own changes at once** (#74). One reader now listens on the port 23 link all the
+  time. The receiver sends a line by itself when something changes (the knob, the remote, HDMI-CEC): power, main
+  zone, volume, mute, input, sound mode, ECO, sleep timer, Zone 2, and the Audyssey, dimmer and trim settings. The
+  window, the Phone Remote, Volume Memory and automations get the change in well under 50 ms on the LAN, not on the
+  next poll. Events such as `power.changed` follow from the state as before, and a turn of the knob is still one
+  `volume.settled`. A new power or input state also reads the full status 400 ms later, for what HEOS plays now.
+- **Fewer full reads while the live link works.** When the port 23 link stays open and the HEOS change events are
+  connected, the full status read runs only as a check, at 9 times the Poll Interval (30 to 60 s; 45 s for the
+  default 5 s). When the link closes, the app connects again at once, reads the full state, and uses the Poll
+  Interval until the link holds again. A query that gets no line at all in three tries drops the link (a dead or
+  silent receiver). One-line commands, the fade checks and the grace window work as before.
+
 ## [2.10.20] - 2026-11-28
 
 ### Added

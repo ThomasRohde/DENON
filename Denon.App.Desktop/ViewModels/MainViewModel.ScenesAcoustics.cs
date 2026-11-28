@@ -9,6 +9,7 @@ public sealed partial class MainViewModel
     private ScenePresetEditor? _selectedScene;
     private bool _isLoadingAcoustics;
     private bool _hasLoadedAcousticsOnce;
+    private AcousticStatus? _shownAcoustics;
     private string _acousticsStatusText = "Click 'Sync from AVR' to read live Audyssey, dimmer, and trim levels from your receiver.";
     private bool _dynamicEqEnabled;
     private bool _subwooferTrimEnabled;
@@ -296,8 +297,23 @@ public sealed partial class MainViewModel
         }
     }
 
+    /// <summary>
+    /// The receiver's PS and DIM lines keep the kept acoustics current (Audyssey or a trim changed on the remote).
+    /// Shown once this page has read the acoustics; before that the page asks for them itself.
+    /// </summary>
+    private void ApplyPushedAcoustics(AcousticStatus? acoustics)
+    {
+        if (acoustics is null || ReferenceEquals(acoustics, _shownAcoustics) || !_hasLoadedAcousticsOnce)
+        {
+            return;
+        }
+
+        ApplyAcousticStatus(acoustics);
+    }
+
     private void ApplyAcousticStatus(AcousticStatus status)
     {
+        _shownAcoustics = status;
         foreach (var item in MultEqModes)
         {
             item.IsActive = string.Equals(item.Code, status.MultEq, StringComparison.OrdinalIgnoreCase);

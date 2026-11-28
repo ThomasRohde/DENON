@@ -6,7 +6,7 @@ left open, and remove them (with a CHANGELOG entry) when they are done.
 ## Code review issues #28–#79 (Antigravity, 2026-11-28)
 
 All 52 issues were checked against the code. The plan is 13 PRs, one area each, done one at a time. Feature
-requests stay open for later: #63, #74, #75, #76, #77, #78, #79.
+requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see below).
 
 - [x] PR 1: guest input security. #29 closed: a phone track gets its watch and thumbnail address from the video
       id. Part of #31: values ride in data-* attributes (no inline JavaScript), and only hex colours go into styles.
@@ -32,6 +32,19 @@ requests stay open for later: #63, #74, #75, #76, #77, #78, #79.
 - [ ] PR 12: Apple TV and HomePod plugins: #35, #50, #70, the HomePod part of #49 (plugin release only when asked).
 - [ ] PR 13: Chromecast plugin and first tests: #49, the Chromecast parts of #59 and #70 (release only when asked).
 - [ ] Not in the review: the Phone Remote volume shows dB (`fmtDb` in `RemoteWebUiHtml.cs`). Show the 0–98 number.
+
+## Live receiver updates on port 23 (#74)
+
+The reader loop is done: `DenonAvrClient` reads every line, keeps `AvrLiveState` per link, and the controller
+patches `ReceiverStateStore` at once. `ReceiverPollingService` slows to 9 × Poll Interval (30–60 s) while the link
+holds and the HEOS events are connected.
+
+- [ ] Read-only live check on the real receiver: turn the knob and press the remote, and see the app follow within
+      ~50 ms; check the slow check line in the log ("Receiver pushes its changes: full check every 45 s").
+- [ ] #75 (HEOS groups and Zone 2 controls) builds on this: Zone 2 source and volume lines (Z2TV, Z240) are read by
+      `AvrLiveState` only for power today.
+- [ ] The Brain still reads the acoustics every 90 s (`RoomIntelligenceService`). With PS/DIM pushes in
+      `ReceiverStateSnapshot.Acoustics`, it could read them from the state and only check now and then.
 
 ## Command palette and shortcuts (#76)
 

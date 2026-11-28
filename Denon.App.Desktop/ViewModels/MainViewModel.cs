@@ -1166,6 +1166,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         IsBusy = snapshot.IsBusy;
         IsConnected = snapshot.IsConnected;
+        ApplyPushedAcoustics(snapshot.Acoustics);
 
         if (snapshot.Status is { } status)
         {

@@ -29,17 +29,62 @@ public sealed class ReceiverStateStore
         });
     }
 
-    public void UpdateStatus(ReceiverStatus status)
+    /// <param name="overlay">
+    /// Runs inside the store's lock on the status before it is kept, so a line that came in after the status was read
+    /// (and was already patched in) is not lost again. The status kept is returned.
+    /// </param>
+    public ReceiverStatus UpdateStatus(ReceiverStatus status, Func<ReceiverStatus, ReceiverStatus>? overlay = null)
     {
-        Update(snapshot => snapshot with
+        var kept = status;
+        Update(snapshot =>
         {
-            Status = status,
-            IsConnected = true,
-            LastError = null,
-            LastAttemptedRefresh = status.RetrievedAt,
-            LastSuccessfulRefresh = status.RetrievedAt,
+            kept = overlay?.Invoke(status) ?? status;
+            return snapshot with
+            {
+                Status = kept,
+                IsConnected = true,
+                LastError = null,
+                LastAttemptedRefresh = status.RetrievedAt,
+                LastSuccessfulRefresh = status.RetrievedAt,
+            };
         });
+        return kept;
     }
+
+    /// <summary>
+    /// Applies what the receiver just said by itself (a pushed status or acoustic line) to the kept status. Nothing is
+    /// raised when nothing changed (for example the echo of a command the app sent).
+    /// </summary>
+    public void PatchFromReceiver(Func<ReceiverStatus, ReceiverStatus> status, Func<AcousticStatus, AcousticStatus>? acoustics = null)
+    {
+        ReceiverStateSnapshot? changed = null;
+        lock (_syncRoot)
+        {
+            var current = _current;
+            var newStatus = current.Status is { } known ? status(known) : null;
+            var newAcoustics = current.Acoustics is { } a && acoustics is not null ? acoustics(a) : current.Acoustics;
+            var statusChanged = newStatus is not null && newStatus != current.Status;
+            var acousticsChanged = newAcoustics != current.Acoustics;
+            if (statusChanged || acousticsChanged)
+            {
+                var now = DateTimeOffset.Now;
+                _current = current with
+                {
+                    Status = statusChanged ? newStatus! with { RetrievedAt = now } : current.Status,
+                    Acoustics = acousticsChanged ? newAcoustics! with { RetrievedAt = now } : current.Acoustics,
+                    LastSuccessfulRefresh = statusChanged ? now : current.LastSuccessfulRefresh,
+                };
+                changed = _current;
+            }
+        }
+
+        if (changed is not null)
+        {
+            StateChanged?.Invoke(changed);
+        }
+    }
+
+    public void UpdateAcoustics(AcousticStatus acoustics) => Update(snapshot => snapshot with { Acoustics = acoustics });
 
     public void UpdateError(string message)
     {
