@@ -904,7 +904,7 @@ public sealed class PluginHostService : IAsyncDisposable
 
         foreach (var evt in eventsToDispatch)
         {
-            QueueReceiverEvent(evt, skipPluginIds: null);
+            QueueReceiverEvent(evt, skipPluginIds: null, CancellationToken.None);
         }
     }
 
@@ -915,7 +915,7 @@ public sealed class PluginHostService : IAsyncDisposable
     {
         var cts = new CancellationTokenSource();
         var previous = Interlocked.Exchange(ref _volumeEventCts, cts);
-        try { previous?.Cancel(); } catch { }
+        try { previous?.Cancel(); } catch { /* already done and disposed */ }
         var token = cts.Token;
         _ = Task.Run(async () =>
         {
@@ -926,13 +926,18 @@ public sealed class PluginHostService : IAsyncDisposable
                 {
                     if (!token.IsCancellationRequested && _lastBroadcastReceiver is { IsConnected: true } latest)
                     {
-                        QueueReceiverEvent(new PluginReceiverEvent(PluginReceiverEventType.VolumeChanged, latest), skipPluginIds: null);
+                        QueueReceiverEvent(new PluginReceiverEvent(PluginReceiverEventType.VolumeChanged, latest), skipPluginIds: null, CancellationToken.None);
                     }
                 }
             }
             catch (OperationCanceledException)
             {
                 // A newer change takes over.
+            }
+            finally
+            {
+                Interlocked.CompareExchange(ref _volumeEventCts, null, cts);
+                cts.Dispose();
             }
         }, CancellationToken.None);
     }
@@ -942,13 +947,14 @@ public sealed class PluginHostService : IAsyncDisposable
         PluginReceiverEvent evt,
         CancellationToken cancellationToken,
         ISet<string>? skipPluginIds = null) =>
-        Task.WhenAll(QueueReceiverEvent(evt, skipPluginIds)).WaitAsync(cancellationToken);
+        Task.WhenAll(QueueReceiverEvent(evt, skipPluginIds, cancellationToken)).WaitAsync(cancellationToken);
 
     /// <summary>
     /// Puts the event in each running plugin's own queue. A plugin handles its events one at a time and in order;
     /// plugins do not wait for each other, so a slow one (the TV wake) does not hold up the rest.
     /// </summary>
-    private List<Task> QueueReceiverEvent(PluginReceiverEvent evt, ISet<string>? skipPluginIds)
+    /// <param name="cancellationToken">The caller's token: a cancelled event is skipped, and a running one gets it.</param>
+    private List<Task> QueueReceiverEvent(PluginReceiverEvent evt, ISet<string>? skipPluginIds, CancellationToken cancellationToken)
     {
         List<ManagedPluginEntry> activeEntries;
         lock (_syncRoot)
@@ -965,7 +971,7 @@ public sealed class PluginHostService : IAsyncDisposable
             }
 
             var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            if (!EventQueueOf(entry).Writer.TryWrite((evt, done)))
+            if (!EventQueueOf(entry).Writer.TryWrite((evt, done, cancellationToken)))
             {
                 done.TrySetResult();
             }
@@ -976,13 +982,13 @@ public sealed class PluginHostService : IAsyncDisposable
         return handled;
     }
 
-    private Channel<(PluginReceiverEvent Event, TaskCompletionSource Done)> EventQueueOf(ManagedPluginEntry entry)
+    private Channel<(PluginReceiverEvent Event, TaskCompletionSource Done, CancellationToken Token)> EventQueueOf(ManagedPluginEntry entry)
     {
         lock (entry)
         {
             if (entry.Events is null)
             {
-                entry.Events = Channel.CreateUnbounded<(PluginReceiverEvent, TaskCompletionSource)>(new UnboundedChannelOptions { SingleReader = true });
+                entry.Events = Channel.CreateUnbounded<(PluginReceiverEvent, TaskCompletionSource, CancellationToken)>(new UnboundedChannelOptions { SingleReader = true });
                 var reader = entry.Events.Reader;
                 _ = Task.Run(() => PumpReceiverEventsAsync(entry, reader));
             }
@@ -991,16 +997,21 @@ public sealed class PluginHostService : IAsyncDisposable
         }
     }
 
-    private async Task PumpReceiverEventsAsync(ManagedPluginEntry entry, ChannelReader<(PluginReceiverEvent Event, TaskCompletionSource Done)> reader)
+    private async Task PumpReceiverEventsAsync(ManagedPluginEntry entry, ChannelReader<(PluginReceiverEvent Event, TaskCompletionSource Done, CancellationToken Token)> reader)
     {
-        await foreach (var (evt, done) in reader.ReadAllAsync())
+        await foreach (var (evt, done, token) in reader.ReadAllAsync())
         {
             try
             {
-                if (entry.IsEnabled && entry.IsStarted)
+                // A cancelled event (a scene that was called off) is skipped, not run late.
+                if (entry.IsEnabled && entry.IsStarted && !token.IsCancellationRequested)
                 {
-                    await entry.Plugin.OnReceiverEventAsync(evt, CancellationToken.None);
+                    await entry.Plugin.OnReceiverEventAsync(evt, token);
                 }
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                // The caller cancelled.
             }
             catch (Exception ex)
             {
@@ -1103,7 +1114,7 @@ public sealed class PluginHostService : IAsyncDisposable
         public IReadOnlyList<PluginActionDescriptor> Actions { get; set; } = [];
 
         /// <summary>This plugin's receiver events, handled one at a time in order (created on first use).</summary>
-        public Channel<(PluginReceiverEvent Event, TaskCompletionSource Done)>? Events { get; set; }
+        public Channel<(PluginReceiverEvent Event, TaskCompletionSource Done, CancellationToken Token)>? Events { get; set; }
     }
 
     private sealed class PluginAssemblyLoadContext : AssemblyLoadContext
