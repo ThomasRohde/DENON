@@ -6,6 +6,9 @@ namespace Denon.App.Core.Services;
 public sealed class ReceiverController
 {
     private readonly SemaphoreSlim _commandGate = new(1, 1);
+
+    /// <summary>Held for a whole groups read (see <see cref="RefreshHeosGroupsAsync"/>). Never taken before the command gate.</summary>
+    private readonly SemaphoreSlim _groupsReadGate = new(1, 1);
     private readonly HeosClient _heosClient;
     private readonly DenonAvrClient _avrClient;
     private readonly AppSettingsStore _settingsStore;
@@ -216,6 +219,20 @@ public sealed class ReceiverController
 
     /// <summary>Reads the HEOS players, the groups and each group's volume, and keeps them in the state store.</summary>
     public async Task<HeosGroupsState> RefreshHeosGroupsAsync(CancellationToken cancellationToken = default)
+    {
+        // One read at a time, whole: two that overlap could end in the wrong order, and the older one would win.
+        await _groupsReadGate.WaitAsync(cancellationToken);
+        try
+        {
+            return await ReadHeosGroupsLockedAsync(cancellationToken);
+        }
+        finally
+        {
+            _groupsReadGate.Release();
+        }
+    }
+
+    private async Task<HeosGroupsState> ReadHeosGroupsLockedAsync(CancellationToken cancellationToken)
     {
         // Group volume events that come in while this read runs are newer than it: the store keeps them.
         var readStart = _stateStore.BeginHeosGroupsRead();
