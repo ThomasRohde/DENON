@@ -743,6 +743,60 @@ public sealed class ReceiverTransportTests : IDisposable
         Assert.Equal(key, AvrLiveState.AcousticKey(line));
 
     [Fact]
+    public async Task A_change_sent_just_before_the_link_closes_is_kept_and_an_old_link_is_ignored()
+    {
+        using var avr = new FakeAvr();
+        var client = new DenonAvrClient(avr.Port);
+        await client.GetStatusAsync(Loopback(), CancellationToken.None); // Opens link 1.
+        var firstLink = client.OpenLinkGeneration;
+
+        var seen = new TaskCompletionSource<AvrLiveState?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.LinesReceived += received =>
+        {
+            if (!received.Lines.Contains("PSDYNEQ OFF"))
+            {
+                return;
+            }
+
+            // Handle the event only once the link is closed, as when the event task is behind.
+            SpinWait.SpinUntil(() => client.OpenLinkGeneration == 0, TimeSpan.FromSeconds(5));
+            seen.TrySetResult(client.LatestLiveState(received));
+        };
+
+        await avr.PushAsync("PSDYNEQ OFF\r");
+        avr.DropAll(); // The receiver sends a change, then drops the link.
+
+        var live = await seen.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.NotNull(live);
+        Assert.False(live!.ApplyAcousticsTo(AcousticStatus.Empty).DynamicEq);
+
+        // A newer link is open: lines from the old one are old and change nothing.
+        await client.GetStatusAsync(Loopback(), CancellationToken.None);
+        Assert.True(client.OpenLinkGeneration > firstLink);
+        Assert.Null(client.LatestLiveState(new AvrLinesReceived("127.0.0.1", firstLink, ["MV10"], AvrLiveState.Empty.Apply("MV10"))));
+    }
+
+    [Fact]
+    public async Task A_pushed_change_then_a_drop_still_updates_the_state()
+    {
+        using var avr = new FakeAvr();
+        using var heos = new FakeHeos();
+        avr.Replies["PSDYNEQ ?"] = "PSDYNEQ ON\r";
+        var (controller, state, telemetry, _, _) = await CreateRigAsync(avr, heos);
+        await controller.RefreshAsync();
+        await controller.GetAcousticStatusAsync();
+        Assert.True(state.Snapshot.Acoustics!.DynamicEq);
+
+        await avr.PushAsync("PSDYNEQ OFF\rMUON\r");
+        avr.DropAll();
+
+        await WaitUntilAsync(() => state.Snapshot.Acoustics?.DynamicEq == false, "the acoustic line before the drop");
+        await WaitUntilAsync(() => state.Snapshot.Status?.IsMuted == true, "the mute line before the drop");
+
+        await telemetry.DisposeAsync();
+    }
+
+    [Fact]
     public async Task A_refused_command_sends_nothing_and_the_link_keeps_listening()
     {
         using var avr = new FakeAvr();

@@ -5,8 +5,11 @@ using Denon.App.Core.Models;
 
 namespace Denon.App.Core.Heos;
 
-/// <summary>Lines the receiver sent on one link (see <see cref="DenonAvrClient.LinesReceived"/>).</summary>
-public sealed record AvrLinesReceived(string Host, long Generation, IReadOnlyList<string> Lines);
+/// <summary>
+/// Lines the receiver sent on one link (see <see cref="DenonAvrClient.LinesReceived"/>), and the link's live state
+/// right after the last of them.
+/// </summary>
+public sealed record AvrLinesReceived(string Host, long Generation, IReadOnlyList<string> Lines, AvrLiveState Live);
 
 public sealed class DenonAvrClient : IDisposable
 {
@@ -62,6 +65,22 @@ public sealed class DenonAvrClient : IDisposable
         _link is { IsOpen: true } link && string.Equals(link.Host, host, StringComparison.OrdinalIgnoreCase)
             ? link.Live
             : AvrLiveState.Empty;
+
+    /// <summary>
+    /// The newest state to apply for <paramref name="received"/>: the open link's live state while it is the link the
+    /// lines came on (lines may have come in since), the state the event carries once that link closed (the receiver
+    /// can send a change and then drop the link), or null when a newer link is open (these lines are old).
+    /// </summary>
+    public AvrLiveState? LatestLiveState(AvrLinesReceived received)
+    {
+        var link = _link;
+        if (link is { IsOpen: true })
+        {
+            return link.Generation == received.Generation ? link.Live : null;
+        }
+
+        return link is null || link.Generation <= received.Generation ? received.Live : null;
+    }
 
     public async Task<AvrDeviceStatus> GetStatusAsync(ReceiverSettings settings, CancellationToken cancellationToken)
     {
@@ -894,7 +913,7 @@ public sealed class DenonAvrClient : IDisposable
                 }
 
                 link.Receive(lines);
-                _events.Writer.TryWrite(new LinkEvent(link.Host, link.Generation, lines));
+                _events.Writer.TryWrite(new LinkEvent(link.Host, link.Generation, lines, link.Live));
             }
         }
         catch (Exception exception)
@@ -905,7 +924,7 @@ public sealed class DenonAvrClient : IDisposable
         {
             if (link.MarkClosed(reason))
             {
-                _events.Writer.TryWrite(new LinkEvent(link.Host, link.Generation, Lines: null));
+                _events.Writer.TryWrite(new LinkEvent(link.Host, link.Generation, Lines: null, link.Live));
             }
 
             link.Close();
@@ -935,15 +954,14 @@ public sealed class DenonAvrClient : IDisposable
         var reader = _events.Reader;
         while (await reader.WaitToReadAsync())
         {
-            string? host = null;
-            long generation = 0;
+            LinkEvent? last = null;
             var batch = new List<string>();
             while (reader.TryRead(out var linkEvent))
             {
-                if (host is not null && (linkEvent.Generation != generation || linkEvent.Lines is null))
+                if (last is not null && (linkEvent.Generation != last.Generation || linkEvent.Lines is null))
                 {
-                    RaiseLines(host, generation, batch);
-                    host = null;
+                    RaiseLines(last, batch);
+                    last = null;
                     batch = [];
                 }
 
@@ -953,23 +971,23 @@ public sealed class DenonAvrClient : IDisposable
                     continue;
                 }
 
-                host = linkEvent.Host;
-                generation = linkEvent.Generation;
+                last = linkEvent;
                 batch.AddRange(linkEvent.Lines);
             }
 
-            if (host is not null)
+            if (last is not null)
             {
-                RaiseLines(host, generation, batch);
+                RaiseLines(last, batch);
             }
         }
     }
 
-    private void RaiseLines(string host, long generation, IReadOnlyList<string> lines)
+    /// <param name="last">The batch's last event: its live state has every line of the batch.</param>
+    private void RaiseLines(LinkEvent last, IReadOnlyList<string> lines)
     {
         try
         {
-            LinesReceived?.Invoke(new AvrLinesReceived(host, generation, lines));
+            LinesReceived?.Invoke(new AvrLinesReceived(last.Host, last.Generation, lines, last.Live));
         }
         catch
         {
@@ -1037,7 +1055,7 @@ public sealed class DenonAvrClient : IDisposable
         _events.Writer.TryComplete();
     }
 
-    private sealed record LinkEvent(string Host, long Generation, IReadOnlyList<string>? Lines);
+    private sealed record LinkEvent(string Host, long Generation, IReadOnlyList<string>? Lines, AvrLiveState Live);
 
     /// <summary>One connection on port 23 and its reader. A new connection is a new link with a new number.</summary>
     private sealed class AvrLink

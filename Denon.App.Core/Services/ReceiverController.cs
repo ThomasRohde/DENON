@@ -873,7 +873,7 @@ public sealed class ReceiverController
             var receiverSettings = _settingsStore.Current.Receiver;
             var status = await operation(receiverSettings, cancellationToken);
             // Lines that came in after the read (a turn of the knob) are in the live state: they must not be lost.
-            status = _stateStore.UpdateStatus(status, read => WithLiveAvrState(receiverSettings.Host, read));
+            status = _stateStore.UpdateStatus(status, read => WithLiveAvrState(_avrClient.GetLiveState(receiverSettings.Host), read));
             if (logSuccess)
             {
                 _logStore.Info($"{actionDescription} completed.");
@@ -903,17 +903,17 @@ public sealed class ReceiverController
     }
 
     /// <summary>
-    /// The status with what the receiver said on the open port 23 link since. Only for a status with a real AVR
-    /// answer: a HEOS-only or grace-window status waits for the next full read.
+    /// The status with what the receiver said on the port 23 link (<paramref name="liveState"/>). Only for a status
+    /// with a real AVR answer: a HEOS-only or grace-window status waits for the next full read.
     /// </summary>
-    private ReceiverStatus WithLiveAvrState(string host, ReceiverStatus status)
+    private static ReceiverStatus WithLiveAvrState(AvrLiveState liveState, ReceiverStatus status)
     {
         if (!status.IsAvrConfirmed)
         {
             return status;
         }
 
-        var live = _avrClient.GetLiveState(host).ApplyTo(status);
+        var live = liveState.ApplyTo(status);
         // Off, or away from NET: no station plays (the same rule as the full read).
         return live.IsPoweredOn && live.IsMainZoneOn && DenonCatalog.InputMatches(live.InputSource, "NET")
             ? live
@@ -934,9 +934,13 @@ public sealed class ReceiverController
         }
 
         var before = _stateStore.Snapshot.Status;
+        // Read inside the store's lock: the newest state for this link, also after the link closed (the receiver can
+        // send a change and drop the link before this runs). Lines from a link a newer one replaced change nothing.
         _stateStore.PatchFromReceiver(
-            status => WithLiveAvrState(host, status),
-            received.Lines.Any(AvrLiveState.IsAcousticLine) ? acoustics => _avrClient.GetLiveState(host).ApplyAcousticsTo(acoustics) : null);
+            status => _avrClient.LatestLiveState(received) is { } live ? WithLiveAvrState(live, status) : status,
+            received.Lines.Any(AvrLiveState.IsAcousticLine)
+                ? acoustics => _avrClient.LatestLiveState(received)?.ApplyAcousticsTo(acoustics) ?? acoustics
+                : null);
 
         if (before is { IsAvrConfirmed: true } &&
             _stateStore.Snapshot.Status is { } after &&
