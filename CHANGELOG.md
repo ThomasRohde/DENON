@@ -4,6 +4,30 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Live lyrics find the new song** (#51). On every track change the app looked up the new title with the previous
+  artist, and often found nothing. Now it looks up after both are set.
+- **Cinema opens only when the cast started** (#52). After a failed cast it used to open a silent video. With
+  Cinema already open, a new track loads once, not twice. Two quick opens no longer start WebView2 twice.
+- **A Cinema sync nudge is kept for the next tracks** (#52), as its tip said: the +/- buttons now save the offset.
+- **The Cinema title bar keeps its size in the Compact and Large skins** (#52, #53) after it was hidden, and the
+  drag area matches it.
+- **A busy clipboard or a locked export file no longer closes the app** (#71); the status line says what failed.
+  A new or duplicated scene, and a new station, never get an id that is already used.
+- Album art colours are read off the UI thread from a small copy of the cover, the lyrics timer runs only while
+  lyrics are on, a failed artwork download is tried again, and Cinema's page watcher runs at most once a frame
+  (#56).
+
+### Security
+- **"Allow in firewall" runs Windows' own netsh** (#33), by its full path, so a netsh.exe in the app's folder
+  cannot run elevated. The rule is limited to this program, and a second click updates the rule instead of adding
+  another one.
+- **Cinema opens only web pages, and artwork never loads from a network share** (#29, defense in depth). The
+  Cinema address is built from the video id, Open Browser opens only http(s), and file, network-share and app
+  links are blocked in Cinema. TV channel logos on this PC still load.
+
 ## [2.10.26] - 2026-11-28
 
 ### Fixed
