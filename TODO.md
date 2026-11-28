@@ -31,7 +31,10 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
       YouTube pump teardown order (only a stray warning) and a background log writer.
 - [ ] Verify PR 5 live: a jukebox FLAC plays to its end and the next one starts. Needs the user's OK (it plays
       media).
-- [ ] PR 6: plugin host: #44, #45, #69, the CreateHttpClient part of #64.
+- [x] PR 6: plugin host. #44, #45, #61, #64, #65 and #69 closed (the host and Plugins page parts, the MCP
+      subscription cleanup). Left as is: #44 F5 (scan only DLLs with a deps.json; a third-party plugin without one
+      would be skipped) and the plugin view dispose hook (#69 F3, a feature).
+- [ ] Not in PR 6: a parameter form on the Plugins page for actions that need input (#78).
 - [ ] PR 7: Smart TV plugin: #34, #47, the Smart TV part of #68.
 - [ ] PR 8: YouTube and Cinema: #33, #51, #52, #56, the Cinema parts of #53 and #71. Add a Cinema guard too: open
       and navigate only http/https (defense in depth for #29).

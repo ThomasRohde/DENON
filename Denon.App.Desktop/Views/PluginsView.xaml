@@ -176,10 +176,22 @@
                 <StackPanel>
                     <TextBlock Text="{Binding SelectedPlugin.Name}" FontSize="{DynamicResource FontSize10}" FontWeight="Bold" />
                     <TextBlock Text="{Binding SelectedPlugin.Description}" FontSize="{DynamicResource FontSize07}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="{skin:Space 0,6,0,12}" />
-                    <TextBlock Text="Enable this plugin to activate its dashboard, AVR event hooks, and actions."
-                               FontSize="{DynamicResource FontSize06}"
-                               Foreground="{DynamicResource AccentAmberBrush}"
-                               Margin="{skin:Space 0,0,0,12}" />
+                    <TextBlock FontSize="{DynamicResource FontSize06}"
+                               Margin="{skin:Space 0,0,0,12}"
+                               TextWrapping="Wrap">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="Enable this plugin to activate its dashboard, AVR event hooks, and actions." />
+                                <Setter Property="Foreground" Value="{DynamicResource AccentAmberBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SelectedPlugin.IsEnabled}" Value="True">
+                                        <Setter Property="Text" Value="This plugin has no dashboard. Its actions are under Plugin Actions below." />
+                                        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                     <Button Content="{Binding SelectedPlugin.EnableButtonLabel}"
                             Command="{Binding TogglePluginEnabledCommand}"
                             CommandParameter="{Binding SelectedPlugin}"
