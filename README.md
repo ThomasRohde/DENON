@@ -197,4 +197,5 @@ All global Windows hotkeys and in-app shortcuts can be recorded, cleared, and ch
 ## Changelog & License
 
 - See [CHANGELOG.md](CHANGELOG.md) for release history.
+- Developer guides: [CONTRIBUTING.md](CONTRIBUTING.md), [docs/plugin-development.md](docs/plugin-development.md) and [SECURITY.md](SECURITY.md).
 - MIT License — see [LICENSE](LICENSE) for details.

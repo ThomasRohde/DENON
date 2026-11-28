@@ -44,4 +44,10 @@ internal sealed class HomePodSpeakerConfig
     public DateTimeOffset? LastSeenUtc { get; set; }
 
     public bool IsStereoPair => Members.Count > 1;
+
+    /// <summary>
+    /// Discovery passes in a row in which only part of this stereo pair answered (in memory only, not saved).
+    /// The pair stays as saved until this reaches <see cref="HomePodGroups.MaxPartialPasses"/>.
+    /// </summary>
+    internal int PartialPasses { get; set; }
 }

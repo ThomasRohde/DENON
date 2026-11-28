@@ -376,6 +376,98 @@ public sealed class HomePodMergeTests
     }
 
     [Fact]
+    public void A_pair_stays_a_pair_when_the_other_homepod_misses_a_reply()
+    {
+        // The leader carries no pgid, so on its own it looks like a single HomePod.
+        var pair = Saved("L", "192.168.1.8", "HomePod Left", "HomePod Right");
+
+        var merge = HomePodGroups.Merge([pair], [Found("L", "192.168.1.8", "HomePod Left")], Now);
+
+        var speaker = Assert.Single(merge.Speakers);
+        Assert.Same(pair, speaker);
+        Assert.Equal("HomePod Left + Right", speaker.Name);
+        Assert.Equal(["HomePod Left", "HomePod Right"], speaker.Members);
+        Assert.Equal(["L", "R"], speaker.MemberIds);
+        Assert.Empty(merge.Restart); // the link stays
+        Assert.Empty(merge.Removed);
+        Assert.Equal(Now, speaker.LastSeenUtc);
+    }
+
+    [Fact]
+    public void A_pair_keeps_its_leader_when_only_the_other_homepod_answers()
+    {
+        var pair = Saved("L", "192.168.1.8", "HomePod Left", "HomePod Right");
+
+        var merge = HomePodGroups.Merge([pair], [Found("R", "192.168.1.9", "HomePod Right")], Now);
+
+        var speaker = Assert.Single(merge.Speakers);
+        Assert.Equal("L", speaker.Id);
+        Assert.Equal("192.168.1.8", speaker.Host);
+        Assert.Equal(2, speaker.Members.Count);
+        Assert.Empty(merge.Restart);
+        Assert.Equal(0, merge.Added);
+    }
+
+    [Fact]
+    public void A_pair_whose_leader_answers_alone_at_a_new_address_restarts_there()
+    {
+        var pair = Saved("L", "192.168.1.8", "HomePod Left", "HomePod Right");
+
+        var merge = HomePodGroups.Merge([pair], [Found("L", "192.168.1.18", "HomePod Left")], Now);
+
+        var (oldId, speaker) = Assert.Single(merge.Restart);
+        Assert.Equal("L", oldId);
+        Assert.Equal("192.168.1.18", speaker.Host);
+        Assert.Equal(2, speaker.Members.Count);
+    }
+
+    [Fact]
+    public void A_pair_that_answers_in_part_too_long_follows_discovery()
+    {
+        var pair = Saved("L", "192.168.1.8", "HomePod Left", "HomePod Right");
+
+        for (var pass = 1; pass < HomePodGroups.MaxPartialPasses; pass++)
+        {
+            HomePodGroups.Merge([pair], [Found("L", "192.168.1.8", "HomePod Left")], Now);
+            Assert.Equal(2, pair.Members.Count);
+        }
+
+        var merge = HomePodGroups.Merge([pair], [Found("L", "192.168.1.8", "HomePod Left")], Now);
+
+        Assert.Equal(["HomePod Left"], Assert.Single(merge.Speakers).Members);
+    }
+
+    [Fact]
+    public void A_full_reply_resets_the_count_of_partial_replies()
+    {
+        var pair = Saved("L", "192.168.1.8", "HomePod Left", "HomePod Right");
+
+        for (var pass = 0; pass < HomePodGroups.MaxPartialPasses * 2; pass++)
+        {
+            var found = pass % 2 == 0
+                ? Found("L", "192.168.1.8", "HomePod Left")
+                : Found("L", "192.168.1.8", "HomePod Left", "HomePod Right");
+            HomePodGroups.Merge([pair], [found], Now);
+        }
+
+        Assert.Equal(2, pair.Members.Count);
+        Assert.Equal(0, pair.PartialPasses);
+    }
+
+    [Fact]
+    public void A_pair_split_in_the_home_app_splits_at_once()
+    {
+        // Both HomePods answer, each as its own speaker: the pair is gone.
+        var pair = Saved("L", "192.168.1.8", "HomePod Left", "HomePod Right");
+
+        var merge = HomePodGroups.Merge([pair], [Found("L", "192.168.1.8", "HomePod Left"), Found("R", "192.168.1.9", "HomePod Right")], Now);
+
+        Assert.Equal(2, merge.Speakers.Count);
+        Assert.Equal(["HomePod Left"], merge.Speakers.Single(s => s.Id == "L").Members);
+        Assert.Equal(1, merge.Added);
+    }
+
+    [Fact]
     public void Ids_match_in_any_case()
     {
         var kitchen = Saved("ce:2e", "192.168.1.7", "Køkken");
