@@ -4,6 +4,31 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **A slow plugin no longer holds up the others** (#45). Each plugin now has its own queue for receiver events, and
+  the plugins run in parallel. Before, a TV wake (up to 35 s) delayed Home Assistant and Hue. Each plugin still
+  gets its events in order.
+- **Plugins hear about volume and mute changes** (#45). The VolumeChanged event was never sent. Now it comes once
+  after the volume has rested for 0.4 s, so a slider drag or a fade is one event. The Home Assistant push uses it.
+- **All plugins stop at the same time at exit, and only once** (#45). One slow plugin no longer keeps the others
+  from writing their session end. Turning a plugin on or off from two places at once now starts or stops it once.
+  An action of a plugin that failed to start now says it is not running.
+- **A plugin's dashboard that fails no longer closes the app** (#44); the page shows why. A plugin that reports
+  audio sync wrongly can no longer stop the meter loop. A plugin DLL that loads nothing (or a duplicate) is
+  unloaded at once.
+- **A plugin built for a newer Plugin SDK is refused with a clear log line** (#69), not a crash later. A plugin
+  action that needs input (for example "Trigger HA Entity") now says what it needs, and where to run it, instead of
+  failing with "Missing ...". The Plugins page shows "AVR Control" for plugins that may control the receiver, and
+  the text above an enabled plugin without a dashboard no longer says "Enable this plugin".
+
+### Security
+- **Self-signed certificates are accepted only for LAN devices** (#64), now also for IPv6 LAN addresses,
+  169.254 link-local addresses and localhost; every plugin HTTP client keeps its connection limits.
+- **MCP clients can subscribe only to resources that exist** (#64), and only the room state is kept, so closed
+  sessions are forgotten.
+
 ## [2.10.23] - 2026-11-28
 
 ### Security

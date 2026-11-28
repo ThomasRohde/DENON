@@ -161,6 +161,7 @@ public sealed class PluginCardViewModel : ObservableObject
     {
         var list = new List<string>();
         if (caps.HasFlag(PluginCapabilities.DashboardUi)) list.Add("Dashboard UI");
+        if (caps.HasFlag(PluginCapabilities.ReceiverControl)) list.Add("AVR Control");
         if (caps.HasFlag(PluginCapabilities.ReceiverEvents)) list.Add("AVR Events");
         if (caps.HasFlag(PluginCapabilities.SceneAutomation)) list.Add("Smart Scene Sync");
         if (caps.HasFlag(PluginCapabilities.Actions)) list.Add("Actions");
@@ -365,9 +366,25 @@ public sealed partial class MainViewModel
             if (!_pluginViewCache.TryGetValue(SelectedPlugin.Id, out var cachedView))
             {
                 var instance = _pluginHost.GetPluginInstance(SelectedPlugin.Id);
-                cachedView = instance is IPluginViewProvider viewProvider
-                    ? viewProvider.CreateDashboardView()
-                    : null;
+                try
+                {
+                    cachedView = instance is IPluginViewProvider viewProvider
+                        ? viewProvider.CreateDashboardView()
+                        : null;
+                }
+                catch (Exception ex)
+                {
+                    // A plugin's view that throws (on the UI thread) would close the app: show why instead.
+                    _logStore.Error($"[Plugin:{SelectedPlugin.Id}] Dashboard view failed.", ex);
+                    cachedView = new System.Windows.Controls.TextBlock
+                    {
+                        Text = $"The {SelectedPlugin.Name} dashboard could not open: {ex.Message}",
+                        TextWrapping = System.Windows.TextWrapping.Wrap,
+                        Margin = new System.Windows.Thickness(12),
+                    };
+                    PluginsStatusText = $"⚠ {SelectedPlugin.Name}: the dashboard could not open.";
+                }
+
                 _pluginViewCache[SelectedPlugin.Id] = cachedView;
             }
 
@@ -406,6 +423,13 @@ public sealed partial class MainViewModel
     {
         if (SelectedPlugin is null || parameter is not PluginActionDescriptor action)
         {
+            return;
+        }
+
+        var required = action.Parameters?.Where(static p => p.Required).Select(static p => p.Name).ToList() ?? [];
+        if (required.Count > 0)
+        {
+            PluginsStatusText = $"{action.DisplayName} needs {string.Join(", ", required)}. Run it from a Smart Scene, an automation or an MCP client.";
             return;
         }
 

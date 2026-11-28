@@ -599,13 +599,41 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
 
     private ValueTask<EmptyResult> Subscribe(McpServer session, string? uri)
     {
-        if (!string.IsNullOrWhiteSpace(uri))
+        if (string.IsNullOrWhiteSpace(uri) || !IsKnownResourceUri(uri))
         {
-            _resourceSubscribers.GetOrAdd(session, static _ => new(StringComparer.OrdinalIgnoreCase))[uri] = 0;
-            LogActivity("resources/subscribe", uri, "OK", 0);
+            throw new McpProtocolException($"Unknown resource '{uri}'.", McpErrorCode.InvalidParams);
         }
 
+        // Only the room state sends updates, so only that subscription is kept. Every kept session then gets the
+        // updates, and one that has closed is forgotten when a send to it fails (no list that only grows).
+        if (string.Equals(uri, RoomStateUri, StringComparison.OrdinalIgnoreCase))
+        {
+            _resourceSubscribers.GetOrAdd(session, static _ => new(StringComparer.OrdinalIgnoreCase))[uri] = 0;
+        }
+
+        LogActivity("resources/subscribe", uri, "OK", 0);
         return ValueTask.FromResult(new EmptyResult());
+    }
+
+    /// <summary>A listed resource, or one that fits a listed template (denon://plugins/..., /scenes/..., /logs/events/...).</summary>
+    internal static bool IsKnownResourceUri(string uri)
+    {
+        if (ListResources().Resources.Any(r => string.Equals(r.Uri, uri, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        foreach (var template in ListResourceTemplates().ResourceTemplates)
+        {
+            var brace = template.UriTemplate.IndexOf('{');
+            var prefix = brace > 0 ? template.UriTemplate[..brace] : template.UriTemplate;
+            if (uri.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && uri.Length > prefix.Length && !uri[prefix.Length..].Contains('/'))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private ValueTask<EmptyResult> Unsubscribe(McpServer session, string? uri)
