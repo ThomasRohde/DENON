@@ -2,6 +2,16 @@
 
 Released separately from Denon Desktop with tags `appletv-vX.Y.Z`.
 
+## [Unreleased]
+
+### Fixed
+- **No second copy of an Apple TV after a partial discovery reply** (#70). When only the Companion service
+  answered, the reply had no device id, and the Apple TV was saved again under its IP address. Now such a reply only
+  updates the saved Apple TV at that address; a new Apple TV is added when it answers in full.
+- **Artwork is written whole, and not on the now-playing read loop** (#70). The file goes to a temporary name and
+  is then moved into place, so the now-playing view never reads half a file. The cache check no longer lists the
+  artwork folder on the loop that reads the Apple TV's messages.
+
 ## [0.6.0] - 2026-11-28
 
 ### Security

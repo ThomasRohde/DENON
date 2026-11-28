@@ -473,45 +473,13 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
 
         var added = 0;
         var restart = new List<AppleTvDeviceConfig>();
+        var skipped = new List<AppleDevice>();
         await _configGate.WaitAsync(cancellationToken);
         try
         {
             lock (_gate)
             {
-                foreach (var device in found)
-                {
-                    var id = device.DeviceId ?? device.Address.ToString();
-                    var companionPort = device.Service(AppleServiceTypes.Companion)!.Port;
-                    var airPlayPort = device.Service(AppleServiceTypes.AirPlay)?.Port is > 0 and var p ? p : 7000;
-                    var existing = _config.Devices.FirstOrDefault(d => d.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
-                    if (existing is null)
-                    {
-                        _config.Devices.Add(new AppleTvDeviceConfig
-                        {
-                            Id = id,
-                            Name = device.Name,
-                            Host = device.Address.ToString(),
-                            CompanionPort = companionPort,
-                            AirPlayPort = airPlayPort,
-                            Model = device.ModelName,
-                            OsVersion = device.OsVersion ?? string.Empty,
-                        });
-                        added++;
-                        continue;
-                    }
-
-                    var moved = existing.Host != device.Address.ToString() || existing.CompanionPort != companionPort || existing.AirPlayPort != airPlayPort;
-                    existing.Name = device.Name;
-                    existing.Host = device.Address.ToString();
-                    existing.CompanionPort = companionPort;
-                    existing.AirPlayPort = airPlayPort;
-                    existing.Model = device.ModelName;
-                    existing.OsVersion = device.OsVersion ?? existing.OsVersion;
-                    if (moved && existing.IsPaired && existing.Enabled)
-                    {
-                        restart.Add(existing);
-                    }
-                }
+                added = MergeDiscovered(_config.Devices, found, restart, skipped);
             }
 
             if (found.Count > 0)
@@ -535,11 +503,74 @@ public sealed class AppleTvPlugin : IDenonPlugin, IPluginViewProvider
             _context?.Logger.Info($"Apple TV discovery: {found.Count} answered, {added} new.");
         }
 
+        foreach (var device in skipped)
+        {
+            _context?.Logger.Info($"Apple TV discovery: {device.Name} at {device.Address} answered without its device id; not added yet.");
+        }
+
         _lastDiscoveryAnswered = found.Count;
         DevicesChanged?.Invoke();
         ReportAggregateStatus();
         return added;
     }
+
+    /// <summary>
+    /// Merges discovered Apple TVs into the saved ones and returns how many are new. A saved Apple TV is found by
+    /// its device id. A reply without the device id (only Companion answered; the id is in the AirPlay record) is
+    /// found by its address, and is never added: under its address it would be a second copy of the same Apple TV.
+    /// Those go to <paramref name="skipped"/>. Paired, enabled Apple TVs that moved go to <paramref name="restart"/>.
+    /// </summary>
+    internal static int MergeDiscovered(List<AppleTvDeviceConfig> devices, IEnumerable<AppleDevice> found,
+        List<AppleTvDeviceConfig> restart, List<AppleDevice> skipped)
+    {
+        var added = 0;
+        foreach (var device in found)
+        {
+            var companionPort = device.Service(AppleServiceTypes.Companion)!.Port;
+            var existing = device.DeviceId is { } id
+                ? devices.FirstOrDefault(d => d.Id.Equals(id, StringComparison.OrdinalIgnoreCase))
+                : devices.FirstOrDefault(d => d.Host == device.Address.ToString());
+            if (existing is null && device.DeviceId is null)
+            {
+                skipped.Add(device);
+                continue;
+            }
+
+            if (existing is null)
+            {
+                devices.Add(new AppleTvDeviceConfig
+                {
+                    Id = device.DeviceId!,
+                    Name = device.Name,
+                    Host = device.Address.ToString(),
+                    CompanionPort = companionPort,
+                    AirPlayPort = AirPlayPortOf(device) ?? 7000,
+                    Model = device.ModelName,
+                    OsVersion = device.OsVersion ?? string.Empty,
+                });
+                added++;
+                continue;
+            }
+
+            // A reply without AirPlay has no AirPlay port: the saved one stays.
+            var airPlayPort = AirPlayPortOf(device) ?? existing.AirPlayPort;
+            var moved = existing.Host != device.Address.ToString() || existing.CompanionPort != companionPort || existing.AirPlayPort != airPlayPort;
+            existing.Name = device.Name;
+            existing.Host = device.Address.ToString();
+            existing.CompanionPort = companionPort;
+            existing.AirPlayPort = airPlayPort;
+            existing.Model = device.ModelName;
+            existing.OsVersion = device.OsVersion ?? existing.OsVersion;
+            if (moved && existing.IsPaired && existing.Enabled)
+            {
+                restart.Add(existing);
+            }
+        }
+
+        return added;
+    }
+
+    private static int? AirPlayPortOf(AppleDevice device) => device.Service(AppleServiceTypes.AirPlay)?.Port is > 0 and var port ? port : null;
 
     // ---------------------------------------------------------------- internals
 

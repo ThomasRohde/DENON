@@ -357,7 +357,8 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
 
     /// <summary>
     /// Gets the artwork of the program when the app has one: from the disk cache, else with a
-    /// PLAYBACK_QUEUE_REQUEST (in the background). One request per program; a failed one is retried after a minute.
+    /// PLAYBACK_QUEUE_REQUEST. One request per program; a failed one is retried after a minute. This runs on the
+    /// MRP read loop, so all disk work is done in the background.
     /// </summary>
     private void RequestArtwork(MrpClient mrp, NowPlayingSnapshot snapshot)
     {
@@ -377,23 +378,19 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
             _artworkRetryAt = DateTimeOffset.UtcNow + ArtworkRetry;
         }
 
-        var name = ArtworkFileName(key);
-        var cached = Directory.Exists(_artworkDirectory)
-            ? Directory.EnumerateFiles(_artworkDirectory, name + ".*").FirstOrDefault()
-            : null;
-        if (cached is not null)
-        {
-            SetState(s => s with { Artwork = new AppleTvArtwork(key, new Uri(cached).AbsoluteUri) });
-            return;
-        }
-
-        _ = Task.Run(() => FetchArtworkAsync(mrp, key, name, snapshot.QueueLocation));
+        _ = Task.Run(() => FetchArtworkAsync(mrp, key, ArtworkFileName(key), snapshot.QueueLocation));
     }
 
     private async Task FetchArtworkAsync(MrpClient mrp, string key, string name, int location)
     {
         try
         {
+            if (FindCachedArtwork(_artworkDirectory, name) is { } cached)
+            {
+                SetState(s => s with { Artwork = new AppleTvArtwork(key, new Uri(cached).AbsoluteUri) });
+                return;
+            }
+
             var artwork = await mrp.RequestPlaybackQueueAsync(location, _cts.Token);
             if (artwork is null)
             {
@@ -401,9 +398,7 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
                 return;
             }
 
-            Directory.CreateDirectory(_artworkDirectory);
-            var path = Path.Combine(_artworkDirectory, name + artwork.Extension);
-            await File.WriteAllBytesAsync(path, artwork.Data, _cts.Token);
+            var path = await SaveArtworkAsync(_artworkDirectory, name, artwork, _cts.Token);
             PruneArtwork();
             SetState(s => s with { Artwork = new AppleTvArtwork(key, new Uri(path).AbsoluteUri) });
         }
@@ -414,6 +409,32 @@ internal sealed class AppleTvDeviceClient : IAsyncDisposable
         {
             Diagnostic?.Invoke($"Artwork not fetched (retry in {ArtworkRetry.TotalSeconds:0} s): {ex.Message}");
         }
+    }
+
+    /// <summary>The saved artwork file for <paramref name="name"/> (JPEG or PNG), or null.</summary>
+    internal static string? FindCachedArtwork(string directory, string name) =>
+        new[] { ".jpg", ".png" }.Select(ext => Path.Combine(directory, name + ext)).FirstOrDefault(File.Exists);
+
+    /// <summary>
+    /// Writes the artwork to a temporary file and then moves it into place, so a reader (the host's now-playing
+    /// view) never sees half a file. Returns the file's path.
+    /// </summary>
+    internal static async Task<string> SaveArtworkAsync(string directory, string name, MrpArtwork artwork, CancellationToken ct)
+    {
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, name + artwork.Extension);
+        var temp = Path.Combine(directory, $"{name}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            await File.WriteAllBytesAsync(temp, artwork.Data, ct);
+            File.Move(temp, path, overwrite: true);
+        }
+        finally
+        {
+            File.Delete(temp); // no-op after the move
+        }
+
+        return path;
     }
 
     /// <summary>A file name from the program key (the key can hold any character).</summary>

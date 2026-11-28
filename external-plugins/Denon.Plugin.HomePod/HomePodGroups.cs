@@ -36,6 +36,12 @@ internal sealed record HomePodMerge(
 /// </summary>
 internal static class HomePodGroups
 {
+    /// <summary>
+    /// How many discovery passes in a row a known stereo pair may answer in part before discovery's view wins
+    /// (discovery runs every 10 minutes, so about half an hour).
+    /// </summary>
+    public const int MaxPartialPasses = 3;
+
     public static IReadOnlyList<DiscoveredSpeaker> Build(IEnumerable<AppleDevice> devices)
     {
         var pods = devices
@@ -85,6 +91,10 @@ internal static class HomePodGroups
     /// Merges discovered speakers into the saved ones. A speaker is found by its leader's id, else by a shared
     /// member HomePod (the pair's leader can change). Each saved speaker matches one discovered speaker at most.
     /// Members are compared by device id, never by name: two HomePods may have the same name.
+    /// A saved stereo pair of which only one HomePod answered, while the other answered nowhere in this pass (a
+    /// missed mDNS reply), stays as saved: its leader keeps the link, and only the leader's address is updated. After
+    /// <see cref="MaxPartialPasses"/> such passes in a row, discovery's view wins (the pair was split or a HomePod
+    /// is gone). A HomePod that answers as part of another speaker means the pair really changed.
     /// </summary>
     public static HomePodMerge Merge(IEnumerable<HomePodSpeakerConfig> saved, IReadOnlyList<DiscoveredSpeaker> found, DateTimeOffset now)
     {
@@ -92,6 +102,7 @@ internal static class HomePodGroups
         var matched = new HashSet<HomePodSpeakerConfig>();
         var restart = new List<(string OldId, HomePodSpeakerConfig Speaker)>();
         var removed = new List<HomePodSpeakerConfig>();
+        var answered = found.SelectMany(f => f.MemberIds).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var added = 0;
 
         foreach (var speaker in found)
@@ -107,6 +118,13 @@ internal static class HomePodGroups
             }
 
             matched.Add(existing);
+            if (!isNew && IsPartialReply(existing, speaker, answered) && ++existing.PartialPasses < MaxPartialPasses)
+            {
+                KeepPair(existing, speaker, now, restart);
+                continue;
+            }
+
+            existing.PartialPasses = 0;
             var oldId = existing.Id; // before the update: the running client and the listen log use it
             var moved = isNew || !string.Equals(oldId, speaker.Id, StringComparison.Ordinal) ||
                         existing.Host != speaker.Host || existing.AirPlayPort != speaker.AirPlayPort;
@@ -140,6 +158,45 @@ internal static class HomePodGroups
             .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
         return new HomePodMerge(merged, added, restart, removed);
+    }
+
+    /// <summary>
+    /// True when <paramref name="speaker"/> is part of the saved pair <paramref name="existing"/> and the pair's
+    /// other HomePods answered nowhere in this pass.
+    /// </summary>
+    private static bool IsPartialReply(HomePodSpeakerConfig existing, DiscoveredSpeaker speaker, HashSet<string> answered)
+    {
+        var keys = Keys(existing).ToList();
+        if (!existing.IsStereoPair || !speaker.MemberIds.All(m => keys.Contains(m, StringComparer.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        var missing = keys.Except(speaker.MemberIds, StringComparer.OrdinalIgnoreCase).ToList();
+        return missing.Count > 0 && !missing.Any(answered.Contains);
+    }
+
+    /// <summary>
+    /// A pair that answered in part keeps its name, members and leader. When the leader answered, its address
+    /// is updated (a new address restarts the link); when only another member answered, nothing changes.
+    /// </summary>
+    private static void KeepPair(HomePodSpeakerConfig existing, DiscoveredSpeaker speaker, DateTimeOffset now,
+        List<(string OldId, HomePodSpeakerConfig Speaker)> restart)
+    {
+        if (!existing.Id.Equals(speaker.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var moved = existing.Host != speaker.Host || existing.AirPlayPort != speaker.AirPlayPort;
+        existing.Host = speaker.Host;
+        existing.AirPlayPort = speaker.AirPlayPort;
+        existing.OsVersion = speaker.OsVersion;
+        existing.LastSeenUtc = now;
+        if (moved)
+        {
+            restart.Add((existing.Id, existing));
+        }
     }
 
     /// <summary>"HomePod Left" + "HomePod Right" → "HomePod Left + Right"; without a shared first word "A + B".</summary>
