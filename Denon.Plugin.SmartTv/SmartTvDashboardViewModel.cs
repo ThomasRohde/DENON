@@ -42,7 +42,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     private CancellationTokenSource? _previewLoopCts;
     private bool _suppressVolumeSend;
     private bool _isViewVisible;
-    private bool _isCapturingPreview;
+    private int _isCapturingPreview;
     private DateTimeOffset _lastUserInteractionUtc = DateTimeOffset.MinValue;
 
     private ImageSource? _previewImage;
@@ -1044,12 +1044,11 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 
     public async Task CapturePreviewAsync(bool showCursor = true, bool quiet = false)
     {
-        if (_isCapturingPreview)
+        if (Interlocked.CompareExchange(ref _isCapturingPreview, 1, 0) != 0)
         {
             return;
         }
 
-        _isCapturingPreview = true;
         try
         {
             if (!quiet)
@@ -1060,11 +1059,15 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
             var shot = await _plugin.Client.CaptureScreenshotAsync(width: 960, height: 540, showCursor: showCursor);
             if (!shot.Success || string.IsNullOrWhiteSpace(shot.ImageBase64))
             {
-                PreviewStatusText = shot.ErrorMessage ?? "Preview unavailable";
-                if (!quiet)
+                var message = shot.ErrorMessage ?? "Preview unavailable";
+                RunOnUi(() =>
                 {
-                    StatusMessage = $"⚠ {PreviewStatusText}";
-                }
+                    PreviewStatusText = message;
+                    if (!quiet)
+                    {
+                        StatusMessage = $"⚠ {message}";
+                    }
+                });
                 return;
             }
 
@@ -1081,11 +1084,11 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
         }
         catch (Exception ex)
         {
-            PreviewStatusText = $"Preview failed: {ex.Message}";
+            RunOnUi(() => PreviewStatusText = $"Preview failed: {ex.Message}");
         }
         finally
         {
-            _isCapturingPreview = false;
+            Volatile.Write(ref _isCapturingPreview, 0);
         }
     }
 
