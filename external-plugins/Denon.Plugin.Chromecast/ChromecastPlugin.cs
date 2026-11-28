@@ -448,9 +448,16 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
             _configGate.Release();
         }
 
-        foreach (var (config, oldId) in restart.Where(r => r.Config.Enabled))
+        foreach (var (config, oldId) in restart)
         {
-            await RestartClientAsync(config, oldId);
+            if (config.Enabled)
+            {
+                await RestartClientAsync(config, oldId);
+            }
+            else
+            {
+                MoveDeviceState(oldId, config.Id);
+            }
         }
 
         // Only a change is worth a line: discovery runs every few minutes and usually finds the same devices.
@@ -683,9 +690,61 @@ public sealed class ChromecastPlugin : IDenonPlugin, IPluginViewProvider
     private async Task RestartClientAsync(CastDeviceConfig config, string oldId)
     {
         await StopClientAsync(oldId);
+        MoveDeviceState(oldId, config.Id);
         if (_lifetime is { IsCancellationRequested: false })
         {
             StartClient(config);
+        }
+    }
+
+    /// <summary>
+    /// Moves what the plugin keeps per device to the device's new id (discovery re-keyed it). A wake-tv launch in
+    /// progress and its session stay the wake's own, and a session that already ran its automation does not run it
+    /// again. A held playback change is dropped: the new client records the state it connects with.
+    /// </summary>
+    private void MoveDeviceState(string oldId, string newId)
+    {
+        if (string.Equals(oldId, newId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        MoveKey(_wakePendingUntil, oldId, newId);
+        MoveKey(_wakeSessions, oldId, newId);
+        MoveSessionKeys(_automatedSessions, oldId, newId);
+        _lastRecordedPlayback.TryRemove(oldId, out _);
+        if (_playbackHolds.TryGetValue(oldId, out var hold))
+        {
+            try
+            {
+                hold.Cancel(); // Its own task removes and disposes it.
+            }
+            catch (ObjectDisposedException)
+            {
+                // It had just finished.
+            }
+        }
+    }
+
+    /// <summary>Moves the value under <paramref name="oldId"/> to <paramref name="newId"/>, if there is one.</summary>
+    internal static void MoveKey<T>(ConcurrentDictionary<string, T> map, string oldId, string newId)
+    {
+        if (map.TryRemove(oldId, out var value))
+        {
+            map[newId] = value;
+        }
+    }
+
+    /// <summary>Renames the "deviceId:sessionId" keys of <paramref name="oldId"/> to <paramref name="newId"/>.</summary>
+    internal static void MoveSessionKeys(ConcurrentDictionary<string, byte> map, string oldId, string newId)
+    {
+        var prefix = oldId + ":";
+        foreach (var key in map.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList())
+        {
+            if (map.TryRemove(key, out var value))
+            {
+                map[newId + ":" + key[prefix.Length..]] = value;
+            }
         }
     }
 
