@@ -457,8 +457,8 @@ public sealed class InsightsServer : IAsyncDisposable
 
         foreach (var (path, pack, type) in new[]
                  {
-                     ("/icon.png", "pack://application:,,,/denon_icon.png", "image/png"),
-                     ("/fonts/share-tech-mono.ttf", "pack://application:,,,/Themes/Fonts/ShareTechMono-Regular.ttf", "font/ttf"),
+                     ("/icon.png", "pack://application:,,,/Denon.App.Desktop;component/denon_icon.png", "image/png"),
+                     ("/fonts/share-tech-mono.ttf", "pack://application:,,,/Denon.App.Desktop;component/Themes/Fonts/ShareTechMono-Regular.ttf", "font/ttf"),
                  })
         {
             if (Application.GetResourceStream(new Uri(pack)) is { } resource)

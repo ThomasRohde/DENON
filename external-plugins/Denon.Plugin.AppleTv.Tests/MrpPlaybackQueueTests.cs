@@ -86,16 +86,18 @@ public sealed class MrpPlaybackQueueTests
     [Fact]
     public void Without_a_client_a_player_that_starts_playing_is_shown_but_older_players_are_not()
     {
-        var tracker = new MrpNowPlayingTracker();
+        var clock = new StepClock();
+        var tracker = new MrpNowPlayingTracker(clock);
         tracker.Apply(SetClient("dk.dr.tv"));
         tracker.Apply(Message(MrpType.SetState, MrpExtension.SetState, State("item-1", "Løftet", MrpPlaybackState.Playing, Path("dk.dr.tv", "avkit-1"))));
 
         // The episode ends: tvOS names no app; the old player still says Playing.
+        clock.Advance();
         tracker.Apply(ClearClient());
         Assert.False(tracker.Current.HasMedia);
 
         // The next episode's player reports state, but tvOS names no app (DRTV autoplay).
-        Thread.Sleep(2);
+        clock.Advance();
         tracker.Apply(Message(MrpType.SetState, MrpExtension.SetState, State("item-2", "Straffen", MrpPlaybackState.Playing, Path("dk.dr.tv", "avkit-2"))));
         Assert.Equal("Straffen", tracker.Current.Title);
         Assert.Equal("dk.dr.tv", tracker.Current.AppBundleId);
@@ -192,4 +194,14 @@ public sealed class MrpPlaybackQueueTests
         tracker.Apply(Message(MrpType.SetState, MrpExtension.SetState, pauseEnabled));
         Assert.True(tracker.Current.CanPause);
     }
+}
+
+/// <summary>A clock that moves only when the test says so: one millisecond per step.</summary>
+internal sealed class StepClock : TimeProvider
+{
+    private DateTimeOffset _now = new(2026, 11, 28, 12, 0, 0, TimeSpan.Zero);
+
+    public void Advance() => _now = _now.AddMilliseconds(1);
+
+    public override DateTimeOffset GetUtcNow() => _now;
 }
