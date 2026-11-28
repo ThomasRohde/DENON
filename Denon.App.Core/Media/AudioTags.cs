@@ -1,7 +1,18 @@
 namespace Denon.App.Core.Media;
 
-/// <summary>Cover art found in an audio file: the image bytes and the image MIME type (for example "image/jpeg").</summary>
-public sealed record AudioCoverArt(byte[] Data, string MimeType);
+/// <summary>
+/// Cover art found in an audio file: the image bytes (read-only) and the image MIME type (for example "image/jpeg").
+/// Two values are equal when the MIME type and the bytes are the same.
+/// </summary>
+public sealed record AudioCoverArt(ReadOnlyMemory<byte> Data, string MimeType)
+{
+    public bool Equals(AudioCoverArt? other) =>
+        other is not null
+        && string.Equals(MimeType, other.MimeType, StringComparison.Ordinal)
+        && Data.Span.SequenceEqual(other.Data.Span);
+
+    public override int GetHashCode() => HashCode.Combine(MimeType, Data.Length);
+}
 
 /// <summary>
 /// The tags that <see cref="AudioTagReader"/> found in an audio file. A field is null when the file does not have

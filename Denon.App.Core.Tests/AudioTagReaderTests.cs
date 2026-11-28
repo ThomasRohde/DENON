@@ -41,7 +41,7 @@ public sealed class AudioTagReaderTests
         Assert.Equal(TimeSpan.FromSeconds(183), tags.Duration);
         Assert.NotNull(tags.CoverArt);
         Assert.Equal("image/png", tags.CoverArt.MimeType);
-        Assert.Equal(Png, tags.CoverArt.Data);
+        Assert.Equal(Png, tags.CoverArt.Data.ToArray());
     }
 
     [Fact]
@@ -137,7 +137,7 @@ public sealed class AudioTagReaderTests
         Assert.Equal(2000 * 1152 / 44100.0, tags.Duration!.Value.TotalSeconds, precision: 3);
         Assert.NotNull(tags.CoverArt);
         Assert.Equal("image/jpeg", tags.CoverArt.MimeType);
-        Assert.Equal(Jpeg, tags.CoverArt.Data);
+        Assert.Equal(Jpeg, tags.CoverArt.Data.ToArray());
     }
 
     [Fact]
@@ -152,7 +152,7 @@ public sealed class AudioTagReaderTests
         Assert.Equal(1500 * 1152 / 44100.0, tags.Duration!.Value.TotalSeconds, precision: 3);
         Assert.NotNull(tags.CoverArt);
         Assert.Equal("image/png", tags.CoverArt.MimeType);
-        Assert.Equal(Png, tags.CoverArt.Data);
+        Assert.Equal(Png, tags.CoverArt.Data.ToArray());
     }
 
     [Fact]
@@ -262,7 +262,7 @@ public sealed class AudioTagReaderTests
         Assert.Equal(2000 * 1152 / 44100.0, tags.Duration!.Value.TotalSeconds, precision: 3);
         if (includeCoverArt)
         {
-            Assert.Equal(image, tags.CoverArt?.Data);
+            Assert.Equal(image, tags.CoverArt?.Data.ToArray());
         }
         else
         {
@@ -345,7 +345,7 @@ public sealed class AudioTagReaderTests
         Assert.Equal(TimeSpan.FromSeconds(185.5), tags.Duration);
         Assert.NotNull(tags.CoverArt);
         Assert.Equal("image/jpeg", tags.CoverArt.MimeType);
-        Assert.Equal(Jpeg, tags.CoverArt.Data);
+        Assert.Equal(Jpeg, tags.CoverArt.Data.ToArray());
     }
 
     [Fact]
@@ -438,6 +438,18 @@ public sealed class AudioTagReaderTests
 
             AudioTagReader.ReadUnguarded(new MemoryStream(file));
         }
+    }
+
+    [Fact]
+    public void TwoReadsOfTheSameFile_AreEqual()
+    {
+        var first = Read(FlacFile());
+        var second = Read(FlacFile());
+
+        Assert.NotNull(first.CoverArt);
+        Assert.Equal(first.CoverArt, second.CoverArt); // compared by content, not by array reference
+        Assert.Equal(first, second);
+        Assert.NotEqual(first.CoverArt, first.CoverArt with { Data = Jpeg });
     }
 
     [Fact]
