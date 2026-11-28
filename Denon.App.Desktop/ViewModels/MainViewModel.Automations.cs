@@ -554,6 +554,12 @@ public sealed partial class MainViewModel
             return;
         }
 
+        // Removing the row that is recording ends the recording: the next key must not go to a deleted row.
+        if (editor.IsRecording)
+        {
+            ToggleRecordShortcut(editor);
+        }
+
         ShortcutEditors.Remove(editor);
         ValidateShortcutCollisions(reportClean: false);
         ShortcutSummaryText = $"Removed custom shortcut '{editor.Label}'. Click Save Settings to apply.";

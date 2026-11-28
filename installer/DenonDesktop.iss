@@ -3,7 +3,7 @@
 ;   iscc /DMyAppVersion=2.10.26 /DMySourceExe=..\release-out\Denon.App.Desktop-win-x64.exe /DMyOutputDir=..\release-out .\installer\DenonDesktop.iss
 
 #ifndef MyAppVersion
-  #define MyAppVersion "2.10.26"
+  #define MyAppVersion "2.10.27"
 #endif
 
 #ifndef MySourceExe

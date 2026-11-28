@@ -53,9 +53,13 @@ public sealed class GlobalHotkeyService : IDisposable
         "Ctrl+S",
     };
 
-    private static readonly HashSet<string> ReservedNavigationGestures = new(StringComparer.OrdinalIgnoreCase)
+    /// <summary>
+    /// Keys the main window handles before custom shortcuts (the pages, Help, the command palette): an in-app binding
+    /// on one of them would never fire, so the checker refuses it.
+    /// </summary>
+    internal static readonly HashSet<string> ReservedNavigationGestures = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Ctrl+1", "Ctrl+2", "Ctrl+3", "Ctrl+4", "Ctrl+5", "Ctrl+6", "Ctrl+7", "Ctrl+R",
+        "Ctrl+1", "Ctrl+2", "Ctrl+3", "Ctrl+4", "Ctrl+5", "Ctrl+6", "Ctrl+7", "Ctrl+8", "Ctrl+9", "Ctrl+R", "Ctrl+K", "F1",
     };
 
     [DllImport("user32.dll", SetLastError = true)]

@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
 using Denon.App.Core.Infrastructure;
 using Denon.App.Desktop.Services;
 using Microsoft.Web.WebView2.Core;
@@ -25,6 +27,52 @@ public partial class AutomationEditorWindow : Window
         _server = server;
         InitializeComponent();
         Closing += OnClosing;
+        SourceInitialized += (_, _) => ApplyFrameTheme();
+        Desktop.Infrastructure.Theming.ThemeManager.ThemeChanged += OnThemeChanged;
+        Closed += (_, _) =>
+        {
+            Desktop.Infrastructure.Theming.ThemeManager.ThemeChanged -= OnThemeChanged;
+            EditorWebView.Dispose();
+        };
+    }
+
+    private const int DwmwaUseImmersiveDarkMode = 20;
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+    /// <summary>The Windows title bar is dark in a dark theme and light in a light one.</summary>
+    private void ApplyFrameTheme()
+    {
+        try
+        {
+            var dark = Desktop.Infrastructure.Theming.ThemeManager.Current.IsDark ? 1 : 0;
+            _ = DwmSetWindowAttribute(new WindowInteropHelper(this).Handle, DwmwaUseImmersiveDarkMode, ref dark, sizeof(int));
+        }
+        catch
+        {
+            // Older Windows: no dark frame.
+        }
+    }
+
+    /// <summary>A theme switch: the frame, and the page's theme.css again (new address, so no cached copy).</summary>
+    private async void OnThemeChanged(object? sender, EventArgs e)
+    {
+        ApplyFrameTheme();
+        if (!_ready || EditorWebView.CoreWebView2 is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await EditorWebView.CoreWebView2.ExecuteScriptAsync(
+                "(() => { const l = document.getElementById('theme-css'); if (l) l.href = '/theme.css?v=' + Date.now(); })();");
+        }
+        catch
+        {
+            // The page is not ready; it loads the new theme when it opens.
+        }
     }
 
     /// <summary>
