@@ -45,7 +45,15 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
       cast), nudge the sync and check the next track keeps it, and "Allow in firewall" twice gives one rule.
 - [x] PR 9: desktop shell. #53, #54, #55 and #71 closed (with PR 8). Left out of #71: an empty state for the
       YouTube, Stations and Cast pages (a feature) and full dark ContextMenu templates (cosmetic, larger).
-- [ ] PR 10: release, CI, installer, docs: #58, #59, #60, #62, #72, #73.
+- [x] PR 10a: release, CI, installer, updater: #58, #60 and #62 closed; parts of #59 and #72. Left out: a signed
+      SHA256SUMS (#62, needs a signing key and a release step), central package versions and the BouncyCastle
+      version split (#72, with the Apple TV and HomePod plugins in PR 12), and the larger #59 test items (Chromecast
+      tests in PR 13, the Apple TV clock in PR 12, loopback tests for the editor and Insights servers).
+- [ ] Verify PR 10a (needs the user): uninstall with "Launch at Windows startup" turned on in Settings and check
+      that the startup entry is gone; the next in-app update downloads, starts and shows notes without the
+      download list.
+- [x] PR 10b: docs and notices, part of #73. Left out: refreshed website screenshots and the new guides
+      (docs/plugin-development.md, CONTRIBUTING.md, SECURITY.md), which are new documents rather than fixes.
 - [ ] PR 11: accessibility (after PR 9): #57.
 - [x] PR 12: Apple TV and HomePod plugins. #35 and #50 closed; the Apple TV and HomePod parts of #70 and the
       HomePod part of #49 (old-id re-keying, pairs dedupe). Left out: keep a known pair when one follower misses an
@@ -184,7 +192,8 @@ Learns the listening volume per source and sets it on a source change (2.10.0, `
 - [ ] Verify live: switch between the Apple TV, DR1 and TV 2 Charlie and check the volume follows; check a Smart Scene
       (Morning Jazz) keeps its own volume.
 - [ ] HEOS radio is one source ("HEOS Music") for now; stations differ in loudness too. Idea: a key per station.
-- [ ] MCP: no tool reads or sets the learned levels yet.
+- [x] MCP: `show_volume_memory` shows the learned levels; `volume_memory_set_level` and `volume_memory_forget` change
+      them (2.10.5).
 
 ## Automations
 
@@ -350,6 +359,10 @@ Design and decisions: `docs/theming.md` (branch `theming-2.0`).
       title bar, sidebar and page wrappers.
 - [x] Built-in plugins (Hue, Smart TV, Home Assistant): use the app's card and button styles (sizes stay local).
 - [x] Hue Music Sync and the Deck meters follow internet radio that the app starts (FFmpeg decodes a copy; 2.10.10). Checked live
+- [x] After an app restart, the meters and Hue Music Sync pick up the station that still plays (the one the app
+      started last, from `last-station.txt`), once per run while nothing else started.
+- [ ] Check live: play a station, restart the app (or install an update), and see the log line "... plays on from
+      before the app started" and Hue moving to the music.
       on DR P8 Jazz: Deck meters DENON · SYNCED, Hue LIVE FFT SYNC with beats. During speech (news) the badge
       blinked to WAITING FOR AUDIO in pauses (~18% of frames below −50 dBFS); the badge now holds 2 s (2.10.11).
 - [ ] Radio meters: check the beat timing against the speakers and, if needed, a radio delay setting

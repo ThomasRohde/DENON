@@ -89,6 +89,16 @@ public sealed class ReceiverController
 
     public IReadOnlyList<StationPreset> GetStations() => _settingsStore.Current.Receiver.Stations;
 
+    /// <summary>
+    /// The saved station this app started last, while nothing else took over since (standby, another input,
+    /// another HEOS source or a relay stream clear it). Kept on disk, so after an app restart the synced meters
+    /// can find the stream that still plays.
+    /// </summary>
+    public StationPreset? LastStartedStation =>
+        _lastPlayedStationAlias is { } alias
+            ? _settingsStore.Current.Receiver.Stations.FirstOrDefault(s => string.Equals(s.Alias, alias, StringComparison.OrdinalIgnoreCase))
+            : null;
+
     public IReadOnlyList<ScenePreset> GetScenes() => _settingsStore.Current.Receiver.Scenes;
 
     public Task<ReceiverStatus> RefreshAsync(CancellationToken cancellationToken = default) =>
