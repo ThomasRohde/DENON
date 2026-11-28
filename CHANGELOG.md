@@ -20,6 +20,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   outside this PC and the local network (loopback, private, link-local and IPv6 unique-local are allowed; IPv4-mapped
   IPv6 counts as IPv4). The switch is on the Cast & Remote page and the Brain page.
 
+## [2.10.34] - 2026-11-28
+
+### Changed
+- **The Input Source and Sound Mode cards on the Control Deck have the same layout**: four equal columns, the same
+  button size and the same header. A long name ends in "…" and shows in full in its tooltip.
+- **The Sound Mode card has two groups.** Stereo, Multi-Ch Stereo, Direct and Pure Direct light up when the receiver
+  plays them. Auto, Movie, Music and Game are under "Let the receiver choose": they ask the receiver to pick a mode of
+  that kind for the source, so they never light up (for a 2-channel source such as HEOS radio the receiver often
+  keeps Stereo, which made "Music" look broken). After you press one, a line says what the receiver chose, for
+  example "Music: the receiver chose Stereo for this source." Another input or a real mode clears the line.
+
 ## [2.10.33] - 2026-11-28
 
 ### Fixed

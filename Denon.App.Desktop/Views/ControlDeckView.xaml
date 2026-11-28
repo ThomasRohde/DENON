@@ -620,17 +620,22 @@
                         <ItemsControl ItemsSource="{Binding InputSources}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <WrapPanel />
+                                    <UniformGrid Columns="4" />
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Button Content="{Binding DisplayName}"
-                                            Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
+                                    <Button Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
                                             Command="{Binding DataContext.SelectInputCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                             CommandParameter="{Binding}"
-                                            Margin="{skin:Space 0,0,8,8}"
-                                            MinWidth="{skin:Size 84}" />
+                                            HorizontalAlignment="Stretch"
+                                            Padding="{skin:Space 1,6}"
+                                            FontSize="{DynamicResource FontSize05}"
+                                            Margin="{skin:Space 0,0,5,5}"
+                                            ToolTip="{Binding DisplayName}"
+                                            AutomationProperties.Name="{Binding DisplayName}">
+                                        <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" />
+                                    </Button>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -649,24 +654,74 @@
                                        Foreground="{DynamicResource AccentAmberBrush}" />
                         </DockPanel>
 
-                        <ItemsControl ItemsSource="{Binding SoundModes}">
+                        <!-- Real modes: lit when the receiver plays them -->
+                        <ItemsControl ItemsSource="{Binding ExactSoundModes}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <WrapPanel />
+                                    <UniformGrid Columns="4" />
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Button Content="{Binding DisplayName}"
-                                            Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
+                                    <Button Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
                                             Command="{Binding DataContext.SelectSoundModeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                             CommandParameter="{Binding}"
-                                            Padding="{skin:Space 11,6}"
+                                            HorizontalAlignment="Stretch"
+                                            Padding="{skin:Space 1,6}"
                                             FontSize="{DynamicResource FontSize05}"
-                                            Margin="{skin:Space 0,0,7,7}" />
+                                            Margin="{skin:Space 0,0,5,5}"
+                                            ToolTip="{Binding DisplayName}"
+                                            AutomationProperties.Name="{Binding DisplayName}">
+                                        <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" />
+                                    </Button>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+
+                        <!-- Shortcuts: the receiver picks a mode of this family for the source, so they never light up -->
+                        <TextBlock Text="Let the receiver choose"
+                                   FontSize="{DynamicResource FontSize04}"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   Margin="{skin:Space 0,6,0,6}"
+                                   ToolTip="Auto, Movie, Music and Game ask the receiver to pick a mode of that kind for the source. For a 2-channel source it often keeps Stereo." />
+                        <ItemsControl ItemsSource="{Binding ReceiverChoiceSoundModes}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="4" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
+                                            Command="{Binding DataContext.SelectSoundModeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}"
+                                            HorizontalAlignment="Stretch"
+                                            Padding="{skin:Space 1,6}"
+                                            FontSize="{DynamicResource FontSize05}"
+                                            Margin="{skin:Space 0,0,5,5}"
+                                            ToolTip="{Binding DisplayName}"
+                                            AutomationProperties.Name="{Binding DisplayName}">
+                                        <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" />
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{Binding SoundModeNote}"
+                                   FontSize="{DynamicResource FontSize04}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="{skin:Space 0,2,0,0}"
+                                   AutomationProperties.LiveSetting="Polite">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <Trigger Property="Text" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
 
                     </StackPanel>
                 </Border>
