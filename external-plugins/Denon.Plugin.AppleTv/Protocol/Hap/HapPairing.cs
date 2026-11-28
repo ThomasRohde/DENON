@@ -27,9 +27,6 @@ internal sealed class HapPairSetup
 
     public byte[] PairingId { get; }
 
-    /// <summary>False when the Apple TV's M6 signature did not verify (pyatv does not check it at all).</summary>
-    public bool? AccessorySignatureVerified { get; private set; }
-
     /// <summary>M1: start pair-setup (the Apple TV then shows a PIN).</summary>
     public static byte[] BuildM1() => Tlv8.Write((TlvTag.Method, [0x00]), (TlvTag.SeqNo, [0x01]));
 
@@ -91,7 +88,11 @@ internal sealed class HapPairSetup
         return Tlv8.Write((TlvTag.SeqNo, [0x05]), (TlvTag.EncryptedData, encrypted));
     }
 
-    /// <summary>M6: the Apple TV's long-term identity. Returns the credentials to store.</summary>
+    /// <summary>
+    /// M6: the Apple TV's long-term identity. Returns the credentials to store. Throws
+    /// <see cref="HapPairingException"/> when the Apple TV's signature does not verify (pyatv does not check it),
+    /// so nothing is saved for a device that cannot prove it holds the key.
+    /// </summary>
     public HapCredentials ReadM6(byte[] tlvBytes)
     {
         var tlv = Tlv8.ReadChecked(tlvBytes);
@@ -115,7 +116,10 @@ internal sealed class HapPairSetup
 
         // HAP: the accessory signs AccessoryX | AccessoryPairingID | AccessoryLTPK.
         var accessoryX = HapCrypto.HkdfExpand("Pair-Setup-Accessory-Sign-Salt", "Pair-Setup-Accessory-Sign-Info", _srp!.SessionKey);
-        AccessorySignatureVerified = HapCrypto.Ed25519Verify(atvPublic, [.. accessoryX, .. atvId, .. atvPublic], atvSignature);
+        if (!HapCrypto.Ed25519Verify(atvPublic, [.. accessoryX, .. atvId, .. atvPublic], atvSignature))
+        {
+            throw new HapPairingException("The Apple TV's pairing signature does not verify. Pairing was not saved; start pairing again.");
+        }
 
         return new HapCredentials(atvPublic, _seed, atvId, PairingId);
     }

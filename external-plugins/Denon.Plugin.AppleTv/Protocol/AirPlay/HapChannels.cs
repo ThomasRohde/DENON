@@ -28,6 +28,9 @@ internal abstract class HapChannel : IAsyncDisposable
 
     public event Action<Exception?>? Closed;
 
+    /// <summary>True once the read loop has ended or the channel was disposed.</summary>
+    public bool IsClosed => Volatile.Read(ref _closed) != 0;
+
     protected MemoryStream Buffer { get; } = new();
 
     protected static async Task<TcpClient> ConnectTcpAsync(string host, int port, CancellationToken cancellationToken)
@@ -197,6 +200,9 @@ internal sealed class DataStreamChannel : HapChannel
 {
     public const int HeaderLength = 32;
 
+    /// <summary>Largest frame we accept. Frames carry MRP messages; artwork is the biggest at well under this.</summary>
+    public const int MaxFrameBytes = 16 * 1024 * 1024;
+
     private readonly ulong _sendSeqno = (ulong)Random.Shared.NextInt64(0x100000000, 0x1FFFFFFFF);
 
     private DataStreamChannel(TcpClient tcp, byte[] outputKey, byte[] inputKey)
@@ -246,26 +252,47 @@ internal sealed class DataStreamChannel : HapChannel
                 break;
             }
 
-            var length = (int)ProtoReader.ReadVarint(data, ref pos);
-            if (length <= 0 || pos + length > data.Length)
+            var length = ProtoReader.ReadVarint(data, ref pos);
+            if (length == 0 || length > (ulong)(data.Length - pos))
             {
                 break;
             }
 
-            messages.Add(data[pos..(pos + length)]);
-            pos += length;
+            messages.Add(data[pos..(pos + (int)length)]);
+            pos += (int)length;
         }
 
         return messages;
     }
 
+    /// <summary>
+    /// The size of the complete frame at the start of <paramref name="buffer"/>, or 0 when more bytes are
+    /// needed. A size below the header or above <see cref="MaxFrameBytes"/> throws
+    /// <see cref="InvalidDataException"/>: such a frame could never be consumed and would stall the stream.
+    /// </summary>
+    public static int CompleteFrameSize(ReadOnlySpan<byte> buffer)
+    {
+        if (buffer.Length < HeaderLength)
+        {
+            return 0;
+        }
+
+        var size = BinaryPrimitives.ReadUInt32BigEndian(buffer);
+        if (size is < HeaderLength or > MaxFrameBytes)
+        {
+            throw new InvalidDataException($"Data stream frame size {size} is invalid.");
+        }
+
+        return buffer.Length >= size ? (int)size : 0;
+    }
+
     protected override async Task HandleReceivedAsync(CancellationToken cancellationToken)
     {
-        while (Buffer.Length >= HeaderLength)
+        while (true)
         {
             var span = Buffer.GetBuffer().AsSpan(0, (int)Buffer.Length);
-            var size = (int)BinaryPrimitives.ReadUInt32BigEndian(span);
-            if (size < HeaderLength || span.Length < size)
+            var size = CompleteFrameSize(span);
+            if (size == 0)
             {
                 break;
             }

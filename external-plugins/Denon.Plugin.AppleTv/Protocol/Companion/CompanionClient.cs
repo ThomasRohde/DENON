@@ -251,8 +251,6 @@ internal sealed class CompanionPairing : IAsyncDisposable
         _setup = setup;
     }
 
-    public bool? AccessorySignatureVerified => _setup.AccessorySignatureVerified;
-
     public static async Task<CompanionPairing> StartAsync(string host, int port, string displayName, CancellationToken cancellationToken)
     {
         var connection = await CompanionConnection.ConnectAsync(host, port, cancellationToken);

@@ -31,6 +31,9 @@ internal sealed class FakeAccessory(string pin)
 
     public int HidPresses { get; set; }
 
+    /// <summary>When true, the M6 signature is corrupted (an accessory that cannot prove its key).</summary>
+    public bool CorruptM6Signature { get; set; }
+
     public byte[] Key(string info) => HapCrypto.HkdfExpand("", info, _shared!);
 
     public byte[] HandleSetup(byte[] request)
@@ -80,6 +83,11 @@ internal sealed class FakeAccessory(string pin)
                 var accX = HapCrypto.HkdfExpand("Pair-Setup-Accessory-Sign-Salt", "Pair-Setup-Accessory-Sign-Info", _sessionKey);
                 var ltpk = HapCrypto.Ed25519PublicKey(_seed);
                 var signature = HapCrypto.Ed25519Sign(_seed, [.. accX, .. Id, .. ltpk]);
+                if (CorruptM6Signature)
+                {
+                    signature[0] ^= 0x01;
+                }
+
                 var payload = Tlv8.Write((TlvTag.Identifier, Id), (TlvTag.PublicKey, ltpk), (TlvTag.Signature, signature));
                 return Tlv8.Write((TlvTag.SeqNo, [6]), (TlvTag.EncryptedData, HapCrypto.Encrypt(encryptKey, HapCrypto.LabelNonce("PS-Msg06"), payload)));
 

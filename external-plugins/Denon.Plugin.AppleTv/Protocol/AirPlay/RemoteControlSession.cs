@@ -27,6 +27,8 @@ internal sealed class RemoteControlSession : IAsyncDisposable
     private int _cseq;
     private EventChannel? _events;
     private Task? _feedbackLoop;
+    private int _closed;
+    private int _disposed;
 
     private RemoteControlSession(AirPlayConnection control, IHapSessionKeys verifier, CompanionIdentity identity)
     {
@@ -37,23 +39,30 @@ internal sealed class RemoteControlSession : IAsyncDisposable
 
     public DataStreamChannel DataChannel { get; private set; } = null!;
 
-    /// <summary>The session failed (feedback or a channel closed).</summary>
+    /// <summary>The session failed (feedback or a channel closed). Fires at most once, and not on dispose.</summary>
     public event Action<Exception?>? Closed;
+
+    /// <summary>
+    /// True once the session has closed or been disposed. A subscriber to <see cref="Closed"/> checks this right
+    /// after subscribing, so a close that happened before the subscription is not missed.
+    /// </summary>
+    public bool IsClosed => Volatile.Read(ref _closed) != 0;
 
     public static async Task<RemoteControlSession> ConnectAsync(
         string host, int port, HapCredentials credentials, CompanionIdentity identity, CancellationToken cancellationToken)
     {
         var control = await AirPlayConnection.ConnectAsync(host, port, cancellationToken);
+        RemoteControlSession? session = null;
         try
         {
             var verifier = await AirPlayAuth.VerifyAsync(control, credentials, cancellationToken);
-            var session = new RemoteControlSession(control, verifier, identity);
+            session = new RemoteControlSession(control, verifier, identity);
             await session.SetupAsync(host, cancellationToken);
             return session;
         }
         catch
         {
-            await control.DisposeAsync();
+            await DisposeAfterFailureAsync(control, session);
             throw;
         }
     }
@@ -63,17 +72,31 @@ internal sealed class RemoteControlSession : IAsyncDisposable
         string host, int port, CompanionIdentity identity, CancellationToken cancellationToken)
     {
         var control = await AirPlayConnection.ConnectAsync(host, port, cancellationToken);
+        RemoteControlSession? session = null;
         try
         {
             var keys = await AirPlayAuth.TransientVerifyAsync(control, cancellationToken);
-            var session = new RemoteControlSession(control, keys, identity);
+            session = new RemoteControlSession(control, keys, identity);
             await session.SetupAsync(host, cancellationToken);
             return session;
         }
         catch
         {
-            await control.DisposeAsync();
+            await DisposeAfterFailureAsync(control, session);
             throw;
+        }
+    }
+
+    /// <summary>A setup that failed part-way: the session (when made) also owns the channels and the CTS.</summary>
+    private static async Task DisposeAfterFailureAsync(AirPlayConnection control, RemoteControlSession? session)
+    {
+        if (session is not null)
+        {
+            await session.DisposeAsync();
+        }
+        else
+        {
+            await control.DisposeAsync();
         }
     }
 
@@ -128,7 +151,11 @@ internal sealed class RemoteControlSession : IAsyncDisposable
         var dataPort = Convert.ToInt32(stream.GetValueOrDefault("dataPort") ?? throw new AirPlayHttpException("SETUP gave no dataPort.", 0));
         var (dataOut, dataIn) = _verifier.DeriveKeys(DataStreamSalt + seed, DataStreamOutputInfo, DataStreamInputInfo);
         DataChannel = await DataStreamChannel.ConnectAsync(host, dataPort, dataOut, dataIn, cancellationToken);
-        DataChannel.Closed += ex => Closed?.Invoke(ex);
+        DataChannel.Closed += OnClosed;
+        if (DataChannel.IsClosed)
+        {
+            OnClosed(null); // it closed before we subscribed
+        }
 
         _feedbackLoop = Task.Run(FeedbackLoopAsync);
     }
@@ -174,12 +201,34 @@ internal sealed class RemoteControlSession : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            Closed?.Invoke(ex);
+            OnClosed(ex);
+        }
+    }
+
+    private void OnClosed(Exception? reason)
+    {
+        if (Interlocked.Exchange(ref _closed, 1) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            Closed?.Invoke(reason);
+        }
+        catch
+        {
         }
     }
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        Interlocked.Exchange(ref _closed, 1); // a dispose is not reported as a close
         _cts.Cancel();
         if (_feedbackLoop is not null)
         {

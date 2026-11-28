@@ -2,6 +2,27 @@
 
 Released separately from Denon Desktop with tags `homepod-vX.Y.Z`.
 
+## [Unreleased]
+
+### Security
+- **Bad network data can no longer crash Denon Desktop or stall the link** (#35). The shared AirPlay readers check
+  every length before they allocate: binary plists (trailer, offsets, object count), data-stream frames (smaller than
+  the header or over 16 MB now close the connection, which reconnects, instead of stalling it), HTTP Content-Length
+  and protobuf lengths.
+
+### Fixed
+- **A PC sleep no longer adds hours of listening time** (#70). Each step counts at most 120 seconds of play, so a
+  HomePod that played while the PC slept is logged with the time it was seen playing.
+- **A stereo pair whose leader changes keeps one link and one session** (#49). The old link and its listening session
+  are closed under the old id before the new one starts. Two single HomePods that become a pair are one speaker,
+  so the same music is no longer logged twice.
+- **The link comes back when it drops right after it opens** (#50). A close before the plugin listened was missed,
+  and the speaker showed "Linked" on a dead connection. A command in flight fails at once when the link closes.
+- **Insights: a second of play and then a pause is no session** (#70); it needs 15 seconds of play.
+- **Discovery: an empty TXT string no longer hides the entries after it** (#70), and a reserved DNS label type
+  drops the packet instead of misreading the rest of it.
+- Connections and timers are cleaned up when the remote-control setup fails part-way or the plugin restarts (#70).
+
 ## [0.2.1] - 2026-11-26
 
 ### Fixed

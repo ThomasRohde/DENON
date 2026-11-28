@@ -273,6 +273,32 @@ public sealed class AppleTvWatchLogTests
         Assert.Equal("app_closed", run["reason"]);
         Assert.Equal(90, run["durationSec"]);
     }
+
+    [Fact]
+    public void A_second_of_play_then_a_pause_is_not_a_session()
+    {
+        var log = NewLog();
+        log.Update(Device, State(MrpPlaybackState.Playing, "Trailer"), Receiver, T0);
+        log.Update(Device, State(MrpPlaybackState.Paused, "Trailer"), Receiver, T0.AddSeconds(1));
+        TickFor(log, T0.AddSeconds(1), 120);
+        Assert.Empty(Named("session.started"));
+
+        // Real play still confirms the dwell.
+        log.Update(Device, State(MrpPlaybackState.Playing, "Trailer"), Receiver, T0.AddSeconds(130));
+        TickFor(log, T0.AddSeconds(130), 30);
+        Assert.Single(Named("session.started"));
+    }
+
+    [Fact]
+    public void EndAll_for_one_device_matches_its_id_in_any_case()
+    {
+        var log = NewLog();
+        log.Update(Device, State(MrpPlaybackState.Playing, "Show"), Receiver, T0);
+        TickFor(log, T0, 30);
+        log.EndAll(T0.AddSeconds(40), "device_disabled", Device.Id.ToLowerInvariant());
+
+        Assert.Equal("device_disabled", Assert.Single(Named("session.ended"))["reason"]);
+    }
 }
 
 public sealed class AppleTvStatusTests
