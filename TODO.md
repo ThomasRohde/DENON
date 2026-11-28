@@ -78,6 +78,8 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
 - [ ] Verify PR 13 live (needs the user): add a Chromecast by IP with Auto-Discover on, run Discover, and check the
       card stays connected and play/pause works; stop an app to Backdrop and check a media command says no app takes
       it; check now-playing still shows artwork (YouTube, and a LAN server such as Plex if there is one).
+- [x] PR 13 follow-up: the wake-tv maps and the automated-session keys move to a device's new id when discovery
+      re-keys it; a held playback change under the old id is dropped (#70). Not released yet (chromecast).
 
 ## Live receiver updates on port 23 (#74)
 
