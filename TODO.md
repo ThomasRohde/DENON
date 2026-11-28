@@ -172,9 +172,8 @@ Phase 2 is done in 1.18.0: YouTube / YouTube Music and jukebox tracks are decode
 Done: Play/Pause, Vol −/+ and Mute in the full-screen HUD (`#denon-cinema-hud`, volume in receiver steps, capped
 at the safe volume by `CinemaHudVolume`), and Save Offset in the sync bar (nudges are for the session until saved).
 
-- [ ] Verify in the app with a video (needs the user's OK, it plays media): hide the bars, use the four HUD
-      buttons, nudge the offset, play the next track (the nudge stays), click Save Offset and check Settings →
-      Cinema Offset.
+- [x] Verified in the app with a video (2.10.31 test build, 2026-11-28): the four HUD buttons, a nudge shows "not
+      saved", and Save Offset writes the Cinema Offset. Not checked live: Vol + at the safe volume (unit tested).
 
 ## Audio tags for the Jukebox (#79, part 2)
 
