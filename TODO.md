@@ -45,7 +45,13 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
       cast), nudge the sync and check the next track keeps it, and "Allow in firewall" twice gives one rule.
 - [x] PR 9: desktop shell. #53, #54, #55 and #71 closed (with PR 8). Left out of #71: an empty state for the
       YouTube, Stations and Cast pages (a feature) and full dark ContextMenu templates (cosmetic, larger).
-- [ ] PR 10: release, CI, installer, docs: #58, #59, #60, #62, #72, #73.
+- [x] PR 10a: release, CI, installer, updater: #58, #60 and #62 closed; parts of #59 and #72. Left out: a signed
+      SHA256SUMS (#62, needs a signing key and a release step), central package versions and the BouncyCastle
+      version split (#72, with the Apple TV and HomePod plugins in PR 12), and the larger #59 test items (Chromecast
+      tests in PR 13, the Apple TV clock in PR 12, loopback tests for the editor and Insights servers).
+- [ ] Verify PR 10a (needs the user): uninstall with "Launch at Windows startup" turned on in Settings and check
+      that the startup entry is gone; the next in-app update downloads, starts and shows notes without the
+      download list.
 - [x] PR 10b: docs and notices, part of #73. Left out: refreshed website screenshots and the new guides
       (docs/plugin-development.md, CONTRIBUTING.md, SECURITY.md), which are new documents rather than fixes.
 - [x] PR 11: accessibility, #57 closed. A focus ring on the shared styles, names on the symbol buttons of the main

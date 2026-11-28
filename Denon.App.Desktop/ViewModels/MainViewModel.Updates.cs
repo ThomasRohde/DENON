@@ -246,6 +246,12 @@ public sealed partial class MainViewModel
 
     private void OpenReleaseUrl(string url)
     {
+        // Only the app's own GitHub pages: the address comes from the release feed.
+        if (!UpdateService.IsTrustedGitHubUrl(url))
+        {
+            url = UpdateService.ReleasesPageUrl;
+        }
+
         try
         {
             Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
@@ -328,8 +334,8 @@ public sealed partial class MainViewModel
         var report = $"update {update.Label} ({update.Tag}), installer {update.InstallerUrl}, notes {update.Notes.Length} chars";
         if (download)
         {
-            var path = await updateService.DownloadVerifiedAsync(update, null);
-            report += $"; downloaded and verified: {path} ({new System.IO.FileInfo(path).Length} bytes)";
+            var installer = await updateService.DownloadVerifiedAsync(update, null);
+            report += $"; downloaded and verified: {installer.Path} ({new System.IO.FileInfo(installer.Path).Length} bytes)";
         }
 
         return report;

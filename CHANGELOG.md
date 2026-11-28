@@ -15,6 +15,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   (which also get tooltips) say what they do instead of just "Button".
 - **YouTube duration badges are readable in the Light theme** (#57): their text was dark on the dark scrim; it is
   light now in both themes.
+- **Uninstalling removes the Windows startup entry** (#60), also when "Launch at Windows startup" was turned on in
+  Settings rather than in Setup. Before, Windows tried to start the deleted app at every sign-in.
+- **The update window shows only the release notes** (#58), without the release page's download list and
+  checksums. Releases no longer add GitHub's generated change list.
+- Built-in plugins report the version in their own project file, and the app's Core library no longer carries an
+  old version number (#72).
 - **Help, README and plugin docs match the app again** (#73). The LG TV topic describes the Watch, Remote, Apps and
   Settings tabs (not the old Setup menu and button names), and says how the TV's Chromecast wakes it without a MAC
   address. The HomePod topic says the Control Deck shows the HomePod that plays while the receiver sleeps. Help
@@ -25,6 +31,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Third-party notices are complete** (#73): the app's notices list every package inside the exe with its
   copyright and license text (MIT, Apache-2.0 for the MCP SDK, and WebView2's license). The Apple TV and HomePod
   notices give pyatv's copyright line as in its license and include BouncyCastle's MIT license.
+
+### Security
+- **Updates download into a new folder of the app's own** (#62), not a fixed path in the shared temp folder. The
+  installer is checked again right before it starts and held open until then, so it cannot be swapped after the
+  check. Release links are used only when they are https addresses in the app's GitHub repository; "Open release
+  page" opens nothing else.
+
+### Changed
+- **Every pull request and every push to master is checked** (#58, #59): the app's tests, the Apple TV and HomePod
+  plugin tests, the Chromecast plugin build and the website build. The release workflow only releases: it refuses
+  a tag that does not match the app's version or has no CHANGELOG section, and stops at the first failed step. The
+  website is built again after each release (its download links need the new tag) and when the app icon changes,
+  and its build fails when Help topics, icons or versions cannot be read.
+- The plugin `install.ps1` scripts refuse to run while Denon Desktop is running, start from empty folders, and
+  check that the build has no copy of the plugin SDK (#72). New tests cover the HEOS reply parser, HomePod plugin
+  updates, the HomePod plugin's theme colors, and update links (#59).
 
 ## [2.10.27] - 2026-11-28
 
