@@ -376,7 +376,8 @@ public sealed class VolumeMemoryService : BackgroundService
     }
 
     private Task SetVolumeAsync(int level, bool log, CancellationToken ct) =>
-        SetVolumeOverride is { } set ? set(level, log, ct) : _receiver.SetVolumeAsync(level, ct, logSuccess: log);
+        // A step of a fade (log false) skips the full status read; the last step reads it.
+        SetVolumeOverride is { } set ? set(level, log, ct) : _receiver.SetVolumeAsync(level, ct, logSuccess: log, refreshStatus: log);
 
     /// <summary>
     /// The automation action "Set learned volume": the learned volume of what plays now, capped at the safe volume.

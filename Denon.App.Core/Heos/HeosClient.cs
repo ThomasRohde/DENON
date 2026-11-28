@@ -23,6 +23,12 @@ public sealed class HeosClient : IDisposable
     private ReceiverPlayerInfo? _cachedPlayer;
     private string? _cachedPlayerKey;
 
+    /// <summary>
+    /// Set by <see cref="Disconnect"/> while a command holds the connection. The next command drops the
+    /// connection and opens a new one. Disconnect never waits for the gate: the UI thread calls it.
+    /// </summary>
+    private volatile bool _resetRequested;
+
     public async Task<IReadOnlyList<ReceiverPlayerInfo>> GetPlayersAsync(ReceiverSettings settings, CancellationToken cancellationToken)
     {
         var response = await SendCommandAsync(settings, "heos://player/get_players", DefaultCommandTimeout, cancellationToken);
@@ -199,18 +205,41 @@ public sealed class HeosClient : IDisposable
         _cachedPlayerKey = null;
     }
 
+    /// <summary>
+    /// Drops the connection without waiting. When a command holds it, the next command drops it instead.
+    /// Never blocks: the UI thread calls this (Reset, Save &amp; Sync, Import) while a command it started may
+    /// still wait for the receiver, and that command needs the UI thread to finish.
+    /// </summary>
     public void Disconnect()
     {
-        _connectionGate.Wait();
+        _cachedPlayer = null;
+        _cachedPlayerKey = null;
+        if (!_connectionGate.Wait(0))
+        {
+            _resetRequested = true;
+            return;
+        }
+
         try
         {
+            _resetRequested = false;
             ResetConnectionLocked();
-            _cachedPlayer = null;
-            _cachedPlayerKey = null;
         }
         finally
         {
             _connectionGate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Refuses a command with a control character. A CR or LF inside a stream URL would make the speaker
+    /// run a second command (for example a set_volume line), past the safe-volume check.
+    /// </summary>
+    internal static void EnsureSingleCommand(string command)
+    {
+        if (command.Any(char.IsControl))
+        {
+            throw new ArgumentException("A HEOS command must be one line without control characters.", nameof(command));
         }
     }
 
@@ -352,6 +381,7 @@ public sealed class HeosClient : IDisposable
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
+        EnsureSingleCommand(command);
         Exception? lastException = null;
         for (var attempt = 0; attempt < 2; attempt++)
         {
@@ -388,6 +418,7 @@ public sealed class HeosClient : IDisposable
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
+        EnsureSingleCommand(command);
         await _connectionGate.WaitAsync(cancellationToken);
         try
         {
@@ -445,6 +476,12 @@ public sealed class HeosClient : IDisposable
 
     private async Task EnsureConnectedLockedAsync(string host, int port, CancellationToken cancellationToken)
     {
+        if (_resetRequested)
+        {
+            _resetRequested = false;
+            ResetConnectionLocked();
+        }
+
         if (_client is { Connected: true } &&
             _reader is not null &&
             _writer is not null &&
@@ -503,6 +540,9 @@ public sealed class HeosClient : IDisposable
             {
                 if (underProcessResponse is not null)
                 {
+                    // The final answer may still come. Drop the connection, so a later command of the same
+                    // kind cannot take that late answer as its own.
+                    ResetConnectionLocked();
                     return underProcessResponse;
                 }
 
@@ -552,19 +592,8 @@ public sealed class HeosClient : IDisposable
         _connectedPort = 0;
     }
 
-    public void Dispose()
-    {
-        _connectionGate.Wait();
-        try
-        {
-            ResetConnectionLocked();
-        }
-        finally
-        {
-            _connectionGate.Release();
-            _connectionGate.Dispose();
-        }
-    }
+    /// <summary>The gate holds no OS handle, so it is not disposed: a command in flight may still release it.</summary>
+    public void Dispose() => Disconnect();
 
     private sealed class PlayerPayload
     {
