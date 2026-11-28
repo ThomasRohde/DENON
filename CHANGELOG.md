@@ -4,7 +4,7 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.10.25] - 2026-11-28
 
 ### Fixed
 - **A slow plugin no longer holds up the others** (#45). Each plugin now has its own queue for receiver events, and
