@@ -107,6 +107,7 @@
     <Color x:Key="OverlayHighlightClearColor">#00FFFFFF</Color>
     <Color x:Key="OverlayHighlightFaintColor">#10FFFFFF</Color>
     <Color x:Key="OverlayHighlightSoftColor">#1FFFFFFF</Color>
+    <Color x:Key="TextOnScrimColor">#F1F5F9</Color>
     <Color x:Key="OverlayScrimColor">#CC07090D</Color>
 
 </ResourceDictionary>

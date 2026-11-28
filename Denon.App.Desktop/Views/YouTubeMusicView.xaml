@@ -47,7 +47,7 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <TextBox Grid.Column="0"
+                    <TextBox AutomationProperties.Name="Search YouTube or paste a link" Grid.Column="0"
                              Text="{Binding YouTubeSearchInput, UpdateSourceTrigger=PropertyChanged}"
                              KeyDown="YouTubeSearchInput_KeyDown"
                              Tag="Search YouTube Music, songs, videos, or paste any YouTube / playlist URL..."
@@ -218,7 +218,7 @@
                                                               VerticalAlignment="Center" />
                                                         <Image Source="{Binding ThumbnailUrl, Converter={StaticResource SafeImageSource}}" Stretch="UniformToFill" />
                                                         <Border Background="{DynamicResource OverlayScrimBrush}" CornerRadius="{DynamicResource Radius01}" Padding="{skin:Space 4,1}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="{skin:Space 3}">
-                                                            <TextBlock Text="{Binding DurationDisplay}" FontSize="{DynamicResource FontSize01}" FontWeight="Bold" FontFamily="{DynamicResource MonoFont}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                                            <TextBlock Text="{Binding DurationDisplay}" FontSize="{DynamicResource FontSize01}" FontWeight="Bold" FontFamily="{DynamicResource MonoFont}" Foreground="{DynamicResource TextOnScrimBrush}" />
                                                         </Border>
                                                     </Grid>
                                                 </Border>
@@ -245,7 +245,7 @@
                                                             FontSize="{DynamicResource FontSize04}"
                                                             Margin="{skin:Space 0,0,5,0}"
                                                             ToolTip="Cast audio to Denon + open synced Cinema Video window" />
-                                                    <Button Content="+ Q"
+                                                    <Button AutomationProperties.Name="Add to Up Next" Content="+ Q"
                                                             Command="{Binding DataContext.EnqueueYouTubeTrackCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource SecondaryButton}"
@@ -354,7 +354,7 @@
                                             </StackPanel>
 
                                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Button Content="▶"
+                                                <Button AutomationProperties.Name="Play this track now" Content="▶"
                                                         Command="{Binding DataContext.PlayYouTubeQueueItemCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource SecondaryButton}"
@@ -362,21 +362,21 @@
                                                         FontSize="{DynamicResource FontSize02}"
                                                         Margin="{skin:Space 0,0,3,0}"
                                                         ToolTip="Jump to track" />
-                                                <Button Content="↑"
+                                                <Button AutomationProperties.Name="Move up in the queue" ToolTip="Move up" Content="↑"
                                                         Command="{Binding DataContext.MoveYouTubeQueueUpCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource SecondaryButton}"
                                                         Padding="{skin:Space 6,4}"
                                                         FontSize="{DynamicResource FontSize02}"
                                                         Margin="{skin:Space 0,0,3,0}" />
-                                                <Button Content="↓"
+                                                <Button AutomationProperties.Name="Move down in the queue" ToolTip="Move down" Content="↓"
                                                         Command="{Binding DataContext.MoveYouTubeQueueDownCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource SecondaryButton}"
                                                         Padding="{skin:Space 6,4}"
                                                         FontSize="{DynamicResource FontSize02}"
                                                         Margin="{skin:Space 0,0,3,0}" />
-                                                <Button Content="✕"
+                                                <Button AutomationProperties.Name="Remove from the queue" ToolTip="Remove from the queue" Content="✕"
                                                         Command="{Binding DataContext.RemoveYouTubeQueueItemCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource DangerButton}"
@@ -403,7 +403,7 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Button Command="{Binding DataContext.PlayYouTubeTrackCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        <Button AutomationProperties.Name="{Binding Title}" Command="{Binding DataContext.PlayYouTubeTrackCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 CommandParameter="{Binding}"
                                                 Style="{StaticResource HardwareChipButton}"
                                                 Padding="{skin:Space 8,4}"

@@ -70,7 +70,7 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Command="{Binding PlayPauseCommand}"
+                        <Button AutomationProperties.Name="{Binding PlayPauseToolTip}" Command="{Binding PlayPauseCommand}"
                                 Style="{StaticResource HeroPlayCircleButton}"
                                 Width="{skin:Size 38}"
                                 Height="{skin:Size 38}"
@@ -93,7 +93,7 @@
                                       Visibility="{Binding IsTransportPlaying, Converter={StaticResource BoolToVis}}" />
                             </Grid>
                         </Button>
-                        <Button Command="{Binding StopCommand}"
+                        <Button AutomationProperties.Name="Stop" Command="{Binding StopCommand}"
                                 Style="{StaticResource TransportCircleButton}"
                                 Width="{skin:Size 34}"
                                 Height="{skin:Size 34}"
@@ -141,7 +141,7 @@
                         </StackPanel>
                     </DockPanel>
 
-                    <Slider Style="{StaticResource VolumeSliderStyle}"
+                    <Slider AutomationProperties.Name="Volume" Style="{StaticResource VolumeSliderStyle}"
                             Minimum="0"
                             Maximum="{Binding MaxVolume}"
                             Value="{Binding TargetVolume, Mode=TwoWay}"

@@ -134,7 +134,7 @@
 
                     <!-- Right Quick Controls + Window Caption Buttons -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Command="{Binding NavigateCommand}"
+                        <Button AutomationProperties.Name="MCP server and Room Brain" Command="{Binding NavigateCommand}"
                                 CommandParameter="Mcp"
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 Style="{StaticResource SecondaryButton}"
@@ -158,7 +158,7 @@
                                 <TextBlock Text="{Binding McpTitleBarBadge}" Foreground="{DynamicResource AccentEmeraldBrush}" FontWeight="SemiBold" />
                             </StackPanel>
                         </Button>
-                        <Button Command="{Binding ShowPhoneQrCommand}"
+                        <Button AutomationProperties.Name="Phone Remote QR code" Command="{Binding ShowPhoneQrCommand}"
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 Style="{StaticResource SecondaryButton}"
                                 Padding="{skin:Space 9,4}"
@@ -167,7 +167,7 @@
                                 ToolTip="Open Couch Phone Remote QR Code, PC Audio Cast &amp; Local FLAC Jukebox">
                             <TextBlock Text="Phone QR" Foreground="{DynamicResource AccentCyanBrightBrush}" FontWeight="SemiBold" />
                         </Button>
-                        <Button Command="{Binding RefreshCommand}"
+                        <Button AutomationProperties.Name="Refresh receiver" Command="{Binding RefreshCommand}"
                                 Style="{StaticResource TitleBarButton}"
                                 ToolTip="Refresh Receiver (F5)"
                                 Margin="{skin:Space 0,0,4,0}">
@@ -178,7 +178,7 @@
                                   Stretch="Uniform" />
                         </Button>
 
-                        <Button Command="{Binding TogglePowerCommand}"
+                        <Button AutomationProperties.Name="Receiver power" Command="{Binding TogglePowerCommand}"
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 ToolTip="Toggle Receiver Power / Standby"
                                 Cursor="Hand"
@@ -235,13 +235,13 @@
 
                         <Border Width="1" Height="{skin:Size 18}" Background="{DynamicResource BorderHairlineBrush}" Margin="{skin:Space 0,0,6,0}" />
 
-                        <Button Click="MinimizeButton_Click" Style="{StaticResource TitleBarButton}" ToolTip="Minimize">
+                        <Button AutomationProperties.Name="Minimize" Click="MinimizeButton_Click" Style="{StaticResource TitleBarButton}" ToolTip="Minimize">
                             <Rectangle Width="{skin:Size 10}" Height="1.5" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                         </Button>
-                        <Button Click="MaximizeRestoreButton_Click" Style="{StaticResource TitleBarButton}" ToolTip="Maximize / Restore">
+                        <Button AutomationProperties.Name="Maximize or restore" Click="MaximizeRestoreButton_Click" Style="{StaticResource TitleBarButton}" ToolTip="Maximize / Restore">
                             <Border Width="{skin:Size 10}" Height="{skin:Size 10}" BorderThickness="1.3" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" CornerRadius="{DynamicResource Radius00}" />
                         </Button>
-                        <Button Click="CloseButton_Click" Style="{StaticResource TitleBarCloseButton}" ToolTip="Close">
+                        <Button AutomationProperties.Name="Close" Click="CloseButton_Click" Style="{StaticResource TitleBarCloseButton}" ToolTip="Close">
                             <Path Data="{DynamicResource IconClose}"
                                   Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                   StrokeThickness="1.5"
@@ -270,7 +270,7 @@
                         BorderThickness="0,0,1,0">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel HorizontalAlignment="Center" Margin="{skin:Space 0,12}">
-                        <RadioButton GroupName="NavRail"
+                        <RadioButton GroupName="NavRail" AutomationProperties.Name="Control Deck"
                                      Style="{StaticResource NavRailIconItem}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Control}"
                                      Command="{Binding NavigateCommand}"
@@ -289,7 +289,7 @@
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                             </StackPanel>
                         </RadioButton>
-                        <RadioButton GroupName="NavRail"
+                        <RadioButton GroupName="NavRail" AutomationProperties.Name="YouTube &amp; Music"
                                      Style="{StaticResource NavRailIconItem}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=YouTube}"
                                      Command="{Binding NavigateCommand}"
@@ -308,7 +308,7 @@
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                             </StackPanel>
                         </RadioButton>
-                        <RadioButton GroupName="NavRail"
+                        <RadioButton GroupName="NavRail" AutomationProperties.Name="Stations &amp; Streams"
                                      Style="{StaticResource NavRailIconItem}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Stations}"
                                      Command="{Binding NavigateCommand}"
@@ -327,7 +327,7 @@
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                             </StackPanel>
                         </RadioButton>
-                        <RadioButton GroupName="NavRail"
+                        <RadioButton GroupName="NavRail" AutomationProperties.Name="Cast &amp; Remote"
                                      Style="{StaticResource NavRailIconItem}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=CastRemote}"
                                      Command="{Binding NavigateCommand}"
@@ -347,7 +347,7 @@
                             </StackPanel>
                         </RadioButton>
                         <Border Width="{skin:Size 40}" Height="1" Background="{DynamicResource BorderHairlineBrush}" Margin="{skin:Space 0,8}" HorizontalAlignment="Center" />
-                        <RadioButton GroupName="NavRail"
+                        <RadioButton GroupName="NavRail" AutomationProperties.Name="Scenes &amp; Acoustics"
                                      Style="{StaticResource NavRailIconItem}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Acoustics}"
                                      Command="{Binding NavigateCommand}"
@@ -366,7 +366,7 @@
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                             </StackPanel>
                         </RadioButton>
-                        <RadioButton GroupName="NavRail"
+                        <RadioButton GroupName="NavRail" AutomationProperties.Name="Plugins"
                                      Style="{StaticResource NavRailIconItem}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Plugins}"
                                      Command="{Binding NavigateCommand}"
@@ -401,7 +401,7 @@
                             </Grid>
                         </RadioButton>
                         <Border Width="{skin:Size 40}" Height="1" Background="{DynamicResource BorderHairlineBrush}" Margin="{skin:Space 0,8}" HorizontalAlignment="Center" />
-                        <RadioButton GroupName="NavRail"
+                        <RadioButton GroupName="NavRail" AutomationProperties.Name="MCP Server &amp; Room Brain"
                                      Style="{StaticResource NavRailIconItem}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Mcp}"
                                      Command="{Binding NavigateCommand}"
@@ -420,7 +420,7 @@
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                             </StackPanel>
                         </RadioButton>
-                        <RadioButton GroupName="NavRail"
+                        <RadioButton GroupName="NavRail" AutomationProperties.Name="Settings"
                                      Style="{StaticResource NavRailIconItem}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Settings}"
                                      Command="{Binding NavigateCommand}"
@@ -439,7 +439,7 @@
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                             </StackPanel>
                         </RadioButton>
-                        <RadioButton GroupName="NavRail"
+                        <RadioButton GroupName="NavRail" AutomationProperties.Name="Health &amp; Support"
                                      Style="{StaticResource NavRailIconItem}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Diagnostics}"
                                      Command="{Binding NavigateCommand}"
@@ -458,7 +458,7 @@
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
                             </StackPanel>
                         </RadioButton>
-                        <RadioButton GroupName="NavRail"
+                        <RadioButton GroupName="NavRail" AutomationProperties.Name="Help &amp; Guide (F1)"
                                      Style="{StaticResource NavRailIconItem}"
                                      IsChecked="{Binding ActiveSection, Converter={StaticResource EqualityConverter}, ConverterParameter=Help}"
                                      Command="{Binding OpenContextHelpCommand}"
@@ -481,7 +481,7 @@
                         <ItemsControl ItemsSource="{Binding InstalledPlugins}" Margin="{skin:Space 0,6,0,0}" HorizontalAlignment="Center">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Button Command="{Binding DataContext.OpenPluginCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    <Button AutomationProperties.Name="{Binding ShortName, StringFormat={}{0} plugin}" Command="{Binding DataContext.OpenPluginCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                             CommandParameter="{Binding}"
                                             Margin="{skin:Space 0,4}"
                                             Cursor="Hand">

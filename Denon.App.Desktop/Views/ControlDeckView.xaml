@@ -57,7 +57,7 @@
                                 FontSize="{DynamicResource FontSize04}"
                                 Margin="{skin:Space 0,0,6,0}"
                                 Visibility="{Binding DataContext.CanUndoRoomState, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}" />
-                        <Button Content="✕"
+                        <Button AutomationProperties.Name="Dismiss insight" Content="✕"
                                 Command="{Binding DataContext.DismissRoomInsightCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                 CommandParameter="{Binding}"
                                 Style="{StaticResource SecondaryButton}"
@@ -194,7 +194,7 @@
 
                     <!-- Circular Transport Deck -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Command="{Binding PreviousTrackCommand}"
+                        <Button AutomationProperties.Name="Previous track" Command="{Binding PreviousTrackCommand}"
                                 Style="{StaticResource TransportCircleButton}"
                                 ToolTip="Previous Track"
                                 Margin="{skin:Space 0,0,8,0}">
@@ -205,7 +205,7 @@
                                   Stretch="Uniform" />
                         </Button>
 
-                        <Button Command="{Binding PlayPauseCommand}"
+                        <Button AutomationProperties.Name="{Binding PlayPauseToolTip}" Command="{Binding PlayPauseCommand}"
                                 Style="{StaticResource HeroPlayCircleButton}"
                                 ToolTip="{Binding PlayPauseToolTip}"
                                 ToolTipService.ShowOnDisabled="True"
@@ -229,14 +229,14 @@
                             </Grid>
                         </Button>
 
-                        <Button Command="{Binding StopCommand}"
+                        <Button AutomationProperties.Name="Stop playback" Command="{Binding StopCommand}"
                                 Style="{StaticResource TransportCircleButton}"
                                 ToolTip="Stop Playback"
                                 Margin="{skin:Space 0,0,8,0}">
                             <Rectangle Width="{skin:Size 11}" Height="{skin:Size 11}" RadiusX="2" RadiusY="2" Fill="{DynamicResource TextPrimaryBrush}" />
                         </Button>
 
-                        <Button Command="{Binding NextTrackCommand}"
+                        <Button AutomationProperties.Name="Next track" Command="{Binding NextTrackCommand}"
                                 Style="{StaticResource TransportCircleButton}"
                                 ToolTip="Next Track">
                             <Path Data="{DynamicResource IconNext}"
@@ -345,7 +345,7 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Button Command="{Binding DataContext.ActivateSceneCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        <Button AutomationProperties.Name="{Binding Name}" Command="{Binding DataContext.ActivateSceneCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 CommandParameter="{Binding}"
                                                 Style="{StaticResource HardwareChipButton}"
                                                 Padding="{skin:Space 10,6}"
@@ -500,7 +500,7 @@
                         </DockPanel>
 
                         <!-- Clickable OLED Readout (click to swap dB vs Absolute) -->
-                        <Button Grid.Row="1"
+                        <Button AutomationProperties.Name="Volume display: switch between dB and the 0-98 scale" Grid.Row="1"
                                 Command="{Binding ToggleVolumeDisplayModeCommand}"
                                 Cursor="Hand"
                                 ToolTip="Click to switch primary display between dB and 0-98 scale"
@@ -535,7 +535,7 @@
                         </Button>
 
                         <!-- Precision Live Volume Slider -->
-                        <Slider Grid.Row="2"
+                        <Slider AutomationProperties.Name="Master volume" Grid.Row="2"
                                 Style="{StaticResource VolumeSliderStyle}"
                                 Minimum="0"
                                 Maximum="{Binding MaxVolume}"
@@ -558,8 +558,8 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
-                            <Button Grid.Column="0" Content="-5" Command="{Binding VolumeDownCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 0,9}" />
-                            <Button Grid.Column="2" Content="-1" Command="{Binding VolumeFineDownCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 0,9}" />
+                            <Button AutomationProperties.Name="Volume down 5" ToolTip="Volume down 5" Grid.Column="0" Content="-5" Command="{Binding VolumeDownCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 0,9}" />
+                            <Button AutomationProperties.Name="Volume down 1" ToolTip="Volume down 1" Grid.Column="2" Content="-1" Command="{Binding VolumeFineDownCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 0,9}" />
                             <Button Grid.Column="4" Command="{Binding ToggleMuteCommand}" Content="{Binding MuteButtonText}" Padding="{skin:Space 0,9}" ToolTip="Toggle Mute (M)">
                                 <Button.Style>
                                     <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
@@ -573,8 +573,8 @@
                                     </Style>
                                 </Button.Style>
                             </Button>
-                            <Button Grid.Column="6" Content="+1" Command="{Binding VolumeFineUpCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 0,9}" />
-                            <Button Grid.Column="8" Content="+5" Command="{Binding VolumeUpCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 0,9}" />
+                            <Button AutomationProperties.Name="Volume up 1" ToolTip="Volume up 1" Grid.Column="6" Content="+1" Command="{Binding VolumeFineUpCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 0,9}" />
+                            <Button AutomationProperties.Name="Volume up 5" ToolTip="Volume up 5" Grid.Column="8" Content="+5" Command="{Binding VolumeUpCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 0,9}" />
                         </Grid>
 
                         <!-- One-Tap Volume Presets -->
@@ -588,7 +588,7 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Button Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
+                                        <Button AutomationProperties.Name="{Binding Name}" Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
                                                 Command="{Binding DataContext.SetVolumePresetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 CommandParameter="{Binding}"
                                                 Margin="{skin:Space 0,0,6,0}"
