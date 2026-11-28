@@ -352,6 +352,7 @@ public sealed partial class MainViewModel
         }
 
         scene.IsActivating = true;
+        ClearSoundModeShortcut(); // a scene's own sound mode is not the receiver's choice for a shortcut
         try
         {
             StatusMessage = $"Activating scene '{scene.Name}'...";
