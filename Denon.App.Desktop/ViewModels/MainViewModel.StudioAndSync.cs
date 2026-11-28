@@ -543,6 +543,7 @@ public sealed partial class MainViewModel
                 var (updated, savedToDisk) = await _settingsStore.UpdateQuietAsync(
                     s => s.Media.CinemaSyncOffsetMs = result.MeasuredOffsetMs);
                 SettingsCinemaSyncOffsetMs = updated.Media.CinemaSyncOffsetMs.ToString();
+                EditorFieldSaved(SettingsEditorValues.CinemaSyncOffsetMs, SettingsCinemaSyncOffsetMs);
                 if (!savedToDisk)
                 {
                     StatusMessage += " It is saved with your next Save & Sync (the settings file is being recovered).";

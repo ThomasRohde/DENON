@@ -17,8 +17,8 @@ public sealed record CommandPalettePage(
 /// The pages of the left nav rail, top to bottom. No WPF: the palette and its tests read it.
 /// </summary>
 /// <remarks>
-/// TODO(#76): MainWindow's Ctrl+1–0 shortcuts and the reserved gestures should read this list too, so
-/// the keys follow the rail order. That waits until the desktop shell PR has merged.
+/// The fixed page keys Ctrl+1–9 and Ctrl+0 (<see cref="PageShortcuts"/>) read this list too, so keep it in the
+/// order of the rail in MainWindow.xaml.
 /// </remarks>
 public static class CommandPalettePages
 {
@@ -48,13 +48,13 @@ public static class CommandPalettePages
             ["help", "guide", "documentation", "f1", "how to"]),
     ];
 
-    /// <summary>The palette rows for the pages, in rail order.</summary>
+    /// <summary>The palette rows for the pages, in rail order, each with its Ctrl+digit key.</summary>
     public static IEnumerable<CommandPaletteEntry> Entries() =>
-        All.Select(page => new CommandPaletteEntry(
-            $"page:{page.Section}",
+        PageShortcuts.All.Select(shortcut => new CommandPaletteEntry(
+            $"page:{shortcut.Page.Section}",
             CommandPaletteCategory.Page,
-            page.Title,
-            "Open this page",
-            [page.RailLabel, .. page.Keywords],
-            page));
+            shortcut.Page.Title,
+            $"Open this page · {shortcut.Gesture}",
+            [shortcut.Page.RailLabel, .. shortcut.Page.Keywords],
+            shortcut.Page));
 }
