@@ -11,7 +11,13 @@ requests stay open for later: #63, #74, #75, #76, #77, #78, #79.
 - [x] PR 1: guest input security. #29 closed: a phone track gets its watch and thumbnail address from the video
       id. Part of #31: values ride in data-* attributes (no inline JavaScript), and only hex colours go into styles.
       Part of #64: the room-dev-deck harness checks Host and Origin and does not crash on bad JSON.
-- [ ] PR 2: receiver and HEOS: #28 UI freeze, #30 CR/LF injection, #38, #39, #43 Telnet speed, parts of #66.
+- [x] PR 2: receiver and HEOS. #28, #30, #38, #39 and #43 closed; the receiver parts of #66 (HEOS-only scenes and
+      Fix silent audio, SSDP on every interface, the Try* cancel filter, the under-process reset).
+- [x] PR 2 read-only live check (2026-11-28): status reads 1.1–1.25 s against 2.2–3.2 s before, same values,
+      Zone 2 on read right with main zone off.
+- [ ] Verify PR 2 in the app: a Volume Memory fade, and Reset Connections while the volume slider moves.
+- [ ] Not done in PR 2: remember optional queries (ECO?, SLP?, Z2?) that a model never answers, so a status read
+      does not wait 550 ms for each. Needs care: some models do not answer in standby.
 - [ ] PR 3: Home Assistant and Hue: #32 entity path, #46 crashes, #48 DTLS, the HA part of #68, the Hue part of #64.
 - [ ] PR 4: MCP tiers and limits: #61, #65, the MCP part of #66, the /health Host check in #64.
 - [ ] PR 5: media relay and Core services: #31 headers, #36, #37 Jukebox 45 s cut, #40, #41, #42, #67, :18925

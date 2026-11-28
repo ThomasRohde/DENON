@@ -10,16 +10,35 @@ public sealed class DenonAvrClient : IDisposable
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan ReadTimeout = TimeSpan.FromMilliseconds(900);
 
+    /// <summary>Denon asks for at least 50 ms between two commands.</summary>
+    private static readonly TimeSpan MinCommandSpacing = TimeSpan.FromMilliseconds(50);
+
+    private readonly int _port;
     private readonly SemaphoreSlim _connectionGate = new(1, 1);
     private TcpClient? _client;
     private NetworkStream? _stream;
     private string? _connectedHost;
+    private DateTimeOffset _lastWriteAt = DateTimeOffset.MinValue;
+
+    /// <summary>
+    /// Set by <see cref="Disconnect"/> while a command holds the connection. The next command drops the
+    /// connection and opens a new one. Disconnect never waits for the gate: the UI thread calls it.
+    /// </summary>
+    private volatile bool _resetRequested;
+
+    public DenonAvrClient()
+        : this(AvrPort)
+    {
+    }
+
+    /// <summary>Tests point the client at a fake receiver on another port.</summary>
+    internal DenonAvrClient(int port) => _port = port;
 
     public async Task<AvrDeviceStatus> GetStatusAsync(ReceiverSettings settings, CancellationToken cancellationToken)
     {
         var power = await QueryAsync(settings, "PW?", "PW", cancellationToken);
         var mainZone = await QueryAsync(settings, "ZM?", "ZM", cancellationToken);
-        var volumeLines = await QueryAllMatchingAsync(settings, "MV?", "MV", cancellationToken);
+        var volumeLines = await QueryAllMatchingAsync(settings, "MV?", "MV", cancellationToken, IsCompleteVolumeReply);
         var mute = await QueryAsync(settings, "MU?", "MU", cancellationToken);
         var input = await QueryAsync(settings, "SI?", "SI", cancellationToken);
 
@@ -27,7 +46,8 @@ public sealed class DenonAvrClient : IDisposable
         var soundMode = await TryQueryAsync(settings, "MS?", "MS", cancellationToken);
         var ecoMode = await TryQueryAsync(settings, "ECO?", "ECO", cancellationToken);
         var sleepRaw = await TryQueryAsync(settings, "SLP?", "SLP", cancellationToken);
-        var zone2 = await TryQueryAsync(settings, "Z2?", "Z2", cancellationToken);
+        // Z2? answers with several Z2 lines (power, source, volume) in any order: look at all of them.
+        var zone2Lines = await TryQueryAllMatchingAsync(settings, "Z2?", "Z2", cancellationToken);
 
         var (volume, volumeExact, maxVolume) = ParseVolumeLines(volumeLines);
 
@@ -40,9 +60,38 @@ public sealed class DenonAvrClient : IDisposable
             SoundMode: ParsePrefixValue(soundMode, "MS"),
             EcoMode: ParsePrefixValue(ecoMode, "ECO"),
             SleepTimerMinutes: ParseSleepTimer(sleepRaw),
-            IsZone2On: string.Equals(zone2, "Z2ON", StringComparison.OrdinalIgnoreCase),
+            IsZone2On: IsZone2OnReply(zone2Lines),
             MaxVolume: maxVolume,
             VolumeExact: volumeExact);
+    }
+
+    /// <summary>The current input (for example "TV"), or null when the receiver does not answer SI?.</summary>
+    public async Task<string?> TryGetInputSourceAsync(ReceiverSettings settings, CancellationToken cancellationToken)
+    {
+        var reply = await TryQueryAsync(settings, "SI?", "SI", cancellationToken);
+        return reply is null ? null : ParsePrefixValue(reply, "SI");
+    }
+
+    /// <summary>True only when ZM? answers ZMON; false for standby and for no answer.</summary>
+    public async Task<bool> IsMainZoneOnAsync(ReceiverSettings settings, CancellationToken cancellationToken) =>
+        string.Equals(await TryQueryAsync(settings, "ZM?", "ZM", cancellationToken), "ZMON", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The current volume (MV? with MVMAX), or null when the receiver does not answer.</summary>
+    public async Task<(int Volume, double VolumeExact, int MaxVolume)?> TryGetVolumeAsync(ReceiverSettings settings, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var lines = (await ExchangeLinesAsync(settings.Host, "MV?", TimeSpan.FromMilliseconds(550), IsCompleteVolumeReply, cancellationToken))
+                .Where(static line => line.StartsWith("MV", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            return lines.Any(static line => !line.StartsWith("MVMAX", StringComparison.OrdinalIgnoreCase))
+                ? ParseVolumeLines(lines)
+                : null;
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
     }
 
     public Task SetPowerAsync(ReceiverSettings settings, bool powerOn, CancellationToken cancellationToken) =>
@@ -337,16 +386,30 @@ public sealed class DenonAvrClient : IDisposable
     {
         try
         {
-            var lines = await ExchangeLinesAsync(settings.Host, command, TimeSpan.FromMilliseconds(550), cancellationToken);
+            var lines = await ExchangeLinesAsync(settings.Host, command, TimeSpan.FromMilliseconds(550), isComplete: null, cancellationToken);
             return lines
                 .Where(line => line.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase))
                 .ToList();
         }
-        catch
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
+            // A cancelled caller must see the cancellation, not an empty answer it would keep as real.
             return [];
         }
     }
+
+    /// <summary>True when one of the Z2? reply lines is exactly "Z2ON" (the other lines are source and volume).</summary>
+    public static bool IsZone2OnReply(IEnumerable<string> lines) =>
+        lines.Any(static line => string.Equals(line.Trim(), "Z2ON", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>MV? answers "MV45" and then "MVMAX 98". The reply is complete when both lines are in.</summary>
+    internal static bool IsCompleteVolumeReply(IReadOnlyList<string> lines) =>
+        lines.Any(static l => l.StartsWith("MVMAX", StringComparison.OrdinalIgnoreCase)) &&
+        lines.Any(static l => l.StartsWith("MV", StringComparison.OrdinalIgnoreCase) &&
+                              !l.StartsWith("MVMAX", StringComparison.OrdinalIgnoreCase));
+
+    private static Func<IReadOnlyList<string>, bool> HasLineStartingWith(string prefix) =>
+        lines => lines.Any(line => line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
 
     public async Task EnsureMainZoneNetAsync(ReceiverSettings settings, CancellationToken cancellationToken)
     {
@@ -411,7 +474,7 @@ public sealed class DenonAvrClient : IDisposable
             throw new ArgumentException("An AVR command is required.", nameof(command));
         }
 
-        var lines = await ExchangeLinesAsync(settings.Host, command.Trim().ToUpperInvariant(), TimeSpan.FromMilliseconds(900), cancellationToken);
+        var lines = await ExchangeLinesAsync(settings.Host, command.Trim().ToUpperInvariant(), TimeSpan.FromMilliseconds(900), isComplete: null, cancellationToken);
         return lines.Count == 0 ? "(sent - no reply)" : string.Join(Environment.NewLine, lines);
     }
 
@@ -531,11 +594,12 @@ public sealed class DenonAvrClient : IDisposable
     {
         try
         {
-            var lines = await ExchangeLinesAsync(settings.Host, command, TimeSpan.FromMilliseconds(550), cancellationToken);
+            var lines = await ExchangeLinesAsync(settings.Host, command, TimeSpan.FromMilliseconds(550), HasLineStartingWith(expectedPrefix), cancellationToken);
             return lines.FirstOrDefault(line => line.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase));
         }
-        catch
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
+            // A cancelled caller must see the cancellation, not an empty answer it would keep as real.
             return null;
         }
     }
@@ -544,11 +608,13 @@ public sealed class DenonAvrClient : IDisposable
         ReceiverSettings settings,
         string command,
         string expectedPrefix,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<IReadOnlyList<string>, bool>? isComplete = null)
     {
+        isComplete ??= HasLineStartingWith(expectedPrefix);
         for (var attempt = 0; attempt < 3; attempt++)
         {
-            var lines = await ExchangeLinesAsync(settings.Host, command, ReadTimeout, cancellationToken);
+            var lines = await ExchangeLinesAsync(settings.Host, command, ReadTimeout, isComplete, cancellationToken);
             var matches = lines
                 .Where(line => line.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase))
                 .ToList();
@@ -566,15 +632,29 @@ public sealed class DenonAvrClient : IDisposable
 
     private async Task SendCommandAsync(ReceiverSettings settings, string command, CancellationToken cancellationToken)
     {
-        await ExchangeLinesAsync(settings.Host, command, TimeSpan.FromMilliseconds(220), cancellationToken);
+        await ExchangeLinesAsync(settings.Host, command, TimeSpan.FromMilliseconds(220), isComplete: null, cancellationToken);
+    }
+
+    /// <summary>
+    /// Refuses a command with a control character. A CR or LF inside a source or mode code would make the
+    /// receiver run a second command (for example "TV\rMV98"), past the safe-volume and power checks.
+    /// </summary>
+    internal static void EnsureSingleCommand(string command)
+    {
+        if (command.Any(char.IsControl))
+        {
+            throw new ArgumentException("An AVR command must be one line without control characters.", nameof(command));
+        }
     }
 
     private async Task<List<string>> ExchangeLinesAsync(
         string host,
         string command,
         TimeSpan readWindow,
+        Func<IReadOnlyList<string>, bool>? isComplete,
         CancellationToken cancellationToken)
     {
+        EnsureSingleCommand(command);
         Exception? lastException = null;
         for (var attempt = 0; attempt < 2; attempt++)
         {
@@ -584,11 +664,18 @@ public sealed class DenonAvrClient : IDisposable
                 await EnsureConnectedLockedAsync(host, cancellationToken);
                 DrainPendingBytesLocked();
 
+                var sinceLastWrite = DateTimeOffset.UtcNow - _lastWriteAt;
+                if (sinceLastWrite < MinCommandSpacing)
+                {
+                    await Task.Delay(MinCommandSpacing - sinceLastWrite, cancellationToken);
+                }
+
                 var payload = Encoding.ASCII.GetBytes(command + "\r");
                 await _stream!.WriteAsync(payload, cancellationToken);
                 await _stream.FlushAsync(cancellationToken);
+                _lastWriteAt = DateTimeOffset.UtcNow;
 
-                return await ReadFramesLockedAsync(readWindow, cancellationToken);
+                return await ReadFramesLockedAsync(readWindow, isComplete, cancellationToken);
             }
             catch (Exception exception) when (exception is IOException or SocketException && attempt == 0)
             {
@@ -612,6 +699,12 @@ public sealed class DenonAvrClient : IDisposable
 
     private async Task EnsureConnectedLockedAsync(string host, CancellationToken cancellationToken)
     {
+        if (_resetRequested)
+        {
+            _resetRequested = false;
+            ResetConnectionLocked();
+        }
+
         if (_client is { Connected: true } &&
             _stream is not null &&
             string.Equals(_connectedHost, host, StringComparison.OrdinalIgnoreCase))
@@ -627,7 +720,7 @@ public sealed class DenonAvrClient : IDisposable
 
         try
         {
-            await client.ConnectAsync(host, AvrPort, connectCts.Token);
+            await client.ConnectAsync(host, _port, connectCts.Token);
         }
         catch
         {
@@ -658,7 +751,14 @@ public sealed class DenonAvrClient : IDisposable
         }
     }
 
-    private async Task<List<string>> ReadFramesLockedAsync(TimeSpan readWindow, CancellationToken cancellationToken)
+    /// <param name="isComplete">
+    /// Tells when the complete lines read so far are the whole answer, so the read ends at once. Null for
+    /// answers whose length is not known (several lines): they end 120 ms after the last line, as before.
+    /// </param>
+    private async Task<List<string>> ReadFramesLockedAsync(
+        TimeSpan readWindow,
+        Func<IReadOnlyList<string>, bool>? isComplete,
+        CancellationToken cancellationToken)
     {
         var buffer = new byte[2048];
         var builder = new StringBuilder();
@@ -690,9 +790,15 @@ public sealed class DenonAvrClient : IDisposable
                 }
 
                 builder.Append(Encoding.ASCII.GetString(buffer, 0, read));
-                if (builder.ToString().Contains('\r'))
+                var text = builder.ToString();
+                var lastLineEnd = text.LastIndexOf('\r');
+                if (lastLineEnd >= 0)
                 {
                     hasReceivedAny = true;
+                    if (isComplete is not null && isComplete(SplitLines(text[..lastLineEnd])))
+                    {
+                        break;
+                    }
                 }
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -701,11 +807,11 @@ public sealed class DenonAvrClient : IDisposable
             }
         }
 
-        return builder
-            .ToString()
-            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .ToList();
+        return SplitLines(builder.ToString());
     }
+
+    private static List<string> SplitLines(string text) =>
+        text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
     private void ResetConnectionLocked()
     {
@@ -716,11 +822,22 @@ public sealed class DenonAvrClient : IDisposable
         _connectedHost = null;
     }
 
+    /// <summary>
+    /// Drops the connection without waiting. When a command holds it, the next command drops it instead.
+    /// Never blocks: the UI thread calls this (Reset, Save &amp; Sync, Import) while a command it started may
+    /// still wait for the receiver, and that command needs the UI thread to finish.
+    /// </summary>
     public void Disconnect()
     {
-        _connectionGate.Wait();
+        if (!_connectionGate.Wait(0))
+        {
+            _resetRequested = true;
+            return;
+        }
+
         try
         {
+            _resetRequested = false;
             ResetConnectionLocked();
         }
         finally
@@ -729,19 +846,8 @@ public sealed class DenonAvrClient : IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        _connectionGate.Wait();
-        try
-        {
-            ResetConnectionLocked();
-        }
-        finally
-        {
-            _connectionGate.Release();
-            _connectionGate.Dispose();
-        }
-    }
+    /// <summary>The gate holds no OS handle, so it is not disposed: a command in flight may still release it.</summary>
+    public void Dispose() => Disconnect();
 
     private static string ParsePrefixValue(string? response, string prefix)
     {

@@ -13,6 +13,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   (`CommandPaletteSearch`) has no WPF and has unit tests. Not in this part: Ctrl+K in the reserved gestures and
   Help, Ctrl+1–0 in rail order, and the unsaved-changes banner.
 
+### Fixed
+- **Reset Connections, Save & Sync and Import no longer freeze the app** (#28). When a volume or refresh command from
+  the window was still waiting for the receiver, these buttons blocked the window for good. Disconnect now never
+  waits: when a command holds the link, the next command opens a new one.
+- **A short port-23 outage keeps the real input for two polls, as intended** (#39). Before, the second failed poll
+  already showed "NET / HEOS", so Volume Memory and automations could act on a source that was not playing. Zone 2
+  now reads as on when any line of the Z2? reply says Z2ON, not only the first.
+- **Smart Scenes and "Fix silent audio" work on HEOS-only speakers** (#66, for example Denon Home). They used to
+  fail on the first AVR step. Now they set the volume first and then unmute through HEOS, and skip the AVR steps
+  (power, input, sound mode, acoustics). An input other than NET is skipped with a log line.
+- **The HEOS push link finds a dead receiver** (#38). The app sends a heartbeat every 30 s and uses TCP keepalive.
+  When nothing comes back for 75 s, it reconnects, so a power cut no longer stops live updates until a restart.
+  A new receiver address no longer waits out the reconnect backoff.
+- **Scan LAN finds the receiver on PCs with a VPN or a virtual network adapter** (#66). The search now goes out on
+  every LAN interface, not only on the first one Windows picks.
+- A cancelled acoustics read no longer saves a mostly blank result as real (#66). A HEOS command that ends with only
+  "command under process" now drops the link, so a late answer cannot belong to the next command.
+
+### Changed
+- **Receiver status reads are faster, and a Volume Memory fade takes a few seconds, not half a minute** (#43). A
+  query now ends as soon as its answer is in (MV? waits for MVMAX), not 120 ms after every answer. On a real
+  receiver a status read went from about 2.2 s to about 1.2 s; most of what is left is the receiver's own reply
+  time (about 90 ms per query).
+  Commands still keep the 50 ms gap that Denon asks for. A fade step sets the volume and then reads only the zone
+  power, the input and the real volume, not the full status. So the fade still stops on standby, a turn of the
+  knob or another source. The last step reads the full status.
+
+### Security
+- **A source, sound mode or stream URL with a line break is refused** (#30). An MCP client could send
+  "TV\rMV98" and get past the safe volume and the power-off check. Both the Telnet and HEOS links now refuse any
+  command with a control character.
+
 ## [2.10.19] - 2026-11-28
 
 ### Security

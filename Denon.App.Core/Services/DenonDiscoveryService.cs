@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
 using Denon.App.Core.Heos;
@@ -43,11 +44,64 @@ public sealed class DenonDiscoveryService
         TimeSpan scanDuration,
         CancellationToken cancellationToken)
     {
+        // Windows sends a multicast out of one interface only (the lowest metric). With a VPN or a
+        // vEthernet adapter first, the LAN never sees the search. So search on every LAN interface.
+        var localAddresses = GetLocalIPv4Addresses();
+        var scans = localAddresses.Count > 0
+            ? localAddresses.Select(address => SearchOnInterfaceAsync(address, scanDuration, cancellationToken))
+            : [SearchOnInterfaceAsync(IPAddress.Any, scanDuration, cancellationToken)];
+
+        var ips = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var found in await Task.WhenAll(scans))
+        {
+            ips.UnionWith(found);
+        }
+
+        return ips;
+    }
+
+    /// <summary>The IPv4 address of each network interface that is up and can send multicast (no loopback).</summary>
+    internal static IReadOnlyList<IPAddress> GetLocalIPv4Addresses()
+    {
+        try
+        {
+            return NetworkInterface.GetAllNetworkInterfaces()
+                .Where(static nic => nic.OperationalStatus == OperationalStatus.Up &&
+                                     nic.SupportsMulticast &&
+                                     nic.NetworkInterfaceType is not (NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel))
+                .SelectMany(static nic => nic.GetIPProperties().UnicastAddresses)
+                .Select(static unicast => unicast.Address)
+                .Where(static address => address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address))
+                .Distinct()
+                .ToList();
+        }
+        catch (NetworkInformationException)
+        {
+            return [];
+        }
+    }
+
+    private static async Task<HashSet<string>> SearchOnInterfaceAsync(
+        IPAddress localAddress,
+        TimeSpan scanDuration,
+        CancellationToken cancellationToken)
+    {
         var ips = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        using var udpClient = new UdpClient();
-        udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-        udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, 0));
+        using var udpClient = new UdpClient(AddressFamily.InterNetwork);
+        try
+        {
+            udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            udpClient.Client.Bind(new IPEndPoint(localAddress, 0));
+            if (!localAddress.Equals(IPAddress.Any))
+            {
+                udpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastInterface, localAddress.GetAddressBytes());
+            }
+        }
+        catch (SocketException)
+        {
+            return ips; // This interface cannot send multicast.
+        }
 
         var multicastEndPoint = new IPEndPoint(IPAddress.Parse(MulticastAddress), SsdpPort);
         foreach (var target in SearchTargets)
@@ -63,7 +117,7 @@ public sealed class DenonDiscoveryService
             {
                 await udpClient.SendAsync(bytes, multicastEndPoint, cancellationToken);
             }
-            catch
+            catch (SocketException)
             {
                 // Ignore interface multicast send errors
             }
@@ -72,6 +126,7 @@ public sealed class DenonDiscoveryService
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(scanDuration);
 
+        var receiveErrors = 0;
         while (!timeoutCts.IsCancellationRequested)
         {
             try
@@ -87,7 +142,11 @@ public sealed class DenonDiscoveryService
             {
                 break;
             }
-            catch
+            catch (SocketException) when (++receiveErrors <= 20)
+            {
+                // One bad datagram (for example an ICMP reset) must not end the scan.
+            }
+            catch (SocketException)
             {
                 break;
             }

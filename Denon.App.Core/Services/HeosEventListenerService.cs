@@ -17,6 +17,12 @@ public sealed class HeosEventListenerService : BackgroundService
     private readonly ReceiverController _receiverController;
     private readonly AppLogStore _logStore;
 
+    /// <summary>A heartbeat goes out this often, and the speaker answers it.</summary>
+    internal TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>No line for this long (not even a heartbeat answer) means the link is dead: reconnect.</summary>
+    internal TimeSpan SilenceLimit { get; set; } = TimeSpan.FromSeconds(75);
+
     private volatile bool _isPushConnected;
     private CancellationTokenSource? _reconnectTriggerCts;
     private CancellationTokenSource? _coalescedRefreshCts;
@@ -81,6 +87,7 @@ public sealed class HeosEventListenerService : BackgroundService
             try
             {
                 using var tcp = new TcpClient { NoDelay = true };
+                EnableKeepAlive(tcp.Client);
                 using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(loopToken);
                 connectCts.CancelAfter(TimeSpan.FromSeconds(4));
 
@@ -99,20 +106,44 @@ public sealed class HeosEventListenerService : BackgroundService
                 backoffSeconds = 2;
                 _logStore.Info($"Real-time HEOS push events subscribed ({settings.Host}:{settings.Port}).");
 
-                while (!loopToken.IsCancellationRequested)
+                // The client only listens, so a power cut or a pulled cable never sends a reset: the read would
+                // wait for ever. A heartbeat makes the speaker answer, and a silent link is dropped.
+                using var silenceCts = CancellationTokenSource.CreateLinkedTokenSource(loopToken);
+                silenceCts.CancelAfter(SilenceLimit);
+                var heartbeats = SendHeartbeatsAsync(writer, silenceCts.Token);
+                try
                 {
-                    var line = await reader.ReadLineAsync(loopToken);
-                    if (line is null)
+                    while (!loopToken.IsCancellationRequested)
                     {
-                        break;
-                    }
+                        string? line;
+                        try
+                        {
+                            line = await reader.ReadLineAsync(silenceCts.Token);
+                        }
+                        catch (OperationCanceledException) when (!loopToken.IsCancellationRequested)
+                        {
+                            _logStore.Warning($"HEOS push events were silent for {SilenceLimit.TotalSeconds:0} s; reconnecting.");
+                            break;
+                        }
 
-                    if (string.IsNullOrWhiteSpace(line))
-                    {
-                        continue;
-                    }
+                        if (line is null)
+                        {
+                            break;
+                        }
 
-                    HandlePushLine(line, loopToken);
+                        silenceCts.CancelAfter(SilenceLimit);
+                        if (string.IsNullOrWhiteSpace(line))
+                        {
+                            continue;
+                        }
+
+                        HandlePushLine(line, loopToken);
+                    }
+                }
+                finally
+                {
+                    silenceCts.Cancel();
+                    try { await heartbeats; } catch { /* the link is closing */ }
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -135,13 +166,42 @@ public sealed class HeosEventListenerService : BackgroundService
 
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(backoffSeconds), stoppingToken);
+                // Wait on the reconnect trigger too: a new receiver address must not wait out the backoff.
+                await Task.Delay(TimeSpan.FromSeconds(backoffSeconds), loopToken);
                 backoffSeconds = Math.Min(backoffSeconds * 2, 20);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 break;
             }
+            catch (OperationCanceledException)
+            {
+                backoffSeconds = 1;
+            }
+        }
+    }
+
+    private static void EnableKeepAlive(Socket socket)
+    {
+        try
+        {
+            socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, 30);
+            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, 5);
+            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, 3);
+        }
+        catch (Exception ex) when (ex is SocketException or PlatformNotSupportedException or NotSupportedException or ArgumentException)
+        {
+            // Some systems do not take these options. The heartbeat still finds a dead link.
+        }
+    }
+
+    private async Task SendHeartbeatsAsync(StreamWriter writer, CancellationToken token)
+    {
+        while (!token.IsCancellationRequested)
+        {
+            await Task.Delay(HeartbeatInterval, token);
+            await writer.WriteLineAsync("heos://system/heart_beat".AsMemory(), token);
         }
     }
 
@@ -219,21 +279,23 @@ public sealed class HeosEventListenerService : BackgroundService
 
     private void ScheduleCoalescedRefresh(CancellationToken loopToken)
     {
-        CancellationTokenSource cts;
+        CancellationToken token;
         lock (_refreshSync)
         {
             _coalescedRefreshCts?.Cancel();
             _coalescedRefreshCts?.Dispose();
-            cts = CancellationTokenSource.CreateLinkedTokenSource(loopToken);
+            var cts = CancellationTokenSource.CreateLinkedTokenSource(loopToken);
             _coalescedRefreshCts = cts;
+            // Take the token now: a newer event may dispose this source before the task starts.
+            token = cts.Token;
         }
 
         _ = Task.Run(async () =>
         {
             try
             {
-                await Task.Delay(250, cts.Token);
-                await _receiverController.RefreshAsync(cts.Token);
+                await Task.Delay(250, token);
+                await _receiverController.RefreshAsync(token);
             }
             catch
             {
