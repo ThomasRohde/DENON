@@ -785,9 +785,8 @@
 
                         <TextBlock Text="CHROMECAST ON THIS TV" FontSize="{DynamicResource FontSize02}" FontWeight="Bold" Foreground="{DynamicResource TextFaintBrush}" Margin="{skin:Space 0,0,0,4}" />
                         <ComboBox ItemsSource="{Binding CastDeviceOptions}"
-                                  SelectedValuePath="Id"
                                   DisplayMemberPath="Label"
-                                  SelectedValue="{Binding CecWakeCastDevice}"
+                                  SelectedItem="{Binding SelectedCastDevice}"
                                   AutomationProperties.Name="Chromecast on this TV"
                                   Margin="{skin:Space 0,0,0,4}" />
                         <TextBlock Text="When Wake-on-LAN gets no answer, this Chromecast turns the TV on over HDMI-CEC (SimpLink). Automatic uses the only Chromecast online."

@@ -4,6 +4,12 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **"Chromecast on this TV" shows the choice.** The box on the Smart TV page was empty after the device list
+  loaded, though the list was right. A device name in the setting now shows as that device.
+
 ## [2.10.13] - 2026-11-28
 
 ### Fixed
