@@ -52,7 +52,7 @@ public sealed class InsightsServerLoopbackTests : IAsyncLifetime
         var heos = new HeosEventListenerService(_settings, state, controller, log);
         var intelligence = new RoomIntelligenceService(state, controller, _settings, plugins, ytQueue, heos, log, Path.Combine(_tempDir, "room-habits.json"));
         var engine = new AutomationEngineService(_settings, controller, state, plugins, telemetry, bus, log);
-        var editor = new AutomationEditorApi(_settings, engine, plugins, relay);
+        var editor = new AutomationEditorApi(_settings, engine, plugins, relay, state);
         _server = new InsightsServer(telemetry, intelligence, editor, log);
 
         _asyncDisposables.AddRange([_server, plugins, telemetry]);

@@ -16,6 +16,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   A/V offset for this session only: Re-Sync and the next tracks keep it, and the status line says "not saved".
   Click Save Offset to keep it as the Cinema Offset, which also times the lyrics and the meters. Before, every
   nudge saved the offset at once, so a quick try changed the lyrics and the meters too.
+
+## [2.10.30] - 2026-11-28
+
+### Added
+- **Zone 2 volume, source and mute** (#75). The Control deck's Power & zones card has a Zone 2 row: power, volume
+  − and + with the receiver's 0–98 number, mute, and a source list (Main zone source, TV, HEOS Music and the other
+  inputs). The receiver's own Zone 2 lines (Z240, Z2TV, Z2MUON) update the app at once, also when the second room's
+  remote changes them. A Z2 line that is not a known source (Z2CS ST, Z2QUICK1) changes nothing, and a source
+  command only takes a known source code, so "Z250" can never slip through as a source.
+- **HEOS multi-room groups** (#75). The same card lists the other HEOS players: tap one to group it with the
+  receiver (the receiver leads and the others play what it plays), tap it again to take it out. With a group the
+  card shows the group's volume (− and +), mute and Leave group. The app reads the groups at start and again on
+  the speaker's groups_changed and players_changed events, and group_volume_changed updates the volume at once.
+- **Smart Scenes can set Zone 2 and a HEOS group** (#75): Zone 2 on or off, source, volume and mute, and HEOS players
+  to group with this receiver (or leave the group). The scene editor has the fields. With a target volume, Zone 2 is
+  muted while it turns on or changes source, and the mute goes back only after the volume is set, so a zone left
+  loud never plays loud first. An MCP agent can run a scene that groups players only in FullOrchestration.
+- **Automations** (#75): `action.receiver` has `zone2_on`, `zone2_off`, `zone2_volume`, `zone2_source`,
+  `zone2_mute`, `zone2_unmute`, `group_with`, `ungroup` and `group_volume`. Zone 2 and group volumes are capped at
+  the safe volume, as the main volume is. See docs/automation-graphs.md.
+- **MCP** (#75): `avr_set_zone2` now sets power, source, volume (capped at MaxSafeVolume) and mute;
+  `heos_get_groups` (read-only) lists the players and groups; `heos_set_group_volume` (SafeControl, capped); and
+  `heos_set_group` (FullOrchestration, because it changes what other rooms play). `get_room_state` shows Zone 2 and
+  the groups, and `create_or_update_scene` takes the Zone 2 and group fields.
 - **Home Assistant: an "Input Booleans" filter** (#79) next to Scenes, Scripts, Switches and Lights. A tile toggles
   the helper with `input_boolean.toggle`. Demo Mode has two of them.
 - **Home Assistant: live updates** (#79). The plugin keeps a WebSocket open to Home Assistant
@@ -27,6 +51,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   with each area and its channel count. A pick is saved, and a running 50 Hz stream moves to the new area. Before,
   Music Sync always used the first area. When the saved area is gone, the panel says which area it uses instead;
   with no area, it says to create one in the Hue app.
+
+### Changed
+- Automation run messages say the receiver volume as its 0–98 number ("Receiver volume 40"), not in dB.
 
 ## [2.10.29] - 2026-11-28
 

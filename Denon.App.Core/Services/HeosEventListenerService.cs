@@ -26,6 +26,7 @@ public sealed class HeosEventListenerService : BackgroundService
     private volatile bool _isPushConnected;
     private CancellationTokenSource? _reconnectTriggerCts;
     private CancellationTokenSource? _coalescedRefreshCts;
+    private CancellationTokenSource? _groupsRefreshCts;
     private readonly object _refreshSync = new();
 
     public HeosEventListenerService(
@@ -105,6 +106,9 @@ public sealed class HeosEventListenerService : BackgroundService
                 SetPushConnected(true);
                 backoffSeconds = 2;
                 _logStore.Info($"Real-time HEOS push events subscribed ({settings.Host}:{settings.Port}).");
+
+                // Events tell only what changes from now on: read the groups once for the start.
+                ScheduleGroupsRefresh(loopToken);
 
                 // The client only listens, so a power cut or a pulled cable never sends a reset: the read would
                 // wait for ever. A heartbeat makes the speaker answer, and a silent link is dropped.
@@ -221,6 +225,17 @@ public sealed class HeosEventListenerService : BackgroundService
             }
 
             var parameters = parsed.MessageFields;
+            if (ApplyGroupVolumeEvent(_stateStore, command, parameters))
+            {
+                return;
+            }
+
+            if (IsGroupsChangedEvent(command))
+            {
+                ScheduleGroupsRefresh(cancellationToken);
+                return;
+            }
+
             var currentPid = _stateStore.Snapshot.Status?.Player.PlayerId;
             if (currentPid is int expectedPid &&
                 parameters.TryGetValue("pid", out var pidStr) &&
@@ -277,6 +292,63 @@ public sealed class HeosEventListenerService : BackgroundService
         }
     }
 
+    /// <summary>
+    /// event/group_volume_changed ("gid=…&amp;level=…&amp;mute=on"): patches that group's volume and mute in the store.
+    /// True for that event (handled), false for any other.
+    /// </summary>
+    internal static bool ApplyGroupVolumeEvent(ReceiverStateStore store, string command, IReadOnlyDictionary<string, string> fields)
+    {
+        if (!command.Equals("event/group_volume_changed", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (fields.TryGetValue("gid", out var gidText) &&
+            int.TryParse(gidText, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var gid))
+        {
+            int? level = fields.TryGetValue("level", out var lvl) &&
+                         double.TryParse(lvl, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
+                ? Math.Clamp((int)Math.Round(parsed), 0, 100)
+                : null;
+            bool? muted = fields.TryGetValue("mute", out var mute) ? string.Equals(mute, "on", StringComparison.OrdinalIgnoreCase) : null;
+            store.PatchGroupVolume(gid, level, muted);
+        }
+
+        return true;
+    }
+
+    /// <summary>The events after which the groups must be read again: they carry no data themselves.</summary>
+    internal static bool IsGroupsChangedEvent(string command) =>
+        command.Equals("event/groups_changed", StringComparison.OrdinalIgnoreCase) ||
+        command.Equals("event/players_changed", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>One groups read 300 ms after the last groups event (a new group sends a few in a row).</summary>
+    private void ScheduleGroupsRefresh(CancellationToken loopToken)
+    {
+        CancellationToken token;
+        lock (_refreshSync)
+        {
+            _groupsRefreshCts?.Cancel();
+            _groupsRefreshCts?.Dispose();
+            var cts = CancellationTokenSource.CreateLinkedTokenSource(loopToken);
+            _groupsRefreshCts = cts;
+            token = cts.Token;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(300, token);
+                await _receiverController.RefreshHeosGroupsAsync(token);
+            }
+            catch
+            {
+                // Superseded by a newer event, or the speaker is away: the next event or connection reads again.
+            }
+        }, CancellationToken.None);
+    }
+
     private void ScheduleCoalescedRefresh(CancellationToken loopToken)
     {
         CancellationToken token;
@@ -327,6 +399,9 @@ public sealed class HeosEventListenerService : BackgroundService
             _coalescedRefreshCts?.Cancel();
             _coalescedRefreshCts?.Dispose();
             _coalescedRefreshCts = null;
+            _groupsRefreshCts?.Cancel();
+            _groupsRefreshCts?.Dispose();
+            _groupsRefreshCts = null;
         }
 
         _reconnectTriggerCts?.Dispose();

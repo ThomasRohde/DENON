@@ -699,8 +699,8 @@
                                 </ItemsControl>
                             </StackPanel>
 
-                            <StackPanel>
-                                <TextBlock Text="ECO &amp; ZONE 2" Style="{StaticResource SectionLabelStyle}" Margin="{skin:Space 0,0,0,7}" />
+                            <StackPanel Margin="{skin:Space 0,0,0,14}">
+                                <TextBlock Text="ECO" Style="{StaticResource SectionLabelStyle}" Margin="{skin:Space 0,0,0,7}" />
                                 <WrapPanel>
                                     <Button Content="ECO Auto"
                                             Command="{Binding SetEcoModeCommand}"
@@ -726,7 +726,15 @@
                                             Margin="{skin:Space 0,0,6,0}"
                                             Style="{StaticResource ChipButton}"
                                             infra:Chip.IsActive="{Binding EcoMode, Converter={StaticResource EqualityConverter}, ConverterParameter=OFF}" />
+                                </WrapPanel>
+                            </StackPanel>
+
+                            <!-- Zone 2: power, volume (the receiver's 0–98 number), mute and source -->
+                            <StackPanel Margin="{skin:Space 0,0,0,14}">
+                                <TextBlock Text="ZONE 2" Style="{StaticResource SectionLabelStyle}" Margin="{skin:Space 0,0,0,7}" />
+                                <WrapPanel>
                                     <Button Command="{Binding ToggleZone2Command}"
+                                            Margin="{skin:Space 0,0,6,0}"
                                             Padding="{skin:Space 10,5}"
                                             FontSize="{DynamicResource FontSize04}">
                                         <Button.Style>
@@ -743,6 +751,121 @@
                                             </Style>
                                         </Button.Style>
                                     </Button>
+                                    <Button Content="−"
+                                            AutomationProperties.Name="Zone 2 volume down"
+                                            Command="{Binding StepZone2VolumeCommand}"
+                                            CommandParameter="-1"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Padding="{skin:Space 9,5}"
+                                            FontSize="{DynamicResource FontSize04}"
+                                            Margin="{skin:Space 0,0,4,0}" />
+                                    <TextBlock Text="{Binding Zone2VolumeText}"
+                                               AutomationProperties.Name="Zone 2 volume"
+                                               Style="{StaticResource OledMonoText}"
+                                               FontSize="{DynamicResource FontSize05}"
+                                               FontWeight="Bold"
+                                               MinWidth="{skin:Size 26}"
+                                               TextAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="{skin:Space 0,0,4,0}" />
+                                    <Button Content="+"
+                                            AutomationProperties.Name="Zone 2 volume up"
+                                            Command="{Binding StepZone2VolumeCommand}"
+                                            CommandParameter="1"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Padding="{skin:Space 9,5}"
+                                            FontSize="{DynamicResource FontSize04}"
+                                            Margin="{skin:Space 0,0,6,0}" />
+                                    <Button Content="Mute"
+                                            AutomationProperties.Name="Zone 2 mute"
+                                            Command="{Binding ToggleZone2MuteCommand}"
+                                            Style="{StaticResource ChipButton}"
+                                            infra:Chip.IsActive="{Binding IsZone2Muted}"
+                                            Padding="{skin:Space 9,5}"
+                                            FontSize="{DynamicResource FontSize04}" />
+                                </WrapPanel>
+                                <ComboBox ItemsSource="{Binding Zone2Sources}"
+                                          SelectedItem="{Binding SelectedZone2Source}"
+                                          DisplayMemberPath="DisplayName"
+                                          AutomationProperties.Name="Zone 2 source"
+                                          ToolTip="The source Zone 2 plays"
+                                          HorizontalAlignment="Left"
+                                          MinWidth="{skin:Size 170}"
+                                          FontSize="{DynamicResource FontSize04}"
+                                          Margin="{skin:Space 0,8,0,0}" />
+                            </StackPanel>
+
+                            <!-- HEOS multi-room: the other players join or leave this receiver's group -->
+                            <StackPanel>
+                                <TextBlock Text="HEOS MULTI-ROOM" Style="{StaticResource SectionLabelStyle}" Margin="{skin:Space 0,0,0,7}" />
+                                <TextBlock Text="{Binding HeosGroupSummary}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           FontSize="{DynamicResource FontSize04}"
+                                           TextWrapping="Wrap"
+                                           Margin="{skin:Space 0,0,0,7}" />
+                                <ItemsControl ItemsSource="{Binding HeosPlayerChips}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding Name}"
+                                                    AutomationProperties.Name="{Binding AccessibleName}"
+                                                    ToolTip="{Binding AccessibleName}"
+                                                    Style="{StaticResource ChipButton}" infra:Chip.IsActive="{Binding IsActive}"
+                                                    Command="{Binding DataContext.ToggleHeosGroupMemberCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}"
+                                                    Padding="{skin:Space 9,5}"
+                                                    FontSize="{DynamicResource FontSize04}"
+                                                    Margin="{skin:Space 0,0,6,6}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <WrapPanel Visibility="{Binding IsInHeosGroup, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="GROUP"
+                                               Style="{StaticResource SectionLabelStyle}"
+                                               VerticalAlignment="Center"
+                                               Margin="{skin:Space 0,0,6,0}" />
+                                    <Button Content="−"
+                                            AutomationProperties.Name="Group volume down"
+                                            Command="{Binding StepHeosGroupVolumeCommand}"
+                                            CommandParameter="-2"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Padding="{skin:Space 9,5}"
+                                            FontSize="{DynamicResource FontSize04}"
+                                            Margin="{skin:Space 0,0,4,0}" />
+                                    <TextBlock Text="{Binding HeosGroupVolumeText}"
+                                               AutomationProperties.Name="Group volume"
+                                               Style="{StaticResource OledMonoText}"
+                                               FontSize="{DynamicResource FontSize05}"
+                                               FontWeight="Bold"
+                                               MinWidth="{skin:Size 26}"
+                                               TextAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="{skin:Space 0,0,4,0}" />
+                                    <Button Content="+"
+                                            AutomationProperties.Name="Group volume up"
+                                            Command="{Binding StepHeosGroupVolumeCommand}"
+                                            CommandParameter="2"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Padding="{skin:Space 9,5}"
+                                            FontSize="{DynamicResource FontSize04}"
+                                            Margin="{skin:Space 0,0,6,0}" />
+                                    <Button Content="Mute"
+                                            AutomationProperties.Name="Group mute"
+                                            Command="{Binding ToggleHeosGroupMuteCommand}"
+                                            Style="{StaticResource ChipButton}"
+                                            infra:Chip.IsActive="{Binding IsHeosGroupMuted}"
+                                            Padding="{skin:Space 9,5}"
+                                            FontSize="{DynamicResource FontSize04}"
+                                            Margin="{skin:Space 0,0,6,0}" />
+                                    <Button Content="Leave group"
+                                            Command="{Binding LeaveHeosGroupCommand}"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Padding="{skin:Space 9,5}"
+                                            FontSize="{DynamicResource FontSize04}" />
                                 </WrapPanel>
                             </StackPanel>
                         </StackPanel>

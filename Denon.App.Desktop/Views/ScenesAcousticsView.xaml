@@ -278,6 +278,39 @@
                                 </StackPanel>
                             </Grid>
 
+                            <!-- Zone 2 and HEOS multi-room (#75): empty means no change -->
+                            <Grid Margin="{skin:Space 0,0,0,8}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="{skin:Size 8}" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="{skin:Size 8}" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="{skin:Size 8}" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Zone 2 (ON/OFF)" FontSize="{DynamicResource FontSize03}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,3}" />
+                                    <TextBox Text="{Binding Zone2PowerChoice, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Zone 2 power, ON or OFF" Padding="{skin:Space 8,6}" FontSize="{DynamicResource FontSize06}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Z2 source (TV/NET)" FontSize="{DynamicResource FontSize03}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,3}" />
+                                    <TextBox Text="{Binding Zone2Source, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Zone 2 source code" Padding="{skin:Space 8,6}" FontSize="{DynamicResource FontSize06}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="4">
+                                    <TextBlock Text="Z2 volume (0-98)" FontSize="{DynamicResource FontSize03}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,3}" />
+                                    <TextBox Text="{Binding Zone2VolumeText, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Zone 2 volume, 0 to 98" Padding="{skin:Space 8,6}" FontSize="{DynamicResource FontSize06}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="6">
+                                    <TextBlock Text="Z2 mute (ON/OFF)" FontSize="{DynamicResource FontSize03}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,3}" />
+                                    <TextBox Text="{Binding Zone2MuteChoice, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Zone 2 mute, ON or OFF" Padding="{skin:Space 8,6}" FontSize="{DynamicResource FontSize06}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock Text="HEOS group with (player names, comma-separated)" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,3}" />
+                            <TextBox Text="{Binding HeosGroupMembersText, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="HEOS players to group with this receiver" Padding="{skin:Space 8,6}" FontSize="{DynamicResource FontSize05}" Margin="{skin:Space 0,0,0,6}" />
+                            <CheckBox Content="Leave the HEOS group (when no players are named)" IsChecked="{Binding HeosUngroup}" Style="{StaticResource ToggleSwitchStyle}" Margin="{skin:Space 0,0,0,8}" />
+
                             <TextBlock Text="Optional Auto-Play Stream URL" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,3}" />
                             <TextBox Text="{Binding StreamUrl, UpdateSourceTrigger=PropertyChanged}" Tag="Optional http:// stream URL..." Padding="{skin:Space 8,6}" FontSize="{DynamicResource FontSize05}" FontFamily="{DynamicResource MonoFont}" Margin="{skin:Space 0,0,0,6}" />
 
