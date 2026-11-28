@@ -11,6 +11,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   title, artist, album, track number, duration and embedded cover art of FLAC, MP3 (ID3v2.2–2.4, ID3v1, Xing/VBRI
   or bitrate duration) and M4A/MP4 files. It reads only the tag region, needs no extra package, and gives empty
   fields for a bad or cut-off file. The Jukebox does not use it yet, so you see no change.
+- **Command palette (Ctrl+K)**, part 1 of #76. Press Ctrl+K in the main window and type to find a page, a Smart
+  Scene, a saved station, a receiver input, a sound mode, a plugin or a plugin action. Up and Down choose, Enter or
+  a click runs it, Esc closes. It runs through the same commands as the pages. The matching and ranking
+  (`CommandPaletteSearch`) has no WPF and has unit tests. Not in this part: Ctrl+K in the reserved gestures and
+  Help, Ctrl+1–0 in rail order, and the unsaved-changes banner.
 
 ## [2.10.19] - 2026-11-28
 
