@@ -28,6 +28,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   Cinema address is built from the video id, Open Browser opens only http(s), and file, network-share and app
   links are blocked in Cinema. TV channel logos on this PC still load.
 
+## [2.10.26] - 2026-11-28
+
+### Fixed
+- **The TV no longer asks to pair every half minute after it forgot the key** (#47). When the TV refuses the saved
+  key, the app stops reconnecting and the LG TV card says "The TV asks to pair again". Before, a background
+  reconnect showed the TV's Accept dialog again about every 30 s and left a socket open each time.
+- **A disconnect from an unplugged TV takes at most a second per socket** (#47), not up to 20 s, so the other
+  plugins still get their stop time at exit. A failed connect or pointer socket is closed, not left open.
+- **"Wake TV with the receiver" also works without a MAC address** (#68). It wakes the TV through HDMI-CEC (the
+  Cast device on the TV), as Power On does. Before, the option did nothing without a MAC.
+- TV events that arrive from several threads no longer mix up the TV's Insights entries (#68). The screen preview
+  sets its status on the UI thread, and the click marker no longer blocks a background thread.
+
+### Security
+- **The LG TV plugin trusts only LAN addresses** (#34). A screenshot or pointer-socket address the TV sends must be
+  the TV on the LAN (not this PC, not the internet). A self-signed certificate is accepted only from a LAN address.
+  A screenshot is at most 10 MB. In Auto-Discover, an SSDP answer must point at the device that sent it.
+
+## [2.10.25] - 2026-11-28
+
+### Fixed
+- **A slow plugin no longer holds up the others** (#45). Each plugin now has its own queue for receiver events, and
+  the plugins run in parallel. Before, a TV wake (up to 35 s) delayed Home Assistant and Hue. Each plugin still
+  gets its events in order.
+- **Plugins hear about volume and mute changes** (#45). The VolumeChanged event was never sent. Now it comes once
+  after the volume has rested for 0.4 s, so a slider drag or a fade is one event. The Home Assistant push uses it.
+- **All plugins stop at the same time at exit, and only once** (#45). One slow plugin no longer keeps the others
+  from writing their session end. Turning a plugin on or off from two places at once now starts or stops it once.
+  An action of a plugin that failed to start now says it is not running.
+- **A plugin's dashboard that fails no longer closes the app** (#44); the page shows why. A plugin that reports
+  audio sync wrongly can no longer stop the meter loop. A plugin DLL that loads nothing (or a duplicate) is
+  unloaded at once.
+- **A plugin built for a newer Plugin SDK is refused with a clear log line** (#69), not a crash later. A plugin
+  action that needs input (for example "Trigger HA Entity") now says what it needs, and where to run it, instead of
+  failing with "Missing ...". The Plugins page shows "AVR Control" for plugins that may control the receiver, and
+  the text above an enabled plugin without a dashboard no longer says "Enable this plugin".
+
+### Security
+- **Self-signed certificates are accepted only for LAN devices** (#64), now also for IPv6 LAN addresses,
+  169.254 link-local addresses and localhost; every plugin HTTP client keeps its connection limits.
+- **MCP clients can subscribe only to resources that exist** (#64), and only the room state is kept, so closed
+  sessions are forgotten.
+
 ## [2.10.24] - 2026-11-28
 
 ### Fixed

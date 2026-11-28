@@ -31,8 +31,14 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
       YouTube pump teardown order (only a stray warning) and a background log writer.
 - [ ] Verify PR 5 live: a jukebox FLAC plays to its end and the next one starts. Needs the user's OK (it plays
       media).
-- [ ] PR 6: plugin host: #44, #45, #69, the CreateHttpClient part of #64.
-- [ ] PR 7: Smart TV plugin: #34, #47, the Smart TV part of #68.
+- [x] PR 6: plugin host. #44, #45, #61, #64, #65 and #69 closed (the host and Plugins page parts, the MCP
+      subscription cleanup). Left as is: #44 F5 (scan only DLLs with a deps.json; a third-party plugin without one
+      would be skipped) and the plugin view dispose hook (#69 F3, a feature).
+- [ ] Not in PR 6: a parameter form on the Plugins page for actions that need input (#78).
+- [x] PR 7: Smart TV plugin. #34, #47 and #68 closed (with PR 6's per-plugin event queues, a TV wake no longer
+      delays the other plugins).
+- [ ] Verify PR 7 live (needs the user, it uses the TV): the screen preview and the trackpad still work (they now
+      check that the TV's addresses are on the LAN), and "Wake TV with the receiver" without a MAC wakes the TV.
 - [x] PR 8: YouTube and Cinema. #33, #51, #52 and #56 closed; the Cinema part of #53 and the clipboard, export and
       id parts of #71; the Cinema guard for #29.
 - [ ] Verify PR 8 in the app (needs the user, it plays media): Watch a YouTube track (Cinema opens once, after the
