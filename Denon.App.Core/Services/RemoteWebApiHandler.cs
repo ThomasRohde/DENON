@@ -18,6 +18,9 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
 {
     private const string HooksPrefix = "/api/hooks/";
 
+    /// <summary>The role of the webhook token: it may only call POST /api/hooks/{name}.</summary>
+    private const string WebhookRole = "webhook";
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly ReceiverController _receiverController;
@@ -113,6 +116,13 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
                     }, JsonOptions));
             }
 
+            var isWebhookCall = method.Equals("POST", StringComparison.OrdinalIgnoreCase) &&
+                                path.StartsWith(HooksPrefix, StringComparison.OrdinalIgnoreCase);
+            if (role == WebhookRole && !isWebhookCall)
+            {
+                return JsonError(403, "The webhook token only works for POST /api/hooks/{name}.");
+            }
+
             if (method.Equals("GET", StringComparison.OrdinalIgnoreCase) && path.Equals("/api/status", StringComparison.OrdinalIgnoreCase))
             {
                 return JsonOk(BuildStatusPayload(role));
@@ -140,14 +150,14 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
             }
 
             var lowerPath = path.ToLowerInvariant();
+            if (isWebhookCall && role is "owner" or WebhookRole)
+            {
+                return await HandleWebhookAsync(path[HooksPrefix.Length..], body, cancellationToken);
+            }
+
             if (role != "owner" && lowerPath != "/api/youtube/queue")
             {
                 return JsonError(403, "Owner access required for this control. Guests can search and queue YouTube tracks.");
-            }
-
-            if (lowerPath.StartsWith(HooksPrefix, StringComparison.Ordinal))
-            {
-                return await HandleWebhookAsync(path[HooksPrefix.Length..], body, cancellationToken);
             }
 
             using var doc = string.IsNullOrWhiteSpace(body)
@@ -503,6 +513,11 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
         if (SecureEquals(candidateToken, cfg.GuestToken))
         {
             return "guest";
+        }
+
+        if (SecureEquals(candidateToken, cfg.WebhookToken))
+        {
+            return WebhookRole;
         }
 
         return "none";

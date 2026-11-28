@@ -70,8 +70,6 @@ Each one needs the real devices, and most change them or play media, so they wai
 - [ ] Uninstall with "Launch at Windows startup" on: the startup entry is gone. The next in-app update downloads,
       starts and shows notes without the download list.
 - [ ] Insights with the real event log on the installed app.
-- [ ] After the next release: `%TEMP%\.net\Denon.App.Desktop\` keeps only the current folder, and the log says
-      "Deleted N old runtime extraction folders" (#94; tested only with a probe bundle).
 - [ ] Station logos: the Deck and the phone remote show the TuneIn logo for a saved station (DR P6 Beat).
 - [ ] Skins and windows: the first start on a small screen (1366 × 768, or 1920 × 1080 at 150 %) picks Compact; a
       second monitor with another scale opens at the right size; the tray flyout, Cinema window and the Chromecast
@@ -79,6 +77,10 @@ Each one needs the real devices, and most change them or play media, so they wai
 - [ ] iPhone: remove the old phone-remote icon, scan the QR code, add it to the Home Screen again, and open it.
 - [ ] MCP: the now-playing card's play/pause button, the cards in Claude Desktop, and which protocol version Claude
       Code and Claude Desktop choose.
+- [ ] #77 with real clients: an MCP call from Claude Code writes an audit line with the client name and 127.0.0.1;
+      a tool turned off on the Brain page disappears from the client's list after Save & Apply.
+- [ ] #77 iPhone: switch the "arrive home" Shortcut to the webhook token (Cast & Remote → WEBHOOK TOKEN), and check
+      it still runs; with LAN only on, it works on the home Wi-Fi and gets 403 over mobile data with a VPN.
 
 ## Decisions
 
@@ -106,7 +108,6 @@ Each one needs the real devices, and most change them or play media, so they wai
 
 ## Features (GitHub issues)
 
-- [ ] #77: MCP audit log, per-tool and per-plugin allow/deny, a scoped webhook token, and an optional LAN-only guard.
 - [ ] #78: shared plugin foundation: SDK WPF theming and skin helpers, a parameter form on the Plugins page for
       actions that need input, and shared DNS-SD and session logging for the external plugins.
 - [ ] #63: encrypt tokens, pairing keys and private keys at rest with Windows DPAPI (see Decisions).

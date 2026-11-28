@@ -159,6 +159,7 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<EventTelemetryMonitorService>();
             builder.Services.AddHostedService(sp => sp.GetRequiredService<EventTelemetryMonitorService>());
             builder.Services.AddSingleton<RoomIntelligenceService>();
+            builder.Services.AddSingleton(_ => new McpAuditLog(AppDataPaths.LogsDirectory));
             builder.Services.AddSingleton<DenonMcpServer>();
             builder.Services.AddSingleton<LyricsService>();
             builder.Services.AddSingleton<UpdateService>();

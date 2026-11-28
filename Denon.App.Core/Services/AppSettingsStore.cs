@@ -230,6 +230,7 @@ public sealed class AppSettingsStore
         sanitized.Mcp.BearerToken = RedactedSecretPlaceholder;
         sanitized.Remote.OwnerToken = RedactedSecretPlaceholder;
         sanitized.Remote.GuestToken = RedactedSecretPlaceholder;
+        sanitized.Remote.WebhookToken = RedactedSecretPlaceholder;
         return JsonSerializer.Serialize(sanitized, JsonOptions);
     }
 
@@ -257,6 +258,11 @@ public sealed class AppSettingsStore
             parsed.Remote.GuestToken = existing.Remote.GuestToken;
         }
 
+        if (IsRedactedOrEmpty(parsed.Remote.WebhookToken))
+        {
+            parsed.Remote.WebhookToken = existing.Remote.WebhookToken;
+        }
+
         // An import replaces the whole settings on purpose: it is written and ends a recovery.
         await CommitAsync(Normalize(parsed, seedDefaultsIfEmpty: false), endsRecovery: true, cancellationToken);
         _logStore.Info("Settings imported.");
@@ -280,9 +286,11 @@ public sealed class AppSettingsStore
             var tokensToSave = !rawJson.Contains("\"bearerToken\"", StringComparison.OrdinalIgnoreCase) ||
                                !rawJson.Contains("\"ownerToken\"", StringComparison.OrdinalIgnoreCase) ||
                                !rawJson.Contains("\"guestToken\"", StringComparison.OrdinalIgnoreCase) ||
+                               !rawJson.Contains("\"webhookToken\"", StringComparison.OrdinalIgnoreCase) ||
                                IsRedactedOrEmpty(settings.Mcp?.BearerToken) ||
                                IsRedactedOrEmpty(settings.Remote?.OwnerToken) ||
-                               IsRedactedOrEmpty(settings.Remote?.GuestToken);
+                               IsRedactedOrEmpty(settings.Remote?.GuestToken) ||
+                               IsRedactedOrEmpty(settings.Remote?.WebhookToken);
             var normalized = Normalize(settings, seedDefaultsIfEmpty: false);
             return (normalized, tokensToSave);
         }
@@ -454,6 +462,14 @@ public sealed class AppSettingsStore
             normalized.Remote.GuestToken = RemoteAccessSettings.GeneratePairingToken("gst");
         }
 
+        if (IsRedactedOrEmpty(normalized.Remote.WebhookToken))
+        {
+            normalized.Remote.WebhookToken = RemoteAccessSettings.GeneratePairingToken("hook");
+        }
+
+        normalized.Mcp.DeniedTools = NormalizeNames(normalized.Mcp.DeniedTools);
+        normalized.Mcp.DeniedPluginIds = NormalizeNames(normalized.Mcp.DeniedPluginIds);
+
         normalized.Telemetry ??= new TelemetrySettings();
         normalized.Telemetry.RetentionDays = Math.Clamp(normalized.Telemetry.RetentionDays, 7, 365);
         normalized.Telemetry.MediaDwellSeconds = Math.Clamp(normalized.Telemetry.MediaDwellSeconds, 5, 120);
@@ -486,12 +502,24 @@ public sealed class AppSettingsStore
         settings.Plugins ??= new PluginSettings();
         settings.Plugins.DisabledPluginIds ??= [];
         settings.Mcp ??= new McpServerSettings();
+        settings.Mcp.DeniedTools ??= [];
+        settings.Mcp.DeniedPluginIds ??= [];
         settings.Remote ??= new RemoteAccessSettings();
+        settings.Security ??= new SecuritySettings();
         settings.Telemetry ??= new TelemetrySettings();
         settings.VolumeMemory ??= new VolumeMemorySettings();
         settings.AutomationGraphs ??= AutomationGraph.CreateDefaults();
         settings.AutomationGraphs.RemoveAll(static g => g is null);
     }
+
+    /// <summary>Trimmed, without blanks or repeats (case-insensitive), sorted.</summary>
+    private static List<string> NormalizeNames(IEnumerable<string?>? names) =>
+        (names ?? [])
+            .Where(static n => !string.IsNullOrWhiteSpace(n))
+            .Select(static n => n!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
     private static bool IsRedactedOrEmpty(string? token) =>
         string.IsNullOrWhiteSpace(token) ||

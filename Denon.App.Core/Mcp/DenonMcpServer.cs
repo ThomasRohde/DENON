@@ -71,6 +71,10 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
     private readonly EventTelemetryLog _telemetry;
     private readonly VolumeMemoryStore _volumeMemory;
     private readonly AppLogStore _logStore;
+    private readonly McpAuditLog _auditLog;
+
+    // Filled by ASP.NET Core for each request: the tool calls read the caller's address from it.
+    private readonly HttpContextAccessor _httpContext = new();
 
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private readonly Lock _activityLock = new();
@@ -100,7 +104,8 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
         LyricsService lyricsService,
         EventTelemetryLog telemetry,
         VolumeMemoryStore volumeMemory,
-        AppLogStore logStore)
+        AppLogStore logStore,
+        McpAuditLog auditLog)
     {
         _settingsStore = settingsStore;
         _receiverController = receiverController;
@@ -115,10 +120,15 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
         _telemetry = telemetry;
         _volumeMemory = volumeMemory;
         _logStore = logStore;
+        _auditLog = auditLog;
 
         _intelligence.RoomGraphChanged += NotifyRoomStateUpdated;
         _pluginHost.PluginsChanged += SyncTools;
+        _settingsStore.SettingsChanged += OnSettingsChanged;
     }
+
+    /// <summary>The folder of the audit log files (logs\mcp-audit-*.jsonl).</summary>
+    public string AuditLogDirectory => _auditLog.Directory;
 
     public event Action? StatusChanged;
 
@@ -245,6 +255,7 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
         _disposed = true;
         _intelligence.RoomGraphChanged -= NotifyRoomStateUpdated;
         _pluginHost.PluginsChanged -= SyncTools;
+        _settingsStore.SettingsChanged -= OnSettingsChanged;
         await StopAsync();
         _lifecycleGate.Dispose();
     }
@@ -271,6 +282,7 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
             });
             builder.Logging.ClearProviders();
             builder.Logging.AddProvider(new AppLogLoggerProvider(_logStore));
+            builder.Services.AddSingleton<IHttpContextAccessor>(_httpContext);
             builder.WebHost.ConfigureKestrel(kestrel =>
             {
                 // Kestrel binds the LAN without the admin URL reservation HttpListener needed.
@@ -310,7 +322,9 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
                 .WithUnsubscribeFromResourcesHandler((request, _) => Unsubscribe(request.Server, request.Params?.Uri))
                 .WithListPromptsHandler((_, _) => ValueTask.FromResult(ListPrompts()))
                 .WithGetPromptHandler((request, _) => ValueTask.FromResult(GetPrompt(request.Params?.Name ?? string.Empty, request.Params?.Arguments)))
-                .WithCompleteHandler((request, _) => ValueTask.FromResult(Complete(request.Params?.Argument)));
+                .WithCompleteHandler((request, _) => ValueTask.FromResult(Complete(request.Params?.Argument)))
+                // A tool that is not in the collection: turned off (a clear refusal), or unknown.
+                .WithCallToolHandler((request, _) => ValueTask.FromResult(CallMissingTool(request)));
 
             app = builder.Build();
             app.UseCors();
@@ -409,6 +423,14 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
     /// </summary>
     private async Task GuardAsync(HttpContext context, RequestDelegate next)
     {
+        if (LanAddressGuard.Refuses(_settingsStore.Current.Security.LanOnly, context.Connection.RemoteIpAddress))
+        {
+            LogActivity("auth", $"{context.Request.Method} {context.Request.Path} from {context.Connection.RemoteIpAddress}", "Blocked (LAN only)", 0);
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(new { error = LanAddressGuard.RefusalMessage });
+            return;
+        }
+
         if (!IsAllowedHost(context.Request.Host.Host, _settingsStore.Current.Mcp.AllowLanConnections))
         {
             LogActivity("auth", $"{context.Request.Method} {context.Request.Path} for host {context.Request.Host}", "Blocked (403)", 0);
@@ -462,33 +484,13 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
 
         if (IPAddress.TryParse(name.Trim('[', ']'), out var address))
         {
-            return IPAddress.IsLoopback(address) || (allowLan && IsPrivateOrLinkLocal(address));
+            return IPAddress.IsLoopback(address) || (allowLan && LanAddressGuard.IsLocalNetwork(address));
         }
 
         var machine = Environment.MachineName;
         return allowLan &&
                (name.Equals(machine, StringComparison.OrdinalIgnoreCase) ||
                 name.Equals(machine + ".local", StringComparison.OrdinalIgnoreCase));
-    }
-
-    /// <summary>A LAN address: 10/8, 172.16/12, 192.168/16, 169.254/16, or IPv6 unique-local and link-local.</summary>
-    private static bool IsPrivateOrLinkLocal(IPAddress address)
-    {
-        if (address.IsIPv4MappedToIPv6)
-        {
-            address = address.MapToIPv4();
-        }
-
-        if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-        {
-            var b = address.GetAddressBytes();
-            return b[0] == 10 ||
-                   (b[0] == 172 && b[1] is >= 16 and <= 31) ||
-                   (b[0] == 192 && b[1] == 168) ||
-                   (b[0] == 169 && b[1] == 254);
-        }
-
-        return address.IsIPv6LinkLocal || address.IsIPv6UniqueLocal;
     }
 
     /// <summary>No Origin (a native client), or a page on this PC (localhost, 127.0.0.1, [::1]).</summary>
@@ -553,35 +555,119 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
         }
     }
 
+    /// <summary>A deny switch changed: list the tools again (the SDK tells the sessions when the list changed).</summary>
+    private void OnSettingsChanged(AppSettings settings) => SyncTools();
+
     private static bool SameDefinition(Tool a, Tool b) =>
         JsonSerializer.Serialize(a, McpJsonUtilities.DefaultOptions) == JsonSerializer.Serialize(b, McpJsonUtilities.DefaultOptions);
 
-    /// <summary>One tool call: run it, log it, and turn the app's errors into MCP results or protocol errors.</summary>
-    private async ValueTask<CallToolResult> CallToolAsync(string toolName, IDictionary<string, JsonElement>? arguments, CancellationToken ct)
+    /// <summary>
+    /// One tool call: refuse it when the tool is turned off, run it, and turn the app's errors into MCP results or
+    /// protocol errors. Each call goes to the live activity feed and (when on) the audit log.
+    /// </summary>
+    private async ValueTask<CallToolResult> CallToolAsync(RequestContext<CallToolRequestParams> request, string toolName, CancellationToken ct)
     {
+        if (IsToolDenied(toolName))
+        {
+            return RefuseDeniedTool(request, toolName);
+        }
+
+        var arguments = request.Params?.Arguments;
         var args = arguments is null ? default : JsonSerializer.SerializeToElement(arguments, McpJsonUtilities.DefaultOptions);
         var sw = Stopwatch.StartNew();
         try
         {
             var result = await HandleToolCallAsync(toolName, args, ct);
-            LogActivity("tools/call", toolName, result.IsError == true ? "Error" : "OK", sw.ElapsedMilliseconds);
+            var failed = result.IsError == true;
+            LogActivity("tools/call", toolName, failed ? "Error" : "OK", sw.ElapsedMilliseconds);
+            Audit(request, toolName, failed ? McpAuditOutcome.Error : McpAuditOutcome.Ok, sw.ElapsedMilliseconds);
             return result;
         }
         catch (UnauthorizedAccessException ex)
         {
             LogActivity("tools/call", $"{toolName}: {ex.Message}", "Blocked (Tier)", sw.ElapsedMilliseconds);
+            Audit(request, toolName, McpAuditOutcome.Refused, sw.ElapsedMilliseconds);
             return BuildToolError(ex.Message);
         }
         catch (McpInvalidParamsException ex)
         {
             LogActivity("tools/call", $"{toolName}: {ex.Message}", "Invalid Params", sw.ElapsedMilliseconds);
+            Audit(request, toolName, McpAuditOutcome.Error, sw.ElapsedMilliseconds);
             throw new McpProtocolException(ex.Message, McpErrorCode.InvalidParams);
         }
-        catch (Exception ex) when (ex is not (OperationCanceledException or McpException))
+        catch (OperationCanceledException)
+        {
+            Audit(request, toolName, McpAuditOutcome.Error, sw.ElapsedMilliseconds);
+            throw;
+        }
+        catch (Exception ex) when (ex is not McpException)
         {
             LogActivity("tools/call", $"{toolName}: {ex.Message}", "Error", sw.ElapsedMilliseconds);
+            Audit(request, toolName, McpAuditOutcome.Error, sw.ElapsedMilliseconds);
             return BuildToolError(ex.Message);
         }
+    }
+
+    /// <summary>A call to a name that is not listed: a tool that is turned off gets a refusal, others are unknown.</summary>
+    private CallToolResult CallMissingTool(RequestContext<CallToolRequestParams> request)
+    {
+        var toolName = request.Params?.Name ?? string.Empty;
+        if (toolName.Length > 0 && IsToolDenied(toolName))
+        {
+            return RefuseDeniedTool(request, toolName);
+        }
+
+        LogActivity("tools/call", $"{toolName}: unknown tool", "Unknown", 0);
+        Audit(request, toolName, McpAuditOutcome.Error, 0);
+        throw new McpProtocolException($"Unknown tool: '{toolName}'", McpErrorCode.InvalidParams);
+    }
+
+    private CallToolResult RefuseDeniedTool(RequestContext<CallToolRequestParams> request, string toolName)
+    {
+        LogActivity("tools/call", $"{toolName}: turned off", "Blocked (Off)", 0);
+        Audit(request, toolName, McpAuditOutcome.Refused, 0);
+        return BuildToolError(McpToolAccess.RefusalMessage(toolName));
+    }
+
+    /// <summary>True when the tool is turned off by name, or it belongs to a plugin whose tools are off.</summary>
+    private bool IsToolDenied(string toolName)
+    {
+        var cfg = _settingsStore.Current.Mcp;
+        if (McpToolAccess.IsDenied(cfg, toolName))
+        {
+            return true;
+        }
+
+        return toolName.StartsWith("plugin_", StringComparison.OrdinalIgnoreCase) &&
+               _pluginHost.GetPlugins().Any(p => McpToolAccess.IsPluginDenied(cfg, p.Id) &&
+                                                 p.Actions.Any(a => BuildPluginToolName(p.Id, a.ActionId).Equals(toolName, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    /// <summary>
+    /// A line in the audit log (when on): the caller's address and client name, the tool, the argument names (not
+    /// their values) and the outcome.
+    /// </summary>
+    private void Audit(RequestContext<CallToolRequestParams> request, string toolName, string outcome, long durationMs)
+    {
+        if (!_settingsStore.Current.Mcp.AuditLogEnabled)
+        {
+            return;
+        }
+
+        var address = _httpContext.HttpContext?.Connection.RemoteIpAddress;
+        if (address is { IsIPv4MappedToIPv6: true })
+        {
+            address = address.MapToIPv4();
+        }
+
+        _auditLog.Write(new McpAuditEntry(
+            DateTimeOffset.UtcNow,
+            address?.ToString(),
+            request.Server?.ClientInfo?.Name,
+            toolName,
+            McpAuditLog.ArgumentKeysOf(request.Params?.Arguments?.Keys),
+            outcome,
+            durationMs));
     }
 
     /// <summary>A Denon Desktop tool in the SDK's collection: its definition, and the call goes to the server.</summary>
@@ -592,7 +678,7 @@ public sealed partial class DenonMcpServer : IAsyncDisposable
         public override IReadOnlyList<object> Metadata { get; } = [];
 
         public override ValueTask<CallToolResult> InvokeAsync(RequestContext<CallToolRequestParams> request, CancellationToken cancellationToken = default) =>
-            owner.CallToolAsync(ProtocolTool.Name, request.Params?.Arguments, cancellationToken);
+            owner.CallToolAsync(request, ProtocolTool.Name, cancellationToken);
     }
 
     // ---------------------------------------------------------------- resource updates

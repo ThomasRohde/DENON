@@ -70,6 +70,15 @@ public sealed partial class MainViewModel : ObservableObject
     private string _inputSourceCode = string.Empty;
     private string _inputSourceDisplay = "—";
     private string _soundMode = "—";
+    private string _soundModeNote = string.Empty;
+    private SoundModeItem? _soundModeShortcut; // the last shortcut pressed, while its note shows
+    private string? _soundModeShortcutInput; // the input it was pressed on; another input clears the note
+    private long _soundModeShortcutAt; // Environment.TickCount64 of the press
+    private string? _soundModeShortcutChoice; // the mode the receiver reported after the press
+
+    // The receiver picks its mode within a few seconds of a shortcut. A mode change after this comes from
+    // somewhere else (a scene, an automation, MCP, the receiver's remote) and clears the note.
+    private const long SoundModeShortcutWindowMs = 10_000;
     private string _ecoMode = "—";
     private int? _sleepTimerMinutes;
     private string _nowPlayingTitle = "Ready for Playback";
@@ -193,7 +202,9 @@ public sealed partial class MainViewModel : ObservableObject
             DenonCatalog.InputSources.Select(static opt => new InputSourceItem(opt.Code, opt.DisplayName, opt.ShortLabel)));
 
         SoundModes = new ObservableCollection<SoundModeItem>(
-            DenonCatalog.SoundModes.Select(static opt => new SoundModeItem(opt.Code, opt.DisplayName)));
+            DenonCatalog.SoundModes.Select(static opt => new SoundModeItem(opt.Code, opt.DisplayName, opt.ReceiverChooses)));
+        ExactSoundModes = SoundModes.Where(static m => !m.ReceiverChooses).ToArray();
+        ReceiverChoiceSoundModes = SoundModes.Where(static m => m.ReceiverChooses).ToArray();
 
         SleepTimerOptions =
         [
@@ -354,6 +365,19 @@ public sealed partial class MainViewModel : ObservableObject
     public ObservableCollection<DiscoveredReceiver> DiscoveredReceivers { get; }
     public ObservableCollection<InputSourceItem> InputSources { get; }
     public ObservableCollection<SoundModeItem> SoundModes { get; }
+
+    /// <summary>The modes the receiver plays as named (Stereo, Multi-Ch Stereo, Direct, Pure Direct).</summary>
+    public IReadOnlyList<SoundModeItem> ExactSoundModes { get; }
+
+    /// <summary>The shortcuts where the receiver picks the mode (Auto, Movie, Music, Game).</summary>
+    public IReadOnlyList<SoundModeItem> ReceiverChoiceSoundModes { get; }
+
+    /// <summary>After a shortcut: which mode the receiver picked. Empty otherwise.</summary>
+    public string SoundModeNote
+    {
+        get => _soundModeNote;
+        private set => SetProperty(ref _soundModeNote, value);
+    }
     public ObservableCollection<VolumePresetItem> VolumePresets { get; }
     public ObservableCollection<SleepTimerOption> SleepTimerOptions { get; }
     public ObservableCollection<AppLogEntry> LogEntries { get; }
@@ -1284,8 +1308,11 @@ public sealed partial class MainViewModel : ObservableObject
             var normalizedSoundMode = (status.SoundMode ?? string.Empty).Trim().ToUpperInvariant();
             foreach (var modeItem in SoundModes)
             {
-                modeItem.IsActive = SoundModeMatches(normalizedSoundMode, modeItem.Code);
+                // A shortcut never lights up: the receiver reports the mode it picked, not "MUSIC".
+                modeItem.IsActive = !modeItem.ReceiverChooses && SoundModeMatches(normalizedSoundMode, modeItem.Code);
             }
+
+            UpdateSoundModeNote(status.SoundMode, status.InputSource);
 
             foreach (var sleepOption in SleepTimerOptions)
             {
@@ -1656,9 +1683,72 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        await ExecuteReceiverActionAsync(
+        var shortcut = parameter as SoundModeItem is { ReceiverChooses: true } item2 ? item2 : null;
+        ClearSoundModeShortcut();
+        _soundModeShortcut = shortcut;
+        _soundModeShortcutInput = InputSourceCode;
+        _soundModeShortcutAt = Environment.TickCount64;
+
+        var sent = await ExecuteReceiverActionAsync(
             () => _receiverController.SetSoundModeAsync(code),
             $"Sound mode set to {code}.");
+
+        if (!sent)
+        {
+            // The receiver did not get the shortcut: its current mode is not its choice.
+            ClearSoundModeShortcut();
+            return;
+        }
+
+        // The receiver may pick its mode a moment later; the status updates refresh the note until then.
+        UpdateSoundModeNote(SoundMode == "—" ? null : SoundMode, InputSourceCode); // "—": no mode reported yet
+    }
+
+    /// <summary>
+    /// Shows which mode the receiver picked for the last shortcut (Auto, Movie, Music, Game). A real mode, or
+    /// another input, clears it.
+    /// </summary>
+    private void UpdateSoundModeNote(string? reportedMode, string? input)
+    {
+        if (_soundModeShortcut is not { } shortcut)
+        {
+            return;
+        }
+
+        if (_soundModeShortcutInput is not null && input is not null &&
+            !string.Equals(_soundModeShortcutInput, input, StringComparison.OrdinalIgnoreCase))
+        {
+            ClearSoundModeShortcut();
+            return;
+        }
+
+        var mode = string.IsNullOrWhiteSpace(reportedMode) ? null : reportedMode.Trim();
+        if (Environment.TickCount64 - _soundModeShortcutAt > SoundModeShortcutWindowMs)
+        {
+            // The receiver has made its choice. Another mode now comes from somewhere else.
+            if (mode is not null && !string.Equals(mode, _soundModeShortcutChoice, StringComparison.OrdinalIgnoreCase))
+            {
+                ClearSoundModeShortcut();
+            }
+
+            return;
+        }
+
+        if (mode is not null)
+        {
+            _soundModeShortcutChoice = mode;
+        }
+
+        SoundModeNote = DenonCatalog.ReceiverChoiceNote(shortcut.DisplayName, mode) ?? string.Empty;
+    }
+
+    /// <summary>Forgets the last shortcut and hides its note.</summary>
+    private void ClearSoundModeShortcut()
+    {
+        _soundModeShortcut = null;
+        _soundModeShortcutInput = null;
+        _soundModeShortcutChoice = null;
+        SoundModeNote = string.Empty;
     }
 
     private async Task SetEcoModeAsync(object? parameter)
@@ -2483,17 +2573,20 @@ public sealed partial class MainViewModel : ObservableObject
         return true;
     }
 
-    private async Task ExecuteReceiverActionAsync(Func<Task<ReceiverStatus>> action, string successMessage)
+    /// <summary>Runs a receiver command and shows the result. False when the command failed.</summary>
+    private async Task<bool> ExecuteReceiverActionAsync(Func<Task<ReceiverStatus>> action, string successMessage)
     {
         try
         {
             await action();
             StatusMessage = successMessage;
+            return true;
         }
         catch (Exception exception)
         {
             LastError = exception.Message;
             StatusMessage = exception.Message;
+            return false;
         }
     }
 

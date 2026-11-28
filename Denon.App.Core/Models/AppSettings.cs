@@ -16,6 +16,8 @@ public sealed class AppSettings
 
     public RemoteAccessSettings Remote { get; set; } = new();
 
+    public SecuritySettings Security { get; set; } = new();
+
     public TelemetrySettings Telemetry { get; set; } = new();
 
     public VolumeMemorySettings VolumeMemory { get; set; } = new();
@@ -32,6 +34,7 @@ public sealed class AppSettings
             Plugins = Plugins.Clone(),
             Mcp = Mcp.Clone(),
             Remote = Remote.Clone(),
+            Security = Security.Clone(),
             Telemetry = Telemetry.Clone(),
             VolumeMemory = VolumeMemory.Clone(),
             AutomationGraphs = AutomationGraphs.Select(static a => a.Clone()).ToList(),
@@ -301,6 +304,9 @@ public sealed class RemoteAccessSettings
 
     public string GuestToken { get; set; } = string.Empty;
 
+    /// <summary>Works only for POST /api/hooks/{name}, so an iPhone Shortcut need not hold the owner token.</summary>
+    public string WebhookToken { get; set; } = string.Empty;
+
     public RemoteAccessSettings Clone() =>
         new()
         {
@@ -308,6 +314,7 @@ public sealed class RemoteAccessSettings
             RequirePairing = RequirePairing,
             OwnerToken = OwnerToken,
             GuestToken = GuestToken,
+            WebhookToken = WebhookToken,
         };
 
     public static string GeneratePairingToken(string prefix = "own")
@@ -315,4 +322,16 @@ public sealed class RemoteAccessSettings
         var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(12);
         return $"{prefix}_{Convert.ToHexString(bytes).ToLowerInvariant()}";
     }
+}
+
+/// <summary>Network rules shared by the Phone Remote server (:18925) and the MCP server (:18926).</summary>
+public sealed class SecuritySettings
+{
+    /// <summary>
+    /// Answer only this PC and the local network: loopback, private (10/8, 172.16/12, 192.168/16), link-local, and
+    /// IPv6 unique-local addresses. Others get 403. Off by default.
+    /// </summary>
+    public bool LanOnly { get; set; }
+
+    public SecuritySettings Clone() => new() { LanOnly = LanOnly };
 }

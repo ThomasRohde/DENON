@@ -106,7 +106,12 @@ public sealed record StreamProbeResult(
 
 public sealed record AvrInputOption(string Code, string DisplayName, string ShortLabel);
 
-public sealed record AvrSoundModeOption(string Code, string DisplayName);
+/// <summary>
+/// A sound mode button. <paramref name="ReceiverChooses"/>: a shortcut (Auto, Movie, Music, Game) that asks the
+/// receiver to pick a mode of that family for the source; the receiver then reports the mode it picked (for a
+/// 2-channel source often Stereo), never the shortcut's own name.
+/// </summary>
+public sealed record AvrSoundModeOption(string Code, string DisplayName, bool ReceiverChooses = false);
 
 public static class DenonCatalog
 {
@@ -127,15 +132,37 @@ public static class DenonCatalog
 
     public static IReadOnlyList<AvrSoundModeOption> SoundModes { get; } =
     [
-        new("AUTO", "Auto"),
         new("STEREO", "Stereo"),
+        new("MCH STEREO", "Multi-Ch Stereo"),
         new("DIRECT", "Direct"),
         new("PURE DIRECT", "Pure Direct"),
-        new("MOVIE", "Movie"),
-        new("MUSIC", "Music"),
-        new("GAME", "Game"),
-        new("MCH STEREO", "Multi-Ch Stereo"),
+        new("AUTO", "Auto", ReceiverChooses: true),
+        new("MOVIE", "Movie", ReceiverChooses: true),
+        new("MUSIC", "Music", ReceiverChooses: true),
+        new("GAME", "Game", ReceiverChooses: true),
     ];
+
+    /// <summary>A readable name for a mode the receiver reports ("MCH STEREO" → "Multi-Ch Stereo").</summary>
+    public static string DescribeSoundMode(string? reported)
+    {
+        var mode = (reported ?? string.Empty).Trim();
+        if (mode.Length == 0)
+        {
+            return "an unknown mode";
+        }
+
+        var known = SoundModes.FirstOrDefault(m => !m.ReceiverChooses && string.Equals(m.Code, mode, StringComparison.OrdinalIgnoreCase));
+        return known?.DisplayName ?? mode;
+    }
+
+    /// <summary>
+    /// The line under the sound mode buttons after a shortcut: which mode the receiver picked. Null when the receiver
+    /// has not reported a mode yet.
+    /// </summary>
+    public static string? ReceiverChoiceNote(string shortcutName, string? reportedMode) =>
+        string.IsNullOrWhiteSpace(reportedMode)
+            ? null
+            : $"{shortcutName}: the receiver chose {DescribeSoundMode(reportedMode)} for this source.";
 
     /// <summary>
     /// The sources Zone 2 can play, for the pickers. SOURCE follows the main zone's input. The receiver takes the

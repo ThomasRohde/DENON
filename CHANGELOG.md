@@ -22,6 +22,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The receiver link learned the Denon commands `PSREFLEV`, `PSCINEMA EQ.`, `PSDRC`, `PSLOM`, `PSLFE` and `PSDELAY` (read
   and write, through the profiles only), and refuses any command over Denon's 135-byte limit.
 
+## [2.10.35] - 2026-11-28
+
+### Added
+- **MCP audit log** (#77): one JSON line per tool call in `logs\mcp-audit-*.jsonl` with the time, the caller's
+  address, the client name, the tool, the argument names, the outcome (`ok`, `refused`, `error`) and the duration.
+  It never holds argument values or tokens. A new file starts each day or at 1 MB, and the newest 7 are kept. It is
+  on by default (Brain page → "Keep an audit log of tool calls", with Open Folder); the live feed stays as it was.
+- **Tool access switches** (#77) on the Brain page, on top of the permission tiers: turn off single tools, or all
+  tools of one plugin. A tool that is off is not listed, and a call to it gets a clear refusal. `apply_atmosphere`
+  is refused when it would use a plugin that is off.
+- **Webhook token** (#77): a token that can only call `POST /api/hooks/{name}`, so an iPhone Shortcut no longer needs
+  the owner token. Show, Copy and Regenerate it on the Cast & Remote page. The owner token still works for webhooks.
+- **LAN only** (#77, off by default): the Phone Remote server (:18925) and the MCP server (:18926) refuse addresses
+  outside this PC and the local network (loopback, private, link-local and IPv6 unique-local are allowed; IPv4-mapped
+  IPv6 counts as IPv4). The switch is on the Cast & Remote page and the Brain page.
+
+## [2.10.34] - 2026-11-28
+
+### Changed
+- **The Input Source and Sound Mode cards on the Control Deck have the same layout**: four equal columns, the same
+  button size and the same header. A long name ends in "…" and shows in full in its tooltip.
+- **The Sound Mode card has two groups.** Stereo, Multi-Ch Stereo, Direct and Pure Direct light up when the receiver
+  plays them. Auto, Movie, Music and Game are under "Let the receiver choose": they ask the receiver to pick a mode of
+  that kind for the source, so they never light up (for a 2-channel source such as HEOS radio the receiver often
+  keeps Stereo, which made "Music" look broken). After you press one, a line says what the receiver chose, for
+  example "Music: the receiver chose Stereo for this source." Another input or a real mode clears the line.
+
 ## [2.10.33] - 2026-11-28
 
 ### Fixed

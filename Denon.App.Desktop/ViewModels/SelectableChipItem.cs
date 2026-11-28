@@ -31,11 +31,15 @@ public sealed class SoundModeItem : ObservableObject
 {
     private bool _isActive;
 
-    public SoundModeItem(string code, string displayName)
+    public SoundModeItem(string code, string displayName, bool receiverChooses = false)
     {
         Code = code;
         DisplayName = displayName;
+        ReceiverChooses = receiverChooses;
     }
+
+    /// <summary>Auto, Movie, Music or Game: the receiver picks the mode, so this button never lights up.</summary>
+    public bool ReceiverChooses { get; }
 
     public string Code { get; }
 
