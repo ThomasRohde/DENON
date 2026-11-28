@@ -37,6 +37,14 @@ public sealed record AvrLiveState
 
     public bool? IsZone2On { get; init; }
 
+    /// <summary>Zone 2 volume on the receiver's 0–98 scale ("Z240" is 40).</summary>
+    public int? Zone2Volume { get; init; }
+
+    /// <summary>Zone 2 source code ("Z2TV" is TV, "Z2SOURCE" follows the main zone).</summary>
+    public string? Zone2Source { get; init; }
+
+    public bool? IsZone2Muted { get; init; }
+
     /// <summary>
     /// The newest acoustic line (PS* and DIM) for each setting, for example "PSDYNEQ" → "PSDYNEQ OFF". The newest line
     /// for a setting is its real value, so <see cref="ApplyAcousticsTo"/> can apply them in any order.
@@ -113,8 +121,7 @@ public sealed record AvrLiveState
 
         if (line.StartsWith("Z2", StringComparison.OrdinalIgnoreCase))
         {
-            // Only the power line: Z2TV is the zone's source and Z240 its volume.
-            return OnOff(line, "Z2ON", "Z2OFF") is { } on ? this with { IsZone2On = on } : this;
+            return ApplyZone2(line);
         }
 
         if (line.StartsWith("MS", StringComparison.OrdinalIgnoreCase))
@@ -145,7 +152,37 @@ public sealed record AvrLiveState
         EcoMode = EcoMode ?? status.EcoMode,
         SleepTimerMinutes = HasSleepTimer ? SleepTimerMinutes : status.SleepTimerMinutes,
         IsZone2On = IsZone2On ?? status.IsZone2On,
+        Zone2Volume = Zone2Volume ?? status.Zone2Volume,
+        Zone2Source = Zone2Source ?? status.Zone2Source,
+        IsZone2Muted = IsZone2Muted ?? status.IsZone2Muted,
     };
+
+    /// <summary>
+    /// One Zone 2 line: power (Z2ON, Z2OFF), mute (Z2MUON, Z2MUOFF), volume (Z240, or Z2405 for a half step) or
+    /// source (Z2TV). Other Z2 lines (channel setting, tone, sleep, Quick Select) leave the state as it is.
+    /// </summary>
+    private AvrLiveState ApplyZone2(string line)
+    {
+        if (OnOff(line, "Z2ON", "Z2OFF") is { } on)
+        {
+            return this with { IsZone2On = on };
+        }
+
+        if (OnOff(line, "Z2MUON", "Z2MUOFF") is { } muted)
+        {
+            return this with { IsZone2Muted = muted };
+        }
+
+        var value = line[2..].Trim();
+        if (value.Length is 2 or 3 && value.All(char.IsAsciiDigit))
+        {
+            return DenonAvrClient.TryParseDenonVolumeToken(value, out var volume, out _)
+                ? this with { Zone2Volume = volume }
+                : this;
+        }
+
+        return DenonCatalog.IsZone2SourceCode(value) ? this with { Zone2Source = value.ToUpperInvariant() } : this;
+    }
 
     /// <summary>
     /// Reads one acoustic line (PS* and DIM) into <paramref name="acoustics"/>. Returns the same instance for any other

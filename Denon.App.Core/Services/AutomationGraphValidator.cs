@@ -132,13 +132,24 @@ public static partial class AutomationGraphValidator
                 var value = node.Get("value");
                 switch (command)
                 {
-                    case "volume" when !int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var volume) || volume is < 0 or > 98:
+                    case "volume" or "zone2_volume" or "group_volume"
+                        when !int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var volume) || volume is < 0 or > 98:
                         problems.Add(new(node.Id, "Receiver: the volume must be a whole number from 0 to 98."));
                         break;
                     case "input" or "sound_mode" when value.Length == 0:
                         problems.Add(new(node.Id, $"Receiver: fill in the {(command == "input" ? "input code" : "sound mode")}."));
                         break;
-                    case "" or "power_on" or "power_off" or "mute" or "unmute" or "volume" or "input" or "sound_mode":
+                    case "zone2_source" when !DenonCatalog.IsZone2SourceCode(value):
+                        problems.Add(new(node.Id, value.Length == 0
+                            ? "Receiver: choose the Zone 2 source."
+                            : $"Receiver: '{value}' is not a Zone 2 source."));
+                        break;
+                    case "group_with" when !value.Split(',').Any(static v => v.Trim().Length > 0):
+                        problems.Add(new(node.Id, "Receiver: name the HEOS players to group with, comma-separated."));
+                        break;
+                    case "" or "power_on" or "power_off" or "mute" or "unmute" or "volume" or "input" or "sound_mode" or
+                         "zone2_on" or "zone2_off" or "zone2_volume" or "zone2_source" or "zone2_mute" or "zone2_unmute" or
+                         "group_with" or "ungroup" or "group_volume":
                         break;
                     default:
                         problems.Add(new(node.Id, $"Receiver: unknown command '{command}'."));

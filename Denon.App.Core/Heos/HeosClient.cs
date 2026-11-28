@@ -39,6 +39,10 @@ public sealed class HeosClient : IDisposable
         return players.Select(MapPlayer).ToList();
     }
 
+    /// <summary>The HEOS player this app controls (the receiver, by name or address).</summary>
+    public Task<ReceiverPlayerInfo> GetOwnPlayerAsync(ReceiverSettings settings, CancellationToken cancellationToken) =>
+        ResolvePlayerAsync(settings, cancellationToken);
+
     public async Task<ReceiverStatus> GetStatusAsync(ReceiverSettings settings, CancellationToken cancellationToken)
     {
         var player = await ResolvePlayerAsync(settings, cancellationToken);
@@ -137,6 +141,133 @@ public sealed class HeosClient : IDisposable
         await Task.Delay(700, cancellationToken);
         return await GetStatusAsync(settings, player, cancellationToken);
     }
+
+    /// <summary>The multi-room groups (heos://group/get_groups), without their volume.</summary>
+    public async Task<IReadOnlyList<HeosGroup>> GetGroupsAsync(ReceiverSettings settings, CancellationToken cancellationToken)
+    {
+        var response = await SendCommandAsync(settings, "heos://group/get_groups", DefaultCommandTimeout, cancellationToken);
+        EnsureSuccess(response);
+        return response.Payload is { } payload ? ParseGroups(payload) : [];
+    }
+
+    /// <summary>
+    /// Makes a group: the first player leads, the others join it. A group that exists with this leader changes to these
+    /// members. One player alone ends the group it leads.
+    /// </summary>
+    public async Task SetGroupAsync(ReceiverSettings settings, IReadOnlyList<int> playerIds, CancellationToken cancellationToken) =>
+        EnsureSuccess(await SendCommandAsync(settings, SetGroupCommand(playerIds), AsyncCommandTimeout, cancellationToken));
+
+    /// <summary>The group's volume (0–100) and mute.</summary>
+    public async Task<(int Volume, bool IsMuted)> GetGroupVolumeAsync(ReceiverSettings settings, int groupId, CancellationToken cancellationToken)
+    {
+        var volume = await SendCommandAsync(settings, $"heos://group/get_volume?gid={groupId}", DefaultCommandTimeout, cancellationToken);
+        var mute = await SendCommandAsync(settings, $"heos://group/get_mute?gid={groupId}", DefaultCommandTimeout, cancellationToken);
+        EnsureSuccess(volume);
+        EnsureSuccess(mute);
+        var level = volume.MessageFields.TryGetValue("level", out var raw) && int.TryParse(raw, out var parsed) ? parsed : 0;
+        var muted = mute.MessageFields.TryGetValue("state", out var state) && string.Equals(state, "on", StringComparison.OrdinalIgnoreCase);
+        return (level, muted);
+    }
+
+    /// <summary>Sets the group's volume (0–100). The caller applies the safe-volume limit.</summary>
+    public async Task SetGroupVolumeAsync(ReceiverSettings settings, int groupId, int level, CancellationToken cancellationToken) =>
+        EnsureSuccess(await SendCommandAsync(settings, GroupVolumeCommand(groupId, level), DefaultCommandTimeout, cancellationToken));
+
+    public async Task SetGroupMuteAsync(ReceiverSettings settings, int groupId, bool isMuted, CancellationToken cancellationToken) =>
+        EnsureSuccess(await SendCommandAsync(
+            settings,
+            $"heos://group/set_mute?gid={groupId}&state={(isMuted ? "on" : "off")}",
+            DefaultCommandTimeout,
+            cancellationToken));
+
+    /// <summary>"heos://group/set_group?pid=leader,member,…". Each player once; at least one.</summary>
+    internal static string SetGroupCommand(IReadOnlyList<int> playerIds)
+    {
+        if (playerIds.Count == 0)
+        {
+            throw new ArgumentException("A group needs at least one player.", nameof(playerIds));
+        }
+
+        if (playerIds.Distinct().Count() != playerIds.Count)
+        {
+            throw new ArgumentException("A player can be in a group only once.", nameof(playerIds));
+        }
+
+        return $"heos://group/set_group?pid={string.Join(',', playerIds.Select(static p => p.ToString(System.Globalization.CultureInfo.InvariantCulture)))}";
+    }
+
+    /// <summary>"heos://group/set_volume?gid=…&amp;level=…", the level 0–100.</summary>
+    internal static string GroupVolumeCommand(int groupId, int level)
+    {
+        if (level is < 0 or > 100)
+        {
+            throw new ArgumentOutOfRangeException(nameof(level), "Group volume must be between 0 and 100.");
+        }
+
+        return $"heos://group/set_volume?gid={groupId}&level={level}";
+    }
+
+    /// <summary>
+    /// Reads the get_groups payload. HEOS sends the ids as numbers or as strings, depending on the firmware; a group or
+    /// player without a readable id is left out.
+    /// </summary>
+    public static IReadOnlyList<HeosGroup> ParseGroups(JsonElement payload)
+    {
+        if (payload.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var groups = new List<HeosGroup>();
+        foreach (var item in payload.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object || ReadId(item, "gid") is not int groupId)
+            {
+                continue;
+            }
+
+            var members = new List<HeosGroupMember>();
+            if (item.TryGetProperty("players", out var players) && players.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var player in players.EnumerateArray())
+                {
+                    if (player.ValueKind != JsonValueKind.Object || ReadId(player, "pid") is not int playerId)
+                    {
+                        continue;
+                    }
+
+                    members.Add(new HeosGroupMember(
+                        playerId,
+                        ReadString(player, "name"),
+                        string.Equals(ReadString(player, "role"), "leader", StringComparison.OrdinalIgnoreCase)));
+                }
+            }
+
+            // The leader first, then the members in the speaker's order.
+            members = [.. members.OrderByDescending(static m => m.IsLeader)];
+            groups.Add(new HeosGroup(groupId, ReadString(item, "name"), members));
+        }
+
+        return groups;
+    }
+
+    private static int? ReadId(JsonElement element, string name)
+    {
+        if (!element.TryGetProperty(name, out var value))
+        {
+            return null;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.Number when value.TryGetInt32(out var number) => number,
+            JsonValueKind.String when int.TryParse(value.GetString(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var parsed) => parsed,
+            _ => null,
+        };
+    }
+
+    private static string ReadString(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? string.Empty : string.Empty;
 
     public static string FormatStreamUrlForHeos(string url) =>
         url.Trim()

@@ -6,6 +6,9 @@ namespace Denon.App.Core.Services;
 public sealed class ReceiverController
 {
     private readonly SemaphoreSlim _commandGate = new(1, 1);
+
+    /// <summary>Held for a whole groups read (see <see cref="RefreshHeosGroupsAsync"/>). Never taken before the command gate.</summary>
+    private readonly SemaphoreSlim _groupsReadGate = new(1, 1);
     private readonly HeosClient _heosClient;
     private readonly DenonAvrClient _avrClient;
     private readonly AppSettingsStore _settingsStore;
@@ -153,6 +156,205 @@ public sealed class ReceiverController
             logSuccess: true,
             logFailures: true,
             cancellationToken);
+
+    /// <summary>Zone 2 volume on the receiver's 0–98 scale. MCP, automations and scenes cap it at the safe volume first.</summary>
+    public Task<ReceiverStatus> SetZone2VolumeAsync(int level, CancellationToken cancellationToken = default) =>
+        ExecuteZone2Async(
+            $"Set Zone 2 volume to {Math.Clamp(level, 0, DenonVolumeMath.MaxAbsoluteVolume)}",
+            (settings, token) => _avrClient.SetZone2VolumeAsync(settings, Math.Clamp(level, 0, DenonVolumeMath.MaxAbsoluteVolume), token),
+            cancellationToken);
+
+    /// <summary>One step up or down. <paramref name="ceiling"/>: no step up from this level or above (the safe volume).</summary>
+    public Task<ReceiverStatus> StepZone2VolumeAsync(bool up, int? ceiling = null, CancellationToken cancellationToken = default) =>
+        ExecuteZone2Async(
+            up ? "Zone 2 volume up" : "Zone 2 volume down",
+            async (settings, token) =>
+            {
+                if (up && ceiling is int cap && _stateStore.Snapshot.Status?.Zone2Volume is int now && now >= cap)
+                {
+                    throw new InvalidOperationException($"Zone 2 is at {now}, the safe volume is {cap}.");
+                }
+
+                await _avrClient.StepZone2VolumeAsync(settings, up, token);
+            },
+            cancellationToken);
+
+    public Task<ReceiverStatus> SetZone2MuteAsync(bool isMuted, CancellationToken cancellationToken = default) =>
+        ExecuteZone2Async(
+            isMuted ? "Mute Zone 2" : "Unmute Zone 2",
+            (settings, token) => _avrClient.SetZone2MuteAsync(settings, isMuted, token),
+            cancellationToken);
+
+    public Task<ReceiverStatus> SetZone2SourceAsync(string sourceCode, CancellationToken cancellationToken = default) =>
+        ExecuteZone2Async(
+            $"Switch Zone 2 to {DenonCatalog.GetFriendlyZone2SourceName(sourceCode)}",
+            (settings, token) => _avrClient.SetZone2SourceAsync(settings, sourceCode, token),
+            cancellationToken);
+
+    /// <summary>
+    /// A Zone 2 command, then the status as it is known, with the receiver's answer in it: the receiver echoes a Zone 2
+    /// change on port 23 at once, so no full status read (about 1 s) is needed.
+    /// </summary>
+    private Task<ReceiverStatus> ExecuteZone2Async(
+        string description,
+        Func<ReceiverSettings, CancellationToken, Task> command,
+        CancellationToken cancellationToken) =>
+        ExecuteAsync(
+            description,
+            async (settings, token) =>
+            {
+                await command(settings, token);
+                return _stateStore.Snapshot.Status is { IsAvrConfirmed: true } known
+                    ? known with { RetrievedAt = DateTimeOffset.Now }
+                    : await GetMergedStatusAsync(settings, token);
+            },
+            markBusy: false,
+            logSuccess: true,
+            logFailures: true,
+            cancellationToken);
+
+    /// <summary>The HEOS player this app controls: its id, to find its group.</summary>
+    public Task<ReceiverPlayerInfo> GetOwnHeosPlayerAsync(CancellationToken cancellationToken = default) =>
+        _heosClient.GetOwnPlayerAsync(_settingsStore.Current.Receiver, cancellationToken);
+
+    /// <summary>Reads the HEOS players, the groups and each group's volume, and keeps them in the state store.</summary>
+    public async Task<HeosGroupsState> RefreshHeosGroupsAsync(CancellationToken cancellationToken = default)
+    {
+        // One read at a time, whole: two that overlap could end in the wrong order, and the older one would win.
+        await _groupsReadGate.WaitAsync(cancellationToken);
+        try
+        {
+            return await ReadHeosGroupsLockedAsync(cancellationToken);
+        }
+        finally
+        {
+            _groupsReadGate.Release();
+        }
+    }
+
+    private async Task<HeosGroupsState> ReadHeosGroupsLockedAsync(CancellationToken cancellationToken)
+    {
+        // Group volume events that come in while this read runs are newer than it: the store keeps them.
+        var readStart = _stateStore.BeginHeosGroupsRead();
+        var settings = _settingsStore.Current.Receiver;
+        var players = await _heosClient.GetPlayersAsync(settings, cancellationToken);
+        var groups = new List<HeosGroup>();
+        foreach (var group in await _heosClient.GetGroupsAsync(settings, cancellationToken))
+        {
+            try
+            {
+                var (volume, muted) = await _heosClient.GetGroupVolumeAsync(settings, group.GroupId, cancellationToken);
+                groups.Add(group with { Volume = volume, IsMuted = muted });
+            }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                groups.Add(group); // The group can end between the two reads: keep it without a volume.
+            }
+        }
+
+        return _stateStore.UpdateHeosGroups(new HeosGroupsState(players, groups, DateTimeOffset.Now), readStart);
+    }
+
+    /// <summary>
+    /// Groups the players: the first leads (it plays the source), the others play what it plays. One player alone ends
+    /// the group it leads.
+    /// </summary>
+    public Task<HeosGroupsState> SetHeosGroupAsync(IReadOnlyList<int> playerIds, CancellationToken cancellationToken = default) =>
+        ExecuteHeosGroupsAsync(
+            playerIds.Count == 1 ? "End HEOS group" : $"Group {playerIds.Count} HEOS players",
+            (settings, token) => _heosClient.SetGroupAsync(settings, playerIds, token),
+            cancellationToken);
+
+    /// <summary>
+    /// Ends the group <paramref name="playerId"/> is in. A member leaves (the others stay a group); a leader ends the
+    /// whole group. Nothing happens when the player plays alone.
+    /// </summary>
+    public async Task<HeosGroupsState> LeaveHeosGroupAsync(int playerId, CancellationToken cancellationToken = default)
+    {
+        // Read the groups now: another controller may have changed them since the last read.
+        var state = await RefreshHeosGroupsAsync(cancellationToken);
+        return state.GroupOf(playerId) is { } group
+            ? await SetHeosGroupAsync(PlayersAfterLeave(group, playerId), cancellationToken)
+            : state;
+    }
+
+    /// <summary>A player joins this receiver's HEOS group, or leaves it when it is in it (see <see cref="GroupPlayersAfterToggle"/>).</summary>
+    public async Task<HeosGroupsState> ToggleHeosGroupMemberAsync(int playerId, CancellationToken cancellationToken = default)
+    {
+        var own = await GetOwnHeosPlayerAsync(cancellationToken);
+        var state = await RefreshHeosGroupsAsync(cancellationToken);
+        return await SetHeosGroupAsync(GroupPlayersAfterToggle(state, own.PlayerId, playerId), cancellationToken);
+    }
+
+    /// <summary>
+    /// The set_group players after a tap on <paramref name="playerId"/> in the group list of player
+    /// <paramref name="ownPlayerId"/> (this receiver): a player in the receiver's group leaves it, any other player joins
+    /// it. Without a group the receiver leads a new one.
+    /// </summary>
+    internal static IReadOnlyList<int> GroupPlayersAfterToggle(HeosGroupsState state, int ownPlayerId, int playerId)
+    {
+        if (state.GroupOf(ownPlayerId) is not { } group)
+        {
+            return playerId == ownPlayerId ? [ownPlayerId] : [ownPlayerId, playerId];
+        }
+
+        if (group.Contains(playerId))
+        {
+            return PlayersAfterLeave(group, playerId);
+        }
+
+        var leader = group.Leader?.PlayerId ?? ownPlayerId;
+        return [leader, .. group.Members.Select(static m => m.PlayerId).Where(p => p != leader), playerId];
+    }
+
+    /// <summary>
+    /// The set_group players that take <paramref name="playerId"/> out of <paramref name="group"/>: the leader alone
+    /// (the group ends) when it leads, else the leader and the other members.
+    /// </summary>
+    internal static IReadOnlyList<int> PlayersAfterLeave(HeosGroup group, int playerId)
+    {
+        var leader = group.Leader?.PlayerId ?? playerId;
+        return leader == playerId
+            ? [leader]
+            : [leader, .. group.Members.Select(static m => m.PlayerId).Where(p => p != playerId && p != leader)];
+    }
+
+    /// <summary>The group's volume on the HEOS 0–100 scale. MCP and automations cap it at the safe volume first.</summary>
+    public Task<HeosGroupsState> SetHeosGroupVolumeAsync(int groupId, int level, CancellationToken cancellationToken = default) =>
+        ExecuteHeosGroupsAsync(
+            $"Set HEOS group volume to {Math.Clamp(level, 0, 100)}",
+            (settings, token) => _heosClient.SetGroupVolumeAsync(settings, groupId, Math.Clamp(level, 0, 100), token),
+            cancellationToken);
+
+    public Task<HeosGroupsState> SetHeosGroupMuteAsync(int groupId, bool isMuted, CancellationToken cancellationToken = default) =>
+        ExecuteHeosGroupsAsync(
+            isMuted ? "Mute HEOS group" : "Unmute HEOS group",
+            (settings, token) => _heosClient.SetGroupMuteAsync(settings, groupId, isMuted, token),
+            cancellationToken);
+
+    private async Task<HeosGroupsState> ExecuteHeosGroupsAsync(
+        string description,
+        Func<ReceiverSettings, CancellationToken, Task> command,
+        CancellationToken cancellationToken)
+    {
+        await _commandGate.WaitAsync(cancellationToken);
+        try
+        {
+            await command(_settingsStore.Current.Receiver, cancellationToken);
+            var state = await RefreshHeosGroupsAsync(cancellationToken);
+            _logStore.Info($"{description} completed.");
+            return state;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logStore.Error($"{description} failed.", exception);
+            throw;
+        }
+        finally
+        {
+            _commandGate.Release();
+        }
+    }
 
     public Task<ReceiverStatus> SetInputSourceAsync(string sourceCode, CancellationToken cancellationToken = default) =>
         ExecuteAsync(
@@ -652,6 +854,9 @@ public sealed class ReceiverController
             volumeAppliedEarly = true;
         }
 
+        // Zone 2 before the main input: a Zone 2 that follows the main zone (SOURCE) must be at its volume first.
+        await ApplySceneZone2StepsAsync(settings, scene, token);
+
         if (!string.IsNullOrWhiteSpace(scene.InputSource))
         {
             if (DenonCatalog.InputMatches(scene.InputSource, "NET"))
@@ -739,6 +944,8 @@ public sealed class ReceiverController
             await _avrClient.SetMuteAsync(settings, false, token);
         }
 
+        await ApplySceneGroupStepsAsync(settings, scene, token);
+
         if (!string.IsNullOrWhiteSpace(scene.StreamUrl))
         {
             var streamUrl = scene.StreamUrl.Trim();
@@ -775,6 +982,13 @@ public sealed class ReceiverController
             await _heosClient.SetMuteAsync(settings, false, token);
         }
 
+        if (HasZone2Steps(scene))
+        {
+            _logStore.Warning($"Scene '{scene.Name}': Zone 2 skipped (no AVR control on port 23).");
+        }
+
+        await ApplySceneGroupStepsAsync(settings, scene, token);
+
         if (!string.IsNullOrWhiteSpace(scene.StreamUrl))
         {
             var streamUrl = scene.StreamUrl.Trim();
@@ -785,6 +999,217 @@ public sealed class ReceiverController
             NonRelaySourceActivated?.Invoke();
             StreamUrlStarted?.Invoke(streamUrl, station?.DisplayName ?? scene.Name);
         }
+    }
+
+    /// <summary>
+    /// The Zone 2 mute as the receiver said it on this link, or its answer to Z2MU?. Null when it does not answer.
+    /// </summary>
+    private async Task<bool?> ReadZone2MutedAsync(ReceiverSettings settings, CancellationToken token)
+    {
+        if (_avrClient.GetLiveState(settings.Host).IsZone2Muted is bool live)
+        {
+            return live;
+        }
+
+        try
+        {
+            return await _avrClient.TryGetZone2MutedAsync(settings, token);
+        }
+        catch (Exception) when (!token.IsCancellationRequested)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Runs a step that must work: a failure goes to the caller.</summary>
+    private static async Task<bool> RunRequiredStepAsync(Func<Task> step)
+    {
+        await step();
+        return true;
+    }
+
+    private static bool HasZone2Steps(ScenePreset scene) =>
+        scene.Zone2On is not null || scene.Zone2Volume is not null || scene.Zone2Muted is not null ||
+        !string.IsNullOrWhiteSpace(scene.Zone2Source);
+
+    /// <summary>
+    /// Zone 2: off alone, or on, then source, then volume, and mute last, so a muted zone never plays loud before the
+    /// volume is down. Each step is optional: a model without Zone 2 does not stop the scene.
+    /// </summary>
+    private Task ApplySceneZone2StepsAsync(ReceiverSettings settings, ScenePreset scene, CancellationToken token) =>
+        RunZone2StepsAsync(
+            settings,
+            scene.Zone2On,
+            DenonCatalog.IsZone2SourceCode(scene.Zone2Source) ? scene.Zone2Source : null,
+            scene.Zone2Volume,
+            scene.Zone2Muted,
+            TryRunSceneStepAsync,
+            token);
+
+    /// <summary>
+    /// Zone 2 power, source, volume and mute in one go (MCP avr_set_zone2). The volume is the caller's, already capped
+    /// at the safe volume. The order is that of <see cref="RunZone2StepsAsync"/>.
+    /// </summary>
+    public Task<ReceiverStatus> ApplyZone2Async(
+        bool? on,
+        string? source,
+        int? volume,
+        bool? muted,
+        CancellationToken cancellationToken = default)
+    {
+        if (!string.IsNullOrWhiteSpace(source) && !DenonCatalog.IsZone2SourceCode(source))
+        {
+            throw new ArgumentException($"'{source}' is not a Zone 2 source.", nameof(source));
+        }
+
+        return ExecuteZone2Async(
+            "Set Zone 2",
+            (settings, token) => RunZone2StepsAsync(
+                settings, on, string.IsNullOrWhiteSpace(source) ? null : source, volume, muted, RunRequiredStepAsync, token),
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// The Zone 2 steps in a safe order. Off: the other steps first (a source command can turn the zone on), then off.
+    /// With a target volume, the zone is muted before it turns on or gets a new source, the volume is set, and only
+    /// then does the mute go to what was asked (or back to what it was): a zone left loud never plays loud first.
+    /// </summary>
+    /// <param name="run">
+    /// Runs one step and says if it worked: a scene skips a failed step, MCP lets it fail. When the volume step fails in
+    /// a guarded sequence, the source and the mute release are skipped: the zone stays muted rather than play loud.
+    /// </param>
+    private async Task RunZone2StepsAsync(
+        ReceiverSettings settings,
+        bool? on,
+        string? source,
+        int? volume,
+        bool? muted,
+        Func<Func<Task>, Task<bool>> run,
+        CancellationToken token)
+    {
+        var guard = volume is not null && (on == true || source is not null);
+
+        // Without a mute asked for, the guard puts back the mute the zone had. Unknown (no answer): it stays muted.
+        var finalMute = muted;
+        if (guard && muted is null)
+        {
+            finalMute = await ReadZone2MutedAsync(settings, token) ?? true;
+        }
+
+        if (guard && !await run(() => _avrClient.SetZone2MuteAsync(settings, true, token)))
+        {
+            // Without the mute the zone could play at its old volume: no power on, no source, no volume. Off still runs.
+            _logStore.Warning("Zone 2 could not be muted first: its power, source and volume steps were skipped.");
+            if (on == false)
+            {
+                await run(() => _avrClient.SetZone2PowerAsync(settings, false, token));
+            }
+
+            return;
+        }
+
+        if (on == true)
+        {
+            await run(() => _avrClient.SetZone2PowerAsync(settings, true, token));
+            if (guard)
+            {
+                // Mute again: a zone that was off may not take the first mute.
+                await run(() => _avrClient.SetZone2MuteAsync(settings, true, token));
+            }
+        }
+
+        if (volume is int level &&
+            !await run(() => _avrClient.SetZone2VolumeAsync(settings, Math.Clamp(level, 0, DenonVolumeMath.MaxAbsoluteVolume), token)))
+        {
+            // The old volume may be loud: no new source and no unmute. A mute asked for, and off, still run.
+            _logStore.Warning("Zone 2 volume could not be set: its source and unmute steps were skipped.");
+            if (muted == true)
+            {
+                await run(() => _avrClient.SetZone2MuteAsync(settings, true, token));
+            }
+
+            if (on == false)
+            {
+                await run(() => _avrClient.SetZone2PowerAsync(settings, false, token));
+            }
+
+            return;
+        }
+
+        if (source is not null)
+        {
+            await run(() => _avrClient.SetZone2SourceAsync(settings, source, token));
+        }
+
+        if (finalMute is bool mute)
+        {
+            await run(() => _avrClient.SetZone2MuteAsync(settings, mute, token));
+        }
+
+        if (on == false)
+        {
+            await run(() => _avrClient.SetZone2PowerAsync(settings, false, token));
+        }
+    }
+
+    /// <summary>The scene's HEOS group: this app's player leads, the named players join. Optional, as the Zone 2 steps.</summary>
+    private async Task ApplySceneGroupStepsAsync(ReceiverSettings settings, ScenePreset scene, CancellationToken token)
+    {
+        if (scene.HeosGroupMembers.Count == 0 && !scene.HeosUngroup)
+        {
+            return;
+        }
+
+        await TryRunSceneStepAsync(async () =>
+        {
+            var own = await _heosClient.GetOwnPlayerAsync(settings, token);
+            if (scene.HeosGroupMembers.Count > 0)
+            {
+                var members = await ResolveHeosPlayerIdsAsync(scene.HeosGroupMembers, token);
+                await _heosClient.SetGroupAsync(settings, [own.PlayerId, .. members.Where(p => p != own.PlayerId)], token);
+            }
+            else if ((await _heosClient.GetGroupsAsync(settings, token)).FirstOrDefault(g => g.Contains(own.PlayerId)) is { } group)
+            {
+                await _heosClient.SetGroupAsync(settings, PlayersAfterLeave(group, own.PlayerId), token);
+            }
+        });
+    }
+
+    /// <summary>
+    /// The ids of the named HEOS players: each name is a player's name (any case) or its id. An unknown name is an
+    /// error that lists the players there are.
+    /// </summary>
+    public async Task<IReadOnlyList<int>> ResolveHeosPlayerIdsAsync(IEnumerable<string> namesOrIds, CancellationToken cancellationToken = default)
+    {
+        var players = await _heosClient.GetPlayersAsync(_settingsStore.Current.Receiver, cancellationToken);
+        return ResolveHeosPlayerIds(players, namesOrIds);
+    }
+
+    internal static IReadOnlyList<int> ResolveHeosPlayerIds(IReadOnlyList<ReceiverPlayerInfo> players, IEnumerable<string> namesOrIds)
+    {
+        var ids = new List<int>();
+        foreach (var raw in namesOrIds)
+        {
+            var name = raw?.Trim() ?? string.Empty;
+            if (name.Length == 0)
+            {
+                continue;
+            }
+
+            var match = players.FirstOrDefault(p => string.Equals(p.Name.Trim(), name, StringComparison.OrdinalIgnoreCase))
+                ?? (int.TryParse(name, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var pid)
+                    ? players.FirstOrDefault(p => p.PlayerId == pid)
+                    : null)
+                ?? throw new InvalidOperationException(
+                    $"No HEOS player '{name}'. Players: {(players.Count == 0 ? "none" : string.Join(", ", players.Select(static p => p.Name)))}.");
+
+            if (!ids.Contains(match.PlayerId))
+            {
+                ids.Add(match.PlayerId);
+            }
+        }
+
+        return ids;
     }
 
     private async Task<AcousticStatus> ExecuteAcousticAsync(
@@ -814,15 +1239,18 @@ public sealed class ReceiverController
         }
     }
 
-    private async Task TryRunSceneStepAsync(Func<Task> step)
+    /// <summary>Runs an optional scene step. False when it failed (logged, and the scene goes on).</summary>
+    private async Task<bool> TryRunSceneStepAsync(Func<Task> step)
     {
         try
         {
             await step();
+            return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logStore.Warning($"Optional scene step skipped: {ex.Message}");
+            return false;
         }
     }
 
@@ -1038,6 +1466,9 @@ public sealed class ReceiverController
                     EcoMode = prevConfirmed.EcoMode,
                     SleepTimerMinutes = prevConfirmed.SleepTimerMinutes,
                     IsZone2On = prevConfirmed.IsZone2On,
+                    Zone2Volume = prevConfirmed.Zone2Volume,
+                    Zone2Source = prevConfirmed.Zone2Source,
+                    IsZone2Muted = prevConfirmed.IsZone2Muted,
                     ActiveStationAlias = prevConfirmed.ActiveStationAlias,
                     IsAvrConfirmed = false,
                 };
@@ -1080,6 +1511,9 @@ public sealed class ReceiverController
             EcoMode = avrStatus.EcoMode,
             SleepTimerMinutes = avrStatus.SleepTimerMinutes,
             IsZone2On = avrStatus.IsZone2On,
+            Zone2Volume = avrStatus.Zone2Volume,
+            Zone2Source = avrStatus.Zone2Source,
+            IsZone2Muted = avrStatus.IsZone2Muted,
             ActiveStationAlias = activeAlias,
             IsAvrConfirmed = true,
         };

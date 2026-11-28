@@ -24,14 +24,17 @@ public sealed class AutomationEditorApi
     private readonly AutomationEngineService _engine;
     private readonly PluginHostService _pluginHost;
     private readonly LocalAudioRelayServer _relay;
+    private readonly ReceiverStateStore _stateStore;
 
     public AutomationEditorApi(
         AppSettingsStore settingsStore,
         AutomationEngineService engine,
         PluginHostService pluginHost,
-        LocalAudioRelayServer relay)
+        LocalAudioRelayServer relay,
+        ReceiverStateStore stateStore)
     {
         _settingsStore = settingsStore;
+        _stateStore = stateStore;
         _engine = engine;
         _pluginHost = pluginHost;
         _relay = relay;
@@ -260,6 +263,11 @@ public sealed class AutomationEditorApi
             eventNames = AutomationNodeTypes.KnownEventNames,
             inputs = DenonCatalog.InputSources.Select(static i => new { code = i.Code, name = i.DisplayName }),
             soundModes = DenonCatalog.SoundModes.Select(static m => m.Code),
+            zone2Sources = DenonCatalog.Zone2Sources.Select(static i => new { code = i.Code, name = i.DisplayName }),
+            // The other HEOS players this receiver can group with (by name, as the node stores them).
+            heosPlayers = (_stateStore.Snapshot.HeosGroups?.Players ?? [])
+                .Where(p => p.PlayerId != _stateStore.Snapshot.Status?.Player.PlayerId)
+                .Select(static p => p.Name),
             webhookBaseUrl = string.IsNullOrWhiteSpace(baseUrl) ? string.Empty : baseUrl.TrimEnd('/') + "/api/hooks/",
             maxSafeVolume = settings.Mcp.MaxSafeVolume,
         };

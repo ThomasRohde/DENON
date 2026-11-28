@@ -61,7 +61,10 @@ public sealed record ReceiverStatus(
     int MaxVolume = 98,
     double VolumeExact = 0,
     string? ActiveStationAlias = null,
-    bool IsAvrConfirmed = true);
+    bool IsAvrConfirmed = true,
+    int? Zone2Volume = null,
+    string Zone2Source = "",
+    bool IsZone2Muted = false);
 
 public sealed record AvrDeviceStatus(
     bool IsPoweredOn,
@@ -74,7 +77,10 @@ public sealed record AvrDeviceStatus(
     int? SleepTimerMinutes = null,
     bool IsZone2On = false,
     int MaxVolume = 98,
-    double VolumeExact = 0);
+    double VolumeExact = 0,
+    int? Zone2Volume = null,
+    string Zone2Source = "",
+    bool IsZone2Muted = false);
 
 public sealed record DiscoveredReceiver(
     string IpAddress,
@@ -130,6 +136,36 @@ public static class DenonCatalog
         new("GAME", "Game"),
         new("MCH STEREO", "Multi-Ch Stereo"),
     ];
+
+    /// <summary>
+    /// The sources Zone 2 can play, for the pickers. SOURCE follows the main zone's input. The receiver takes the
+    /// same codes as for the main zone, with "Z2" in front (Z2TV).
+    /// </summary>
+    public static IReadOnlyList<AvrInputOption> Zone2Sources { get; } =
+        [new("SOURCE", "Main zone source", "MAIN"), .. InputSources];
+
+    /// <summary>
+    /// Every source code a "Z2" line can carry: the picker's codes and the other inputs Denon models report. A Z2
+    /// line with any other text (Z2MUON, Z2CS ST, Z2PSBAS 50, Z245) is not a source.
+    /// </summary>
+    private static readonly HashSet<string> Zone2SourceCodes = new(
+        Zone2Sources.Select(static s => s.Code).Concat(
+        [
+            "DVD", "AUX2", "AUX3", "AUX4", "AUX5", "AUX6", "AUX7", "USB", "USB/IPOD", "IPD", "IPOD", "SERVER", "IRADIO",
+            "FAVORITES", "PANDORA", "SIRIUSXM", "SPOTIFY", "LASTFM", "FLICKR", "HDRADIO", "SAT", "CBL/SAT", "DVR",
+            "V.AUX", "8K", "HEOS", "NETHOME", "IRP", "FVP", "NAPSTER", "TIDAL", "DEEZER", "AMAZON", "TUNEIN",
+        ]),
+        StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>True for a code Zone 2 can play (see <see cref="Zone2SourceCodes"/>).</summary>
+    public static bool IsZone2SourceCode(string? code) =>
+        !string.IsNullOrWhiteSpace(code) && Zone2SourceCodes.Contains(code.Trim());
+
+    /// <summary>The name for a Zone 2 source code; SOURCE is the main zone's source.</summary>
+    public static string GetFriendlyZone2SourceName(string? code) =>
+        string.Equals(code?.Trim(), "SOURCE", StringComparison.OrdinalIgnoreCase)
+            ? "Main zone source"
+            : GetFriendlyInputName(code);
 
     public static string GetFriendlyInputName(string? code)
     {
