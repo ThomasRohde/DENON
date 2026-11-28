@@ -52,7 +52,8 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
 - [ ] Verify PR 10a (needs the user): uninstall with "Launch at Windows startup" turned on in Settings and check
       that the startup entry is gone; the next in-app update downloads, starts and shows notes without the
       download list.
-- [ ] PR 10b: docs and notices: #73.
+- [x] PR 10b: docs and notices, part of #73. Left out: refreshed website screenshots and the new guides
+      (docs/plugin-development.md, CONTRIBUTING.md, SECURITY.md), which are new documents rather than fixes.
 - [ ] PR 11: accessibility (after PR 9): #57.
 - [ ] PR 12: Apple TV and HomePod plugins: #35, #50, #70, the HomePod part of #49 (plugin release only when asked).
 - [ ] PR 13: Chromecast plugin and first tests: #49, the Chromecast parts of #59 and #70 (release only when asked).
@@ -185,7 +186,8 @@ Learns the listening volume per source and sets it on a source change (2.10.0, `
 - [ ] Verify live: switch between the Apple TV, DR1 and TV 2 Charlie and check the volume follows; check a Smart Scene
       (Morning Jazz) keeps its own volume.
 - [ ] HEOS radio is one source ("HEOS Music") for now; stations differ in loudness too. Idea: a key per station.
-- [ ] MCP: no tool reads or sets the learned levels yet.
+- [x] MCP: `show_volume_memory` shows the learned levels; `volume_memory_set_level` and `volume_memory_forget` change
+      them (2.10.5).
 
 ## Automations
 
