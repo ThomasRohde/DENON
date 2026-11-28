@@ -4,6 +4,22 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **MCP audit log** (#77): one JSON line per tool call in `logs\mcp-audit-*.jsonl` with the time, the caller's
+  address, the client name, the tool, the argument names, the outcome (`ok`, `refused`, `error`) and the duration.
+  It never holds argument values or tokens. A new file starts each day or at 1 MB, and the newest 7 are kept. It is
+  on by default (Brain page → "Keep an audit log of tool calls", with Open Folder); the live feed stays as it was.
+- **Tool access switches** (#77) on the Brain page, on top of the permission tiers: turn off single tools, or all
+  tools of one plugin. A tool that is off is not listed, and a call to it gets a clear refusal. `apply_atmosphere`
+  is refused when it would use a plugin that is off.
+- **Webhook token** (#77): a token that can only call `POST /api/hooks/{name}`, so an iPhone Shortcut no longer needs
+  the owner token. Show, Copy and Regenerate it on the Cast & Remote page. The owner token still works for webhooks.
+- **LAN only** (#77, off by default): the Phone Remote server (:18925) and the MCP server (:18926) refuse addresses
+  outside this PC and the local network (loopback, private, link-local and IPv6 unique-local are allowed; IPv4-mapped
+  IPv6 counts as IPv4). The switch is on the Cast & Remote page and the Brain page.
+
 ## [2.10.33] - 2026-11-28
 
 ### Fixed

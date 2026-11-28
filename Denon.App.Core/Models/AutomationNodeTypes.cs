@@ -68,7 +68,7 @@ public static class AutomationNodeTypes
                     Help: "key=value terms, comma-separated; key!=value for 'not'. stream, device and origin test the event itself."),
             ]),
         new(TriggerWebhook, GroupTrigger, "Webhook",
-            "Starts when an iPhone Shortcut or another device calls POST /api/hooks/{name} with the owner token.",
+            "Starts when an iPhone Shortcut or another device calls POST /api/hooks/{name} with the webhook token (Cast & Remote page).",
             OutPort, false,
             [
                 new("hook", "Hook name", "hook", Required: true, Placeholder: "arrive-home",

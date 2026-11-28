@@ -392,6 +392,24 @@ public sealed class LocalAudioRelayServer : IDisposable
         }
     }
 
+    private long _lastLanRefusalLogTicks;
+
+    /// <summary>Writes a refused address to the app log, at most once a minute (a scan sends many).</summary>
+    private void NoteLanRefusal(IPAddress? remote)
+    {
+        var now = Environment.TickCount64;
+        var last = Interlocked.Read(ref _lastLanRefusalLogTicks);
+        if (last != 0 && now - last < 60_000)
+        {
+            return;
+        }
+
+        if (Interlocked.CompareExchange(ref _lastLanRefusalLogTicks, now, last) == last)
+        {
+            _logStore.Warning($"Refused a connection from {remote?.ToString() ?? "an unknown address"}: LAN only is on.");
+        }
+    }
+
     /// <summary>Most connections open at once: the receiver's stream, casts and phones need far fewer.</summary>
     internal const int MaxOpenConnections = 64;
 
@@ -452,6 +470,16 @@ public sealed class LocalAudioRelayServer : IDisposable
         {
             try
             {
+                // LAN only (Settings): a client outside this PC and the local network gets 403 for every path.
+                var remote = (client.Client.RemoteEndPoint as IPEndPoint)?.Address;
+                if (LanAddressGuard.Refuses(_settingsStore.Current.Security.LanOnly, remote))
+                {
+                    NoteLanRefusal(remote);
+                    await WriteSimpleResponseAsync(networkStream, StatusLine(403), "application/json; charset=utf-8",
+                        "{\"error\":\"" + LanAddressGuard.RefusalMessage + "\"}", serverToken);
+                    return;
+                }
+
                 var request = await ReadHttpRequestAsync(networkStream, serverToken);
                 if (request is null)
                 {

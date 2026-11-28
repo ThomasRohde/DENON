@@ -30,6 +30,18 @@ public sealed class McpServerSettings
 
     public bool EnableRoomDoctorSuggestions { get; set; } = true;
 
+    /// <summary>
+    /// Write one line per tool call to logs\mcp-audit-*.jsonl: time, address, client, tool, the argument names (never
+    /// their values) and the outcome. On by default: the lines hold no values or tokens, and the files are capped.
+    /// </summary>
+    public bool AuditLogEnabled { get; set; } = true;
+
+    /// <summary>Tools turned off by name, on top of the permission tier. They are not listed and a call is refused.</summary>
+    public List<string> DeniedTools { get; set; } = [];
+
+    /// <summary>Plugins whose tools are turned off (the plugin_* tools and the plugin's own named tools).</summary>
+    public List<string> DeniedPluginIds { get; set; } = [];
+
     public McpServerSettings Clone() =>
         new()
         {
@@ -41,6 +53,9 @@ public sealed class McpServerSettings
             PermissionTier = PermissionTier,
             MaxSafeVolume = MaxSafeVolume,
             EnableRoomDoctorSuggestions = EnableRoomDoctorSuggestions,
+            AuditLogEnabled = AuditLogEnabled,
+            DeniedTools = [.. DeniedTools],
+            DeniedPluginIds = [.. DeniedPluginIds],
         };
 
     public static string GenerateSecureToken()
@@ -109,3 +124,11 @@ public sealed record McpActivityEntry(
 {
     public string TimeLabel => Timestamp.LocalDateTime.ToString("HH:mm:ss");
 }
+
+/// <summary>A tool the MCP server can serve, for the Tool access switches in Settings.</summary>
+public sealed record McpToolCatalogEntry(
+    string Name,
+    string Title,
+    string? PluginId,
+    string? PluginName,
+    bool ReadOnly);

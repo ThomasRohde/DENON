@@ -93,6 +93,32 @@
                             <Button Content="Open Browser" Command="{Binding OpenRemoteInBrowserCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 10,6}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,6,0}" />
                             <Button Content="Allow Firewall" Command="{Binding AllowRelayFirewallCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 10,6}" FontSize="{DynamicResource FontSize04}" />
                         </WrapPanel>
+
+                        <!-- The webhook token: only POST /api/hooks/{name}, for iPhone Shortcuts. Hidden like the QR. -->
+                        <Border Background="{DynamicResource SidebarBgBrush}" BorderBrush="{DynamicResource Ink11Brush}" BorderThickness="1" CornerRadius="{DynamicResource Radius02}" Padding="{skin:Space 9,6}" Margin="{skin:Space 0,10,0,6}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="WEBHOOK TOKEN" FontSize="{DynamicResource FontSize01}" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" />
+                                    <TextBlock Text="{Binding WebhookTokenDisplay}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize05}" Foreground="{DynamicResource TextStrongBrush}" Margin="{skin:Space 0,2,0,0}" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="{skin:Space 8,0,0,0}">
+                                    <Button Content="{Binding SecretsToggleLabel}" Command="{Binding ToggleSecretsCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,4}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,5,0}"
+                                            ToolTip="Show or hide the token and the QR code. They hide again when you leave the page." />
+                                    <Button Content="Copy" Command="{Binding CopyWebhookTokenCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,4}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,5,0}" />
+                                    <Button Content="Regenerate" Command="{Binding RegenerateWebhookTokenCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,4}" FontSize="{DynamicResource FontSize04}" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <TextBlock Text="For iPhone Shortcuts instead of the owner token. It can only start webhooks. Revoke &amp; Rotate does not change it."
+                                   FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="{skin:Space 0,0,0,6}" />
+                        <CheckBox IsChecked="{Binding IsLanOnly}"
+                                  ToolTip="Allows loopback, 10.x, 172.16-31.x, 192.168.x, link-local and IPv6 unique-local addresses. Others get 403. A VPN address such as 100.64.x is refused.">
+                            <TextBlock Text="LAN only: answer only this PC and the local network (the MCP server too)" TextWrapping="Wrap" />
+                        </CheckBox>
                     </StackPanel>
                 </Grid>
             </Border>

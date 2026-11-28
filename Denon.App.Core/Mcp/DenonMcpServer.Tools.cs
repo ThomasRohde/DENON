@@ -10,7 +10,39 @@ namespace Denon.App.Core.Mcp;
 /// <summary>The tools of the Denon Desktop MCP server: their definitions, and what each call does.</summary>
 public sealed partial class DenonMcpServer
 {
+    /// <summary>The tools the server lists: every tool, less the ones turned off (by name or by plugin).</summary>
     private List<Tool> BuildToolDefinitions()
+    {
+        var cfg = _settingsStore.Current.Mcp;
+        return BuildAllToolDefinitions()
+            .Where(t => !McpToolAccess.IsDenied(cfg, t.Tool.Name, t.PluginId))
+            .Select(static t => t.Tool)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Every tool the server can serve now, also the ones turned off, for the Tool access switches in Settings. A
+    /// plugin tool names its plugin.
+    /// </summary>
+    public IReadOnlyList<McpToolCatalogEntry> GetToolCatalog()
+    {
+        var pluginNames = _pluginHost.GetPlugins().ToDictionary(static p => p.Id, static p => p.Name, StringComparer.OrdinalIgnoreCase);
+        return BuildAllToolDefinitions()
+            .Select(t =>
+            {
+                var pluginId = t.PluginId ?? McpToolAccess.NamedToolPlugin(t.Tool.Name);
+                var pluginName = pluginId is not null && pluginNames.TryGetValue(pluginId, out var name) ? name : pluginId;
+                return new McpToolCatalogEntry(
+                    t.Tool.Name,
+                    string.IsNullOrWhiteSpace(t.Tool.Title) ? t.Tool.Name : t.Tool.Title,
+                    pluginId,
+                    pluginName,
+                    t.Tool.Annotations?.ReadOnlyHint == true);
+            })
+            .ToList();
+    }
+
+    private List<(Tool Tool, string? PluginId)> BuildAllToolDefinitions()
     {
         var tools = new List<Tool>
         {
@@ -354,6 +386,7 @@ public sealed partial class DenonMcpServer
         // MCP App: the now-playing card (hosts without MCP Apps get its data as text).
         tools.AddRange(AppCardTools());
         tools.AddRange(AppHelperTools());
+        var all = tools.Select(static t => (t, (string?)null)).ToList();
 
         // Zero-config auto-bridge: expose enabled plugin actions as annotated MCP tools
         // (Skip hue.set_color since curated hue_set_color already exposes its full typed schema)
@@ -369,18 +402,18 @@ public sealed partial class DenonMcpServer
                 var toolName = BuildPluginToolName(plugin.Id, action.ActionId);
                 var (isReadOnly, isDestructive, isIdempotent) = McpPluginToolBridge.ResolveHints(action);
 
-                tools.Add(Tool(
+                all.Add((Tool(
                     toolName,
                     $"[{plugin.Name}] {action.DisplayName}: {action.Description}",
                     McpPluginToolBridge.BuildInputSchema(action),
                     title: $"{plugin.Name}: {action.DisplayName}",
                     readOnly: isReadOnly,
                     destructive: isDestructive,
-                    idempotent: isIdempotent));
+                    idempotent: isIdempotent), plugin.Id));
             }
         }
 
-        return tools;
+        return all;
     }
 
     private async Task<CallToolResult> HandleToolCallAsync(string toolName, JsonElement args, CancellationToken ct)
@@ -1058,6 +1091,11 @@ public sealed partial class DenonMcpServer
     /// </summary>
     private void EnsureAtmospherePluginAction(string pluginId, string actionId, McpServerSettings cfg)
     {
+        if (McpToolAccess.IsPluginDenied(cfg, pluginId))
+        {
+            throw new UnauthorizedAccessException(McpToolAccess.PluginRefusalMessage("apply_atmosphere", pluginId));
+        }
+
         var plugin = _pluginHost.GetPlugins().FirstOrDefault(p => string.Equals(p.Id, pluginId, StringComparison.OrdinalIgnoreCase) && p.IsEnabled)
                      ?? throw new McpInvalidParamsException($"The plugin '{pluginId}' is not enabled.");
         var action = plugin.Actions.FirstOrDefault(a => string.Equals(a.ActionId, actionId, StringComparison.OrdinalIgnoreCase))

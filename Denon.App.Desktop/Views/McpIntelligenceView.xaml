@@ -170,7 +170,70 @@
 
                             <CheckBox Content="Require Authorization: Bearer token on all /mcp requests" IsChecked="{Binding McpRequireAuth}" Margin="{skin:Space 0,0,0,8}" />
                             <CheckBox Content="Allow LAN connections (off = strict 127.0.0.1 localhost only)" IsChecked="{Binding McpAllowLan}" Margin="{skin:Space 0,0,0,8}" />
-                            <CheckBox Content="Show live Room Doctor auto-fix insights on Control Deck" IsChecked="{Binding McpEnableRoomDoctor}" Margin="{skin:Space 0,0,0,2}" />
+                            <CheckBox Content="Show live Room Doctor auto-fix insights on Control Deck" IsChecked="{Binding McpEnableRoomDoctor}" Margin="{skin:Space 0,0,0,8}" />
+                            <DockPanel Margin="{skin:Space 0,0,0,8}">
+                                <Button DockPanel.Dock="Right" Content="Open Folder" Command="{Binding OpenMcpAuditFolderCommand}" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,3}" FontSize="{DynamicResource FontSize04}" VerticalAlignment="Center" />
+                                <CheckBox IsChecked="{Binding McpAuditLogEnabled}" VerticalAlignment="Center"
+                                          ToolTip="One line per call in logs\mcp-audit-*.jsonl: time, address, client, tool, argument names and outcome. A new file each day or at 1 MB; the newest 7 are kept.">
+                                    <TextBlock Text="Keep an audit log of tool calls (argument names only, never values)" TextWrapping="Wrap" />
+                                </CheckBox>
+                            </DockPanel>
+                            <CheckBox IsChecked="{Binding IsLanOnly}" Margin="{skin:Space 0,0,0,2}"
+                                      ToolTip="Allows loopback, 10.x, 172.16-31.x, 192.168.x, link-local and IPv6 unique-local addresses. Others get 403. A VPN address such as 100.64.x is refused.">
+                                <TextBlock Text="LAN only: answer only this PC and the local network (the Phone Remote too; saved at once)" TextWrapping="Wrap" />
+                            </CheckBox>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Tool access: per-tool and per-plugin switches on top of the permission tier -->
+                    <Border Style="{StaticResource SurfaceCard}" Margin="{skin:Space 0,0,0,14}">
+                        <StackPanel>
+                            <DockPanel Margin="{skin:Space 0,0,0,6}">
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button Content="All On" Command="{Binding SetAllMcpToolsCommand}" CommandParameter="all" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,3}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,5,0}" />
+                                    <Button Content="All Off" Command="{Binding SetAllMcpToolsCommand}" CommandParameter="none" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 9,3}" FontSize="{DynamicResource FontSize04}" />
+                                </StackPanel>
+                                <TextBlock Text="TOOL ACCESS" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+                            </DockPanel>
+                            <TextBlock Text="A tool that is off is not listed, and a call to it is refused. Save &amp; Apply to use the change."
+                                       FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="{skin:Space 0,0,0,4}" />
+                            <TextBlock Text="{Binding McpToolAccessSummary}" FontSize="{DynamicResource FontSize04}" Foreground="{DynamicResource AccentAmberTextBrush}" TextWrapping="Wrap" Margin="{skin:Space 0,0,0,8}" />
+
+                            <TextBlock Text="PLUGINS" FontSize="{DynamicResource FontSize02}" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,4}"
+                                       Visibility="{Binding HasMcpPluginSwitches, Converter={StaticResource BoolToVis}}" />
+                            <ItemsControl ItemsSource="{Binding McpPluginSwitches}" Margin="{skin:Space 0,0,0,6}"
+                                          Visibility="{Binding HasMcpPluginSwitches, Converter={StaticResource BoolToVis}}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsAllowed}" Margin="{skin:Space 0,0,12,6}" ToolTip="{Binding Detail}">
+                                            <TextBlock Text="{Binding Label}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize04}" />
+                                        </CheckBox>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="ROOM AND MEDIA TOOLS" FontSize="{DynamicResource FontSize02}" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" Margin="{skin:Space 0,0,0,4}" />
+                            <ScrollViewer MaxHeight="{skin:Size 180}" VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding McpToolSwitches}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsAllowed}" Margin="{skin:Space 0,0,12,6}" ToolTip="{Binding Detail}">
+                                            <TextBlock Text="{Binding Label}" FontFamily="{DynamicResource MonoFont}" FontSize="{DynamicResource FontSize04}" />
+                                        </CheckBox>
+                                    </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
                         </StackPanel>
                     </Border>
 
