@@ -3,7 +3,7 @@ using Denon.App.Desktop.Infrastructure;
 namespace Denon.App.Desktop.ViewModels;
 
 /// <summary>
-/// Pairing secrets on screen: the Phone Remote QR code (Cast page; it holds the pairing key), and the MCP bearer token and
+/// Pairing secrets on screen: the Phone Remote QR code and the webhook token (Cast page), and the MCP bearer token and
 /// the client config that contains it (Brain page). They are hidden until the user clicks Show (or picks Owner QR or
 /// Guest QR), and hidden again when the page changes or the window hides, so a screenshot or screen share does not
 /// leak them. Copy buttons still copy the real values.
@@ -48,6 +48,8 @@ public sealed partial class MainViewModel
 
     public string McpBearerTokenDisplay => AreSecretsShown || string.IsNullOrEmpty(McpBearerToken) ? McpBearerToken : Dots;
 
+    public string WebhookTokenDisplay => AreSecretsShown || string.IsNullOrEmpty(WebhookToken) ? WebhookToken : Dots;
+
     public string McpClientConfigPreviewDisplay =>
         AreSecretsShown || string.IsNullOrEmpty(McpBearerToken) || string.IsNullOrEmpty(McpClientConfigPreview)
             ? McpClientConfigPreview
@@ -62,5 +64,6 @@ public sealed partial class MainViewModel
     {
         OnPropertyChanged(nameof(McpBearerTokenDisplay));
         OnPropertyChanged(nameof(McpClientConfigPreviewDisplay));
+        OnPropertyChanged(nameof(WebhookTokenDisplay));
     }
 }

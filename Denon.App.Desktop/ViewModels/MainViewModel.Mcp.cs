@@ -238,12 +238,14 @@ public sealed partial class MainViewModel
         });
 
         _mcpServer.StatusChanged += () => { _ = _dispatcher.InvokeAsync(RefreshMcpServerUi); };
+        _pluginHost.PluginsChanged += () => { _ = _dispatcher.InvokeAsync(RefreshMcpToolSwitches); };
         _mcpServer.ActivityAdded += entry => { _ = _dispatcher.InvokeAsync(() => PrependMcpActivity(entry)); };
         _roomIntelligence.InsightsChanged += () => { _ = _dispatcher.InvokeAsync(RefreshRoomIntelligenceUi); };
         _roomIntelligence.UndoStackChanged += () => { _ = _dispatcher.InvokeAsync(RefreshRoomIntelligenceUi); };
         _roomIntelligence.HabitsChanged += () => { _ = _dispatcher.InvokeAsync(RefreshRoomIntelligenceUi); };
 
         SyncMcpFieldsFromSettings(_settingsStore.Current.Mcp);
+        SyncSecurityFieldsFromSettings(_settingsStore.Current);
         RefreshMcpServerUi();
         RefreshRoomIntelligenceUi();
     }
@@ -348,13 +350,16 @@ public sealed partial class MainViewModel
         updated.Mcp.PermissionTier = tier;
         updated.Mcp.MaxSafeVolume = McpMaxSafeVolume;
         updated.Mcp.EnableRoomDoctorSuggestions = McpEnableRoomDoctor;
+        updated.Mcp.AuditLogEnabled = McpAuditLogEnabled;
+        ApplyMcpToolSwitches(updated.Mcp);
         if (string.IsNullOrWhiteSpace(updated.Mcp.BearerToken))
         {
             updated.Mcp.BearerToken = McpServerSettings.GenerateSecureToken();
         }
 
         await _settingsStore.SaveAsync(updated);
-        SyncMcpFieldsFromSettings(updated.Mcp);
+        SyncMcpFieldsFromSettings(_settingsStore.Current.Mcp);
+        SyncSecurityFieldsFromSettings(_settingsStore.Current);
         await _mcpServer.ApplySettingsAsync();
         RefreshMcpServerUi();
         McpStatusMessage = _mcpServer.IsRunning

@@ -68,6 +68,10 @@ Each one needs the real devices, and most change them or play media, so they wai
 - [ ] iPhone: remove the old phone-remote icon, scan the QR code, add it to the Home Screen again, and open it.
 - [ ] MCP: the now-playing card's play/pause button, the cards in Claude Desktop, and which protocol version Claude
       Code and Claude Desktop choose.
+- [ ] #77 with real clients: an MCP call from Claude Code writes an audit line with the client name and 127.0.0.1;
+      a tool turned off on the Brain page disappears from the client's list after Save & Apply.
+- [ ] #77 iPhone: switch the "arrive home" Shortcut to the webhook token (Cast & Remote → WEBHOOK TOKEN), and check
+      it still runs; with LAN only on, it works on the home Wi-Fi and gets 403 over mobile data with a VPN.
 
 ## Decisions
 
@@ -92,7 +96,6 @@ Each one needs the real devices, and most change them or play media, so they wai
 
 ## Features (GitHub issues)
 
-- [ ] #77: MCP audit log, per-tool and per-plugin allow/deny, a scoped webhook token, and an optional LAN-only guard.
 - [ ] #78: shared plugin foundation: SDK WPF theming and skin helpers, a parameter form on the Plugins page for
       actions that need input, and shared DNS-SD and session logging for the external plugins.
 - [ ] #63: encrypt tokens, pairing keys and private keys at rest with Windows DPAPI (see Decisions).

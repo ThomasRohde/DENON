@@ -62,7 +62,7 @@ public sealed class McpServerIntegrationTests : IAsyncLifetime
         var plugins = new PluginHostService([], _settings, state, controller, telemetry, log);
         var heos = new HeosEventListenerService(_settings, state, controller, log);
         var intelligence = new RoomIntelligenceService(state, controller, _settings, plugins, ytQueue, heos, log, Path.Combine(_tempDir, "room-habits.json"));
-        _server = new DenonMcpServer(_settings, controller, state, plugins, intelligence, new RadioBrowserService(log), ytMedia, relay, ytQueue, new LyricsService(), telemetry, new VolumeMemoryStore(log, Path.Combine(_tempDir, "volume-memory.json")), log);
+        _server = new DenonMcpServer(_settings, controller, state, plugins, intelligence, new RadioBrowserService(log), ytMedia, relay, ytQueue, new LyricsService(), telemetry, new VolumeMemoryStore(log, Path.Combine(_tempDir, "volume-memory.json")), log, new McpAuditLog(Path.Combine(_tempDir, "audit")));
 
         _asyncDisposables.Add(_server);
         _asyncDisposables.Add(telemetry);

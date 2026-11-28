@@ -563,6 +563,38 @@ public sealed class AutomationEventTests : IDisposable
     }
 
     [Fact]
+    public async Task WebhookToken_TriggersWebhooks_AndNothingElse()
+    {
+        var home = SceneGraph("home", Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "arrive-home")));
+        var rig = await CreateRigAsync(home);
+        using var _ = rig.Cleanup;
+        var hook = rig.Store.Current.Remote.WebhookToken;
+        Assert.False(string.IsNullOrWhiteSpace(hook));
+
+        // The webhook token starts webhooks: in the header, or as ?token= for a Shortcut.
+        var ok = await rig.Handler.HandleAsync("POST", "/api/hooks/arrive-home", null, "", hook, CancellationToken.None);
+        Assert.Equal(200, ok.StatusCode);
+        Assert.Contains("\"automations\":[\"home\"]", ok.Body);
+        Assert.Equal(200, (await rig.Handler.HandleAsync("POST", "/API/Hooks/arrive-home", "token=" + hook, "", null, CancellationToken.None)).StatusCode);
+
+        // Nothing else: no status, no search, no controls, no GET on a hook.
+        Assert.Equal(403, (await rig.Handler.HandleAsync("GET", "/api/status", null, "", hook, CancellationToken.None)).StatusCode);
+        Assert.Equal(403, (await rig.Handler.HandleAsync("GET", "/api/youtube/search", "q=x", "", hook, CancellationToken.None)).StatusCode);
+        Assert.Equal(403, (await rig.Handler.HandleAsync("GET", "/api/hooks/arrive-home", null, "", hook, CancellationToken.None)).StatusCode);
+        foreach (var path in new[] { "/api/power", "/api/volume", "/api/youtube/queue", "/api/plugins/toggle", "/api/scene" })
+        {
+            var refused = await rig.Handler.HandleAsync("POST", path, null, "{\"level\":40}", hook, CancellationToken.None);
+            Assert.Equal(403, refused.StatusCode);
+            Assert.Contains("webhook token only works", refused.Body);
+        }
+
+        // The owner token still works for webhooks; a rotated webhook token does not.
+        Assert.Equal(200, (await rig.Handler.HandleAsync("POST", "/api/hooks/arrive-home", null, "", rig.Store.Current.Remote.OwnerToken, CancellationToken.None)).StatusCode);
+        await rig.Store.UpdateAsync(static s => s.Remote.WebhookToken = RemoteAccessSettings.GeneratePairingToken("hook"));
+        Assert.Equal(401, (await rig.Handler.HandleAsync("POST", "/api/hooks/arrive-home", null, "", hook, CancellationToken.None)).StatusCode);
+    }
+
+    [Fact]
     public async Task WebhookEndpoint_PublishesTheEvent_AndNamesTheListeningAutomations()
     {
         var home = SceneGraph("home", Node("t", AutomationNodeTypes.TriggerWebhook, ("hook", "arrive-home")));
