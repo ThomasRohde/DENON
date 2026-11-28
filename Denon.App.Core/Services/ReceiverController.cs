@@ -24,6 +24,9 @@ public sealed class ReceiverController
     /// <summary>The receiver <see cref="_lastConfirmedStatus"/> came from: another receiver gets no grace window.</summary>
     private string? _lastConfirmedHost;
 
+    private readonly object _pushRefreshSync = new();
+    private CancellationTokenSource? _pushRefreshCts;
+
     public ReceiverController(
         HeosClient heosClient,
         DenonAvrClient avrClient,
@@ -42,7 +45,16 @@ public sealed class ReceiverController
         _lastStationFile = lastStationFile;
         // A stream that still plays from before a restart is the station this app started last.
         _lastPlayedStationAlias = lastStationFile?.Load();
+
+        _avrClient.LinesReceived += OnAvrLinesReceived;
+        _avrClient.LinkClosed += OnAvrLinkClosed;
     }
+
+    /// <summary>The port 23 link closed. The poll reconnects and reads the full state at once.</summary>
+    public event Action? AvrLinkClosed;
+
+    /// <summary>A number for the open port 23 link (a new one for each connection), or 0 when none is open.</summary>
+    public long AvrLinkGeneration => _avrClient.OpenLinkGeneration;
 
     /// <summary>The saved station this app started last; null after another source took over. Kept on disk.</summary>
     private string? LastPlayedStation
@@ -200,7 +212,7 @@ public sealed class ReceiverController
     /// <param name="logSuccess">False for the steps of a fade: only its last step is worth a log line.</param>
     /// <param name="refreshStatus">
     /// False for the steps of a fade: the known status gets the new volume, and no full status read runs
-    /// (it takes about 1 s). The last step reads the status. The 5 s poll still sees a turn of the knob.
+    /// (it takes about 1 s). The last step reads the status. The receiver's push lines show a turn of the knob.
     /// </param>
     public Task<ReceiverStatus> SetVolumeAsync(
         int level,
@@ -523,7 +535,9 @@ public sealed class ReceiverController
         {
             var settings = _settingsStore.Current.Receiver;
             // No log line: the Brain reads this every 90 s while the receiver is on.
-            return await _avrClient.GetAcousticStatusAsync(settings, cancellationToken);
+            var status = await _avrClient.GetAcousticStatusAsync(settings, cancellationToken);
+            status = _stateStore.UpdateAcoustics(status, read => _avrClient.GetLiveState(settings.Host).ApplyAcousticsTo(read));
+            return status;
         }
         finally
         {
@@ -775,6 +789,7 @@ public sealed class ReceiverController
             await operation(settings, cancellationToken);
             await Task.Delay(180, cancellationToken);
             var status = await _avrClient.GetAcousticStatusAsync(settings, cancellationToken);
+            status = _stateStore.UpdateAcoustics(status, read => _avrClient.GetLiveState(settings.Host).ApplyAcousticsTo(read));
             _logStore.Info($"{actionDescription} completed.");
             return status;
         }
@@ -857,7 +872,8 @@ public sealed class ReceiverController
 
             var receiverSettings = _settingsStore.Current.Receiver;
             var status = await operation(receiverSettings, cancellationToken);
-            _stateStore.UpdateStatus(status);
+            // Lines that came in after the read (a turn of the knob) are in the live state: they must not be lost.
+            status = _stateStore.UpdateStatus(status, read => WithLiveAvrState(_avrClient.GetLiveState(receiverSettings.Host), read));
             if (logSuccess)
             {
                 _logStore.Info($"{actionDescription} completed.");
@@ -884,6 +900,85 @@ public sealed class ReceiverController
 
             _commandGate.Release();
         }
+    }
+
+    /// <summary>
+    /// The status with what the receiver said on the port 23 link (<paramref name="liveState"/>). Only for a status
+    /// with a real AVR answer: a HEOS-only or grace-window status waits for the next full read.
+    /// </summary>
+    private static ReceiverStatus WithLiveAvrState(AvrLiveState liveState, ReceiverStatus status)
+    {
+        if (!status.IsAvrConfirmed)
+        {
+            return status;
+        }
+
+        var live = liveState.ApplyTo(status);
+        // Off, or away from NET: no station plays (the same rule as the full read).
+        return live.IsPoweredOn && live.IsMainZoneOn && DenonCatalog.InputMatches(live.InputSource, "NET")
+            ? live
+            : live with { ActiveStationAlias = null };
+    }
+
+    /// <summary>
+    /// Answers and pushed lines alike: the state changes at once, and the events (power.changed, volume.settled and
+    /// so on) follow from the state as for a poll. A new power or input also reads the full state soon after, for
+    /// what HEOS plays now.
+    /// </summary>
+    private void OnAvrLinesReceived(AvrLinesReceived received)
+    {
+        var host = _settingsStore.Current.Receiver.Host;
+        if (!string.Equals(received.Host, host, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var before = _stateStore.Snapshot.Status;
+        // Read inside the store's lock: the newest state for this link, also after the link closed (the receiver can
+        // send a change and drop the link before this runs). Lines from a link a newer one replaced change nothing.
+        _stateStore.PatchFromReceiver(
+            status => _avrClient.LatestLiveState(received) is { } live ? WithLiveAvrState(live, status) : status,
+            received.Lines.Any(AvrLiveState.IsAcousticLine)
+                ? acoustics => _avrClient.LatestLiveState(received)?.ApplyAcousticsTo(acoustics) ?? acoustics
+                : null);
+
+        if (before is { IsAvrConfirmed: true } &&
+            _stateStore.Snapshot.Status is { } after &&
+            (before.IsPoweredOn != after.IsPoweredOn ||
+             before.IsMainZoneOn != after.IsMainZoneOn ||
+             !string.Equals(before.InputSource, after.InputSource, StringComparison.OrdinalIgnoreCase)))
+        {
+            ScheduleRefreshAfterPush();
+        }
+    }
+
+    /// <summary>Any address: after Save &amp; Sync the settings may already name the new receiver when the old link closes.</summary>
+    private void OnAvrLinkClosed(string host) => AvrLinkClosed?.Invoke();
+
+    /// <summary>One full read 400 ms after the last power or input push (the remote sends a few in a row).</summary>
+    private void ScheduleRefreshAfterPush()
+    {
+        CancellationToken token;
+        lock (_pushRefreshSync)
+        {
+            _pushRefreshCts?.Cancel();
+            _pushRefreshCts?.Dispose();
+            _pushRefreshCts = new CancellationTokenSource();
+            token = _pushRefreshCts.Token;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(400, token);
+                await RefreshAsync(token);
+            }
+            catch
+            {
+                // A newer push took over, or the read failed: the poll reads again.
+            }
+        }, CancellationToken.None);
     }
 
     private async Task<ReceiverStatus> GetMergedStatusAsync(ReceiverSettings settings, CancellationToken cancellationToken)

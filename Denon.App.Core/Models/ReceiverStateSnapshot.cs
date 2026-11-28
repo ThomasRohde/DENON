@@ -15,4 +15,7 @@ public sealed record ReceiverStateSnapshot
     public DateTimeOffset? LastAttemptedRefresh { get; init; }
 
     public ReceiverStatus? Status { get; init; }
+
+    /// <summary>The last acoustic read (Audyssey, dimmer, trims), kept current by the receiver's PS and DIM lines. Null until read.</summary>
+    public AcousticStatus? Acoustics { get; init; }
 }
