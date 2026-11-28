@@ -21,6 +21,14 @@ public sealed class HueEntertainmentStreamClient : IAsyncDisposable
     private readonly HttpClient _http;
     private readonly object _sendLock = new();
 
+    /// <summary>
+    /// Start and stop run one at a time. A stop that comes during a start waits for it, then stops what it started.
+    /// </summary>
+    private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
+
+    /// <summary>Counts the streams started; the cleanup after a failed send stops only its own stream.</summary>
+    private int _sessionId;
+
     private Socket? _udpSocket;
     private DtlsTransport? _dtlsTransport;
     private string? _activeBridgeIp;
@@ -45,7 +53,24 @@ public sealed class HueEntertainmentStreamClient : IAsyncDisposable
         HueEntertainmentArea area,
         CancellationToken cancellationToken = default)
     {
-        await StopAsync();
+        await _lifecycleGate.WaitAsync(cancellationToken);
+        try
+        {
+            return await StartCoreAsync(config, area, cancellationToken);
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
+    }
+
+    private async Task<bool> StartCoreAsync(
+        HuePluginConfig config,
+        HueEntertainmentArea area,
+        CancellationToken cancellationToken)
+    {
+        await StopCoreAsync();
+        Interlocked.Increment(ref _sessionId);
 
         if (config.DemoMode ||
             string.IsNullOrWhiteSpace(config.BridgeIp) ||
@@ -100,7 +125,7 @@ public sealed class HueEntertainmentStreamClient : IAsyncDisposable
         }
         catch
         {
-            await StopAsync();
+            await StopCoreAsync();
             return false;
         }
     }
@@ -169,8 +194,26 @@ public sealed class HueEntertainmentStreamClient : IAsyncDisposable
         }
 
         // Close the socket and release the area now; the next call returns false at once (not streaming).
-        _ = Task.Run(StopAsync);
+        // Only this stream: a new one may have started by the time the cleanup runs.
+        var failedSession = Volatile.Read(ref _sessionId);
+        _ = Task.Run(() => StopSessionAsync(failedSession));
         return false;
+    }
+
+    private async Task StopSessionAsync(int sessionId)
+    {
+        await _lifecycleGate.WaitAsync();
+        try
+        {
+            if (Volatile.Read(ref _sessionId) == sessionId)
+            {
+                await StopCoreAsync();
+            }
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
     }
 
     private static async Task<IPAddress> ResolveBridgeAddressAsync(string host, CancellationToken cancellationToken)
@@ -187,6 +230,19 @@ public sealed class HueEntertainmentStreamClient : IAsyncDisposable
     }
 
     public async Task StopAsync()
+    {
+        await _lifecycleGate.WaitAsync();
+        try
+        {
+            await StopCoreAsync();
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
+    }
+
+    private async Task StopCoreAsync()
     {
         _isStreaming = false;
 
