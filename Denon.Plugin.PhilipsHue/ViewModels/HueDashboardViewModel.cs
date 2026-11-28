@@ -52,6 +52,12 @@ public sealed class HueCommand : ICommand
 
 public sealed class HueAsyncCommand : ICommand
 {
+    /// <summary>
+    /// Where a failed command goes (the dashboard shows it). Execute is async void, so an exception it let out
+    /// would close the app; with no handler it is dropped.
+    /// </summary>
+    public static Action<Exception>? ErrorHandler { get; set; }
+
     private readonly Func<object?, Task> _execute;
     private readonly Func<object?, bool>? _canExecute;
     private bool _isRunning;
@@ -78,6 +84,10 @@ public sealed class HueAsyncCommand : ICommand
         try
         {
             await _execute(parameter);
+        }
+        catch (Exception ex)
+        {
+            ErrorHandler?.Invoke(ex);
         }
         finally
         {
@@ -434,6 +444,8 @@ public sealed class HueDashboardViewModel : HueObservableObject
     public HueDashboardViewModel(PhilipsHuePlugin plugin)
     {
         _plugin = plugin;
+        // A command that fails (the bridge went offline on "Exit Demo", a storage error) shows why here.
+        HueAsyncCommand.ErrorHandler = ex => RunOnUi(() => StatusMessage = $"⚠ {ex.Message}");
 
         DiscoverBridgeCommand = new HueAsyncCommand(_ => DiscoverBridgeAsync());
         StartPairingCommand = new HueAsyncCommand(_ => StartPairingAsync(), _ => !IsPairing && !string.IsNullOrWhiteSpace(BridgeIpInput));
@@ -1454,6 +1466,9 @@ public sealed class HueDashboardViewModel : HueObservableObject
             TurnOffWithReceiverStandby = TurnOffWithReceiverStandby,
             CinemaPauseLights = CinemaPauseLights,
             TargetRoomId = _automationTargetRoomId,
+            // No control sets these: keep what the config has.
+            PauseBrightenPercent = _plugin.Config.Automation.PauseBrightenPercent,
+            ResumeDimPercent = _plugin.Config.Automation.ResumeDimPercent,
         });
 
     private async Task ToggleMusicSyncAsync()
@@ -1480,6 +1495,8 @@ public sealed class HueDashboardViewModel : HueObservableObject
             Sensitivity = MusicSyncSensitivity,
             MinBrightness = MusicSyncMinBrightness,
             MaxBrightness = MusicSyncMaxBrightness,
+            // No control sets this: keep what the config has.
+            SelectedEntertainmentAreaId = _plugin.Config.MusicSync.SelectedEntertainmentAreaId,
         });
 
     private void UpdateConnectionBadge()

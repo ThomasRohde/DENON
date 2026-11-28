@@ -86,6 +86,12 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
                 {
                     using var initCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
                     await RefreshBridgeStateAsync(initCts.Token);
+                    // Music Sync was on when the app closed: start the 50 Hz stream again, not only the 10 Hz REST path.
+                    if (_isStarted && _musicSyncActive)
+                    {
+                        await EnsureDtlsStreamAsync(CancellationToken.None);
+                        _viewModel?.SetDtlsStreamingState(_entertainmentClient?.IsStreaming == true);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -446,6 +452,11 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
     internal async Task DisconnectBridgeAsync(CancellationToken cancellationToken = default)
     {
         StopDemoBeatSimulator();
+        if (_entertainmentClient is not null)
+        {
+            await _entertainmentClient.StopAsync(); // Release the area now, not after the bridge's timeout.
+        }
+
         _musicSyncActive = false;
         _config.MusicSync.Enabled = false;
         _config.ApplicationKey = string.Empty;
@@ -454,6 +465,37 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
         await SaveConfigAsync(cancellationToken);
         _viewModel?.SyncFromPluginConfig(_config);
         _context?.ReportStatus("Bridge unlinked — ready to pair", PluginHealthState.Idle);
+    }
+
+    /// <summary>
+    /// Starts the 50 Hz Entertainment (DTLS) stream on the chosen area, or the first one. Without it, Music Sync
+    /// falls back to REST at about 10 Hz. Logs why when the stream does not start.
+    /// </summary>
+    private async Task EnsureDtlsStreamAsync(CancellationToken cancellationToken)
+    {
+        if (_config.DemoMode || _entertainmentClient is null || string.IsNullOrWhiteSpace(_config.ClientKey) ||
+            _entertainmentClient.IsStreaming)
+        {
+            return;
+        }
+
+        var area = _entertainmentAreas.FirstOrDefault(a =>
+                       string.Equals(a.Id, _config.MusicSync.SelectedEntertainmentAreaId, StringComparison.OrdinalIgnoreCase))
+                   ?? _entertainmentAreas.FirstOrDefault();
+        if (area is null)
+        {
+            _context?.Logger.Info("Hue Music Sync uses REST: the bridge has no entertainment area.");
+            return;
+        }
+
+        if (await _entertainmentClient.StartAsync(_config, area, cancellationToken))
+        {
+            _context?.Logger.Info($"Started 50 Hz Hue Entertainment DTLS stream on '{area.Name}' ({area.ChannelCount} ch).");
+        }
+        else
+        {
+            _context?.Logger.Warning($"Hue Entertainment DTLS stream on '{area.Name}' did not start; Music Sync uses REST.");
+        }
     }
 
     internal async Task RefreshBridgeStateAsync(CancellationToken cancellationToken = default)
@@ -487,19 +529,9 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
                 await _entertainmentClient.StopAsync();
             }
         }
-        else if (!_config.DemoMode && _entertainmentClient is not null && !string.IsNullOrWhiteSpace(_config.ClientKey))
+        else
         {
-            var area = _entertainmentAreas.FirstOrDefault(a =>
-                           string.Equals(a.Id, _config.MusicSync.SelectedEntertainmentAreaId, StringComparison.OrdinalIgnoreCase))
-                       ?? _entertainmentAreas.FirstOrDefault();
-            if (area is not null)
-            {
-                var dtlsOk = await _entertainmentClient.StartAsync(_config, area, cancellationToken);
-                if (dtlsOk)
-                {
-                    _context?.Logger.Info($"Started 50 Hz Hue Entertainment DTLS stream on '{area.Name}' ({area.ChannelCount} ch).");
-                }
-            }
+            await EnsureDtlsStreamAsync(cancellationToken);
         }
 
         await SaveConfigAsync(cancellationToken);

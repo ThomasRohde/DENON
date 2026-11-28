@@ -4,6 +4,31 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **A failed Home Assistant or Hue click no longer closes the app** (#46). With Home Assistant offline or a bad
+  token, a click on an entity tile closed Denon Desktop. So did "Exit Demo" in Hue with the bridge offline. Both
+  dashboards now show the error in their status line.
+- **Hue Music Sync starts its 50 Hz stream again after a restart** (#48). With Music Sync on, the app came back
+  on the slower REST path (about 10 Hz) until you turned sync off and on. Unlinking the bridge now stops the
+  stream at once. A bridge address typed as a host name works for the stream too. When a stream frame fails, the
+  socket closes and the area is released. Saving Music Sync or automation settings keeps the fields no control
+  sets (the entertainment area, the pause and resume brightness).
+- **Home Assistant lists scenes, scripts and switches first** (#68). The list was cut at 40 entities after an
+  A–Z sort, so 40 lights hid every scene. Now it keeps up to 300, scenes, scripts and switches first, and the
+  status says "300 of 412" when it cuts. A failed connection check after Save now stays on screen; before, the
+  "Saved" text could cover it.
+- **A Hue read that answers with an error says so** (#64), instead of showing an empty bridge.
+
+### Security
+- **Home Assistant triggers only the entity kinds it lists** (#32). An MCP client or a phone could ask for any
+  entity, for example `cover.garage_door` (toggle opens it), or use `%2e%2e/` to reach other Home Assistant API
+  paths. Now the id must be a scene, script, switch, light or input_boolean with a plain object id.
+- **Hue no longer falls back from HTTPS to HTTP** (#64). The fallback sent the app key in clear text, and
+  pairing sent back a new key. With "Use HTTPS" on, the app uses HTTPS only. A bridge without HTTPS works with
+  "Use HTTPS" turned off.
+
 ## [2.10.20] - 2026-11-28
 
 ### Added

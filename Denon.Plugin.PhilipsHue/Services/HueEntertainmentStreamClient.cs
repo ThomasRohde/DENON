@@ -76,7 +76,8 @@ public sealed class HueEntertainmentStreamClient : IAsyncDisposable
         try
         {
             // 2. Connect UDP socket & perform DTLS 1.2 PSK handshake on port 2100 (bounded 10s timeout)
-            var ip = IPAddress.Parse(cleanHost);
+            // The bridge address may be a host name typed by hand, not only an IP from discovery.
+            var ip = await ResolveBridgeAddressAsync(cleanHost, cancellationToken);
             var socket = new Socket(ip.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
             socket.Connect(new IPEndPoint(ip, HueEntertainmentUdpPort));
             _udpSocket = socket;
@@ -164,9 +165,25 @@ public sealed class HueEntertainmentStreamClient : IAsyncDisposable
             catch
             {
                 _isStreaming = false;
-                return false;
             }
         }
+
+        // Close the socket and release the area now; the next call returns false at once (not streaming).
+        _ = Task.Run(StopAsync);
+        return false;
+    }
+
+    private static async Task<IPAddress> ResolveBridgeAddressAsync(string host, CancellationToken cancellationToken)
+    {
+        if (IPAddress.TryParse(host, out var literal))
+        {
+            return literal;
+        }
+
+        var addresses = await Dns.GetHostAddressesAsync(host, cancellationToken);
+        return addresses.FirstOrDefault(static a => a.AddressFamily == AddressFamily.InterNetwork)
+               ?? addresses.FirstOrDefault()
+               ?? throw new InvalidOperationException($"Could not resolve the Hue bridge '{host}'.");
     }
 
     public async Task StopAsync()

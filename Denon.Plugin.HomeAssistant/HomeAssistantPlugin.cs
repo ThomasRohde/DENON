@@ -264,14 +264,29 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
             }
         }
 
-        var ordered = list.OrderBy(static e => e.Domain).ThenBy(static e => e.FriendlyName).Take(40).ToList();
+        // Keep scenes, scripts and switches when there are many lights and helpers: a cap after an
+        // alphabetical sort used to drop every scene.
+        var kept = list
+            .OrderBy(static e => DomainRank(e.Domain))
+            .ThenBy(static e => e.FriendlyName, StringComparer.CurrentCultureIgnoreCase)
+            .Take(MaxEntities)
+            .ToList();
+        var ordered = kept.OrderBy(static e => e.Domain).ThenBy(static e => e.FriendlyName).ToList();
         _viewModel?.ApplyEntities(ordered);
-        _context?.ReportStatus($"Connected • {ordered.Count} entities synced", PluginHealthState.Connected);
+        var countText = list.Count > MaxEntities ? $"{ordered.Count} of {list.Count}" : $"{ordered.Count}";
+        _context?.ReportStatus($"Connected • {countText} entities synced", PluginHealthState.Connected);
         return ordered;
     }
 
     internal async Task TriggerEntityAsync(string entityId, CancellationToken ct = default)
     {
+        if (!TryParseEntityId(entityId, out var domain))
+        {
+            throw new ArgumentException(
+                $"'{entityId}' is not a scene, script, switch, light or input_boolean entity id.", nameof(entityId));
+        }
+
+        entityId = entityId.Trim();
         if (_config.DemoMode)
         {
             var current = _viewModel?.GetEntity(entityId);
@@ -286,8 +301,6 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
         }
 
         EnsureHttp();
-        var dot = entityId.IndexOf('.');
-        var domain = dot > 0 ? entityId[..dot].ToLowerInvariant() : "homeassistant";
         var service = domain is "scene" or "script" ? "turn_on" : "toggle";
 
         using var req = BuildRequest(HttpMethod.Post, $"/api/services/{domain}/{service}", new { entity_id = entityId });
@@ -299,13 +312,60 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
             try
             {
                 await Task.Delay(500, CancellationToken.None);
-                await FetchEntitiesAsync(CancellationToken.None);
+                if (_isStarted)
+                {
+                    await FetchEntitiesAsync(CancellationToken.None);
+                }
             }
             catch { }
         });
     }
 
-    internal async Task SaveConfigAsync(HomeAssistantConfig updated)
+    /// <summary>Most entities the dashboard lists. Scenes, scripts and switches come first.</summary>
+    internal const int MaxEntities = 300;
+
+    private static int DomainRank(string domain) => domain switch
+    {
+        "scene" => 0,
+        "script" => 1,
+        "switch" => 2,
+        "light" => 3,
+        _ => 4,
+    };
+
+    /// <summary>
+    /// True for "domain.object_id" where the domain is one this plugin lists (scene, script, switch, light,
+    /// input_boolean) and the object id has only a-z, 0-9 and "_", as in Home Assistant. The id goes into the
+    /// service call, so any other text (another domain such as cover.garage_door, or "%2e%2e/" to reach other
+    /// API paths) is refused before a request is made.
+    /// </summary>
+    public static bool TryParseEntityId(string? entityId, out string domain)
+    {
+        domain = string.Empty;
+        var id = entityId?.Trim() ?? string.Empty;
+        var dot = id.IndexOf('.');
+        if (dot <= 0 || dot == id.Length - 1)
+        {
+            return false;
+        }
+
+        var candidate = id[..dot];
+        if (candidate is not ("scene" or "script" or "switch" or "light" or "input_boolean"))
+        {
+            return false;
+        }
+
+        if (!id[(dot + 1)..].All(static c => c is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '_'))
+        {
+            return false;
+        }
+
+        domain = candidate;
+        return true;
+    }
+
+    /// <returns>Null when saved and connected (or nothing to check); otherwise why the connection check failed.</returns>
+    internal async Task<string?> SaveConfigAsync(HomeAssistantConfig updated)
     {
         _config = updated;
         if (_context is not null)
@@ -321,13 +381,16 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
             }
             catch (Exception ex)
             {
-                _viewModel?.SetStatus($"Saved, but connection check failed: {ex.Message}");
+                _context?.ReportStatus($"Connection failed: {ex.Message}", PluginHealthState.Error);
+                return ex.Message;
             }
         }
         else
         {
             _context?.ReportStatus("Enter Home Assistant URL & Token (or Demo Mode)", PluginHealthState.Idle);
         }
+
+        return null;
     }
 
     private async Task PushSensorStateAsync(PluginReceiverSnapshot snap, string? sceneName, CancellationToken ct)
@@ -431,27 +494,30 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
     public HomeAssistantViewModel(HomeAssistantPlugin plugin)
     {
         _plugin = plugin;
-        SaveAndConnectCommand = new AsyncCmd(_ => SaveAsync());
-        RefreshCommand = new AsyncCmd(_ => RefreshAsync());
-        ToggleDemoCommand = new AsyncCmd(_ => ToggleDemoAsync());
+        SaveAndConnectCommand = new AsyncCmd(_ => SaveAsync(), ShowError);
+        RefreshCommand = new AsyncCmd(_ => RefreshAsync(), ShowError);
+        ToggleDemoCommand = new AsyncCmd(_ => ToggleDemoAsync(), ShowError);
         ToggleSetupCommand = new AsyncCmd(_ =>
         {
             IsSetupExpanded = !IsSetupExpanded;
             return Task.CompletedTask;
-        });
+        }, ShowError);
         SetDomainFilterCommand = new AsyncCmd(p =>
         {
             SelectedDomainFilter = p?.ToString() ?? "all";
             return Task.CompletedTask;
-        });
-        TriggerEntityCommand = new AsyncCmd(p => p is HaEntityItem item ? _plugin.TriggerEntityAsync(item.EntityId) : Task.CompletedTask);
+        }, ShowError);
+        TriggerEntityCommand = new AsyncCmd(p => p is HaEntityItem item ? _plugin.TriggerEntityAsync(item.EntityId) : Task.CompletedTask, ShowError);
         PushNowCommand = new AsyncCmd(async _ =>
         {
             var res = await _plugin.ExecuteActionAsync("ha.sync_sensor");
             StatusMessage = res.Success ? $"✓ {res.Message}" : $"⚠ {res.Message}";
             Raise(nameof(TelemetryPreviewText));
-        });
+        }, ShowError);
     }
+
+    /// <summary>A failed tile click or save (Home Assistant offline, a bad token) shows here instead of closing the app.</summary>
+    private void ShowError(Exception ex) => StatusMessage = $"{DateTime.Now:HH:mm:ss} • ⚠ {ex.Message}";
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -633,7 +699,7 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
 
     private async Task SaveAsync(bool quiet = false)
     {
-        await _plugin.SaveConfigAsync(new HomeAssistantConfig
+        var error = await _plugin.SaveConfigAsync(new HomeAssistantConfig
         {
             BaseUrl = BaseUrl.Trim(),
             AccessToken = AccessToken.Trim(),
@@ -641,9 +707,11 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
             DemoMode = DemoMode,
             PushReceiverEventsToHa = PushEvents,
         });
-        StatusMessage = quiet
-            ? "✓ Home Assistant event push setting saved."
-            : "✓ Saved Home Assistant configuration & synced entities.";
+        StatusMessage = error is not null
+            ? $"⚠ Saved, but connection check failed: {error}"
+            : quiet
+                ? "✓ Home Assistant event push setting saved."
+                : "✓ Saved Home Assistant configuration & synced entities.";
     }
 
     private async Task RefreshAsync()
@@ -677,7 +745,11 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
     private void Raise(string prop) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
 
-    private sealed class AsyncCmd(Func<object?, Task> exec) : ICommand
+    /// <summary>
+    /// An ICommand for async work. Execute is async void, so an exception it lets out would close the app:
+    /// it goes to <paramref name="onError"/> instead.
+    /// </summary>
+    private sealed class AsyncCmd(Func<object?, Task> exec, Action<Exception> onError) : ICommand
     {
         private bool _busy;
         public event EventHandler? CanExecuteChanged;
@@ -688,6 +760,7 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
             _busy = true;
             CanExecuteChanged?.Invoke(this, EventArgs.Empty);
             try { await exec(p); }
+            catch (Exception ex) { onError(ex); }
             finally { _busy = false; CanExecuteChanged?.Invoke(this, EventArgs.Empty); }
         }
     }
