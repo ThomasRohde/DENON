@@ -108,6 +108,7 @@ public sealed class YouTubeQueueService : IDisposable
         _relayServer.TrackPlaybackStarted += OnRelayTrackPlaybackStarted;
         _relayServer.TrackStreamCompleted += OnRelayTrackStreamCompleted;
         _receiverController.NonRelaySourceActivated += OnNonRelaySourceActivated;
+        _receiverController.RelayStreamStarting += CancelPendingResume;
         _stateStore.StateChanged += OnReceiverStateChanged;
     }
 
@@ -445,6 +446,7 @@ public sealed class YouTubeQueueService : IDisposable
         string? activeToken;
         lock (_sync)
         {
+            _resumeEntryId = null; // another cast takes over: the last run's track stays stopped
             activeToken = _isActive ? _activeRelayToken : null;
             _isActive = false;
             _activeRelayToken = null;
@@ -839,12 +841,18 @@ public sealed class YouTubeQueueService : IDisposable
         });
     }
 
-    private void OnNonRelaySourceActivated()
+    /// <summary>Anything cast or started in this run replaces the track from the last run.</summary>
+    private void CancelPendingResume()
     {
         lock (_sync)
         {
-            _resumeEntryId = null; // a station or another source started: the last run's track stays stopped
+            _resumeEntryId = null;
         }
+    }
+
+    private void OnNonRelaySourceActivated()
+    {
+        CancelPendingResume(); // a station or another source started: the last run's track stays stopped
 
         var wasActive = false;
         string? activeToken = null;
@@ -1039,6 +1047,7 @@ public sealed class YouTubeQueueService : IDisposable
         _relayServer.TrackPlaybackStarted -= OnRelayTrackPlaybackStarted;
         _relayServer.TrackStreamCompleted -= OnRelayTrackStreamCompleted;
         _receiverController.NonRelaySourceActivated -= OnNonRelaySourceActivated;
+        _receiverController.RelayStreamStarting -= CancelPendingResume;
         _stateStore.StateChanged -= OnReceiverStateChanged;
     }
 }

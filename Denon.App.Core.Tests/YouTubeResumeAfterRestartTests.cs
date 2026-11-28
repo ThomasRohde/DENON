@@ -74,6 +74,23 @@ public sealed class YouTubeResumeAfterRestartTests : IDisposable
         Assert.False(queue.IsYouTubePlaybackActive); // nothing plays until the receiver confirms its stream
     }
 
+    [Fact]
+    public void Another_cast_started_first_cancels_the_resume()
+    {
+        var store = Track(new MediaQueueStore(QueueDir, Log()));
+        store.SaveYouTube(new SavedYouTubeQueue(
+            [Saved("abcdefghijk", "One", "e1")], [], false, YouTubeRepeatMode.Off, PlayingEntryId: "e1"));
+        store.Flush();
+
+        var queue = CreateQueue();
+        Assert.Equal("e1", queue.PendingResumeEntryId);
+
+        // The Jukebox and PC Cast stop the YouTube session before they cast their own relay stream.
+        queue.StopSession();
+
+        Assert.Null(queue.PendingResumeEntryId);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("gone")] // the entry is not in the queue
