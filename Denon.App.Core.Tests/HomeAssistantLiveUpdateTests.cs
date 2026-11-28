@@ -276,6 +276,128 @@ public sealed class HomeAssistantLiveUpdateTests
         Assert.Contains(vm.Entities, e => e.FriendlyName == "Subwoofer");
     }
 
+    // ---------------------------------------------------------------- REST reads and live changes together
+
+    [Fact]
+    public void A_slow_rest_read_does_not_turn_back_a_newer_live_change()
+    {
+        var vm = new HomeAssistantViewModel(new HomeAssistantPlugin());
+        vm.ApplyEntities(MixedEntities);
+
+        var ticket = vm.BeginSnapshot(); // The REST read starts: guest mode is off.
+        vm.ApplyStateChange("input_boolean.guest_mode", new("input_boolean.guest_mode", "Guest Mode", "input_boolean", "on"));
+        vm.ApplyStateChange("light.desk", null);
+        vm.ApplySnapshot(MixedEntities, ticket); // The read ends with the old values.
+
+        Assert.True(vm.GetEntity("input_boolean.guest_mode")!.IsOn);
+        Assert.Null(vm.GetEntity("light.desk"));
+        Assert.True(vm.GetEntity("switch.sub_plug")!.IsOn); // Other entities come from the read.
+    }
+
+    [Fact]
+    public void A_rest_read_that_started_after_a_live_change_is_newer_and_wins()
+    {
+        var vm = new HomeAssistantViewModel(new HomeAssistantPlugin());
+        vm.ApplyEntities(MixedEntities);
+
+        vm.ApplyStateChange("input_boolean.guest_mode", new("input_boolean.guest_mode", "Guest Mode", "input_boolean", "on"));
+        var ticket = vm.BeginSnapshot();
+        vm.ApplySnapshot(MixedEntities, ticket); // Guest mode was turned off again before this read.
+
+        Assert.False(vm.GetEntity("input_boolean.guest_mode")!.IsOn);
+    }
+
+    [Fact]
+    public void A_rest_read_older_than_one_already_applied_is_dropped()
+    {
+        var vm = new HomeAssistantViewModel(new HomeAssistantPlugin());
+        var older = vm.BeginSnapshot();
+        var newer = vm.BeginSnapshot();
+
+        vm.ApplySnapshot([new("switch.sub_plug", "Sub Plug", "switch", "on")], newer);
+        vm.ApplySnapshot([new("switch.sub_plug", "Sub Plug", "switch", "off"), new("scene.old", "Old", "scene", "scening")], older);
+
+        Assert.True(Assert.Single(vm.Entities).IsOn);
+    }
+
+    [Fact]
+    public async Task In_the_plugin_a_slow_refresh_does_not_undo_a_live_event()
+    {
+        const string offJson = """[{"entity_id":"input_boolean.guest_mode","state":"off","attributes":{"friendly_name":"Guest Mode"}}]""";
+        await using var server = new FakeHaServer { HoldOpen = TimeSpan.FromSeconds(30), StatesJson = offJson };
+        var socketReady = new TaskCompletionSource<(WebSocket Ws, int SubId)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        server.AfterSubscribe = (ws, subId) => { socketReady.TrySetResult((ws, subId)); return Task.CompletedTask; };
+        server.Start();
+
+        var context = new FakeContext(new HomeAssistantConfig { BaseUrl = server.BaseUrl, AccessToken = TestToken });
+        var plugin = new HomeAssistantPlugin { LiveOptions = FastOptions() };
+        await plugin.InitializeAsync(context);
+        await plugin.StartAsync();
+        var vm = plugin.ViewModel!;
+        var (ws, subId) = await socketReady.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await WaitUntil(() => plugin.IsLive && vm.GetEntity("input_boolean.guest_mode") is not null);
+        await WaitUntil(() => server.StatesRequests >= 2); // The start read and the read when the socket went live.
+        await Task.Delay(100);
+
+        // A Refresh starts and Home Assistant is slow to answer it.
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        server.BeforeStatesReply = () => release.Task;
+        var requestsBefore = server.StatesRequests;
+        var refresh = plugin.FetchEntitiesAsync();
+        await WaitUntil(() => server.StatesRequests > requestsBefore);
+
+        // Meanwhile the live event turns guest mode on.
+        await ws.SendAsync(Encoding.UTF8.GetBytes(EventJson(subId, "input_boolean.guest_mode", "Guest Mode", "on")).AsMemory(),
+            WebSocketMessageType.Text, true, CancellationToken.None);
+        await WaitUntil(() => vm.GetEntity("input_boolean.guest_mode")!.IsOn);
+
+        // The slow read ends with the old "off".
+        release.SetResult();
+        await refresh.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(vm.GetEntity("input_boolean.guest_mode")!.IsOn);
+        await plugin.StopAsync();
+        await plugin.DisposeAsync();
+    }
+
+    // ---------------------------------------------------------------- The entity cap
+
+    [Fact]
+    public void At_the_cap_a_live_scene_pushes_out_the_lowest_ranked_entity()
+    {
+        var vm = new HomeAssistantViewModel(new HomeAssistantPlugin());
+        var full = Enumerable.Range(0, HomeAssistantPlugin.MaxEntities)
+            .Select(i => new HaEntityItem($"input_boolean.b{i:D3}", $"B {i:D3}", "input_boolean", "off"))
+            .ToList();
+        vm.ApplyEntities(full);
+
+        vm.ApplyStateChange("scene.new_scene", new("scene.new_scene", "New Scene", "scene", "scening"));
+
+        Assert.Equal(HomeAssistantPlugin.MaxEntities, vm.Entities.Count);
+        Assert.Equal("scene.new_scene", vm.Entities[0].EntityId);
+        Assert.Null(vm.GetEntity($"input_boolean.b{HomeAssistantPlugin.MaxEntities - 1:D3}")); // Last by name goes.
+        Assert.NotNull(vm.GetEntity("input_boolean.b000"));
+    }
+
+    [Fact]
+    public void At_the_cap_a_live_entity_that_ranks_last_is_not_added_and_one_that_ranks_higher_is()
+    {
+        var vm = new HomeAssistantViewModel(new HomeAssistantPlugin());
+        var full = Enumerable.Range(0, HomeAssistantPlugin.MaxEntities)
+            .Select(i => new HaEntityItem($"input_boolean.b{i:D3}", $"B {i:D3}", "input_boolean", "off"))
+            .ToList();
+        vm.ApplyEntities(full);
+
+        vm.ApplyStateChange("input_boolean.zzz", new("input_boolean.zzz", "Zzz", "input_boolean", "on"));
+        Assert.Null(vm.GetEntity("input_boolean.zzz"));
+        Assert.Equal(HomeAssistantPlugin.MaxEntities, vm.Entities.Count);
+
+        vm.ApplyStateChange("input_boolean.abc", new("input_boolean.abc", "Abc", "input_boolean", "on")); // Not "Aaa": in Danish "aa" sorts as "å", after "z".
+        Assert.Equal("input_boolean.abc", vm.Entities[0].EntityId);
+        Assert.Equal(HomeAssistantPlugin.MaxEntities, vm.Entities.Count);
+        Assert.Null(vm.GetEntity($"input_boolean.b{HomeAssistantPlugin.MaxEntities - 1:D3}"));
+    }
+
     // ---------------------------------------------------------------- Loopback WebSocket
 
     [Fact]
@@ -519,6 +641,7 @@ public sealed class HomeAssistantLiveUpdateTests
         private readonly CancellationTokenSource _stop = new();
         private int _socketCount;
         private int _pingCount;
+        private int _statesRequests;
 
         public FakeHaServer()
         {
@@ -541,7 +664,12 @@ public sealed class HomeAssistantLiveUpdateTests
 
         public TimeSpan HoldOpen { get; init; } = TimeSpan.FromMilliseconds(500);
 
-        public string StatesJson { get; init; } = "[]";
+        public string StatesJson { get; set; } = "[]";
+
+        /// <summary>Runs before /api/states answers, so a test can make the read slow.</summary>
+        public Func<Task>? BeforeStatesReply { get; set; }
+
+        public int StatesRequests => Volatile.Read(ref _statesRequests);
 
         public Func<WebSocket, int, Task>? AfterSubscribe { get; set; }
 
@@ -619,7 +747,14 @@ public sealed class HomeAssistantLiveUpdateTests
                 }
                 else if (path == "/api/states" && ctx.Request.HttpMethod == "GET")
                 {
-                    reply = StatesJson;
+                    var json = StatesJson;
+                    Interlocked.Increment(ref _statesRequests);
+                    if (BeforeStatesReply is { } wait)
+                    {
+                        await wait();
+                    }
+
+                    reply = json;
                 }
                 else if (path.StartsWith("/api/services/", StringComparison.Ordinal))
                 {

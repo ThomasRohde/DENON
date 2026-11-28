@@ -255,6 +255,8 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
         }
 
         EnsureHttp();
+        // Take the ticket before the request: live changes after this point win over this read.
+        var ticket = _viewModel?.BeginSnapshot();
         using var req = BuildRequest(HttpMethod.Get, "/api/states");
         using var resp = await _http!.SendAsync(req, ct);
         resp.EnsureSuccessStatusCode();
@@ -274,7 +276,10 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
         }
 
         var ordered = OrderForDashboard(list).Take(MaxEntities).ToList();
-        _viewModel?.ApplyEntities(ordered);
+        if (ticket is { } t)
+        {
+            _viewModel!.ApplySnapshot(ordered, t);
+        }
         var countText = list.Count > MaxEntities ? $"{ordered.Count} of {list.Count}" : $"{ordered.Count}";
         _context?.ReportStatus($"Connected • {countText} entities synced", PluginHealthState.Connected);
         return ordered;
@@ -645,10 +650,18 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
     }
 }
 
+/// <summary>Marks when a full REST read started: its order, and the last live change before it.</summary>
+internal readonly record struct SnapshotTicket(long Seq, long LiveVersion);
+
 public sealed class HomeAssistantViewModel : INotifyPropertyChanged
 {
     private readonly HomeAssistantPlugin _plugin;
     private readonly List<HaEntityItem> _allEntities = [];
+    private readonly object _snapshotSync = new();
+    private readonly Dictionary<string, (long Version, HaEntityItem? State)> _liveChanges = new(StringComparer.OrdinalIgnoreCase);
+    private long _liveVersion;
+    private long _snapshotSeq;
+    private long _lastAppliedSnapshotSeq;
     private string _baseUrl = "http://homeassistant.local:8123";
     private string _accessToken = string.Empty;
     private string _webhookId = string.Empty;
@@ -847,70 +860,141 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
     /// Applies one state_changed event from the WebSocket: a known entity gets its new state, a new entity of a
     /// listed domain is added, and a null state removes the entity.
     /// </summary>
-    public void ApplyStateChange(string entityId, HaEntityItem? newState) =>
-        RunOnUi(() =>
+    public void ApplyStateChange(string entityId, HaEntityItem? newState)
+    {
+        var dot = entityId.IndexOf('.');
+        var domain = newState?.Domain ?? (dot > 0 ? entityId[..dot].ToLowerInvariant() : string.Empty);
+        if (!HomeAssistantPlugin.IsListedDomain(domain))
         {
-            var idx = _allEntities.FindIndex(e => e.EntityId.Equals(entityId, StringComparison.OrdinalIgnoreCase));
-            if (newState is null)
-            {
-                if (idx < 0)
-                {
-                    return;
-                }
+            return;
+        }
 
-                _allEntities.RemoveAt(idx);
-            }
-            else if (!HomeAssistantPlugin.IsListedDomain(newState.Domain))
+        // Note the change now, on the receiving thread, so a REST read that started before it cannot undo it.
+        lock (_snapshotSync)
+        {
+            _liveChanges[entityId] = (++_liveVersion, newState);
+        }
+
+        RunOnUi(() => ApplyLiveChangeOnUi(entityId, newState));
+    }
+
+    private void ApplyLiveChangeOnUi(string entityId, HaEntityItem? newState)
+    {
+        var idx = _allEntities.FindIndex(e => e.EntityId.Equals(entityId, StringComparison.OrdinalIgnoreCase));
+        if (newState is null)
+        {
+            if (idx < 0)
             {
                 return;
             }
-            else if (idx >= 0)
+
+            _allEntities.RemoveAt(idx);
+        }
+        else if (idx >= 0)
+        {
+            var old = _allEntities[idx];
+            if (old == newState)
             {
-                var old = _allEntities[idx];
-                if (old == newState)
-                {
-                    return; // Only an attribute changed (for example the brightness of a light).
-                }
-
-                _allEntities[idx] = newState;
-                if (old.FriendlyName == newState.FriendlyName)
-                {
-                    // Same name: the filter keeps the same tiles, so replace the one tile in place.
-                    var shown = Entities.IndexOf(old);
-                    if (shown >= 0)
-                    {
-                        Entities[shown] = newState;
-                    }
-
-                    return;
-                }
-            }
-            else
-            {
-                if (_allEntities.Count >= HomeAssistantPlugin.MaxEntities)
-                {
-                    return;
-                }
-
-                _allEntities.Add(newState);
-                var ordered = HomeAssistantPlugin.OrderForDashboard(_allEntities).ToList();
-                _allEntities.Clear();
-                _allEntities.AddRange(ordered);
+                return; // Only an attribute changed (for example the brightness of a light).
             }
 
-            RebuildFilteredEntities();
-            Raise(nameof(ConnectionBadgeText));
-            Raise(nameof(IsConnectedOrDemo));
-            Raise(nameof(EntitiesCountLabel));
-        });
+            _allEntities[idx] = newState;
+            if (old.FriendlyName == newState.FriendlyName)
+            {
+                // Same name: the filter keeps the same tiles, so replace the one tile in place.
+                var shown = Entities.IndexOf(old);
+                if (shown >= 0)
+                {
+                    Entities[shown] = newState;
+                }
+
+                return;
+            }
+        }
+        else
+        {
+            // The same rule as a REST read: rank by domain, then cut to the cap. A new scene can push out the
+            // lowest-ranked entity. A new entity that ranks last when the list is full is not shown.
+            _allEntities.Add(newState);
+            var ordered = HomeAssistantPlugin.OrderForDashboard(_allEntities).Take(HomeAssistantPlugin.MaxEntities).ToList();
+            if (!ordered.Contains(newState))
+            {
+                _allEntities.Remove(newState);
+                return;
+            }
+
+            _allEntities.Clear();
+            _allEntities.AddRange(ordered);
+        }
+
+        RebuildFilteredEntities();
+        Raise(nameof(ConnectionBadgeText));
+        Raise(nameof(IsConnectedOrDemo));
+        Raise(nameof(EntitiesCountLabel));
+    }
 
     public void SetLiveStatus(string text) => RunOnUi(() => LiveStatusText = text);
 
-    public void ApplyEntities(IReadOnlyList<HaEntityItem> items) =>
+    /// <summary>A full list that is not a REST read (Demo Mode, tests). It counts as the newest read.</summary>
+    public void ApplyEntities(IReadOnlyList<HaEntityItem> items) => ApplySnapshot(items, BeginSnapshot());
+
+    /// <summary>
+    /// Call when a full REST read starts. The ticket orders the reads and marks which live changes are newer.
+    /// </summary>
+    internal SnapshotTicket BeginSnapshot()
+    {
+        lock (_snapshotSync)
+        {
+            return new SnapshotTicket(++_snapshotSeq, _liveVersion);
+        }
+    }
+
+    /// <summary>
+    /// Applies a full list from a read that started at <paramref name="ticket"/>. A read older than one already
+    /// applied is dropped. A live change that came after the read started wins over the read's value for that
+    /// entity, so a slow REST answer cannot turn back a newer WebSocket state.
+    /// </summary>
+    internal void ApplySnapshot(IReadOnlyList<HaEntityItem> items, SnapshotTicket ticket) =>
         RunOnUi(() =>
         {
+            List<(string EntityId, HaEntityItem? State)> newer;
+            lock (_snapshotSync)
+            {
+                if (ticket.Seq < _lastAppliedSnapshotSeq)
+                {
+                    return;
+                }
+
+                _lastAppliedSnapshotSeq = ticket.Seq;
+                newer = _liveChanges
+                    .Where(c => c.Value.Version > ticket.LiveVersion)
+                    .Select(c => (c.Key, c.Value.State))
+                    .ToList();
+
+                // This read already has the older changes, and every later read starts after it: forget them.
+                foreach (var key in _liveChanges.Where(c => c.Value.Version <= ticket.LiveVersion).Select(c => c.Key).ToList())
+                {
+                    _liveChanges.Remove(key);
+                }
+            }
+
+            var merged = items.ToList();
+            foreach (var (entityId, state) in newer)
+            {
+                merged.RemoveAll(e => e.EntityId.Equals(entityId, StringComparison.OrdinalIgnoreCase));
+                if (state is not null)
+                {
+                    merged.Add(state);
+                }
+            }
+
+            if (newer.Count > 0)
+            {
+                merged = HomeAssistantPlugin.OrderForDashboard(merged).Take(HomeAssistantPlugin.MaxEntities).ToList();
+            }
+
             _allEntities.Clear();
-            _allEntities.AddRange(items);
+            _allEntities.AddRange(merged);
             RebuildFilteredEntities();
             if (_allEntities.Count > 0)
             {
