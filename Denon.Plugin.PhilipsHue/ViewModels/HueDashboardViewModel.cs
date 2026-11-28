@@ -395,6 +395,25 @@ public sealed class HueRoomChipViewModel : HueObservableObject
     }
 }
 
+/// <summary>One Hue Entertainment area in the Music Sync picker.</summary>
+public sealed class HueEntertainmentAreaOption
+{
+    public HueEntertainmentAreaOption(HueEntertainmentArea area)
+    {
+        Id = area.Id;
+        Name = area.Name;
+        ChannelCount = area.ChannelCount;
+    }
+
+    public string Id { get; }
+
+    public string Name { get; }
+
+    public int ChannelCount { get; }
+
+    public string Label => $"{Name} • {ChannelCount} {(ChannelCount == 1 ? "channel" : "channels")}";
+}
+
 public sealed class HueDashboardViewModel : HueObservableObject
 {
     private readonly PhilipsHuePlugin _plugin;
@@ -442,6 +461,14 @@ public sealed class HueDashboardViewModel : HueObservableObject
     private string _albumArtSecondaryHex = "#F59E0B";
     private string _albumArtTrackLabel = "Waiting for artwork...";
     private string _entertainmentAreaSummary = "LAN Fast-Sync Ready";
+    private HueEntertainmentAreaOption? _selectedEntertainmentArea;
+    private string _entertainmentAreaHint = string.Empty;
+
+    /// <summary>
+    /// True while the area list is filled from the plugin. The ComboBox then sets its selection by itself; that
+    /// must not save an area or restart the stream.
+    /// </summary>
+    private bool _suppressAreaSave;
     private long _lastMeterUiTickMs;
     private readonly LiveSignalHold _liveSignalHold = new();
 
@@ -518,6 +545,7 @@ public sealed class HueDashboardViewModel : HueObservableObject
     public ObservableCollection<HueRoomChipViewModel> Rooms { get; } = [];
     public ObservableCollection<HueLightViewModel> VisibleLights { get; } = [];
     public ObservableCollection<HueSceneItem> VisibleScenes { get; } = [];
+    public ObservableCollection<HueEntertainmentAreaOption> EntertainmentAreas { get; } = [];
 
     public IReadOnlyList<HueColorPreset> MoodPresets => HueColorPreset.Defaults;
 
@@ -952,6 +980,41 @@ public sealed class HueDashboardViewModel : HueObservableObject
         private set => SetProperty(ref _entertainmentAreaSummary, value);
     }
 
+    public bool HasEntertainmentAreas => EntertainmentAreas.Count > 0;
+
+    /// <summary>
+    /// The area Music Sync uses. When the user picks one, the plugin saves it (and moves a running stream to it).
+    /// When the saved area is gone, this shows the area the plugin uses instead, and the saved id stays.
+    /// </summary>
+    public HueEntertainmentAreaOption? SelectedEntertainmentArea
+    {
+        get => _selectedEntertainmentArea;
+        set
+        {
+            if (!SetProperty(ref _selectedEntertainmentArea, value) || _suppressAreaSave || value is null)
+            {
+                return;
+            }
+
+            UpdateEntertainmentAreaText(value.Id);
+            _ = SelectEntertainmentAreaAsync(value);
+        }
+    }
+
+    public string EntertainmentAreaHint
+    {
+        get => _entertainmentAreaHint;
+        private set
+        {
+            if (SetProperty(ref _entertainmentAreaHint, value))
+            {
+                RaisePropertyChanged(nameof(HasEntertainmentAreaHint));
+            }
+        }
+    }
+
+    public bool HasEntertainmentAreaHint => !string.IsNullOrEmpty(EntertainmentAreaHint);
+
     public void SyncFromPluginConfig(HuePluginConfig config)
     {
         RunOnUi(() =>
@@ -1037,10 +1100,67 @@ public sealed class HueDashboardViewModel : HueObservableObject
     {
         RunOnUi(() =>
         {
-            EntertainmentAreaSummary = areas.Count > 0
-                ? $"Hue Entertainment Ready: {areas[0].Name} ({areas[0].ChannelCount} ch)"
-                : "LAN Fast-Sync Engine Ready";
+            // Show the area the plugin streams to. A saved id that is not in the list stays saved until the user
+            // picks an area.
+            var savedId = _plugin.Config.MusicSync.SelectedEntertainmentAreaId;
+            var inUse = PhilipsHuePlugin.ResolveEntertainmentArea(areas, savedId);
+
+            _suppressAreaSave = true;
+            try
+            {
+                EntertainmentAreas.Clear();
+                foreach (var area in areas)
+                {
+                    EntertainmentAreas.Add(new HueEntertainmentAreaOption(area));
+                }
+
+                SelectedEntertainmentArea = inUse is null
+                    ? null
+                    : EntertainmentAreas.FirstOrDefault(o => string.Equals(o.Id, inUse.Id, StringComparison.OrdinalIgnoreCase));
+            }
+            finally
+            {
+                _suppressAreaSave = false;
+            }
+
+            RaisePropertyChanged(nameof(HasEntertainmentAreas));
+            UpdateEntertainmentAreaText(savedId);
         });
+    }
+
+    /// <summary>Sets the header badge and the hint under the picker from the selected area.</summary>
+    private void UpdateEntertainmentAreaText(string savedId)
+    {
+        var area = SelectedEntertainmentArea;
+        EntertainmentAreaSummary = area is not null
+            ? $"Hue Entertainment Ready: {area.Name} ({area.ChannelCount} ch)"
+            : "LAN Fast-Sync Engine Ready";
+
+        if (area is null)
+        {
+            EntertainmentAreaHint = "No Entertainment areas — create one in the Hue app. Music Sync uses LAN sync.";
+        }
+        else if (!string.IsNullOrWhiteSpace(savedId) && !string.Equals(savedId, area.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            EntertainmentAreaHint = $"The saved area is gone. Music Sync uses '{area.Name}' until you pick an area.";
+        }
+        else
+        {
+            EntertainmentAreaHint = string.Empty;
+        }
+    }
+
+    private async Task SelectEntertainmentAreaAsync(HueEntertainmentAreaOption area)
+    {
+        try
+        {
+            await _plugin.SelectEntertainmentAreaAsync(area.Id);
+            RunOnUi(() => StatusMessage = $"Music Sync uses the Entertainment area '{area.Name}'.");
+        }
+        catch (Exception ex)
+        {
+            ShowCommandError(ex);
+        }
     }
 
     public void SetDemoBeatState(bool active) => RunOnUi(() => IsDemoBeatActive = active);
@@ -1501,7 +1621,7 @@ public sealed class HueDashboardViewModel : HueObservableObject
             Sensitivity = MusicSyncSensitivity,
             MinBrightness = MusicSyncMinBrightness,
             MaxBrightness = MusicSyncMaxBrightness,
-            // No control sets this: keep what the config has.
+            // The area picker saves this through the plugin: keep what the config has.
             SelectedEntertainmentAreaId = _plugin.Config.MusicSync.SelectedEntertainmentAreaId,
         });
 

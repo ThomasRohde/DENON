@@ -201,8 +201,27 @@
                             <ColumnDefinition Width="0.85*" />
                         </Grid.ColumnDefinitions>
 
-                        <!-- Left: 4 Sync Modes + Sliders -->
+                        <!-- Left: Entertainment area + 4 Sync Modes + Sliders -->
                         <StackPanel Grid.Column="0">
+                            <!-- The area the 50 Hz stream uses. Disabled when the bridge has no area. -->
+                            <StackPanel Margin="{skin:Space 0,0,0,10}">
+                                <TextBlock Text="ENTERTAINMENT AREA" FontSize="{DynamicResource FontSize01}" FontWeight="Bold" Foreground="{DynamicResource TextFaintBrush}" Margin="{skin:Space 0,0,0,4}" />
+                                <ComboBox ItemsSource="{Binding EntertainmentAreas}"
+                                          DisplayMemberPath="Label"
+                                          SelectedItem="{Binding SelectedEntertainmentArea}"
+                                          IsEnabled="{Binding HasEntertainmentAreas}"
+                                          AutomationProperties.Name="Hue Entertainment area"
+                                          AutomationProperties.HelpText="{Binding EntertainmentAreaHint}"
+                                          ToolTip="The Hue Entertainment area that Music Sync streams to at 50 Hz"
+                                          FontSize="{DynamicResource FontSize05}" />
+                                <TextBlock Text="{Binding EntertainmentAreaHint}"
+                                           Visibility="{Binding HasEntertainmentAreaHint, Converter={StaticResource HueBoolToVis}}"
+                                           FontSize="{DynamicResource FontSize04}"
+                                           Foreground="{DynamicResource TextMutedBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="{skin:Space 0,4,0,0}" />
+                            </StackPanel>
+
                             <WrapPanel Margin="{skin:Space 0,0,0,10}">
                                 <Button Content="Bass Pulse" Command="{Binding SetMusicSyncModeCommand}" CommandParameter="BassPulse" Padding="{skin:Space 10,5}" FontSize="{DynamicResource FontSize05}" Margin="{skin:Space 0,0,6,6}">
                                     <Button.Style>

@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   only the parts that changed and have no edits. If the part you edit also changed, your edits stay and the banner
   and the status line say so; Save replaces that change and Discard loads it. Factory Reset shows the defaults as
   unsaved changes until you save them.
+- **Pick the Hue Entertainment area for Music Sync** (#79). The Music Sync panel has an "Entertainment area" list
+  with each area and its channel count. A pick is saved, and a running 50 Hz stream moves to the new area. Before,
+  Music Sync always used the first area. When the saved area is gone, the panel says which area it uses instead;
+  with no area, it says to create one in the Hue app.
 
 ### Changed
 - **Ctrl+1 to Ctrl+9 and Ctrl+0 follow the nav rail** (#76): 1 Deck, 2 Music, 3 Stations, 4 Cast, 5 Scenes,
