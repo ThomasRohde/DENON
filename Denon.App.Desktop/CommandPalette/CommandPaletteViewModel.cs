@@ -45,6 +45,7 @@ public sealed class CommandPaletteResultItem
         CommandPaletteCategory.SoundMode => "IconMusicNote",
         CommandPaletteCategory.Plugin => "IconNavPlugins",
         CommandPaletteCategory.PluginAction => "IconPlay",
+        CommandPaletteCategory.Tool => "IconNavScenes",
         _ => "IconChevronRight",
     };
 }
@@ -121,6 +122,7 @@ public sealed class CommandPaletteViewModel : ObservableObject
         CommandPaletteCategory.SoundMode => "Sound mode",
         CommandPaletteCategory.Plugin => "Plugin",
         CommandPaletteCategory.PluginAction => "Plugin action",
+        CommandPaletteCategory.Tool => "Tool",
         _ => category.ToString(),
     };
 
@@ -192,6 +194,8 @@ public sealed class CommandPaletteViewModel : ObservableObject
                 return Guard(_main.SelectSoundModeCommand, mode);
             case PluginCardViewModel plugin:
                 return () => _main.OpenPluginCommand.Execute(plugin);
+            case CommandPaletteTool tool:
+                return () => tool.Open(_main);
             case CommandPalettePluginAction pluginAction:
                 // The same path a plugin-action shortcut takes: it runs the action and shows the result in the status bar.
                 return () => _main.ExecuteShortcutAction($"plugin:{pluginAction.Plugin.Id}:{pluginAction.Action.ActionId}");

@@ -19,6 +19,12 @@ public static class AppDataPaths
 
     public static string PluginsDirectory => Path.Combine(RootDirectory, "plugins");
 
+    /// <summary>The user's own receiver profiles (JSON). They override the profiles bundled in the app.</summary>
+    public static string ProfilesDirectory => Path.Combine(RootDirectory, "profiles");
+
+    /// <summary>The old values of the last receiver setup apply, kept for Undo.</summary>
+    public static string SetupSnapshotsDirectory => Path.Combine(RootDirectory, "setup-snapshots");
+
     public static string ExternalPluginsDirectory => Path.Combine(PluginsDirectory, "external");
 
     public static string SettingsFilePath => Path.Combine(RootDirectory, "settings.json");

@@ -2,6 +2,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Channels;
 using Denon.App.Core.Models;
+using Denon.App.Core.Setup;
 
 namespace Denon.App.Core.Heos;
 
@@ -581,6 +582,63 @@ public sealed class DenonAvrClient : IDisposable
         return lines.Count == 0 ? "(sent - no reply)" : string.Join(Environment.NewLine, lines);
     }
 
+    /// <summary>
+    /// What the receiver is doing now, for the setup check: power, main zone, the selected input and the sound mode.
+    /// Four short reads. A value the receiver does not answer comes back empty (or false).
+    /// </summary>
+    public async Task<(bool IsPoweredOn, bool IsMainZoneOn, string InputCode, string SoundMode)> GetSetupContextAsync(
+        ReceiverSettings settings,
+        CancellationToken cancellationToken)
+    {
+        var power = await TryQueryAsync(settings, "PW?", "PW", cancellationToken);
+        var zone = await TryQueryAsync(settings, "ZM?", "ZM", cancellationToken);
+        var input = await TryQueryAsync(settings, "SI?", "SI", cancellationToken);
+        var mode = await TryQueryAsync(settings, "MS?", "MS", cancellationToken);
+        return (
+            string.Equals(power, "PWON", StringComparison.OrdinalIgnoreCase),
+            string.Equals(zone, "ZMON", StringComparison.OrdinalIgnoreCase),
+            input is null ? string.Empty : ParsePrefixValue(input, "SI").ToUpperInvariant(),
+            mode is null ? string.Empty : ParsePrefixValue(mode, "MS").ToUpperInvariant());
+    }
+
+    /// <summary>
+    /// Sends a read from a receiver profile and returns the lines that came back. The command is a
+    /// <see cref="AvrSetupCommand"/>, which only <see cref="AvrCommandGate"/> makes, so this cannot send anything a
+    /// profile does not describe. Ends as soon as a line satisfies <paramref name="answerLine"/>.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> QuerySetupAsync(
+        ReceiverSettings settings,
+        AvrSetupCommand command,
+        Func<string, bool> answerLine,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(answerLine);
+        if (!command.IsRead)
+        {
+            throw new SetupCommandRefusedException("QuerySetupAsync sends reads only.");
+        }
+
+        return await ExchangeLinesAsync(
+            settings.Host,
+            command.Text,
+            TimeSpan.FromMilliseconds(550),
+            lines => lines.Any(answerLine),
+            cancellationToken);
+    }
+
+    /// <summary>Sends a write from a receiver profile (see <see cref="QuerySetupAsync"/>). Waits briefly for the receiver's echo.</summary>
+    public async Task SendSetupAsync(ReceiverSettings settings, AvrSetupCommand command, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        if (command.IsRead)
+        {
+            throw new SetupCommandRefusedException("SendSetupAsync sends writes only.");
+        }
+
+        await SendCommandAsync(settings, command.Text, cancellationToken);
+    }
+
     public static (int Volume, double VolumeExact, int MaxVolume) ParseVolumeLines(IEnumerable<string> lines)
     {
         var maxVolume = DenonVolumeMath.MaxAbsoluteVolume;
@@ -756,6 +814,12 @@ public sealed class DenonAvrClient : IDisposable
         if (command.Any(char.IsControl))
         {
             throw new ArgumentException("An AVR command must be one line without control characters.", nameof(command));
+        }
+
+        // Denon's limit: 135 bytes for one command, with its closing carriage return.
+        if (Encoding.ASCII.GetByteCount(command) + 1 > AvrCommandGate.MaxCommandBytes)
+        {
+            throw new ArgumentException($"An AVR command is at most {AvrCommandGate.MaxCommandBytes} bytes.", nameof(command));
         }
     }
 

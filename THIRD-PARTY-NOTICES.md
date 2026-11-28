@@ -15,8 +15,15 @@ the list.
 | NAudio (https://github.com/naudio/NAudio) | 3.3.0 | Copyright (c) 2026 Mark Heath & Contributors | MIT |
 | QRCoder (https://github.com/Shane32/QRCoder) | 1.9.0 | Copyright (c) 2013-2025 Raffael Herrmann; Copyright (c) 2024-2025 Shane Krueger | MIT |
 | YoutubeExplode (https://github.com/Tyrrrz/YoutubeExplode) | 6.6.3 | Copyright (C) Oleksii Holub | MIT |
+| JsonSchema.Net, JsonPointer.Net and Json.More.Net (https://github.com/json-everything/json-everything) | 9.7.0, 7.1.0, 3.1.0 | Copyright (c) Greg Dennis and json-everything contributors | MIT source; the binary release is under the Open Source Maintenance Fee agreement (no fee below US$10,000 annual revenue, see the note below) |
+| Humanizer.Core (https://github.com/Humanizr/Humanizer), used by JsonSchema.Net | 3.0.10 | Copyright (c) .NET Foundation and Contributors | MIT |
 | ModelContextProtocol.AspNetCore and ModelContextProtocol.Extensions.Apps (https://github.com/modelcontextprotocol/csharp-sdk) | 2.4.0 | Model Context Protocol a Series of LF Projects, LLC | Apache-2.0 |
 | Microsoft.Web.WebView2 (https://aka.ms/webview) | 1.0.4314.35 | Copyright (C) Microsoft Corporation | BSD-3-Clause style (below) |
+
+The json-everything binaries (JsonSchema.Net and its two companions) come with the "Open Source Maintenance Fee" agreement:
+the source is MIT, and the fee applies only to users with revenue-generating activities and at least US$10,000 annual
+gross revenue. Denon Desktop is free, so no fee is due; anyone who builds a commercial product from it should read
+the agreement (OSMFEULA.txt in the NuGet package) or build the library from source.
 
 The .NET runtime and Microsoft.Extensions packages carry their own third-party notices
 (https://github.com/dotnet/runtime/blob/main/THIRD-PARTY-NOTICES.TXT).

@@ -10,6 +10,7 @@ using Denon.App.Core.Infrastructure;
 using Denon.App.Core.Mcp;
 using Denon.App.Core.Models;
 using Denon.App.Core.Plugins;
+using Denon.App.Core.Setup;
 using Denon.App.Core.Services;
 using Denon.App.Core.Services.Metering;
 using Denon.App.Desktop.Infrastructure;
@@ -155,7 +156,8 @@ public sealed partial class MainViewModel : ObservableObject
         AcousticSyncCalibrationService calibrationService,
         RoomIntelligenceService roomIntelligenceService,
         DenonMcpServer mcpServer,
-        EventTelemetryLog telemetryLog)
+        EventTelemetryLog telemetryLog,
+        ReceiverSetupService setupService)
     {
         _receiverController = receiverController;
         _settingsStore = settingsStore;
@@ -306,6 +308,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         InitializeYouTube(youtubeService, relayServer, youtubeQueueService, cinemaWindow);
         InitializeScenesAcoustics();
+        InitializeSetupCheck(setupService);
         InitializeCastRemoteRadio(radioBrowserService, localJukeboxService, pcAudioCastService, heosEventListener);
         InitializeShortcuts(globalHotkeyService);
         InitializePlugins(pluginHostService);

@@ -17,6 +17,15 @@ Each one needs the real devices, and most change them or play media, so they wai
 - [ ] Jukebox with real files: the cover in Now Playing, the Hue colours from the cover, and the next track
       starting at the real end of a FLAC.
 - [ ] A real arrival ("arrive home" Shortcut) with the receiver left on and HEOS stopped.
+- [ ] Receiver setup check (Scenes & Acoustics → Setup check) on the real X2400H, with the receiver on and an input
+      selected: "Check receiver" only reads. Look at the log (`PSREFLEV ?`, `PSCINEMA EQ. ?`, `PSDRC ?`, `PSLOM ?`,
+      `PSLFE ?`, `PSDELAY ?` were never sent to this receiver) and at the rows: none should say CANNOT READ for a
+      setting the X2400H has. If the receiver does not answer one, fix its read pattern in the bundled profile.
+- [ ] Receiver setup check, per input: apply one safe row (Cinema EQ) on one input, switch to another input and read it
+      there. The code assumes a `PS` write changes the selected input only, and that a read answers for it. If the
+      write changes every input, the per-input rows in the profile become global.
+- [ ] Receiver setup check, Undo: apply two rows, press Undo last apply, and check both values are back. Check the
+      Reference Level Offset row (it needs Dynamic EQ on) and the Direct / Pure Direct rows (blocked by mode).
 
 **Smart TV and casting**
 - [ ] A wake from deep standby (TV off for hours) with "Chromecast on this TV" on Automatic.
@@ -81,6 +90,9 @@ Each one needs the real devices, and most change them or play media, so they wai
 - [ ] LG TV actions `tv.button`, `tv.launch_app`, `tv.type_text` and `tv.open_url` work but are not listed in
       `GetActions` (the `tv_computer` MCP tool covers them). List them or not?
 - [ ] User theme files (JSON tokens, validated on import; no loose XAML)?
+- [ ] The receiver profile schema check uses JsonSchema.Net 9.7.0 (MIT source; the NuGet binary comes under the Open
+      Source Maintenance Fee agreement: no fee below US$10,000 revenue, noted in THIRD-PARTY-NOTICES). Keep it, or
+      replace it with a small validator of our own (the schema is simple) so no fee agreement is in the app?
 
 ## Releases
 
@@ -111,6 +123,13 @@ Each one needs the real devices, and most change them or play media, so they wai
 - [ ] The Brain reads the acoustics every 90 s (`RoomIntelligenceService`). It could read the PS/DIM pushes from
       `ReceiverStateSnapshot.Acoustics` and only check now and then.
 - [ ] HEOS radio is one Volume Memory source ("HEOS Music"); stations differ in loudness. Idea: a key per station.
+- [ ] Receiver setup check: profiles for other families (2018+ X-series, Marantz) from their protocol files; the
+      bundled profile is checked against the X2400H manual and the protocol file only. Its per-model overrides are
+      tested but unused. The forum sources behind some recommendations (Reference Level Offset by use, Restorer) could
+      not be read, so they are second-hand. The sub trim has no target on purpose (sources disagree): it only warns
+      at -12 and +12.
+- [ ] Receiver setup check: a Smart Scene step that applies a use ("films") and an MCP tool that reads the check
+      (read-only). Not built: the check holds the command gate for a few seconds, and a scene already holds it.
 
 **Meters and radio**
 - [ ] Radio meters: check the beat timing against the speakers; if needed, a radio delay setting

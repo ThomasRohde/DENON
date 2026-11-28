@@ -673,6 +673,36 @@ public sealed class ReceiverController
         }
     }
 
+    /// <summary>
+    /// Runs a receiver setup check, apply or undo (<c>Denon.App.Core.Setup</c>) while holding the command gate, so no
+    /// other command sits between its reads and writes. The link it gets sends only commands that came out of the
+    /// profile gate.
+    /// </summary>
+    public async Task<T> RunSetupSessionAsync<T>(
+        string actionDescription,
+        Func<Setup.IReceiverSetupLink, Task<T>> session,
+        CancellationToken cancellationToken = default)
+    {
+        await _commandGate.WaitAsync(cancellationToken);
+        try
+        {
+            var settings = _settingsStore.Current.Receiver;
+            var model = _stateStore.Snapshot.Status?.Player.Model ?? string.Empty;
+            var result = await session(new Setup.AvrSetupLink(_avrClient, settings, model));
+            _logStore.Info($"{actionDescription} completed.");
+            return result;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logStore.Error($"{actionDescription} failed.", exception);
+            throw;
+        }
+        finally
+        {
+            _commandGate.Release();
+        }
+    }
+
     public void ResetConnections()
     {
         _heosClient.Disconnect();

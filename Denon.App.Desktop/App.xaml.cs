@@ -5,6 +5,7 @@ using Denon.App.Core.Heos;
 using Denon.App.Core.Infrastructure;
 using Denon.App.Core.Mcp;
 using Denon.App.Core.Plugins;
+using Denon.App.Core.Setup;
 using Denon.App.Core.Services;
 using Denon.App.Core.Services.Metering;
 using Denon.App.Desktop.Infrastructure;
@@ -133,6 +134,11 @@ public partial class App : System.Windows.Application
             builder.Services.AddSingleton<GlobalHotkeyService>();
             builder.Services.AddSingleton(_ => new LastStationFile());
             builder.Services.AddSingleton<ReceiverController>();
+            builder.Services.AddSingleton(sp => new ReceiverSetupService(
+                sp.GetRequiredService<ReceiverController>(),
+                sp.GetRequiredService<ReceiverStateStore>(),
+                AppDataPaths.ProfilesDirectory,
+                new SetupSnapshotStore(AppDataPaths.SetupSnapshotsDirectory)));
             builder.Services.AddSingleton<YouTubeMediaService>();
             builder.Services.AddSingleton<LocalAudioRelayServer>();
             builder.Services.AddSingleton(sp => new MediaQueueStore(AppDataPaths.QueuesDirectory, sp.GetRequiredService<AppLogStore>()));
@@ -553,6 +559,7 @@ public partial class App : System.Windows.Application
         {
             shots.Add(("Stations", "Presets", "07-stations-presets.png", null));
             shots.Add(("Acoustics", "VolumeMemory", "07b-volume-memory.png", null));
+            shots.Add(("Acoustics", "Setup", "07c-setup-check.png", null));
             shots.Add(("Mcp", null, "08-brain.png", null));
             shots.Add(("Diagnostics", null, "09-health.png", null));
             shots.Add(("Help", null, "10-help.png", null));

@@ -38,6 +38,7 @@ public static class CommandPaletteSearch
         CommandPaletteCategory.SoundMode => ["sound mode", "surround"],
         CommandPaletteCategory.Plugin => ["plugin", "open"],
         CommandPaletteCategory.PluginAction => ["plugin", "action", "run"],
+        CommandPaletteCategory.Tool => ["tool", "check", "open"],
         _ => [],
     };
 

@@ -10,6 +10,7 @@ public enum CommandPaletteCategory
     SoundMode,
     Plugin,
     PluginAction,
+    Tool,
 }
 
 /// <summary>

@@ -604,6 +604,7 @@ public sealed partial class MainViewModel
                 new("07", "Try it and switch it on", "Click Dry run in the editor to see what would happen now without changing anything. Then switch the automation on in the list. AUTOMATION ACTIVITY LOG shows what ran."),
                 new("08", "Let the app remember volumes", "Click Volume memory. The app learns how loud you listen to each TV channel, app and input, and sets that volume when you switch: down at once, up in a short fade, never above the safe volume. Change a level with −1 and +1, or tick Only turn down."),
                 new("09", "Tune the acoustics", "In Smart Scenes & Acoustics → LIVE ACOUSTIC TUNING & AUDYSSEY, set MultEQ, Dynamic EQ, Dynamic Volume, Audio Restorer, the display dimmer, Subwoofer and Dialog levels, and Bass and Treble. Click Sync from AVR to read the values from the receiver."),
+                new("10", "Check the receiver against recommended settings", "Click Setup check, choose Films, Music, Late night or TV, and click Check receiver. It only reads. Rows marked DIFFERS show what the receiver has, what is recommended and why. Tick the rows to change and click Apply ticked: the app asks, saves the old values, and Undo last apply puts them back. Settings that belong to one input are read and set for the input that is selected now."),
             ],
             proTips:
             [
@@ -622,6 +623,7 @@ public sealed partial class MainViewModel
                 new("The Shortcut gets 401 or no answer?", "Use the owner token (not the guest token) and the PC's address on your Wi-Fi. Phone Remote must be on, and the firewall must allow port 18925 (Cast & Remote → Allow Firewall). The answer names the automations that listen to the hook."),
                 new("A plugin step fails with 'Missing … parameter'?", "Fill in the required action parameters shown under PLUGIN ACTION CHAIN (for example entityId for Home Assistant or roomId for Philips Hue) and click Save Scenes."),
                 new("Bass and Treble do not change?", "The receiver turns off tone control while Dynamic EQ is ON."),
+                new("The setup check says BLOCKED BY MODE, CANNOT READ or has no profile?", "BLOCKED BY MODE: Direct and Pure Direct skip Audyssey, so switch to Stereo or Auto first. CANNOT READ: the receiver is in standby, or this model does not answer that setting. No profile: add a profile file for the model to the profiles folder (Profiles folder button; the format is in docs/receiver-profiles.md). A file that was refused is listed on the page with the reason."),
             ],
             quickJumps:
             [
