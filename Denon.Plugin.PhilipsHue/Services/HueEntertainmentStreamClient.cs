@@ -21,6 +21,14 @@ public sealed class HueEntertainmentStreamClient : IAsyncDisposable
     private readonly HttpClient _http;
     private readonly object _sendLock = new();
 
+    /// <summary>
+    /// Start and stop run one at a time. A stop that comes during a start waits for it, then stops what it started.
+    /// </summary>
+    private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
+
+    /// <summary>Counts the streams started; the cleanup after a failed send stops only its own stream.</summary>
+    private int _sessionId;
+
     private Socket? _udpSocket;
     private DtlsTransport? _dtlsTransport;
     private string? _activeBridgeIp;
@@ -45,7 +53,24 @@ public sealed class HueEntertainmentStreamClient : IAsyncDisposable
         HueEntertainmentArea area,
         CancellationToken cancellationToken = default)
     {
-        await StopAsync();
+        await _lifecycleGate.WaitAsync(cancellationToken);
+        try
+        {
+            return await StartCoreAsync(config, area, cancellationToken);
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
+    }
+
+    private async Task<bool> StartCoreAsync(
+        HuePluginConfig config,
+        HueEntertainmentArea area,
+        CancellationToken cancellationToken)
+    {
+        await StopCoreAsync();
+        Interlocked.Increment(ref _sessionId);
 
         if (config.DemoMode ||
             string.IsNullOrWhiteSpace(config.BridgeIp) ||
@@ -76,7 +101,8 @@ public sealed class HueEntertainmentStreamClient : IAsyncDisposable
         try
         {
             // 2. Connect UDP socket & perform DTLS 1.2 PSK handshake on port 2100 (bounded 10s timeout)
-            var ip = IPAddress.Parse(cleanHost);
+            // The bridge address may be a host name typed by hand, not only an IP from discovery.
+            var ip = await ResolveBridgeAddressAsync(cleanHost, cancellationToken);
             var socket = new Socket(ip.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
             socket.Connect(new IPEndPoint(ip, HueEntertainmentUdpPort));
             _udpSocket = socket;
@@ -99,7 +125,7 @@ public sealed class HueEntertainmentStreamClient : IAsyncDisposable
         }
         catch
         {
-            await StopAsync();
+            await StopCoreAsync();
             return false;
         }
     }
@@ -164,12 +190,59 @@ public sealed class HueEntertainmentStreamClient : IAsyncDisposable
             catch
             {
                 _isStreaming = false;
-                return false;
             }
+        }
+
+        // Close the socket and release the area now; the next call returns false at once (not streaming).
+        // Only this stream: a new one may have started by the time the cleanup runs.
+        var failedSession = Volatile.Read(ref _sessionId);
+        _ = Task.Run(() => StopSessionAsync(failedSession));
+        return false;
+    }
+
+    private async Task StopSessionAsync(int sessionId)
+    {
+        await _lifecycleGate.WaitAsync();
+        try
+        {
+            if (Volatile.Read(ref _sessionId) == sessionId)
+            {
+                await StopCoreAsync();
+            }
+        }
+        finally
+        {
+            _lifecycleGate.Release();
         }
     }
 
+    private static async Task<IPAddress> ResolveBridgeAddressAsync(string host, CancellationToken cancellationToken)
+    {
+        if (IPAddress.TryParse(host, out var literal))
+        {
+            return literal;
+        }
+
+        var addresses = await Dns.GetHostAddressesAsync(host, cancellationToken);
+        return addresses.FirstOrDefault(static a => a.AddressFamily == AddressFamily.InterNetwork)
+               ?? addresses.FirstOrDefault()
+               ?? throw new InvalidOperationException($"Could not resolve the Hue bridge '{host}'.");
+    }
+
     public async Task StopAsync()
+    {
+        await _lifecycleGate.WaitAsync();
+        try
+        {
+            await StopCoreAsync();
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
+    }
+
+    private async Task StopCoreAsync()
     {
         _isStreaming = false;
 

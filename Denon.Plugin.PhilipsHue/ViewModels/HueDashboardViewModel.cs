@@ -53,14 +53,23 @@ public sealed class HueCommand : ICommand
 public sealed class HueAsyncCommand : ICommand
 {
     private readonly Func<object?, Task> _execute;
+    private readonly Action<Exception>? _onError;
     private readonly Func<object?, bool>? _canExecute;
     private bool _isRunning;
 
-    public HueAsyncCommand(Func<object?, Task> execute, Func<object?, bool>? canExecute = null)
+    /// <param name="onError">
+    /// Where a failed run goes (the dashboard shows it). Execute is async void, so an exception it let out would
+    /// close the app; with no handler it is dropped.
+    /// </param>
+    public HueAsyncCommand(Func<object?, Task> execute, Func<object?, bool>? canExecute = null, Action<Exception>? onError = null)
     {
         _execute = execute;
         _canExecute = canExecute;
+        _onError = onError;
     }
+
+    public static HueAsyncCommand WithErrors(Action<Exception>? onError, Func<object?, Task> execute, Func<object?, bool>? canExecute = null) =>
+        new(execute, canExecute, onError);
 
     public event EventHandler? CanExecuteChanged;
 
@@ -78,6 +87,10 @@ public sealed class HueAsyncCommand : ICommand
         try
         {
             await _execute(parameter);
+        }
+        catch (Exception ex)
+        {
+            _onError?.Invoke(ex);
         }
         finally
         {
@@ -111,7 +124,8 @@ public sealed class HueLightViewModel : HueObservableObject
         Func<HueLightViewModel, bool, Task> onToggle,
         Func<HueLightViewModel, int, Task> onBrightnessChanged,
         Func<HueLightViewModel, int, Task> onColorTempChanged,
-        Func<HueLightViewModel, HueColorPreset, Task> onPresetApplied)
+        Func<HueLightViewModel, HueColorPreset, Task> onPresetApplied,
+        Action<Exception>? onError = null)
     {
         Id = state.Id;
         Name = state.Name;
@@ -125,8 +139,8 @@ public sealed class HueLightViewModel : HueObservableObject
         _onColorTempChanged = onColorTempChanged;
         _onPresetApplied = onPresetApplied;
 
-        ToggleCommand = new HueAsyncCommand(_ => _onToggle(this, !IsOn));
-        ApplySwatchCommand = new HueAsyncCommand(param =>
+        ToggleCommand = HueAsyncCommand.WithErrors(onError, _ => _onToggle(this, !IsOn));
+        ApplySwatchCommand = HueAsyncCommand.WithErrors(onError, param =>
             param is HueColorPreset preset ? _onPresetApplied(this, preset) : Task.CompletedTask);
 
         ApplyState(state);
@@ -431,20 +445,23 @@ public sealed class HueDashboardViewModel : HueObservableObject
     private long _lastMeterUiTickMs;
     private readonly LiveSignalHold _liveSignalHold = new();
 
+    /// <summary>A command that fails (the bridge went offline on "Exit Demo", a storage error) shows why here.</summary>
+    private void ShowCommandError(Exception ex) => RunOnUi(() => StatusMessage = $"⚠ {ex.Message}");
+
     public HueDashboardViewModel(PhilipsHuePlugin plugin)
     {
         _plugin = plugin;
 
-        DiscoverBridgeCommand = new HueAsyncCommand(_ => DiscoverBridgeAsync());
-        StartPairingCommand = new HueAsyncCommand(_ => StartPairingAsync(), _ => !IsPairing && !string.IsNullOrWhiteSpace(BridgeIpInput));
+        DiscoverBridgeCommand = HueAsyncCommand.WithErrors(ShowCommandError, _ => DiscoverBridgeAsync());
+        StartPairingCommand = HueAsyncCommand.WithErrors(ShowCommandError, _ => StartPairingAsync(), _ => !IsPairing && !string.IsNullOrWhiteSpace(BridgeIpInput));
         CancelPairingCommand = new HueCommand(_ => CancelPairing(), _ => IsPairing);
-        ToggleDemoModeCommand = new HueAsyncCommand(_ => ToggleDemoModeAsync());
-        DisconnectBridgeCommand = new HueAsyncCommand(_ => DisconnectBridgeAsync());
-        RefreshStateCommand = new HueAsyncCommand(_ => RefreshStateAsync(), _ => IsConnectedOrDemo);
+        ToggleDemoModeCommand = HueAsyncCommand.WithErrors(ShowCommandError, _ => ToggleDemoModeAsync());
+        DisconnectBridgeCommand = HueAsyncCommand.WithErrors(ShowCommandError, _ => DisconnectBridgeAsync());
+        RefreshStateCommand = HueAsyncCommand.WithErrors(ShowCommandError, _ => RefreshStateAsync(), _ => IsConnectedOrDemo);
 
-        AllLightsOnCommand = new HueAsyncCommand(_ => ExecuteQuickGroupAsync("0", isOn: true), _ => IsConnectedOrDemo);
-        AllLightsOffCommand = new HueAsyncCommand(_ => ExecuteQuickGroupAsync("0", isOn: false), _ => IsConnectedOrDemo);
-        SetAllBrightnessCommand = new HueAsyncCommand(param =>
+        AllLightsOnCommand = HueAsyncCommand.WithErrors(ShowCommandError, _ => ExecuteQuickGroupAsync("0", isOn: true), _ => IsConnectedOrDemo);
+        AllLightsOffCommand = HueAsyncCommand.WithErrors(ShowCommandError, _ => ExecuteQuickGroupAsync("0", isOn: false), _ => IsConnectedOrDemo);
+        SetAllBrightnessCommand = HueAsyncCommand.WithErrors(ShowCommandError, param =>
         {
             if (param is string s && int.TryParse(s, out var pct))
             {
@@ -461,10 +478,10 @@ public sealed class HueDashboardViewModel : HueObservableObject
                 SelectRoom(room);
             }
         });
-        ToggleSelectedRoomCommand = new HueAsyncCommand(_ => ToggleSelectedRoomAsync(), _ => IsConnectedOrDemo && SelectedRoom is not null);
-        ApplyMoodPresetCommand = new HueAsyncCommand(param =>
+        ToggleSelectedRoomCommand = HueAsyncCommand.WithErrors(ShowCommandError, _ => ToggleSelectedRoomAsync(), _ => IsConnectedOrDemo && SelectedRoom is not null);
+        ApplyMoodPresetCommand = HueAsyncCommand.WithErrors(ShowCommandError, param =>
             param is HueColorPreset preset ? ApplyPresetToSelectedRoomAsync(preset) : Task.CompletedTask, _ => IsConnectedOrDemo);
-        ActivateHueSceneCommand = new HueAsyncCommand(param =>
+        ActivateHueSceneCommand = HueAsyncCommand.WithErrors(ShowCommandError, param =>
             param is HueSceneItem scene ? ActivateHueSceneAsync(scene) : Task.CompletedTask, _ => IsConnectedOrDemo);
         SelectDiscoveredBridgeCommand = new HueCommand(param =>
         {
@@ -474,7 +491,7 @@ public sealed class HueDashboardViewModel : HueObservableObject
                 StatusMessage = $"Selected Hue Bridge at {bridge.IpAddress}. Click 'Press Bridge Button & Pair' to connect.";
             }
         });
-        UseSelectedRoomForAutomationCommand = new HueAsyncCommand(_ => SetAutomationTargetToSelectedRoomAsync());
+        UseSelectedRoomForAutomationCommand = HueAsyncCommand.WithErrors(ShowCommandError, _ => SetAutomationTargetToSelectedRoomAsync());
         ShowAllLightsCommand = new HueCommand(_ =>
         {
             var allChip = Rooms.FirstOrDefault(r => r.Id == "0");
@@ -483,8 +500,8 @@ public sealed class HueDashboardViewModel : HueObservableObject
                 SelectRoom(allChip);
             }
         });
-        ToggleMusicSyncCommand = new HueAsyncCommand(_ => ToggleMusicSyncAsync(), _ => IsConnectedOrDemo);
-        SetMusicSyncModeCommand = new HueAsyncCommand(param =>
+        ToggleMusicSyncCommand = HueAsyncCommand.WithErrors(ShowCommandError, _ => ToggleMusicSyncAsync(), _ => IsConnectedOrDemo);
+        SetMusicSyncModeCommand = HueAsyncCommand.WithErrors(ShowCommandError, param =>
         {
             if (param is string modeStr && Enum.TryParse<HueMusicSyncMode>(modeStr, ignoreCase: true, out var parsed))
             {
@@ -1118,7 +1135,8 @@ public sealed class HueDashboardViewModel : HueObservableObject
                 onToggle: HandleLightToggleAsync,
                 onBrightnessChanged: HandleLightBrightnessAsync,
                 onColorTempChanged: HandleLightColorTempAsync,
-                onPresetApplied: HandleLightPresetAsync));
+                onPresetApplied: HandleLightPresetAsync,
+                onError: ShowCommandError));
         }
 
         VisibleScenes.Clear();
@@ -1454,6 +1472,9 @@ public sealed class HueDashboardViewModel : HueObservableObject
             TurnOffWithReceiverStandby = TurnOffWithReceiverStandby,
             CinemaPauseLights = CinemaPauseLights,
             TargetRoomId = _automationTargetRoomId,
+            // No control sets these: keep what the config has.
+            PauseBrightenPercent = _plugin.Config.Automation.PauseBrightenPercent,
+            ResumeDimPercent = _plugin.Config.Automation.ResumeDimPercent,
         });
 
     private async Task ToggleMusicSyncAsync()
@@ -1480,6 +1501,8 @@ public sealed class HueDashboardViewModel : HueObservableObject
             Sensitivity = MusicSyncSensitivity,
             MinBrightness = MusicSyncMinBrightness,
             MaxBrightness = MusicSyncMaxBrightness,
+            // No control sets this: keep what the config has.
+            SelectedEntertainmentAreaId = _plugin.Config.MusicSync.SelectedEntertainmentAreaId,
         });
 
     private void UpdateConnectionBadge()

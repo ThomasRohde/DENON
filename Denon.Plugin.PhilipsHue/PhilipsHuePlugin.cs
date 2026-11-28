@@ -25,6 +25,14 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
     private HuePluginConfig _config = new();
     private bool _isStarted;
 
+    /// <summary>Cancelled by StopAsync: the startup sync (refresh, then the DTLS stream) ends with the plugin.</summary>
+    private CancellationTokenSource? _lifetimeCts;
+
+    private Task _startupSync = Task.CompletedTask;
+
+    /// <summary>One stream start at a time: a second start would close the first one's socket.</summary>
+    private readonly SemaphoreSlim _dtlsStartGate = new(1, 1);
+
     // Real-time Music Sync state
     private volatile bool _musicSyncActive;
     private volatile bool _demoBeatRunning;
@@ -77,22 +85,36 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
         _isStarted = true;
+        _lifetimeCts?.Dispose();
+        _lifetimeCts = new CancellationTokenSource();
+        var lifetime = _lifetimeCts.Token;
         if (_config.DemoMode || IsConfigured)
         {
             _context?.ReportStatus($"Connecting to {(_config.DemoMode ? "Demo Bridge" : _config.BridgeIp)}...", PluginHealthState.Idle);
-            _ = Task.Run(async () =>
+            _startupSync = Task.Run(async () =>
             {
                 try
                 {
-                    using var initCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    using var initCts = CancellationTokenSource.CreateLinkedTokenSource(lifetime);
+                    initCts.CancelAfter(TimeSpan.FromSeconds(5));
                     await RefreshBridgeStateAsync(initCts.Token);
+                    // Music Sync was on when the app closed: start the 50 Hz stream again, not only the 10 Hz REST path.
+                    if (_musicSyncActive && !lifetime.IsCancellationRequested)
+                    {
+                        await EnsureDtlsStreamAsync(lifetime);
+                        _viewModel?.SetDtlsStreamingState(_entertainmentClient?.IsStreaming == true);
+                    }
+                }
+                catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+                {
+                    // The plugin stopped during the startup sync.
                 }
                 catch (Exception ex)
                 {
                     _context?.Logger.Warning($"Initial Hue sync deferred: {ex.Message}");
                     _context?.ReportStatus($"Bridge unreachable ({_config.BridgeIp})", PluginHealthState.Warning);
                 }
-            });
+            }, CancellationToken.None);
         }
         else
         {
@@ -106,6 +128,9 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
     {
         _isStarted = false;
         StopDemoBeatSimulator();
+
+        await EndStartupSyncAsync();
+
         if (_entertainmentClient is not null)
         {
             await _entertainmentClient.StopAsync();
@@ -443,9 +468,25 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
         }
     }
 
+    /// <summary>
+    /// Cancels the startup sync and waits for it. When it is starting the stream right now, a stop (or an unlink
+    /// that clears the keys) must come after it, or the bridge area stays active.
+    /// </summary>
+    private async Task EndStartupSyncAsync()
+    {
+        _lifetimeCts?.Cancel();
+        try { await _startupSync; } catch { /* already logged, or cancelled */ }
+    }
+
     internal async Task DisconnectBridgeAsync(CancellationToken cancellationToken = default)
     {
+        await EndStartupSyncAsync();
         StopDemoBeatSimulator();
+        if (_entertainmentClient is not null)
+        {
+            await _entertainmentClient.StopAsync(); // Release the area now, not after the bridge's timeout.
+        }
+
         _musicSyncActive = false;
         _config.MusicSync.Enabled = false;
         _config.ApplicationKey = string.Empty;
@@ -454,6 +495,59 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
         await SaveConfigAsync(cancellationToken);
         _viewModel?.SyncFromPluginConfig(_config);
         _context?.ReportStatus("Bridge unlinked — ready to pair", PluginHealthState.Idle);
+    }
+
+    /// <summary>
+    /// Starts the 50 Hz Entertainment (DTLS) stream on the chosen area, or the first one. Without it, Music Sync
+    /// falls back to REST at about 10 Hz. Logs why when the stream does not start.
+    /// </summary>
+    private async Task EnsureDtlsStreamAsync(CancellationToken cancellationToken)
+    {
+        // The startup sync and a "Music Sync on" (button or action) can both get here during one handshake:
+        // the second waits, then sees the stream running and returns.
+        await _dtlsStartGate.WaitAsync(cancellationToken);
+        try
+        {
+            await StartDtlsStreamLockedAsync(cancellationToken);
+        }
+        finally
+        {
+            _dtlsStartGate.Release();
+        }
+    }
+
+    private async Task StartDtlsStreamLockedAsync(CancellationToken cancellationToken)
+    {
+        if (_config.DemoMode || _entertainmentClient is null || string.IsNullOrWhiteSpace(_config.ClientKey) ||
+            _entertainmentClient.IsStreaming)
+        {
+            return;
+        }
+
+        var area = _entertainmentAreas.FirstOrDefault(a =>
+                       string.Equals(a.Id, _config.MusicSync.SelectedEntertainmentAreaId, StringComparison.OrdinalIgnoreCase))
+                   ?? _entertainmentAreas.FirstOrDefault();
+        if (area is null)
+        {
+            _context?.Logger.Info("Hue Music Sync uses REST: the bridge has no entertainment area.");
+            return;
+        }
+
+        if (await _entertainmentClient.StartAsync(_config, area, cancellationToken))
+        {
+            // The start takes a moment. When the plugin stopped or Music Sync went off meanwhile, release the area.
+            if (!_isStarted || !_musicSyncActive || _config.DemoMode || string.IsNullOrWhiteSpace(_config.ClientKey))
+            {
+                await _entertainmentClient.StopAsync();
+                return;
+            }
+
+            _context?.Logger.Info($"Started 50 Hz Hue Entertainment DTLS stream on '{area.Name}' ({area.ChannelCount} ch).");
+        }
+        else
+        {
+            _context?.Logger.Warning($"Hue Entertainment DTLS stream on '{area.Name}' did not start; Music Sync uses REST.");
+        }
     }
 
     internal async Task RefreshBridgeStateAsync(CancellationToken cancellationToken = default)
@@ -481,25 +575,31 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
         _config.MusicSync.Enabled = enabled;
         if (!enabled)
         {
+            // The startup sync keeps running (it reads the rooms, lights and areas). If it is starting the stream
+            // now, that start sees Music Sync off when it finishes and stops the stream itself.
             StopDemoBeatSimulator();
             if (_entertainmentClient is not null)
             {
                 await _entertainmentClient.StopAsync();
             }
         }
-        else if (!_config.DemoMode && _entertainmentClient is not null && !string.IsNullOrWhiteSpace(_config.ClientKey))
+        else
         {
-            var area = _entertainmentAreas.FirstOrDefault(a =>
-                           string.Equals(a.Id, _config.MusicSync.SelectedEntertainmentAreaId, StringComparison.OrdinalIgnoreCase))
-                       ?? _entertainmentAreas.FirstOrDefault();
-            if (area is not null)
+            if (!_config.DemoMode && IsConfigured && (_entertainmentAreas.Count == 0 || _cachedLights.Count == 0))
             {
-                var dtlsOk = await _entertainmentClient.StartAsync(_config, area, cancellationToken);
-                if (dtlsOk)
+                // The first bridge read did not finish (or failed): read it now, so the stream has an area and the
+                // REST path has lights.
+                try
                 {
-                    _context?.Logger.Info($"Started 50 Hz Hue Entertainment DTLS stream on '{area.Name}' ({area.ChannelCount} ch).");
+                    await RefreshBridgeStateAsync(cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _context?.Logger.Warning($"Hue bridge read before Music Sync failed: {ex.Message}");
                 }
             }
+
+            await EnsureDtlsStreamAsync(cancellationToken);
         }
 
         await SaveConfigAsync(cancellationToken);
