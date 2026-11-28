@@ -18,7 +18,10 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
 - [ ] Verify PR 2 in the app: a Volume Memory fade, and Reset Connections while the volume slider moves.
 - [ ] Not done in PR 2: remember optional queries (ECO?, SLP?, Z2?) that a model never answers, so a status read
       does not wait 550 ms for each. Needs care: some models do not answer in standby.
-- [ ] PR 3: Home Assistant and Hue: #32 entity path, #46 crashes, #48 DTLS, the HA part of #68, the Hue part of #64.
+- [x] PR 3: Home Assistant and Hue. #32, #46 and #48 closed; the HA part of #68, the Hue part of #64 (no HTTP
+      fallback with HTTPS on, error answers on reads).
+- [ ] Verify PR 3 live: Hue Music Sync on, restart the app, and check the log says "Started 50 Hz Hue Entertainment
+      DTLS stream". Needs the user's OK (it changes the lights).
 - [x] PR 4: MCP tiers and limits. #66 closed; the MCP side of #61 and #65, and the /health Host check of #64.
       Kept as decided: plugin actions marked destructive still run in SafeControl (#61 F1). The plugin-host items of
       #61 (caller state, origin label, "AVR Control" capability) and #65 (SetPluginEnabledAsync) are in PR 6.

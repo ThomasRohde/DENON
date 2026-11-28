@@ -157,6 +157,9 @@ public sealed class HueBridgeClient : IDisposable
         var groupsJson = await SendWithSchemeFallbackAsync(config.BridgeIp, config.UseHttps, HttpMethod.Get, $"{basePath}/groups", null, cancellationToken);
         var scenesJson = await SendWithSchemeFallbackAsync(config.BridgeIp, config.UseHttps, HttpMethod.Get, $"{basePath}/scenes", null, cancellationToken);
 
+        ThrowIfHueError(lightsJson);
+        ThrowIfHueError(groupsJson);
+        ThrowIfHueError(scenesJson);
         var lights = ParseLights(lightsJson);
         var rooms = ParseGroups(groupsJson);
         var scenes = ParseScenes(scenesJson);
@@ -361,7 +364,9 @@ public sealed class HueBridgeClient : IDisposable
             .Replace("http://", string.Empty, StringComparison.OrdinalIgnoreCase)
             .TrimEnd('/');
 
-        var schemes = preferHttps ? new[] { "https", "http" } : new[] { "http", "https" };
+        // With HTTPS on, never fall back to HTTP: the request path carries the app key, and pairing returns
+        // a new key. A bridge without HTTPS works with "Use HTTPS" turned off (then HTTP first, HTTPS second).
+        var schemes = preferHttps ? new[] { "https" } : new[] { "http", "https" };
         Exception? lastError = null;
 
         foreach (var scheme in schemes)
@@ -397,7 +402,30 @@ public sealed class HueBridgeClient : IDisposable
             }
         }
 
-        throw new InvalidOperationException($"Could not reach Philips Hue Bridge at {cleanHost}: {lastError?.Message}");
+        var hint = preferHttps ? " (over HTTPS; turn off 'Use HTTPS' only if this bridge has no HTTPS)" : string.Empty;
+        throw new InvalidOperationException($"Could not reach Philips Hue Bridge at {cleanHost}{hint}: {lastError?.Message}");
+    }
+
+    /// <summary>
+    /// A Hue v1 read answers 200 OK with [{"error":{...}}] when it fails. The parsers expect an object and would
+    /// show "no lights"; throw with the bridge's description instead.
+    /// </summary>
+    internal static void ThrowIfHueError(string json)
+    {
+        if (!json.TrimStart().StartsWith('['))
+        {
+            return;
+        }
+
+        using var doc = JsonDocument.Parse(json);
+        foreach (var item in doc.RootElement.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.Object && item.TryGetProperty("error", out var error))
+            {
+                var description = error.TryGetProperty("description", out var d) ? d.GetString() : null;
+                throw new InvalidOperationException($"Hue Bridge error: {description ?? error.GetRawText()}");
+            }
+        }
     }
 
     private static IReadOnlyList<HueLightState> ParseLights(string json)
