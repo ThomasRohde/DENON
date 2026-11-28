@@ -104,17 +104,18 @@ public sealed class McpAuditLog
     /// <summary>Adds a line. Returns false when the write failed (the line is dropped).</summary>
     public bool Write(McpAuditEntry entry)
     {
-        var line = FormatLine(entry) + "\n";
         lock (_gate)
         {
             try
             {
+                var line = FormatLine(entry) + "\n";
                 var path = PickFileLocked(_clock());
                 File.AppendAllText(path, line);
                 return true;
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (Exception)
             {
+                // Any failure (the disk, the folder, the line) drops the line; the tool call goes on.
                 _currentPath = null;
                 return false;
             }

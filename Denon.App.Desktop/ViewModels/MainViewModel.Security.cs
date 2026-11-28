@@ -240,9 +240,23 @@ public sealed partial class MainViewModel
         ];
     }
 
+    /// <summary>Saves LAN only. A failed save is logged and the checkbox shows the saved value again.</summary>
     private async Task SaveLanOnlyAsync(bool lanOnly)
     {
-        var (_, savedToDisk) = await _settingsStore.UpdateQuietAsync(s => s.Security.LanOnly = lanOnly);
+        bool savedToDisk;
+        try
+        {
+            (_, savedToDisk) = await _settingsStore.UpdateQuietAsync(s => s.Security.LanOnly = lanOnly);
+        }
+        catch (Exception ex)
+        {
+            _logStore.Warning($"Could not save LAN only: {ex.Message}");
+            SyncInstantSecurityFields(_settingsStore.Current);
+            StatusMessage = $"Could not save LAN only: {ex.Message}";
+            McpStatusMessage = $"⚠ {StatusMessage}";
+            return;
+        }
+
         StatusMessage = lanOnly
             ? "LAN only is on: the Phone Remote and the MCP server answer only this PC and the local network."
             : "LAN only is off.";

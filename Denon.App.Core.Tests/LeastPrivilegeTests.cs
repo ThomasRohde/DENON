@@ -103,6 +103,20 @@ public sealed class LeastPrivilegeTests : IDisposable
     }
 
     [Fact]
+    public void A_failed_audit_write_is_dropped_and_does_not_throw()
+    {
+        // A file where the folder should be: the write fails, returns false, and the next one tries again.
+        var blocked = Path.Combine(_tempDir, "not-a-folder");
+        File.WriteAllText(blocked, "x");
+        var log = new McpAuditLog(blocked);
+        Assert.False(log.Write(new McpAuditEntry(DateTimeOffset.UtcNow, null, null, "t", [], McpAuditOutcome.Ok, 0)));
+        Assert.Null(log.CurrentFile);
+
+        var throwingClock = new McpAuditLog(Path.Combine(_tempDir, "clock"), () => throw new InvalidOperationException("clock"));
+        Assert.False(throwingClock.Write(new McpAuditEntry(DateTimeOffset.UtcNow, null, null, "t", [], McpAuditOutcome.Ok, 0)));
+    }
+
+    [Fact]
     public void After_a_restart_the_audit_log_goes_on_with_todays_file()
     {
         var now = new DateTimeOffset(2026, 11, 20, 8, 0, 0, TimeSpan.Zero);
