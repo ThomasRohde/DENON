@@ -5,8 +5,16 @@ namespace Denon.App.Core.Services;
 public sealed class ReceiverStateStore
 {
     private readonly object _syncRoot = new();
+    private readonly object _deliverSync = new();
     private ReceiverStateSnapshot _current = ReceiverStateSnapshot.Empty;
+    private long _version;
+    private long _deliveredVersion;
 
+    /// <summary>
+    /// Raised after each change, one at a time and in order, always with the newest snapshot. Writes come from more
+    /// than one thread (a full read, the receiver's pushes, HEOS events); an older snapshot is never raised after a
+    /// newer one, or the window and the event log could keep a state the receiver already left.
+    /// </summary>
     public event Action<ReceiverStateSnapshot>? StateChanged;
 
     public ReceiverStateSnapshot Snapshot
@@ -57,7 +65,7 @@ public sealed class ReceiverStateStore
     /// </summary>
     public void PatchFromReceiver(Func<ReceiverStatus, ReceiverStatus> status, Func<AcousticStatus, AcousticStatus>? acoustics = null)
     {
-        ReceiverStateSnapshot? changed = null;
+        var changed = false;
         lock (_syncRoot)
         {
             var current = _current;
@@ -74,13 +82,14 @@ public sealed class ReceiverStateStore
                     Acoustics = acousticsChanged ? newAcoustics! with { RetrievedAt = now } : current.Acoustics,
                     LastSuccessfulRefresh = statusChanged ? now : current.LastSuccessfulRefresh,
                 };
-                changed = _current;
+                _version++;
+                changed = true;
             }
         }
 
-        if (changed is not null)
+        if (changed)
         {
-            StateChanged?.Invoke(changed);
+            Deliver();
         }
     }
 
@@ -136,13 +145,37 @@ public sealed class ReceiverStateStore
 
     private void Update(Func<ReceiverStateSnapshot, ReceiverStateSnapshot> updater)
     {
-        ReceiverStateSnapshot snapshot;
         lock (_syncRoot)
         {
             _current = updater(_current);
-            snapshot = _current;
+            _version++;
         }
 
-        StateChanged?.Invoke(snapshot);
+        Deliver();
+    }
+
+    /// <summary>
+    /// Raises the newest snapshot unless it was raised already. One delivery at a time: a writer that comes second
+    /// waits, then finds its change already raised (with the newer one) or raises it. The handlers only queue work
+    /// or take short locks of their own, so this never waits long.
+    /// </summary>
+    private void Deliver()
+    {
+        lock (_deliverSync)
+        {
+            ReceiverStateSnapshot snapshot;
+            lock (_syncRoot)
+            {
+                if (_version == _deliveredVersion)
+                {
+                    return;
+                }
+
+                _deliveredVersion = _version;
+                snapshot = _current;
+            }
+
+            StateChanged?.Invoke(snapshot);
+        }
     }
 }

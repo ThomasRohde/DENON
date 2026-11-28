@@ -520,6 +520,49 @@ public sealed class ReceiverTransportTests : IDisposable
         Assert.Equal(TimeSpan.FromSeconds(slowSeconds), ReceiverPollingService.SlowCheckInterval(pollSeconds));
 
     [Fact]
+    public async Task State_changes_from_many_threads_are_raised_in_order_and_end_on_the_newest()
+    {
+        var state = new ReceiverStateStore();
+        var player = new ReceiverPlayerInfo("Fake", 1, "Fake AVR", "1", "127.0.0.1", "wired", 0, "");
+        var media = new NowPlayingMedia("", "", "", "", "", "", "", null, null);
+        var start = new ReceiverStatus(player, "stop", 0, false, media, DateTimeOffset.Now, IsPoweredOn: true, IsMainZoneOn: true);
+        state.UpdateStatus(start); // A status to patch.
+        var raised = new List<int>();
+        state.StateChanged += snapshot =>
+        {
+            lock (raised)
+            {
+                raised.Add(snapshot.Status?.Volume ?? -1);
+            }
+        };
+
+        var order = 0;
+        // Like a full read and the receiver's pushes at the same time. The stamp is taken inside the store's lock,
+        // so it is the order of the writes.
+        await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() =>
+        {
+            for (var i = 0; i < 200; i++)
+            {
+                if (i % 2 == 0)
+                {
+                    state.UpdateStatus(start, s => s with { Volume = Interlocked.Increment(ref order) });
+                }
+                else
+                {
+                    state.PatchFromReceiver(s => s with { Volume = Interlocked.Increment(ref order) });
+                }
+            }
+        })));
+
+        Assert.Equal(1600, order);
+        Assert.Equal(1600, raised[^1]); // The last raised state is the newest.
+        for (var i = 1; i < raised.Count; i++)
+        {
+            Assert.True(raised[i] > raised[i - 1], $"State {raised[i]} was raised after {raised[i - 1]}.");
+        }
+    }
+
+    [Fact]
     public async Task A_query_gets_its_answer_while_a_push_comes_in_between()
     {
         using var avr = new FakeAvr();
