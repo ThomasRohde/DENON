@@ -86,6 +86,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
     private string _appsCountBadge = "7 quick apps";
     private bool _isBusy;
     private string _selectedTab = SmartTvConfig.WatchTab;
+    private string _remotePanel = SmartTvConfig.ButtonsPanel;
     private bool _suppressAutoSave;
 
     public SmartTvDashboardViewModel(SmartTvPlugin plugin)
@@ -186,6 +187,29 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 
     public bool IsSettingsTab { get => _selectedTab == SmartTvConfig.SettingsTab; set { if (value) SelectTab(SmartTvConfig.SettingsTab); } }
 
+    // The Remote tab's right side: the remote buttons or the trackpad. The keyboard line serves both.
+    public bool IsButtonsPanel { get => _remotePanel == SmartTvConfig.ButtonsPanel; set { if (value) SelectRemotePanel(SmartTvConfig.ButtonsPanel); } }
+
+    public bool IsTrackpadPanel { get => _remotePanel == SmartTvConfig.TrackpadPanel; set { if (value) SelectRemotePanel(SmartTvConfig.TrackpadPanel); } }
+
+    private void SelectRemotePanel(string panel, bool remember = true)
+    {
+        panel = SmartTvConfig.NormalizeRemotePanel(panel);
+        if (remember)
+        {
+            _ = _plugin.SavePageChoiceAsync(remotePanel: panel);
+        }
+
+        if (_remotePanel == panel)
+        {
+            return;
+        }
+
+        _remotePanel = panel;
+        Raise(nameof(IsButtonsPanel));
+        Raise(nameof(IsTrackpadPanel));
+    }
+
     /// <summary>
     /// Shows a tab. A tab the person picks is kept for the next visit (<paramref name="remember"/>); one the page
     /// opens by itself (Settings while the TV is not paired) is not. The screen preview refreshes only on Remote.
@@ -195,7 +219,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
         tab = SmartTvConfig.NormalizeTab(tab);
         if (remember)
         {
-            _ = _plugin.SaveDashboardTabAsync(tab);
+            _ = _plugin.SavePageChoiceAsync(tab: tab);
         }
 
         if (_selectedTab == tab)
@@ -528,6 +552,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
 
                 var isConfigured = cfg.DemoMode || (!string.IsNullOrWhiteSpace(cfg.TvIp) && !string.IsNullOrWhiteSpace(cfg.ClientKey));
                 SelectTab(isConfigured ? cfg.DashboardTab : SmartTvConfig.SettingsTab, remember: false);
+                SelectRemotePanel(cfg.RemotePanel, remember: false);
                 if (isConfigured && StatusMessage == NotPairedHint)
                 {
                     StatusMessage = string.Empty;
@@ -822,6 +847,7 @@ public sealed class SmartTvDashboardViewModel : INotifyPropertyChanged
             LastWebOsVersion = _plugin.Config.LastWebOsVersion,
             CecWakeCastDevice = _cecWakeCastDevice,
             DashboardTab = _plugin.Config.DashboardTab,
+            RemotePanel = _plugin.Config.RemotePanel,
         });
         StatusMessage = quiet ? "✓ Coordination setting saved automatically." : "✓ Saved Smart TV settings.";
     }

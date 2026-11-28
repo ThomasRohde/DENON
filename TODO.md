@@ -116,6 +116,7 @@ prompt is wired (`create_or_update_automation`) but not tried with a real agent.
 - [x] Checked live on 2026-11-28: TV on → Live TV and TV audio works.
 - [ ] Check live: a cast from the iPhone while the TV is off → the cast stays.
 - [x] TV page tabs (Watch, Remote, Apps, Settings); the last tab is kept (`DashboardTab`). Checked in the app.
+- [x] Remote tab: one card, TV screen + "Remote" or "Trackpad" (kept in `RemotePanel`) + one keyboard line. Checked in the app.
 - [x] "TV on → Live TV" example and the "Recent event" condition (2.10.12). Not when a cast or the Apple TV woke the TV.
 - [ ] Check "TV on → Live TV" live: TV remote on (HDMI 1 → Live TV), and a cast from the iPhone (stays on the cast).
 - [x] Station logos are cached in memory and in `art-cache`; the last started station is kept in `last-station.txt`

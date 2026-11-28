@@ -14,6 +14,16 @@ public sealed class SmartTvConfig
     /// <summary>The tab the Smart TV page opens on: the one the person used last.</summary>
     public string DashboardTab { get; set; } = WatchTab;
 
+    public const string ButtonsPanel = "buttons";
+    public const string TrackpadPanel = "trackpad";
+
+    /// <summary>The Remote tab shows the remote buttons or the trackpad beside the TV screen: the one used last.</summary>
+    public string RemotePanel { get; set; } = ButtonsPanel;
+
+    /// <summary>"trackpad", else the buttons.</summary>
+    public static string NormalizeRemotePanel(string? panel) =>
+        string.Equals(panel?.Trim(), TrackpadPanel, StringComparison.OrdinalIgnoreCase) ? TrackpadPanel : ButtonsPanel;
+
     public string TvName { get; set; } = "Living Room Smart TV";
 
     public string TvIp { get; set; } = string.Empty;
