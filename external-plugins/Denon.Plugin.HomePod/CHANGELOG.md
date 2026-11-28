@@ -10,7 +10,7 @@ Released separately from Denon Desktop with tags `homepod-vX.Y.Z`.
 
 ## [0.2.0] - 2026-11-24
 
-Needs Denon Desktop **2.8.0** or later for the now-playing hero (older versions ignore it).
+Needs Denon Desktop **2.8.0** or later. On an older version the plugin does not run: it calls a host method (ReportStatus with details) that those versions do not have. Denon Desktop now refuses a plugin built for a newer Plugin SDK, with a clear log line.
 
 ### Added
 - **The now-playing hero shows the HomePod while the receiver sleeps:** the title, "artist • app • speaker", the

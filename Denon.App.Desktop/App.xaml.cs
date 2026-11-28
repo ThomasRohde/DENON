@@ -786,7 +786,8 @@ public partial class App : System.Windows.Application
             var pluginHost = host.Services.GetService<PluginHostService>();
             if (pluginHost is not null)
             {
-                await pluginHost.StopAllAsync().WaitAsync(pluginTimeout);
+                using var stopCts = new CancellationTokenSource(pluginTimeout);
+                await pluginHost.StopAllAsync(stopCts.Token).WaitAsync(pluginTimeout);
             }
         }
         catch
