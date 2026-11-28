@@ -49,6 +49,10 @@ requests stay open for later: #63, #75, #76, #77, #78, #79 (#74 is done, see bel
       SHA256SUMS (#62, needs a signing key and a release step), central package versions and the BouncyCastle
       version split (#72, with the Apple TV and HomePod plugins in PR 12), and the larger #59 test items (Chromecast
       tests in PR 13, the Apple TV clock in PR 12, loopback tests for the editor and Insights servers).
+- [x] PR 10a follow-up: central package versions in Directory.Packages.props, one BouncyCastle (2.7.0) for Hue,
+      Apple TV and HomePod, and a global.json that CI and the release workflows read (#72). Still on .NET 10;
+      the TargetFramework stays in each project (the SDK and the external plugins must stay on net10.0 when the
+      app moves).
 - [ ] Verify PR 10a (needs the user): uninstall with "Launch at Windows startup" turned on in Settings and check
       that the startup entry is gone; the next in-app update downloads, starts and shows notes without the
       download list.

@@ -2,6 +2,12 @@
 
 Released separately from Denon Desktop with tags `appletv-vX.Y.Z`.
 
+## [Unreleased]
+
+### Changed
+- **BouncyCastle 2.7.0** (#72), the same version as the Hue plugin in Denon Desktop (it was 2.5.1). The package
+  versions now come from the repository's `Directory.Packages.props`.
+
 ## [0.6.0] - 2026-11-28
 
 ### Security
