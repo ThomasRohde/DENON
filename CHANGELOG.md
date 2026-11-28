@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   zone would play the new input at its old volume). A scene's stream counts too (it switches to NET). When the mute
   fails too, the input and stream steps are skipped and the log says why.
 
-## [2.10.31] - 2026-11-28
+## [2.10.32] - 2026-11-28
 
 ### Added
 - **The Jukebox reads the tags of your files** (#79): the title, artist, album, length and cover art come from the
@@ -23,6 +23,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   than 4 MB).
 - **The Jukebox and YouTube queues come back after a restart** (#79), with shuffle, repeat and the YouTube history.
   Only the queue comes back: nothing starts to play by itself. The queues are in the `queues` folder.
+
+### Fixed
+- The phone remote gets only web artwork. Before, it got a file path on this PC (a TV channel logo), which a phone
+  cannot load.
+
+## [2.10.31] - 2026-11-28
+
+### Added
 - **Unsaved changes banner on Settings, Scenes and Stations** (#76). When you edit a field, a scene or a station
   and do not save yet, the page shows "Unsaved changes" with Save and Discard. A settings change from somewhere
   else (an automation, Volume Memory, the MCP server, a plugin) no longer overwrites your edits: the app loads again
@@ -46,10 +54,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   refused for in-app shortcuts like the other page keys.
 - Ctrl+K is a normal key binding of the main window now (it was a temporary class handler). It does nothing while
   the shortcut recorder or the update panel is open.
-
-### Fixed
-- The phone remote gets only web artwork. Before, it got a file path on this PC (a TV channel logo), which a phone
-  cannot load.
 
 ## [2.10.30] - 2026-11-28
 
