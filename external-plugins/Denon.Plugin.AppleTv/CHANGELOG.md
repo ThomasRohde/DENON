@@ -4,6 +4,10 @@ Released separately from Denon Desktop with tags `appletv-vX.Y.Z`.
 
 ## [Unreleased]
 
+### Changed
+- **BouncyCastle 2.7.0** (#72), the same version as the Hue plugin in Denon Desktop (it was 2.5.1). The package
+  versions now come from the repository's `Directory.Packages.props`.
+
 ### Fixed
 - **No second copy of an Apple TV after a partial discovery reply** (#70). When only the Companion service
   answered, the reply had no device id, and the Apple TV was saved again under its IP address. Now such a reply only
