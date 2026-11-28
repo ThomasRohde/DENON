@@ -543,7 +543,8 @@ public static class SetupCheckEngine
                 await link.SendAsync(write, cancellationToken);
                 var after = await ReadTokenAsync(setting, link, cancellationToken);
                 var kind = ClassifyReadBack(after, entry.OldToken);
-                if (kind != SetupOutcomeKind.NotTaken)
+                // Only a confirmed old value ends the entry; an unconfirmed one stays so the undo can be tried again.
+                if (kind == SetupOutcomeKind.Applied)
                 {
                     remaining[i] = entry with { Written = false };
                 }

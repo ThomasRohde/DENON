@@ -578,6 +578,21 @@ public sealed class ReceiverSetupCheckTests : IDisposable
         Assert.Equal(["dynamicEq", "cinemaEq"], undo.Snapshot!.Entries.Where(static e => e.Written).Select(static e => e.SettingId));
     }
 
+    [Fact]
+    public async Task An_undo_the_receiver_does_not_confirm_stays_in_the_snapshot_for_another_try()
+    {
+        var link = SetupTestProfiles.FakeWithWrongValues(_profile);
+        var store = Store();
+        var check = await SetupCheckEngine.CheckAsync(_profile, ListeningUse.Films, link, CancellationToken.None);
+        await SetupCheckEngine.ApplyAsync(check, ["eco"], link, store, CancellationToken.None);
+        link.BeforeWrite = _ => link.Silent.Add("eco");
+
+        var undo = await SetupCheckEngine.UndoAsync(store.Load()!, _profile, link, CancellationToken.None);
+
+        Assert.Equal(SetupOutcomeKind.Unconfirmed, Assert.Single(undo.Outcomes).Kind);
+        Assert.True(undo.Snapshot!.HasWrittenEntries);
+    }
+
     // ---- Which receiver ------------------------------------------------------------------------------------------
 
     [Fact]
