@@ -25,6 +25,11 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
     private HuePluginConfig _config = new();
     private bool _isStarted;
 
+    /// <summary>Cancelled by StopAsync: the startup sync (refresh, then the DTLS stream) ends with the plugin.</summary>
+    private CancellationTokenSource? _lifetimeCts;
+
+    private Task _startupSync = Task.CompletedTask;
+
     // Real-time Music Sync state
     private volatile bool _musicSyncActive;
     private volatile bool _demoBeatRunning;
@@ -77,28 +82,36 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
         _isStarted = true;
+        _lifetimeCts?.Dispose();
+        _lifetimeCts = new CancellationTokenSource();
+        var lifetime = _lifetimeCts.Token;
         if (_config.DemoMode || IsConfigured)
         {
             _context?.ReportStatus($"Connecting to {(_config.DemoMode ? "Demo Bridge" : _config.BridgeIp)}...", PluginHealthState.Idle);
-            _ = Task.Run(async () =>
+            _startupSync = Task.Run(async () =>
             {
                 try
                 {
-                    using var initCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    using var initCts = CancellationTokenSource.CreateLinkedTokenSource(lifetime);
+                    initCts.CancelAfter(TimeSpan.FromSeconds(5));
                     await RefreshBridgeStateAsync(initCts.Token);
                     // Music Sync was on when the app closed: start the 50 Hz stream again, not only the 10 Hz REST path.
-                    if (_isStarted && _musicSyncActive)
+                    if (_musicSyncActive && !lifetime.IsCancellationRequested)
                     {
-                        await EnsureDtlsStreamAsync(CancellationToken.None);
+                        await EnsureDtlsStreamAsync(lifetime);
                         _viewModel?.SetDtlsStreamingState(_entertainmentClient?.IsStreaming == true);
                     }
+                }
+                catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+                {
+                    // The plugin stopped during the startup sync.
                 }
                 catch (Exception ex)
                 {
                     _context?.Logger.Warning($"Initial Hue sync deferred: {ex.Message}");
                     _context?.ReportStatus($"Bridge unreachable ({_config.BridgeIp})", PluginHealthState.Warning);
                 }
-            });
+            }, CancellationToken.None);
         }
         else
         {
@@ -112,6 +125,11 @@ public sealed class PhilipsHuePlugin : IDenonPlugin, IPluginViewProvider, IAudio
     {
         _isStarted = false;
         StopDemoBeatSimulator();
+
+        // End the startup sync first: if it is starting the stream now, the stop below must come after it.
+        _lifetimeCts?.Cancel();
+        try { await _startupSync; } catch { /* already logged, or cancelled */ }
+
         if (_entertainmentClient is not null)
         {
             await _entertainmentClient.StopAsync();

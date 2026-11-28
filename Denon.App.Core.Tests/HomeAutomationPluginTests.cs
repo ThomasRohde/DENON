@@ -59,33 +59,44 @@ public sealed class HomeAutomationPluginTests
     }
 
     [Fact]
-    public async Task A_failed_hue_command_goes_to_the_error_handler()
+    public async Task A_failed_hue_command_goes_to_its_dashboards_error_handler()
     {
-        var previous = HueAsyncCommand.ErrorHandler;
         Exception? seen = null;
-        HueAsyncCommand.ErrorHandler = e => seen = e;
-        try
+        var command = HueAsyncCommand.WithErrors(e => seen = e, async _ =>
         {
-            var command = new HueAsyncCommand(async _ =>
-            {
-                await Task.Yield();
-                throw new InvalidOperationException("Could not reach Philips Hue Bridge");
-            });
+            await Task.Yield();
+            throw new InvalidOperationException("Could not reach Philips Hue Bridge");
+        });
 
-            command.Execute(null);
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-            while (seen is null && DateTime.UtcNow < deadline)
-            {
-                await Task.Delay(10);
-            }
-
-            Assert.IsType<InvalidOperationException>(seen);
-            Assert.True(command.CanExecute(null));
-        }
-        finally
+        command.Execute(null);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (seen is null && DateTime.UtcNow < deadline)
         {
-            HueAsyncCommand.ErrorHandler = previous;
+            await Task.Delay(10);
         }
+
+        Assert.IsType<InvalidOperationException>(seen);
+        Assert.True(command.CanExecute(null));
+
+        // Without a handler the error is dropped, never thrown out of async void.
+        var silent = new HueAsyncCommand(_ => throw new InvalidOperationException("x"));
+        Assert.Null(Record.Exception(() => silent.Execute(null)));
+    }
+
+    [Fact]
+    public async Task Saving_home_assistant_without_url_or_token_does_not_claim_a_sync()
+    {
+        var viewModel = new HomeAssistantViewModel(new HomeAssistantPlugin());
+
+        viewModel.SaveAndConnectCommand.Execute(null);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (!viewModel.StatusMessage.StartsWith('✓') && !viewModel.StatusMessage.Contains('⚠') && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(10);
+        }
+
+        Assert.Contains("Enter the Home Assistant URL", viewModel.StatusMessage);
+        Assert.DoesNotContain("synced", viewModel.StatusMessage);
     }
 
     [Fact]

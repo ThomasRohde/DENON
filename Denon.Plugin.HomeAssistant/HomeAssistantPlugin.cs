@@ -266,12 +266,11 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
 
         // Keep scenes, scripts and switches when there are many lights and helpers: a cap after an
         // alphabetical sort used to drop every scene.
-        var kept = list
+        var ordered = list
             .OrderBy(static e => DomainRank(e.Domain))
             .ThenBy(static e => e.FriendlyName, StringComparer.CurrentCultureIgnoreCase)
             .Take(MaxEntities)
             .ToList();
-        var ordered = kept.OrderBy(static e => e.Domain).ThenBy(static e => e.FriendlyName).ToList();
         _viewModel?.ApplyEntities(ordered);
         var countText = list.Count > MaxEntities ? $"{ordered.Count} of {list.Count}" : $"{ordered.Count}";
         _context?.ReportStatus($"Connected • {countText} entities synced", PluginHealthState.Connected);
@@ -321,6 +320,8 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
         });
     }
 
+    internal const string NotConfiguredMessage = "Enter the Home Assistant URL and a long-lived access token to connect.";
+
     /// <summary>Most entities the dashboard lists. Scenes, scripts and switches come first.</summary>
     internal const int MaxEntities = 300;
 
@@ -364,7 +365,10 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
         return true;
     }
 
-    /// <returns>Null when saved and connected (or nothing to check); otherwise why the connection check failed.</returns>
+    /// <returns>
+    /// Null when saved and the entities synced (or Demo Mode); <see cref="NotConfiguredMessage"/> when the URL or the
+    /// token is missing, so nothing was checked; otherwise why the connection check failed.
+    /// </returns>
     internal async Task<string?> SaveConfigAsync(HomeAssistantConfig updated)
     {
         _config = updated;
@@ -388,6 +392,7 @@ public sealed class HomeAssistantPlugin : IDenonPlugin, IPluginViewProvider
         else
         {
             _context?.ReportStatus("Enter Home Assistant URL & Token (or Demo Mode)", PluginHealthState.Idle);
+            return NotConfiguredMessage;
         }
 
         return null;
@@ -707,7 +712,9 @@ public sealed class HomeAssistantViewModel : INotifyPropertyChanged
             DemoMode = DemoMode,
             PushReceiverEventsToHa = PushEvents,
         });
-        StatusMessage = error is not null
+        StatusMessage = error == HomeAssistantPlugin.NotConfiguredMessage
+            ? $"✓ Saved. {error}"
+            : error is not null
             ? $"⚠ Saved, but connection check failed: {error}"
             : quiet
                 ? "✓ Home Assistant event push setting saved."
