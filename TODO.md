@@ -169,15 +169,28 @@ Phase 2 is done in 1.18.0: YouTube / YouTube Music and jukebox tracks are decode
 - [x] RTA during PC Cast from a non-default output device no longer falls back to SIM: `PcCastAudioMeterPipeline` runs
       a 512-pt 31-band FFT directly on the PC Cast capture stream (both default and non-default output devices).
 
+## Cinema Companion HUD (#79, part 1)
+
+Done: Play/Pause, Vol −/+ and Mute in the full-screen HUD (`#denon-cinema-hud`, volume in receiver steps, capped
+at the safe volume by `CinemaHudVolume`), and Save Offset in the sync bar (nudges are for the session until saved).
+
+- [x] Verified in the app with a video (2.10.31 test build, 2026-11-28): the four HUD buttons, a nudge shows "not
+      saved", and Save Offset writes the Cinema Offset. Not checked live: Vol + at the safe volume (unit tested).
+
 ## Audio tags for the Jukebox (#79, part 2)
 
 `AudioTagReader` (`Denon.App.Core/Media`) reads title, artist, album, track number, duration and cover art from
-FLAC, MP3 and M4A/MP4 files, with no NuGet package. Nothing uses it yet.
+FLAC, MP3 and M4A/MP4 files, with no NuGet package.
 
-- [ ] Wire the reader into the Jukebox (`LocalMediaJukeboxService`: track titles, sort by track number, the real
-      duration for auto-advance), Now Playing (cover art) and the Hue album-art palette. Do this after Antigravity
-      PR 5 merges: that PR changes the Jukebox, the relay and the YouTube queue.
-- [ ] Keep the Jukebox and YouTube queues across restarts (the other half of #79 CORE-21).
+- [x] The Jukebox uses the tags: title, artist, album, length and cover art (cached in `jukebox-art`) for the list,
+      Now Playing, Hue Album-Art Ambient and the auto-advance wait. A worker reads them off the UI thread; a track
+      that starts before the worker reaches it is read first.
+- [x] The Jukebox and YouTube queues (with shuffle, repeat and the YouTube history) are saved in `queues` and come
+      back after a restart. Nothing starts to play by itself.
+- [ ] Verify in the app with real files (needs the user's OK, it plays media): the cover in Now Playing, the Hue
+      colours from the cover, and the next track starting at the real end of a FLAC.
+- [ ] Sort a dropped folder by disc and track number from the tags (today: by file path, which is right for
+      "01 - Title" names).
 - [ ] Other Jukebox formats give no tags yet: .ogg/.opus (Vorbis comments in Ogg pages), .wav (LIST INFO or an
       `id3 ` chunk), .wma (ASF) and raw .aac (ADTS: an ID3v2 tag is read, but no duration).
 - [ ] An MP3 duration from a Xing/Info header includes the encoder delay and padding (about 50 ms). Subtract them

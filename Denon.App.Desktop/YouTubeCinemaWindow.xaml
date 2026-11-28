@@ -125,7 +125,16 @@
                         <Button Content="-100ms" Click="NudgeMinus100_Click" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 8,5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,4,0}" />
                         <Button Content="+100ms" Click="NudgePlus100_Click" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 8,5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,4,0}" />
                         <Button Content="+500ms" Click="NudgePlus500_Click" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 8,5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,8,0}" />
-                        <Button Content="Re-Sync to Denon" Click="ResyncToDenon_Click" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 10,5}" FontSize="{DynamicResource FontSize04}" ToolTip="Snap video to the current estimated playback position on your Denon AVR" />
+                        <Button Content="Re-Sync to Denon" Click="ResyncToDenon_Click" Style="{StaticResource SecondaryButton}" Padding="{skin:Space 10,5}" FontSize="{DynamicResource FontSize04}" Margin="{skin:Space 0,0,4,0}" ToolTip="Snap video to the current estimated playback position on your Denon AVR" />
+                        <Button x:Name="SaveOffsetButton"
+                                Content="Save Offset"
+                                Click="SaveOffset_Click"
+                                IsEnabled="False"
+                                Style="{StaticResource PrimaryButton}"
+                                Padding="{skin:Space 10,5}"
+                                FontSize="{DynamicResource FontSize04}"
+                                ToolTip="Save the nudged A/V offset as the Cinema Offset. The -/+ buttons change it only until you save; the next videos, the lyrics and the meters then use it."
+                                ToolTipService.ShowOnDisabled="True" />
                     </StackPanel>
 
                     <TextBlock x:Name="SyncStatusText"

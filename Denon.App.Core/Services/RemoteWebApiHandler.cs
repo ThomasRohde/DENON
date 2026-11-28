@@ -573,7 +573,8 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
                 activeStationLogoUrl: _stationLogos?.TryGet(activeStationName));
             title = resolved.Title;
             detail = resolved.Detail;
-            artwork = resolved.ImageUrl;
+            // Only a web picture: a phone cannot load a file on this PC, and the path must not leave the PC.
+            artwork = IsWebAddress(resolved.ImageUrl) ? resolved.ImageUrl : string.Empty;
         }
         else
         {
@@ -690,6 +691,9 @@ public sealed class RemoteWebApiHandler : IRemoteWebApiHandler
             ThumbnailUrl: $"https://i.ytimg.com/vi/{videoId}/hqdefault.jpg",
             WatchUrl: $"https://www.youtube.com/watch?v={videoId}");
     }
+
+    internal static bool IsWebAddress(string? url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
 
     private static bool IsYouTubeVideoId(string id) =>
         id.Length == 11 && id.All(static c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');

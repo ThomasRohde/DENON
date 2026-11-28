@@ -6,13 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+- **A scene no longer switches the main input while Zone 2 may be loud** (#75 follow-up). When a scene's Zone 2
+  volume step fails and the scene also changes the main input, Zone 2 is muted first (a Zone 2 that follows the main
+  zone would play the new input at its old volume). A scene's stream counts too (it switches to NET). When the mute
+  fails too, the input and stream steps are skipped and the log says why.
+
+## [2.10.31] - 2026-11-28
+
 ### Added
+- **The Jukebox reads the tags of your files** (#79): the title, artist, album, length and cover art come from the
+  FLAC, MP3 and M4A tags, not from the file name. Now Playing shows the cover and "Artist • Album", the list shows
+  the album and the length, and Hue Album-Art Ambient takes its colours from the cover. The next track starts at the
+  real end of the track, because the length is known before it plays. The names from the file paths show at once;
+  the tags replace them a moment later. Cover art is kept in `jukebox-art` (one file per picture, no picture larger
+  than 4 MB).
+- **The Jukebox and YouTube queues come back after a restart** (#79), with shuffle, repeat and the YouTube history.
+  Only the queue comes back: nothing starts to play by itself. The queues are in the `queues` folder.
 - **Unsaved changes banner on Settings, Scenes and Stations** (#76). When you edit a field, a scene or a station
   and do not save yet, the page shows "Unsaved changes" with Save and Discard. A settings change from somewhere
   else (an automation, Volume Memory, the MCP server, a plugin) no longer overwrites your edits: the app loads again
   only the parts that changed and have no edits. If the part you edit also changed, your edits stay and the banner
   and the status line say so; Save replaces that change and Discard loads it. Factory Reset shows the defaults as
   unsaved changes until you save them.
+- **Receiver buttons in the Cinema window's full-screen HUD** (#79): when the bars are hidden, the floating HUD
+  has Play/Pause, Vol −, Vol + and Mute next to Show Bars, Fullscreen and Close, and shows the volume as the
+  receiver's number ("Vol 35", "Muted 35"). One press moves the volume 2 steps. Vol + stops at the safe volume
+  (the same limit as Volume Memory and the automations, Brain → HARD MAX SAFE VOLUME CEILING) and says so in the
+  HUD; Vol − always works.
+- **Save Offset in the Cinema window's sync bar** (#79). The −500 / −100 / +100 / +500 ms buttons now change the
+  A/V offset for this session only: Re-Sync and the next tracks keep it, and the status line says "not saved".
+  Click Save Offset to keep it as the Cinema Offset, which also times the lyrics and the meters. Before, every
+  nudge saved the offset at once, so a quick try changed the lyrics and the meters too.
 
 ### Changed
 - **Ctrl+1 to Ctrl+9 and Ctrl+0 follow the nav rail** (#76): 1 Deck, 2 Music, 3 Stations, 4 Cast, 5 Scenes,
@@ -23,10 +48,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   the shortcut recorder or the update panel is open.
 
 ### Fixed
-- **A scene no longer switches the main input while Zone 2 may be loud** (#75 follow-up). When a scene's Zone 2
-  volume step fails and the scene also changes the main input, Zone 2 is muted first (a Zone 2 that follows the main
-  zone would play the new input at its old volume). A scene's stream counts too (it switches to NET). When the mute
-  fails too, the input and stream steps are skipped and the log says why.
+- The phone remote gets only web artwork. Before, it got a file path on this PC (a TV channel logo), which a phone
+  cannot load.
 
 ## [2.10.30] - 2026-11-28
 

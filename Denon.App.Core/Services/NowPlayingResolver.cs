@@ -268,8 +268,8 @@ public static class NowPlayingResolver
             {
                 return new ResolvedNowPlaying(
                     Title: activeLocalTrack.Title,
-                    Detail: $"{activeLocalTrack.Artist} • Local {activeLocalTrack.CodecBadge} ({activeLocalTrack.SizeDisplay})",
-                    ImageUrl: string.Empty,
+                    Detail: $"{activeLocalTrack.ArtistAlbumDisplay} • Local {activeLocalTrack.CodecBadge} ({activeLocalTrack.SizeDisplay})",
+                    ImageUrl: LocalCoverImageUrl(activeLocalTrack),
                     PlayStateLabel: ToTitleCase(status.PlayState),
                     IsExternalLiveInput: false);
             }
@@ -329,6 +329,12 @@ public static class NowPlayingResolver
             PlayStateLabel: ToTitleCase(status.PlayState),
             IsExternalLiveInput: false);
     }
+
+    /// <summary>The cached cover art of a Jukebox track as a file:// address, or empty without a cover.</summary>
+    internal static string LocalCoverImageUrl(LocalAudioTrackItem track) =>
+        !string.IsNullOrWhiteSpace(track.CoverArtPath) && Path.IsPathFullyQualified(track.CoverArtPath)
+            ? new Uri(track.CoverArtPath).AbsoluteUri
+            : string.Empty;
 
     public static bool IsTvAudioInput(string? inputSource)
     {
