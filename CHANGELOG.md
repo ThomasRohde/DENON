@@ -4,6 +4,14 @@ All notable changes to **Denon Desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Pick the Hue Entertainment area for Music Sync** (#79). The Music Sync panel has an "Entertainment area" list
+  with each area and its channel count. A pick is saved, and a running 50 Hz stream moves to the new area. Before,
+  Music Sync always used the first area. When the saved area is gone, the panel says which area it uses instead;
+  with no area, it says to create one in the Hue app.
+
 ## [2.10.28] - 2026-11-28
 
 ### Fixed
