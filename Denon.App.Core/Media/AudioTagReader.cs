@@ -15,10 +15,7 @@ public static partial class AudioTagReader
     /// <summary>Cover art larger than this is ignored.</summary>
     public const int MaxCoverArtBytes = 16 * 1024 * 1024;
 
-    /// <summary>The reader reads at most this much of one tag (an ID3v2 tag or a Vorbis comment block).</summary>
-    public const int MaxTagBytes = 32 * 1024 * 1024;
-
-    /// <summary>An MP4 text item larger than this is ignored.</summary>
+    /// <summary>An ID3 text frame or an MP4 text item larger than this is skipped.</summary>
     private const int MaxTextBytes = 64 * 1024;
 
     /// <summary>A duration longer than this is a bad header, not a real track.</summary>

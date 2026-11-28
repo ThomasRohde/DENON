@@ -219,6 +219,57 @@ public sealed class AudioTagReaderTests
         Assert.Equal(2, tags.TrackNumber);
     }
 
+    private static byte[] Mp3WithLargePicture(bool unsynchronised, out byte[] image)
+    {
+        image = new byte[300_000];
+        new Random(3).NextBytes(image);
+        Jpeg.CopyTo(image, 0);
+        image[100] = 0xFF; // a pair that unsynchronisation must change
+        image[101] = 0xE0;
+        var body = Concat(
+            Id3Frame23("TPE1", Latin1Text("Before")),
+            Id3Frame23("APIC", Concat([0], Ascii("image/jpeg"), [0, 3, 0], image)),
+            Id3Frame23("TIT2", Latin1Text("After The Picture")));
+        return Concat(
+            Id3Tag(3, unsynchronised ? (byte)0x80 : (byte)0, unsynchronised ? Unsynchronise(body) : body),
+            XingFrame(2000),
+            MpegFrame());
+    }
+
+    [Fact]
+    public void Mp3_WithoutCoverArt_SeeksPastThePictureFrame()
+    {
+        var stream = new CountingStream(Mp3WithLargePicture(unsynchronised: false, out _));
+        var tags = AudioTagReader.ReadUnguarded(stream, includeCoverArt: false);
+
+        Assert.Equal("Before", tags.Artist);
+        Assert.Equal("After The Picture", tags.Title);
+        Assert.Equal(2000 * 1152 / 44100.0, tags.Duration!.Value.TotalSeconds, precision: 3);
+        Assert.Null(tags.CoverArt);
+        Assert.True(stream.BytesRead < 100_000, $"read {stream.BytesRead} bytes");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Mp3_WholeTagUnsynchronisation_ReadsOrSkipsALargePicture(bool includeCoverArt)
+    {
+        var file = Mp3WithLargePicture(unsynchronised: true, out var image);
+        var tags = Read(file, includeCoverArt);
+
+        Assert.Equal("Before", tags.Artist);
+        Assert.Equal("After The Picture", tags.Title);
+        Assert.Equal(2000 * 1152 / 44100.0, tags.Duration!.Value.TotalSeconds, precision: 3);
+        if (includeCoverArt)
+        {
+            Assert.Equal(image, tags.CoverArt?.Data);
+        }
+        else
+        {
+            Assert.Null(tags.CoverArt);
+        }
+    }
+
     [Fact]
     public void Mp3_CutInsideTheApicFrame_KeepsTheFramesBeforeIt()
     {
@@ -252,8 +303,12 @@ public sealed class AudioTagReaderTests
 
     // ---------------------------------------------------------------- M4A
 
-    private static byte[] M4aFile(bool moovAtEnd = false, bool fullBoxMeta = true, bool version1Header = false)
+    private static byte[] M4aFile(
+        bool moovAtEnd = false, bool fullBoxMeta = true, bool version1Header = false, bool utf16Album = false)
     {
+        var album = utf16Album
+            ? DataBox(2, Encoding.BigEndianUnicode.GetBytes("Ålbum Ærø"))
+            : DataBox(1, Utf8("Mp4 Album"));
         var mvhd = version1Header
             ? Box("mvhd", [1, 0, 0, 0], new byte[16], Be32(44100), Be64(44100UL * 200), new byte[80])
             : Box("mvhd", [0, 0, 0, 0], Be32(0), Be32(0), Be32(1000), Be32(185_500), new byte[80]);
@@ -262,7 +317,7 @@ public sealed class AudioTagReaderTests
             Box("©too", DataBox(1, Utf8("Encoder"))),
             Box("©nam", DataBox(1, Utf8("Mp4 Titel æøå"))),
             Box("aART", DataBox(1, Utf8("Album Artist"))),
-            Box("©alb", DataBox(1, Utf8("Mp4 Album"))),
+            Box("©alb", album),
             Box("trkn", DataBox(0, [0, 0, 0, 4, 0, 10, 0, 0])),
             Box("covr", DataBox(13, Jpeg)));
         var meta = fullBoxMeta ? Box("meta", Be32(0), hdlr, ilst) : Box("meta", hdlr, ilst);
@@ -309,6 +364,15 @@ public sealed class AudioTagReaderTests
 
         Assert.Equal("Mp4 Album", tags.Album);
         Assert.Null(tags.CoverArt);
+    }
+
+    [Fact]
+    public void M4a_Utf16TextItem_IsDecodedByItsDataType()
+    {
+        var tags = Read(M4aFile(utf16Album: true));
+
+        Assert.Equal("Ålbum Ærø", tags.Album);
+        Assert.Equal("Mp4 Titel æøå", tags.Title); // type 1 stays UTF-8
     }
 
     [Fact]
@@ -406,6 +470,26 @@ public sealed class AudioTagReaderTests
     }
 
     // ---------------------------------------------------------------- fixture builders
+
+    /// <summary>Counts the bytes that the reader takes from the stream.</summary>
+    private sealed class CountingStream(byte[] data) : MemoryStream(data)
+    {
+        public long BytesRead { get; private set; }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            var read = base.Read(buffer, offset, count);
+            BytesRead += read;
+            return read;
+        }
+
+        public override int Read(Span<byte> buffer)
+        {
+            var read = base.Read(buffer);
+            BytesRead += read;
+            return read;
+        }
+    }
 
     private static AudioTags Read(byte[] file, bool includeCoverArt = true) =>
         AudioTagReader.ReadUnguarded(new MemoryStream(file), includeCoverArt);

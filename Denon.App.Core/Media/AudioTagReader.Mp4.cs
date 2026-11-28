@@ -146,16 +146,16 @@ public static partial class AudioTagReader
                 switch (item.Type)
                 {
                     case "©nam":
-                        tags.OfferTitle(Encoding.UTF8.GetString(value));
+                        tags.OfferTitle(DecodeMp4Text(dataType, value));
                         break;
                     case "©ART":
-                        tags.OfferArtist(Encoding.UTF8.GetString(value));
+                        tags.OfferArtist(DecodeMp4Text(dataType, value));
                         break;
                     case "aART":
-                        tags.OfferAlbumArtist(Encoding.UTF8.GetString(value));
+                        tags.OfferAlbumArtist(DecodeMp4Text(dataType, value));
                         break;
                     case "©alb":
-                        tags.OfferAlbum(Encoding.UTF8.GetString(value));
+                        tags.OfferAlbum(DecodeMp4Text(dataType, value));
                         break;
                     case "trkn" when value.Length >= 4:
                         tags.OfferTrackNumber(BinaryPrimitives.ReadUInt16BigEndian(value.Slice(2, 2)));
@@ -176,6 +176,10 @@ public static partial class AudioTagReader
             }
         }
     }
+
+    /// <summary>Well-known data types: 1 is UTF-8 and 2 is UTF-16 big-endian. Other types are read as UTF-8.</summary>
+    private static string DecodeMp4Text(uint dataType, ReadOnlySpan<byte> value) =>
+        dataType == 2 ? Encoding.BigEndianUnicode.GetString(value) : Encoding.UTF8.GetString(value);
 
     /// <summary>
     /// The boxes between <paramref name="start"/> and <paramref name="end"/>. A box that runs past the end is

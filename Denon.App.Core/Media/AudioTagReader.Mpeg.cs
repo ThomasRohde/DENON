@@ -41,51 +41,49 @@ public static partial class AudioTagReader
             return end; // unknown version or a compressed ID3v2.2 tag: skip it
         }
 
-        var body = ReadUpTo(stream, Math.Min(size, MaxTagBytes));
+        // ID3v2.2/2.3 unsynchronise the whole tag, and the frame sizes count the bytes after decoding.
+        // In ID3v2.4 each frame is unsynchronised on its own, and the sizes count the stored bytes.
         var tagUnsynchronised = (flags & 0x80) != 0;
-        if (tagUnsynchronised && major < 4)
-        {
-            body = RemoveUnsynchronisation(body);
-        }
-
-        var position = 0L;
+        var body = new Id3TagBody(stream, offset + 10, offset + 10 + size, tagUnsynchronised && major < 4);
         if (major >= 3 && (flags & 0x40) != 0)
         {
-            if (body.Length < 4)
+            var extendedHeader = body.Read(4);
+            if (extendedHeader.Length < 4)
             {
                 return end;
             }
 
+            long rest;
             if (major == 3)
             {
-                position = 4L + Be32(body); // the size does not count its own 4 bytes
+                rest = Be32(extendedHeader); // the size does not count its own 4 bytes
             }
-            else if (TryReadSyncsafe(body.AsSpan(0, 4), out var extendedSize))
+            else if (TryReadSyncsafe(extendedHeader, out var extendedSize) && extendedSize >= 4)
             {
-                position = extendedSize;
+                rest = extendedSize - 4;
             }
             else
+            {
+                return end;
+            }
+
+            if (!body.Skip(rest))
             {
                 return end;
             }
         }
 
         var frameHeaderLength = major == 2 ? 6 : 10;
-        while (position + frameHeaderLength <= body.Length)
+        var idLength = major == 2 ? 3 : 4;
+        while (true)
         {
-            var frame = body.AsSpan((int)position);
-            if (frame[0] == 0)
+            var frame = body.Read(frameHeaderLength);
+            if (frame.Length < frameHeaderLength || frame[0] == 0 || !IsFrameId(frame.AsSpan(0, idLength)))
             {
-                break; // padding
+                break; // the end of the tag, padding or bad data
             }
 
-            var idLength = major == 2 ? 3 : 4;
-            if (!IsFrameId(frame[..idLength]))
-            {
-                break;
-            }
-
-            var id = Encoding.ASCII.GetString(frame[..idLength]);
+            var id = Encoding.ASCII.GetString(frame, 0, idLength);
             long frameSize;
             byte formatFlags = 0;
             if (major == 2)
@@ -97,7 +95,7 @@ public static partial class AudioTagReader
                 frameSize = Be32(frame, 4);
                 formatFlags = frame[9];
             }
-            else if (TryReadSyncsafe(frame.Slice(4, 4), out var syncsafeSize))
+            else if (TryReadSyncsafe(frame.AsSpan(4, 4), out var syncsafeSize))
             {
                 frameSize = syncsafeSize;
                 formatFlags = frame[9];
@@ -107,13 +105,24 @@ public static partial class AudioTagReader
                 break;
             }
 
-            if (frameSize > frame.Length - frameHeaderLength)
+            // Only the frames that give a field are read. The others (and pictures when they are not wanted) are skipped.
+            var limit = Id3FrameLimit(id, tags.IncludeCoverArt);
+            if (frameSize > limit)
+            {
+                if (!body.Skip(frameSize))
+                {
+                    break;
+                }
+
+                continue;
+            }
+
+            var data = body.Read(frameSize);
+            if (data.Length < frameSize)
             {
                 break; // the frame is cut off
             }
 
-            var data = frame.Slice(frameHeaderLength, (int)frameSize);
-            position += frameHeaderLength + frameSize;
             if (TryUnwrapId3Frame(major, formatFlags, tagUnsynchronised, data, out var payload))
             {
                 ReadId3Frame(id, payload, major == 2, tags);
@@ -121,6 +130,115 @@ public static partial class AudioTagReader
         }
 
         return end;
+    }
+
+    /// <summary>The largest frame of this kind that is read. 0 means the frame is skipped.</summary>
+    private static long Id3FrameLimit(string id, bool includeCoverArt) => id switch
+    {
+        "TIT2" or "TT2" or "TPE1" or "TP1" or "TPE2" or "TP2" or "TALB" or "TAL" or "TRCK" or "TRK" => MaxTextBytes,
+        "APIC" or "PIC" when includeCoverArt => MaxCoverArtBytes + MaxTextBytes, // the image plus its MIME and description
+        _ => 0,
+    };
+
+    /// <summary>
+    /// The bytes of an ID3v2 tag after its header, read frame by frame. With whole-tag unsynchronisation it removes
+    /// the extra zero bytes as it reads, so a skipped frame is decoded in small chunks but not kept. Without it a
+    /// skip is only a seek.
+    /// </summary>
+    private sealed class Id3TagBody(Stream stream, long start, long end, bool unsynchronised)
+    {
+        private readonly byte[] _chunk = unsynchronised ? new byte[8192] : [];
+        private long _position = start; // in the stream
+        private int _chunkIndex;
+        private int _chunkLength;
+        private bool _lastWasFF;
+
+        private long RawRemaining => Math.Max(0, end - _position) + (_chunkLength - _chunkIndex);
+
+        /// <summary>Reads up to <paramref name="count"/> bytes. Fewer bytes mean the tag or the file ended.</summary>
+        public byte[] Read(long count)
+        {
+            if (!unsynchronised)
+            {
+                stream.Position = _position;
+                var bytes = ReadUpTo(stream, Math.Min(count, RawRemaining));
+                _position += bytes.Length;
+                return bytes;
+            }
+
+            var result = new byte[(int)Math.Clamp(Math.Min(count, RawRemaining), 0, int.MaxValue)];
+            var length = 0;
+            while (length < result.Length && TryReadByte(out var value))
+            {
+                result[length++] = value;
+            }
+
+            return length == result.Length ? result : result[..length];
+        }
+
+        /// <summary>Skips <paramref name="count"/> bytes. False means the tag or the file ended first.</summary>
+        public bool Skip(long count)
+        {
+            if (!unsynchronised)
+            {
+                if (count > RawRemaining)
+                {
+                    _position = end;
+                    return false;
+                }
+
+                _position += count;
+                return true;
+            }
+
+            for (long i = 0; i < count; i++)
+            {
+                if (!TryReadByte(out _))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private bool TryReadByte(out byte value)
+        {
+            while (true)
+            {
+                if (_chunkIndex == _chunkLength)
+                {
+                    _chunkIndex = 0;
+                    _chunkLength = 0;
+                    if (_position >= end)
+                    {
+                        value = 0;
+                        return false;
+                    }
+
+                    stream.Position = _position;
+                    var read = stream.Read(_chunk, 0, (int)Math.Min(_chunk.Length, end - _position));
+                    if (read <= 0)
+                    {
+                        value = 0;
+                        return false;
+                    }
+
+                    _chunkLength = read;
+                    _position += read;
+                }
+
+                value = _chunk[_chunkIndex++];
+                if (_lastWasFF && value == 0)
+                {
+                    _lastWasFF = false; // an unsynchronisation byte
+                    continue;
+                }
+
+                _lastWasFF = value == 0xFF;
+                return true;
+            }
+        }
     }
 
     private static bool IsFrameId(ReadOnlySpan<byte> id)
