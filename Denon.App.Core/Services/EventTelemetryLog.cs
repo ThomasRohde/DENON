@@ -347,7 +347,18 @@ public sealed class EventTelemetryLog : IAsyncDisposable
                         continue;
                     }
 
-                    using var doc = JsonDocument.Parse(line);
+                    // One broken line (a crash mid-write) must not hide the rest of the file.
+                    JsonDocument doc;
+                    try
+                    {
+                        doc = JsonDocument.Parse(line);
+                    }
+                    catch (JsonException)
+                    {
+                        continue;
+                    }
+
+                    using var _ = doc;
                     var root = doc.RootElement;
                     if (root.ValueKind != JsonValueKind.Object)
                     {

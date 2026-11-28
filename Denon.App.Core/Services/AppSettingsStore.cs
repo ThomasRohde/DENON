@@ -269,17 +269,18 @@ public sealed class AppSettingsStore
         try
         {
             var rawJson = await File.ReadAllTextAsync(_settingsFilePath, cancellationToken);
-            var hasPersistedMcpToken = rawJson.Contains("\"bearerToken\"", StringComparison.OrdinalIgnoreCase);
-            var hasPersistedRemoteTokens = rawJson.Contains("\"ownerToken\"", StringComparison.OrdinalIgnoreCase) &&
-                                           rawJson.Contains("\"guestToken\"", StringComparison.OrdinalIgnoreCase);
             var settings = JsonSerializer.Deserialize<AppSettings>(rawJson, JsonOptions);
             if (settings is null)
             {
                 throw new JsonException("Settings file deserialized to null.");
             }
 
+            // A missing, empty or redacted token gets a new one in Normalize: save it, or it changes on every start.
+            var tokensToSave = IsRedactedOrEmpty(settings.Mcp?.BearerToken) ||
+                               IsRedactedOrEmpty(settings.Remote?.OwnerToken) ||
+                               IsRedactedOrEmpty(settings.Remote?.GuestToken);
             var normalized = Normalize(settings, seedDefaultsIfEmpty: false);
-            return (normalized, !hasPersistedMcpToken || !hasPersistedRemoteTokens);
+            return (normalized, tokensToSave);
         }
         catch (Exception exception)
         {
@@ -406,6 +407,7 @@ public sealed class AppSettingsStore
 
     public static AppSettings Normalize(AppSettings settings, bool seedDefaultsIfEmpty = false)
     {
+        FillMissingSections(settings);
         var normalized = settings.Clone();
         normalized.Receiver ??= new ReceiverSettings();
         normalized.Receiver.Host = NormalizeHost(normalized.Receiver.Host);
@@ -455,8 +457,36 @@ public sealed class AppSettingsStore
         normalized.Telemetry.ActiveProbeIntervalSeconds = Math.Clamp(normalized.Telemetry.ActiveProbeIntervalSeconds, 10, 120);
         normalized.Telemetry.StandbyProbeIntervalSeconds = Math.Clamp(normalized.Telemetry.StandbyProbeIntervalSeconds, 30, 300);
         normalized.Telemetry.MaxTotalSizeMb = Math.Clamp(normalized.Telemetry.MaxTotalSizeMb, 5, 500);
+        normalized.VolumeMemory.MinDifference = Math.Clamp(normalized.VolumeMemory.MinDifference, 1, 20);
 
         return normalized;
+    }
+
+    /// <summary>
+    /// JSON can set a section or a list to null ("ui": null). Clone would throw on it, and the file would be taken
+    /// for a corrupt one. Put in defaults first; Normalize then checks the values.
+    /// </summary>
+    private static void FillMissingSections(AppSettings settings)
+    {
+        settings.Receiver ??= ReceiverSettings.CreateDefault();
+        settings.Receiver.VolumePresets ??= [];
+        settings.Receiver.Stations ??= [];
+        settings.Receiver.Scenes ??= [];
+        settings.Receiver.Stations.RemoveAll(static s => s is null);
+        settings.Receiver.Scenes.RemoveAll(static s => s is null);
+        settings.Ui ??= new UiSettings();
+        settings.Media ??= new MediaRelaySettings();
+        settings.Shortcuts ??= new ShortcutSettings();
+        settings.Shortcuts.Bindings ??= [];
+        settings.Shortcuts.Bindings.RemoveAll(static b => b is null);
+        settings.Plugins ??= new PluginSettings();
+        settings.Plugins.DisabledPluginIds ??= [];
+        settings.Mcp ??= new McpServerSettings();
+        settings.Remote ??= new RemoteAccessSettings();
+        settings.Telemetry ??= new TelemetrySettings();
+        settings.VolumeMemory ??= new VolumeMemorySettings();
+        settings.AutomationGraphs ??= AutomationGraph.CreateDefaults();
+        settings.AutomationGraphs.RemoveAll(static g => g is null);
     }
 
     private static bool IsRedactedOrEmpty(string? token) =>
