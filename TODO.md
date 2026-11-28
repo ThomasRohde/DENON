@@ -76,6 +76,20 @@ Phase 2 is done in 1.18.0: YouTube / YouTube Music and jukebox tracks are decode
 - [x] RTA during PC Cast from a non-default output device no longer falls back to SIM: `PcCastAudioMeterPipeline` runs
       a 512-pt 31-band FFT directly on the PC Cast capture stream (both default and non-default output devices).
 
+## Audio tags for the Jukebox (#79, part 2)
+
+`AudioTagReader` (`Denon.App.Core/Media`) reads title, artist, album, track number, duration and cover art from
+FLAC, MP3 and M4A/MP4 files, with no NuGet package. Nothing uses it yet.
+
+- [ ] Wire the reader into the Jukebox (`LocalMediaJukeboxService`: track titles, sort by track number, the real
+      duration for auto-advance), Now Playing (cover art) and the Hue album-art palette. Do this after Antigravity
+      PR 5 merges: that PR changes the Jukebox, the relay and the YouTube queue.
+- [ ] Keep the Jukebox and YouTube queues across restarts (the other half of #79 CORE-21).
+- [ ] Other Jukebox formats give no tags yet: .ogg/.opus (Vorbis comments in Ogg pages), .wav (LIST INFO or an
+      `id3 ` chunk), .wma (ASF) and raw .aac (ADTS: an ID3v2 tag is read, but no duration).
+- [ ] An MP3 duration from a Xing/Info header includes the encoder delay and padding (about 50 ms). Subtract them
+      with the LAME tag if gapless timing is ever needed.
+
 ## Habit telemetry
 
 - [ ] Events written before 1.15.0 have no `coveredSec` / `exclusiveSec`. Readers must fall back to `durationSec`.

@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [2.10.20] - 2026-11-28
 
 ### Added
+- **An audio tag reader for local music files** (part of #79). `AudioTagReader` in Denon.App.Core reads the
+  title, artist, album, track number, duration and embedded cover art of FLAC, MP3 (ID3v2.2–2.4, ID3v1, Xing/VBRI
+  or bitrate duration) and M4A/MP4 files. It reads only the tag region, needs no extra package, and gives empty
+  fields for a bad or cut-off file. The Jukebox does not use it yet, so you see no change.
 - **Command palette (Ctrl+K)**, part 1 of #76. Press Ctrl+K in the main window and type to find a page, a Smart
   Scene, a saved station, a receiver input, a sound mode, a plugin or a plugin action. Up and Down choose, Enter or
   a click runs it, Esc closes. It runs through the same commands as the pages. The matching and ranking
