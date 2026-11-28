@@ -177,7 +177,66 @@ public partial class YouTubeCinemaWindow : Window
                     border-color: #f87171;
                     color: #ffffff;
                 }
+                #denon-cinema-hud button.denon-hud-on {
+                    border-color: rgba(239, 68, 68, 0.65);
+                    color: #fecaca;
+                }
+                #denon-cinema-hud .denon-hud-vol {
+                    min-width: 64px;
+                    text-align: center;
+                    color: #e2e8f0;
+                    font-size: 12px;
+                    font-weight: 600;
+                    font-variant-numeric: tabular-nums;
+                }
+                #denon-cinema-hud .denon-hud-vol.muted {
+                    color: #fca5a5;
+                }
+                #denon-cinema-hud .denon-hud-note {
+                    color: #fcd34d;
+                    font-size: 11px;
+                    font-weight: 600;
+                    white-space: nowrap;
+                }
+                #denon-cinema-hud .denon-hud-note:empty {
+                    display: none;
+                }
+                #denon-cinema-hud .denon-hud-sep {
+                    width: 1px;
+                    align-self: stretch;
+                    margin: 2px 4px;
+                    background: rgba(148, 163, 184, 0.28);
+                }
             `;
+
+            // The receiver part of the HUD (#79): the main window sends its state, the buttons send commands.
+            const renderHud = (hud) => {
+                const s = window.__denonHudState;
+                if (!hud || !s) return;
+                const play = hud.querySelector('#denon-hud-play');
+                if (play) {
+                    play.textContent = s.playing ? '⏸' : '▶';
+                    play.title = s.playing ? 'Pause' : 'Play';
+                    play.setAttribute('aria-label', play.title);
+                }
+                const vol = hud.querySelector('#denon-hud-vol');
+                if (vol) {
+                    vol.textContent = s.muted ? `Muted ${s.volume}` : `Vol ${s.volume}`;
+                    vol.classList.toggle('muted', !!s.muted);
+                }
+                const mute = hud.querySelector('#denon-hud-mute');
+                if (mute) {
+                    mute.textContent = s.muted ? 'Unmute' : 'Mute';
+                    mute.classList.toggle('denon-hud-on', !!s.muted);
+                }
+                const note = hud.querySelector('#denon-hud-note');
+                if (note) note.textContent = s.note || '';
+            };
+
+            window.__denonSetHudState = (state) => {
+                window.__denonHudState = state;
+                renderHud(document.getElementById('denon-cinema-hud'));
+            };
 
             const ensureFloatingHud = () => {
                 const targetParent = document.fullscreenElement || document.documentElement || document.body;
@@ -186,6 +245,35 @@ public partial class YouTubeCinemaWindow : Window
                 if (!hud) {
                     hud = document.createElement('div');
                     hud.id = 'denon-cinema-hud';
+
+                    const hudButton = (id, label, title, message) => {
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.id = id;
+                        btn.textContent = label;
+                        btn.title = title;
+                        btn.setAttribute('aria-label', title);
+                        btn.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            window.chrome?.webview?.postMessage(message);
+                            window.__denonFlashHud?.(2400);
+                        });
+                        return btn;
+                    };
+                    const playBtn = hudButton('denon-hud-play', '⏯', 'Play / pause', 'HUD_PLAY_PAUSE');
+                    const volDownBtn = hudButton('denon-hud-vol-down', 'Vol −', 'Volume down', 'HUD_VOL_DOWN');
+                    const volLabel = document.createElement('span');
+                    volLabel.id = 'denon-hud-vol';
+                    volLabel.className = 'denon-hud-vol';
+                    volLabel.setAttribute('aria-live', 'polite');
+                    const volUpBtn = hudButton('denon-hud-vol-up', 'Vol +', 'Volume up', 'HUD_VOL_UP');
+                    const muteBtn = hudButton('denon-hud-mute', 'Mute', 'Mute on / off', 'HUD_MUTE');
+                    const note = document.createElement('span');
+                    note.id = 'denon-hud-note';
+                    note.className = 'denon-hud-note';
+                    const sep = document.createElement('span');
+                    sep.className = 'denon-hud-sep';
 
                     const showBtn = document.createElement('button');
                     showBtn.type = 'button';
@@ -216,9 +304,9 @@ public partial class YouTubeCinemaWindow : Window
                         window.chrome?.webview?.postMessage('CLOSE_WINDOW');
                     });
 
-                    hud.appendChild(showBtn);
-                    hud.appendChild(fsBtn);
-                    hud.appendChild(closeBtn);
+                    for (const part of [playBtn, volDownBtn, volLabel, volUpBtn, muteBtn, note, sep, showBtn, fsBtn, closeBtn]) {
+                        hud.appendChild(part);
+                    }
 
                     hud.addEventListener('mouseenter', () => {
                         window.__denonHudHovered = true;
@@ -238,6 +326,7 @@ public partial class YouTubeCinemaWindow : Window
                 if (window.__denonBarsHidden) {
                     hud.classList.add('active');
                 }
+                renderHud(hud);
                 return hud;
             };
 
@@ -401,8 +490,14 @@ public partial class YouTubeCinemaWindow : Window
     /// <summary>The one WebView2 start: a second caller during the first start waits for it (no second environment).</summary>
     private Task? _initTask;
 
-    /// <summary>A sync nudge (the +/- buttons): the new HEOS offset in ms, so the next track keeps it.</summary>
-    public event Action<int>? SyncOffsetChanged;
+    /// <summary>
+    /// Saves the A/V offset in ms (the Save Offset button) and returns false when it could not. The +/- nudges change
+    /// the offset for this session only (the next tracks keep it), so a try never changes the lyrics and the meters.
+    /// </summary>
+    public Func<int, Task<bool>>? SaveSyncOffsetAsync { get; set; }
+
+    /// <summary>A receiver button of the full-screen HUD (Play/Pause, Vol −, Vol +, Mute) was clicked.</summary>
+    public event Action<CinemaHudCommand>? HudCommandRequested;
 
     /// <summary>The title bar height in the current skin (42 in the Default skin).</summary>
     private static double TitleBarHeight => SkinMetrics.Scale(42, SkinMetrics.Current.SizeScale);
@@ -416,7 +511,11 @@ public partial class YouTubeCinemaWindow : Window
     private double _restoreTop = double.NaN;
     private string? _currentVideoId;
     private string? _currentWatchUrl;
-    private int _syncOffsetMs = 1800;
+    private int _savedSyncOffsetMs = 1800;
+
+    // The offset of the +/- nudges since the last save, or null to use the saved offset.
+    private int? _sessionSyncOffsetMs;
+    private CinemaHudState? _hudState;
     private Func<int, double>? _positionProvider;
     private CancellationTokenSource? _syncWaitCts;
 
@@ -441,9 +540,15 @@ public partial class YouTubeCinemaWindow : Window
     {
         _currentVideoId = track.VideoId;
         _positionProvider = positionProvider;
-        _syncOffsetMs = Math.Clamp(syncOffsetMs, 0, 8000);
+        _savedSyncOffsetMs = Math.Clamp(syncOffsetMs, 0, 8000);
+        if (_sessionSyncOffsetMs == _savedSyncOffsetMs)
+        {
+            _sessionSyncOffsetMs = null;
+        }
 
-        var initialSeconds = positionProvider is not null ? Math.Max(0, (int)Math.Floor(positionProvider(_syncOffsetMs))) : 0;
+        UpdateSaveOffsetButton();
+
+        var initialSeconds = positionProvider is not null ? Math.Max(0, (int)Math.Floor(positionProvider(SyncOffsetMs))) : 0;
         // Built from the video id, never the track's own address: a track can come from a phone.
         var baseUrl = $"https://www.youtube.com/watch?v={Uri.EscapeDataString(track.VideoId)}";
 
@@ -602,6 +707,7 @@ public partial class YouTubeCinemaWindow : Window
         {
         }
 
+        PushHudState();
         await WaitForVideoReadyAndSyncAsync();
         LoadingOverlay.Visibility = Visibility.Collapsed;
     }
@@ -686,7 +792,7 @@ public partial class YouTubeCinemaWindow : Window
             return;
         }
 
-        var targetSeconds = _positionProvider is not null ? Math.Max(0.0, _positionProvider(_syncOffsetMs)) : 0.0;
+        var targetSeconds = _positionProvider is not null ? Math.Max(0.0, _positionProvider(SyncOffsetMs)) : 0.0;
         var targetLiteral = targetSeconds.ToString("0.###", CultureInfo.InvariantCulture);
         var mutedLiteral = _keepVideoMuted ? "true" : "false";
 
@@ -744,15 +850,16 @@ public partial class YouTubeCinemaWindow : Window
             return;
         }
 
-        // Remember offset adjustment so future Re-Syncs & next tracks inherit the dialed-in sync
-        _syncOffsetMs = Math.Clamp(_syncOffsetMs - (int)Math.Round(deltaSeconds * 1000), 0, 8000);
-        SyncOffsetChanged?.Invoke(_syncOffsetMs);
+        // Re-Sync and the next tracks keep the nudged offset. It is saved only with Save Offset.
+        var next = Math.Clamp(SyncOffsetMs - (int)Math.Round(deltaSeconds * 1000), 0, 8000);
+        _sessionSyncOffsetMs = next == _savedSyncOffsetMs ? null : next;
+        UpdateSaveOffsetButton();
 
         var deltaStr = deltaSeconds.ToString("0.###", CultureInfo.InvariantCulture);
         try
         {
             await VideoWebView.ExecuteScriptAsync($"(() => {{ const v = document.querySelector('video'); if (v) v.currentTime = Math.max(0, v.currentTime + ({deltaStr})); }})();");
-            SyncStatusText.Text = $"Nudged {(deltaSeconds >= 0 ? "+" : "")}{(int)(deltaSeconds * 1000)} ms (HEOS offset {_syncOffsetMs}ms)";
+            SyncStatusText.Text = $"Nudged {(deltaSeconds >= 0 ? "+" : "")}{(int)(deltaSeconds * 1000)} ms (offset {OffsetText()})";
         }
         catch
         {
@@ -770,6 +877,78 @@ public partial class YouTubeCinemaWindow : Window
     private async void ResyncToDenon_Click(object sender, RoutedEventArgs e)
     {
         await ApplyLiveSyncPositionAsync();
+    }
+
+    /// <summary>The offset in use: the nudged one, or the saved one.</summary>
+    private int SyncOffsetMs => _sessionSyncOffsetMs ?? _savedSyncOffsetMs;
+
+    private string OffsetText() =>
+        _sessionSyncOffsetMs is null ? $"{SyncOffsetMs} ms" : $"{SyncOffsetMs} ms, not saved";
+
+    private void UpdateSaveOffsetButton() => SaveOffsetButton.IsEnabled = _sessionSyncOffsetMs is not null;
+
+    private async void SaveOffset_Click(object sender, RoutedEventArgs e)
+    {
+        if (SaveSyncOffsetAsync is not { } save || _sessionSyncOffsetMs is not int offset)
+        {
+            return;
+        }
+
+        SaveOffsetButton.IsEnabled = false;
+        if (await save(offset))
+        {
+            _savedSyncOffsetMs = offset;
+            if (_sessionSyncOffsetMs == offset)
+            {
+                _sessionSyncOffsetMs = null; // A nudge during the save stays unsaved.
+            }
+
+            SyncStatusText.Text = $"Offset {offset} ms saved. The next videos, the lyrics and the meters use it.";
+        }
+        else
+        {
+            SyncStatusText.Text = $"Offset {offset} ms not saved. The main window's status line says why.";
+        }
+
+        UpdateSaveOffsetButton();
+    }
+
+    /// <summary>Shows the receiver state in the full-screen HUD (volume as the receiver's 0–98 number).</summary>
+    public void UpdateHudState(CinemaHudState state)
+    {
+        _hudState = state;
+        PushHudState();
+    }
+
+    private async void PushHudState()
+    {
+        if (_hudState is not { } state || !_isInitialized || !IsVisible || VideoWebView.CoreWebView2 is null)
+        {
+            return;
+        }
+
+        var json = JsonSerializer.Serialize(new { volume = state.Volume, muted = state.IsMuted, playing = state.IsPlaying, note = state.Note });
+        try
+        {
+            await VideoWebView.ExecuteScriptAsync($"window.__denonSetHudState?.({json});");
+        }
+        catch
+        {
+        }
+    }
+
+    /// <summary>The HUD buttons' web messages. Anything else is not a HUD command.</summary>
+    internal static bool TryParseHudCommand(string? message, out CinemaHudCommand command)
+    {
+        (var known, command) = message switch
+        {
+            "HUD_PLAY_PAUSE" => (true, CinemaHudCommand.PlayPause),
+            "HUD_VOL_DOWN" => (true, CinemaHudCommand.VolumeDown),
+            "HUD_VOL_UP" => (true, CinemaHudCommand.VolumeUp),
+            "HUD_MUTE" => (true, CinemaHudCommand.Mute),
+            _ => (false, default),
+        };
+        return known;
     }
 
     private async void OnWebSourceChanged(object? sender, CoreWebView2SourceChangedEventArgs e)
@@ -803,6 +982,12 @@ public partial class YouTubeCinemaWindow : Window
             if (string.Equals(msg, "VIDEO_ENDED", StringComparison.OrdinalIgnoreCase))
             {
                 Dispatcher.Invoke(() => SyncStatusText.Text = "Video ended — waiting for Denon Queue...");
+                return;
+            }
+
+            if (TryParseHudCommand(msg, out var hudCommand))
+            {
+                Dispatcher.Invoke(() => HudCommandRequested?.Invoke(hudCommand));
                 return;
             }
 
@@ -1014,7 +1199,7 @@ public partial class YouTubeCinemaWindow : Window
     {
         var timeTag = syncedSeconds is > 0.5 ? $"Synced {FormatTime(syncedSeconds.Value)} • " : string.Empty;
         SyncStatusText.Text = _keepVideoMuted
-            ? $"{timeTag}Audio on Denon AVR • Video muted (offset {_syncOffsetMs}ms)"
+            ? $"{timeTag}Audio on Denon AVR • Video muted (offset {OffsetText()})"
             : $"{timeTag}Video audio unmuted on PC / HDMI";
     }
 

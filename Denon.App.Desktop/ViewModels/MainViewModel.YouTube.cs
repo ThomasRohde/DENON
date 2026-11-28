@@ -102,7 +102,16 @@ public sealed partial class MainViewModel
 
         _relayServer.StatusChanged += snapshot => _ = _dispatcher.InvokeAsync(() => ApplyRelayStatus(snapshot));
         _youtubeQueueService.QueueChanged += snapshot => _ = _dispatcher.InvokeAsync(() => ApplyYouTubeQueueSnapshot(snapshot));
-        _cinemaWindow.SyncOffsetChanged += offsetMs => _ = SaveCinemaSyncOffsetAsync(offsetMs);
+        _cinemaWindow.SaveSyncOffsetAsync = SaveCinemaSyncOffsetAsync;
+        _cinemaWindow.HudCommandRequested += command => _ = RunCinemaHudCommandAsync(command);
+        _cinemaWindow.IsVisibleChanged += (_, _) => PushCinemaHudState();
+        PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(TargetVolume) or nameof(IsMuted) or nameof(IsTransportPlaying))
+            {
+                PushCinemaHudState();
+            }
+        };
         _youtubeQueueService.TrackStarted += track => _ = _dispatcher.InvokeAsync(async () =>
         {
             if (_cinemaWindow.IsVisible)
@@ -293,19 +302,78 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>
-    /// A Cinema nudge saves only the offset, quietly: a full settings change would reload the Settings, Scenes and
-    /// Stations editors and drop edits that are not saved yet.
+    /// The Cinema window's Save Offset saves only the offset, quietly: a full settings change would reload the
+    /// Settings, Scenes and Stations editors and drop edits that are not saved yet. Returns false when it failed.
     /// </summary>
-    private async Task SaveCinemaSyncOffsetAsync(int offsetMs)
+    private async Task<bool> SaveCinemaSyncOffsetAsync(int offsetMs)
     {
         try
         {
-            var (updated, _) = await _settingsStore.UpdateQuietAsync(s => s.Media.CinemaSyncOffsetMs = offsetMs);
+            var (updated, savedToDisk) = await _settingsStore.UpdateQuietAsync(s => s.Media.CinemaSyncOffsetMs = offsetMs);
             SettingsCinemaSyncOffsetMs = updated.Media.CinemaSyncOffsetMs.ToString();
+            StatusMessage = savedToDisk
+                ? $"Cinema offset {offsetMs} ms saved."
+                : $"Cinema offset {offsetMs} ms is in use. It is saved with your next Save & Sync (the settings file is being recovered).";
+            return true;
         }
         catch (Exception ex)
         {
             _logStore.Warning($"Cinema sync offset not saved: {ex.Message}");
+            StatusMessage = $"Cinema offset not saved: {ex.Message}";
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// The full-screen HUD's receiver buttons (#79). Vol − and Vol + move the receiver's 0–98 volume and stop at the
+    /// safe volume (<see cref="CinemaHudVolume"/>).
+    /// </summary>
+    private async Task RunCinemaHudCommandAsync(CinemaHudCommand command)
+    {
+        switch (command)
+        {
+            case CinemaHudCommand.PlayPause:
+                if (PlayPauseCommand.CanExecute(null))
+                {
+                    PlayPauseCommand.Execute(null);
+                }
+
+                break;
+            case CinemaHudCommand.Mute:
+                if (ToggleMuteCommand.CanExecute(null))
+                {
+                    ToggleMuteCommand.Execute(null);
+                }
+
+                break;
+            case CinemaHudCommand.VolumeDown or CinemaHudCommand.VolumeUp:
+                if (!CanControlReceiver(null))
+                {
+                    return;
+                }
+
+                var delta = command == CinemaHudCommand.VolumeUp ? CinemaHudVolume.Step : -CinemaHudVolume.Step;
+                var safeVolume = _settingsStore.Current.Mcp.MaxSafeVolume;
+                var (target, capped) = CinemaHudVolume.Next(TargetVolume, delta, MaxVolume, safeVolume);
+                if (target != TargetVolume)
+                {
+                    _suppressVolumeSend = true;
+                    TargetVolume = target;
+                    _suppressVolumeSend = false;
+                    _volumeGuard.Sent(target);
+                    await ExecuteReceiverActionAsync(() => _receiverController.SetVolumeAsync(target), $"Volume set to {target}.");
+                }
+
+                PushCinemaHudState(capped ? CinemaHudVolume.CapNote(MaxVolume, safeVolume) : string.Empty);
+                break;
+        }
+    }
+
+    private void PushCinemaHudState(string note = "")
+    {
+        if (_cinemaWindow is { IsVisible: true })
+        {
+            _cinemaWindow.UpdateHudState(new CinemaHudState(TargetVolume, IsMuted, IsTransportPlaying, note));
         }
     }
 

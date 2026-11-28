@@ -561,9 +561,9 @@ public sealed partial class MainViewModel
                 new("02", "Open a link", "Copy a YouTube or YouTube Music link and click Paste & Go."),
                 new("03", "Play or queue", "In RESULTS & TRACKS, click ▶ Play to play the audio, Video to play and open the Cinema window, or + Q to add the track to UP NEXT QUEUE. For a playlist, click Open Tracks →."),
                 new("04", "Open the Cinema window later", "Click Cinema Window in UP NEXT QUEUE, or Watch Video on the Control Deck."),
-                new("05", "Use the Cinema window", "Press F11 for fullscreen. Press H to hide the bars. Press Esc to step back: show the bars, then leave fullscreen, then close."),
+                new("05", "Use the Cinema window", "Press F11 for fullscreen. Press H to hide the bars. Move the mouse to show the floating HUD: Play/Pause, Vol − and Vol + (2 steps, never above the safe volume), Mute, Show Bars, Fullscreen and Close. Press Esc to step back: show the bars, then leave fullscreen, then close."),
                 new("06", "Measure the delay", "HEOS buffers network audio for a few seconds. With the speakers on, click Auto-Calibrate Mic in Settings → ACOUSTIC LIP-SYNC AUTO-CALIBRATION. The app plays a short 1,750 Hz chirp through the receiver, listens with the PC microphone and saves the delay as Cinema Offset (ms)."),
-                new("07", "Fine-tune the sync", "In the Cinema window, click -500ms, -100ms, +100ms or +500ms. After a manual seek, click Re-Sync to Denon."),
+                new("07", "Fine-tune the sync", "In the Cinema window, click -500ms, -100ms, +100ms or +500ms. The next tracks keep the new offset. Click Save Offset to keep it after a restart and to use it for the lyrics and the meters. After a manual seek, click Re-Sync to Denon."),
             ],
             proTips:
             [
@@ -574,7 +574,7 @@ public sealed partial class MainViewModel
             troubleshooting:
             [
                 new("HEOS starts to load a track and then stops with no sound?", "Windows Firewall blocks TCP 18925 from the receiver. Click Allow Firewall in Music or Cast, then try again."),
-                new("The video is ahead of or behind the speakers?", "Run Auto-Calibrate Mic in Settings, or click -500ms / +500ms in the Cinema window. The app remembers the offset."),
+                new("The video is ahead of or behind the speakers?", "Run Auto-Calibrate Mic in Settings, or click -500ms / +500ms in the Cinema window and then Save Offset."),
                 new("Do I need FFmpeg?", "No. Without FFmpeg the app sends M4A audio. With FFmpeg (for example 'winget install Gyan.FFmpeg') it sends 320 kbps MP3, and the meters can show the real YouTube audio."),
             ],
             quickJumps:
