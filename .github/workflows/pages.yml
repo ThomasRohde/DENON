@@ -15,9 +15,8 @@ on:
       - "external-plugins/*/*.csproj"
       - "Denon.App.Desktop/denon_icon.png"
       - ".github/workflows/pages.yml"
-  # The download page links to release files: build again once a release (app or plugin) is published.
-  release:
-    types: [published]
+  # The download page links to release files: the app and plugin release workflows start this one after they
+  # publish (a release made with their token would not start it by itself).
   workflow_dispatch:
 
 permissions:
