@@ -8,6 +8,13 @@ Released separately from Denon Desktop with tags `homepod-vX.Y.Z`.
 - **BouncyCastle 2.7.0** (#72), the same version as the Hue plugin in Denon Desktop (it was 2.5.1). The package
   versions now come from the repository's `Directory.Packages.props`.
 
+### Fixed
+- **A stereo pair stays a pair when one HomePod misses a discovery reply** (#49). The pair's leader has no pair id
+  of its own, so a missed reply from the other HomePod made the pair a single speaker, and a missed reply from the
+  leader moved the link to the other HomePod. Now the saved pair keeps its name, members and leader while the
+  missing HomePod answers nowhere. After three such passes in a row (about 30 minutes), discovery's view wins. A
+  pair that you split in the Home app splits at once, because both HomePods then answer as single speakers.
+
 ## [0.3.0] - 2026-11-28
 
 ### Security
